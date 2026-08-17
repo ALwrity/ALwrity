@@ -19,6 +19,9 @@ from .handlers import render as render_handlers
 from .handlers import videos as video_handlers
 from .oauth_router import router as youtube_oauth_router
 from .publish_router import router as youtube_publish_router
+from .analytics_router import router as youtube_analytics_router
+from .comments_router import router as youtube_comments_router
+from .studio_ops_router import router as youtube_studio_ops_router
 from .task_manager import task_manager
 
 # Re-export schemas for existing test imports
@@ -82,6 +85,9 @@ router.include_router(image_handlers.router)
 router.include_router(audio_handlers.router)
 router.include_router(youtube_oauth_router)
 router.include_router(youtube_publish_router)
+router.include_router(youtube_analytics_router)
+router.include_router(youtube_comments_router)
+router.include_router(youtube_studio_ops_router)
 
 __all__ = [
     "router",

@@ -42,24 +42,14 @@ class YouTubePublishService:
         category_id: str = "22",
         made_for_kids: bool = False,
         language: str = "en",
+        publish_at: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Upload a video to YouTube.
 
         Args:
-            user_id: Clerk user ID
-            token_id: OAuth token row ID (which YouTube channel to publish to)
-            video_source: URL or local file path to the video
-            title: Video title (max 100 chars)
-            description: Video description
-            tags: List of tags
-            privacy_status: 'public', 'private', or 'unlisted'
-            category_id: YouTube category ID (default '22' = People & Blogs)
-            made_for_kids: Whether content is made for children
-            language: Video language (ISO 639-1 code)
-
-        Returns:
-            dict with 'success', 'video_id', 'video_url', 'error' keys
+            publish_at: Optional ISO-8601 UTC datetime (e.g. 2026-08-20T15:00:00Z).
+                When set, privacy_status is forced to private until YouTube goes live.
         """
         temp_path = None
         is_temp = False
@@ -89,15 +79,29 @@ class YouTubePublishService:
             if file_size == 0:
                 return {"success": False, "error": "Video file is empty."}
 
+            effective_privacy = privacy_status
+            if publish_at:
+                # YouTube requires private when using publishAt
+                effective_privacy = "private"
+
             logger.info(
                 f"YouTube publish: starting upload for user {user_id}, "
-                f"title='{title}', size={file_size / 1024 / 1024:.1f}MB, privacy={privacy_status}"
+                f"title='{title}', size={file_size / 1024 / 1024:.1f}MB, "
+                f"privacy={effective_privacy}, publish_at={publish_at or 'now'}"
             )
 
             # Build YouTube API client
             youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
 
             # Prepare video metadata
+            status_body: Dict[str, Any] = {
+                "privacyStatus": effective_privacy,
+                "selfDeclaredMadeForKids": made_for_kids,
+            }
+            if publish_at:
+                status_body["publishAt"] = publish_at
+                status_body["privacyStatus"] = "private"
+
             body = {
                 "snippet": {
                     "title": title,
@@ -106,10 +110,7 @@ class YouTubePublishService:
                     "categoryId": category_id,
                     "defaultLanguage": language,
                 },
-                "status": {
-                    "privacyStatus": privacy_status,
-                    "selfDeclaredMadeForKids": made_for_kids,
-                },
+                "status": status_body,
             }
 
             # Upload with resumable media
@@ -160,7 +161,8 @@ class YouTubePublishService:
                 "video_id": video_id,
                 "video_url": video_url,
                 "title": title,
-                "privacy_status": privacy_status,
+                "privacy_status": effective_privacy,
+                "publish_at": publish_at,
             }
 
         except Exception as e:

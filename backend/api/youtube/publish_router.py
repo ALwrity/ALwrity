@@ -15,7 +15,8 @@ from services.youtube.youtube_publish_service import YouTubePublishService
 from .oauth_router import get_oauth_service
 from .task_manager import task_manager
 
-router = APIRouter(prefix="/youtube/publish", tags=["youtube-publish"])
+# Mounted under /api/youtube — keep prefix relative so publish is /api/youtube/publish
+router = APIRouter(prefix="/publish", tags=["youtube-publish"])
 
 
 class PublishRequest(BaseModel):
@@ -27,6 +28,10 @@ class PublishRequest(BaseModel):
     privacy_status: str = Field("unlisted", pattern="^(public|private|unlisted)$", description="Privacy status")
     category_id: str = Field("22", description="YouTube category ID (default: People & Blogs)")
     made_for_kids: bool = Field(False, description="Whether content is made for children")
+    publish_at: Optional[str] = Field(
+        None,
+        description="Optional ISO-8601 UTC schedule time (forces private until live)",
+    )
 
 
 class PublishResponse(BaseModel):
@@ -83,6 +88,7 @@ def start_publish(
             privacy_status=request.privacy_status,
             category_id=request.category_id,
             made_for_kids=request.made_for_kids,
+            publish_at=request.publish_at,
             publish_service=publish_service,
         )
 
@@ -163,6 +169,7 @@ def _execute_publish_task(
     category_id: str,
     made_for_kids: bool,
     publish_service: YouTubePublishService,
+    publish_at: Optional[str] = None,
 ):
     """Background task to execute video publish."""
     logger.info(f"YouTube publish: background task {task_id} starting for user {user_id}")
@@ -182,6 +189,7 @@ def _execute_publish_task(
             privacy_status=privacy_status,
             category_id=category_id,
             made_for_kids=made_for_kids,
+            publish_at=publish_at,
         )
 
         if result.get("success"):

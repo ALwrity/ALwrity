@@ -40,6 +40,8 @@ class YouTubeOAuthService(OAuthProviderBase):
         "https://www.googleapis.com/auth/youtube.upload",
         "https://www.googleapis.com/auth/youtube.readonly",
         "https://www.googleapis.com/auth/youtube.force-ssl",
+        # Channel Pulse / watch-time / retention-style reports
+        "https://www.googleapis.com/auth/yt-analytics.readonly",
     ]
 
     # SQL fragments consumed by OAuthProviderBase._migrate_plaintext_tokens_if_needed
@@ -438,13 +440,18 @@ class YouTubeOAuthService(OAuthProviderBase):
                 if not cursor.fetchone():
                     return {"connected": False, "channels": []}
                 cursor.execute(
-                    "SELECT id, channel_id, channel_name, expires_at, created_at, is_active FROM youtube_oauth_tokens WHERE user_id = ? ORDER BY created_at DESC",
+                    "SELECT id, channel_id, channel_name, expires_at, created_at, is_active, scope FROM youtube_oauth_tokens WHERE user_id = ? ORDER BY created_at DESC",
                     (user_id,),
                 )
                 rows = cursor.fetchall()
 
             channels = []
+            analytics_ready = False
             for row in rows:
+                scope = row[6] or ""
+                has_analytics = "yt-analytics.readonly" in scope
+                if row[5] and has_analytics:
+                    analytics_ready = True
                 channel = {
                     "token_id": row[0],
                     "channel_id": row[1] or "",
@@ -452,10 +459,18 @@ class YouTubeOAuthService(OAuthProviderBase):
                     "expires_at": row[3],
                     "connected_at": row[4],
                     "is_active": bool(row[5]),
+                    "scope": scope,
+                    "analytics_ready": has_analytics,
+                    "needs_reconnect_for_analytics": bool(row[5]) and not has_analytics,
                 }
                 channels.append(channel)
 
-            return {"connected": len(channels) > 0, "channels": channels}
+            return {
+                "connected": any(c["is_active"] for c in channels),
+                "channels": channels,
+                "analytics_ready": analytics_ready,
+                "required_scopes": list(self.SCOPES),
+            }
 
         except Exception as e:
             logger.debug(f"YouTube OAuth: connection status unavailable for {user_id}: {e}")

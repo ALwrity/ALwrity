@@ -7,11 +7,12 @@ Uses shared build_oauth_callback_html for popup-compatible callback responses.
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from loguru import logger
 
-from middleware.auth_middleware import get_current_user, get_optional_user
+from middleware.auth_middleware import get_current_user
 from services.youtube.youtube_oauth_service import YouTubeOAuthService
 from services.integrations.oauth_callback_utils import build_oauth_callback_html
 
-router = APIRouter(prefix="/youtube/oauth", tags=["youtube-oauth"])
+# Mounted under /api/youtube — keep prefix relative so status is /api/youtube/oauth/status
+router = APIRouter(prefix="/oauth", tags=["youtube-oauth"])
 
 
 def get_oauth_service() -> YouTubeOAuthService:
