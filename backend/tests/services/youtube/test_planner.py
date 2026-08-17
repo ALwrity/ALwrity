@@ -67,7 +67,27 @@ class TestValidateAndEnhancePlan:
         assert enhanced["video_summary"] == "Only summary"
         assert isinstance(enhanced["seo_keywords"], list)
         assert isinstance(enhanced["content_outline"], list)
+        assert enhanced["title_suggestions"] == []
+        assert enhanced["selected_title"] == "Only summary"
         assert "duration_metadata" in enhanced or enhanced.get("tone")
+
+    def test_normalizes_title_suggestions_and_default_selected(self):
+        from services.youtube.planner import YouTubePlannerService
+
+        svc = YouTubePlannerService()
+        duration = svc._get_duration_context("shorts")
+        enhanced = svc._validate_and_enhance_plan(
+            plan_data=_minimal_plan(
+                title_suggestions=["  First Title  ", "", "First Title", "Second Title"],
+                selected_title="   ",
+            ),
+            duration_context=duration,
+            video_type="tutorial",
+            video_type_config={},
+        )
+
+        assert enhanced["title_suggestions"] == ["First Title", "Second Title"]
+        assert enhanced["selected_title"] == "First Title"
 
 
 class TestBuildPlanningPrompt:
@@ -140,6 +160,28 @@ class TestGeneratePlan:
 
         assert result["video_summary"]
         assert result["duration_type"] == "shorts" or "video_summary" in result
+
+    def test_copies_source_article_url_onto_plan(self):
+        from services.youtube.planner import YouTubePlannerService
+
+        svc = YouTubePlannerService()
+        llm_payload = _minimal_plan()
+
+        with patch("services.youtube.planner.llm_text_gen", return_value=llm_payload), \
+             patch.object(svc, "_perform_exa_research", new=AsyncMock(return_value=None)):
+            result = asyncio.run(
+                svc.generate_plan(
+                    user_idea="Cheap travel tips",
+                    duration_type="shorts",
+                    user_id="user_planner",
+                    enable_research=False,
+                    source_article_url="https://example.com/bali-guide",
+                    source_article_title="Bali Guide",
+                    source_article_summary="Pack light.",
+                )
+            )
+
+        assert result["source_article_url"] == "https://example.com/bali-guide"
 
     def test_http_exception_propagates(self):
         from services.youtube.planner import YouTubePlannerService

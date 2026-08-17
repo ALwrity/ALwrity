@@ -55,6 +55,10 @@ class YouTubePlannerService:
         avatar_url: Optional[str] = None,
         include_scenes: bool = False,  # For shorts: combine plan + scenes in one call
         enable_research: bool = True,  # Always enable research by default for enhanced plans
+        source_article_url: Optional[str] = None,
+        source_article_title: Optional[str] = None,
+        source_article_summary: Optional[str] = None,
+        channel_bible_context: str = "",
     ) -> Dict[str, Any]:
         """
         Generate a comprehensive video plan from user input.
@@ -65,7 +69,8 @@ class YouTubePlannerService:
         try:
             logger.info(
                 f"[YouTubePlanner] Generating plan: idea={user_idea[:50]}..., "
-                f"duration={duration_type}, video_type={video_type}, user={user_id}"
+                f"duration={duration_type}, video_type={video_type}, user={user_id}, "
+                f"has_channel_bible={bool((channel_bible_context or '').strip())}"
             )
 
             video_type_config = {}
@@ -148,9 +153,13 @@ class YouTubePlannerService:
                 persona_data=persona_data,
                 source_content_id=source_content_id,
                 source_content_type=source_content_type,
+                source_article_url=source_article_url,
+                source_article_title=source_article_title,
+                source_article_summary=source_article_summary,
                 reference_image_description=reference_image_description,
                 research_context=research_context,
                 include_scenes=include_scenes,
+                channel_bible_context=channel_bible_context or "",
             )
             json_struct = build_plan_json_struct(
                 include_scenes=include_scenes,
@@ -202,6 +211,9 @@ class YouTubePlannerService:
 
             if include_scenes and duration_type == "shorts":
                 plan_data = self._finalize_shorts_scenes(plan_data, duration_context)
+
+            if source_article_url:
+                plan_data["source_article_url"] = source_article_url
 
             logger.info("[YouTubePlanner] ✅ Plan generated successfully")
             return plan_data
@@ -332,6 +344,39 @@ class YouTubePlannerService:
                 f"({len(plan_data.get('seo_keywords', []))}). "
                 f"Plan may need enhancement."
             )
+
+        raw_titles = plan_data.get("title_suggestions")
+        suggestions: List[str] = []
+        if isinstance(raw_titles, list):
+            seen_titles: set[str] = set()
+            for item in raw_titles:
+                if not isinstance(item, str):
+                    continue
+                title = item.strip()[:70]
+                key = title.lower()
+                if not title or key in seen_titles:
+                    continue
+                seen_titles.add(key)
+                suggestions.append(title)
+                if len(suggestions) >= 5:
+                    break
+        plan_data["title_suggestions"] = suggestions
+
+        selected = plan_data.get("selected_title")
+        selected_title = selected.strip()[:70] if isinstance(selected, str) else ""
+        if not selected_title:
+            if suggestions:
+                selected_title = suggestions[0]
+            else:
+                summary = plan_data.get("video_summary")
+                selected_title = (
+                    summary.strip()[:80] if isinstance(summary, str) and summary.strip() else ""
+                )
+        plan_data["selected_title"] = selected_title
+        logger.info(
+            f"[YouTubePlanner] Title fields normalized: "
+            f"suggestion_count={len(suggestions)}, has_selected={bool(selected_title)}"
+        )
 
         if not plan_data.get("avatar_recommendations"):
             logger.warning(

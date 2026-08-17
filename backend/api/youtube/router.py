@@ -12,6 +12,7 @@ from utils.logger_utils import get_service_logger
 from .deps import require_authenticated_user
 from .handlers import avatar as avatar_handlers
 from .handlers import audio as audio_handlers
+from .handlers import channel_bible as channel_bible_handlers
 from .handlers import images as image_handlers
 from .handlers import plan as plan_handlers
 from .handlers import render as render_handlers
@@ -71,6 +72,7 @@ logger = get_service_logger("api.youtube")
 
 # Domain handlers (plan/scenes, render, videos)
 router.include_router(plan_handlers.router)
+router.include_router(channel_bible_handlers.router)
 router.include_router(render_handlers.router)
 router.include_router(video_handlers.router)
 

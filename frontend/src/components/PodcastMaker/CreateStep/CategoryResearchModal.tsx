@@ -53,6 +53,8 @@ interface CategoryResearchModalProps {
   onRedoSearch?: (keyword: string, websiteUrl?: string) => void;
   onConfirmSelection?: (selectedTopics: string[]) => void;
   isCached?: boolean;
+  /** Used in loading and confirm copy. Default keeps Podcast wording. */
+  productNoun?: string;
 }
 
 const CATEGORY_CONFIG: Record<CategoryType, { label: string; icon: React.ReactNode; color: string; bgLight: string }> = {
@@ -102,6 +104,7 @@ export const CategoryResearchModal: React.FC<CategoryResearchModalProps> = ({
   onRedoSearch,
   onConfirmSelection,
   isCached = false,
+  productNoun = "podcast",
 }) => {
   const config = CATEGORY_CONFIG[category];
   const categoryLabel = config.label;
@@ -275,7 +278,7 @@ export const CategoryResearchModal: React.FC<CategoryResearchModalProps> = ({
             <Typography variant="body2" sx={{ color: "#6b7280" }}>
               {isPersonalSite 
                 ? `Searching within ${localWebsiteUrl || "your website"}`
-                : `Finding relevant ${categoryLabel.toLowerCase()} for your podcast`}
+                : `Finding relevant ${categoryLabel.toLowerCase()} for your ${productNoun}`}
             </Typography>
           </Box>
         )}
@@ -593,7 +596,8 @@ export const CategoryResearchModal: React.FC<CategoryResearchModalProps> = ({
               },
             }}
           >
-            Use {selectedTopics.size > 0 ? `${selectedTopics.size} ` : ""}Selected for Podcast
+            Use {selectedTopics.size > 0 ? `${selectedTopics.size} ` : ""}Selected for{" "}
+            {productNoun.charAt(0).toUpperCase() + productNoun.slice(1)}
           </Button>
         </Box>
       </DialogActions>

@@ -64,6 +64,7 @@ import models.user_business_info  # noqa: E402, F401
 import models.video_models  # noqa: E402, F401
 import models.website_analysis_monitoring_models  # noqa: E402, F401
 import models.youtube_task_models  # noqa: E402, F401
+import models.youtube_channel_bible_models  # noqa: E402, F401
 
 target_metadata = Base.metadata
 

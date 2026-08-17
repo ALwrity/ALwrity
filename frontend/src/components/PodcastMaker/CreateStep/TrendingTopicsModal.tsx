@@ -27,12 +27,15 @@ import {
 import { TrendsChart } from "../../Research/steps/components/TrendsChart";
 import { GoogleTrendsData } from "../../Research/types/intent.types";
 import { podcastApi } from "../../../services/podcastApi";
+import { normalizeTrendsKeywords } from "../../../utils/trendsKeywords";
 
 interface TrendingTopicsModalProps {
   open: boolean;
   onClose: () => void;
   onSelectTopic: (topic: string) => void;
   initialKeywords: string;
+  /** "web" = Google web trends (Podcast default). "podcast" = YouTube search interest. */
+  source?: "web" | "podcast";
 }
 
 interface TabPanelProps {
@@ -52,6 +55,7 @@ export const TrendingTopicsModal: React.FC<TrendingTopicsModalProps> = ({
   onClose,
   onSelectTopic,
   initialKeywords,
+  source = "web",
 }) => {
   const [trendsData, setTrendsData] = useState<GoogleTrendsData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -61,11 +65,12 @@ export const TrendingTopicsModal: React.FC<TrendingTopicsModalProps> = ({
   const fetchTrends = useCallback(async () => {
     if (!initialKeywords.trim()) return;
 
-    const keywords = initialKeywords
-      .split(/[,;]+/)
-      .map((k) => k.trim())
-      .filter(Boolean)
-      .slice(0, 5);
+    const keywords = normalizeTrendsKeywords(
+      initialKeywords
+        .split(/[,;]+/)
+        .map((k) => k.trim())
+        .filter(Boolean),
+    );
 
     if (keywords.length === 0) return;
 
@@ -73,25 +78,68 @@ export const TrendingTopicsModal: React.FC<TrendingTopicsModalProps> = ({
     setError(null);
     setTrendsData(null);
 
+    const trendsSource = source || "web";
+    const keywordPreview = keywords[0]?.slice(0, 50) || "";
+    console.info("[TrendingTopics] Fetch started", {
+      keywordCount: keywords.length,
+      source: trendsSource,
+      keywordPreview,
+    });
+
     try {
       const result = await podcastApi.getTrendingTopics({
         keywords,
         timeframe: "today 12-m",
         geo: "US",
+        source: trendsSource,
       });
 
       if (result.success && result.data) {
         setTrendsData(result.data as GoogleTrendsData);
       } else {
-        setError(result.error || "Failed to fetch trends data. Google may be rate-limiting requests — please try again in a few minutes.");
+        const errorMsg =
+          result.error ||
+          "Failed to fetch trends data. Google may be rate-limiting requests — please try again in a few minutes.";
+        console.warn("[TrendingTopics] Fetch returned success=false", {
+          source: trendsSource,
+          error: errorMsg,
+        });
+        setError(errorMsg);
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.detail || err?.message || "Failed to fetch trending topics. Please try again later.";
+      const detail = err?.response?.data?.detail;
+      const status = err?.response?.status;
+      let msg = "Failed to fetch trending topics. Please try again later.";
+      if (status === 401) {
+        msg = "Please sign in again.";
+      } else if (status === 504) {
+        msg =
+          (typeof detail === "string" && detail.trim()) ||
+          "Google Trends took too long. Try a shorter idea with 2-4 words (e.g. 'Bali travel').";
+      } else if (status === 429) {
+        msg =
+          (typeof detail === "string" && detail.trim()) ||
+          (detail && typeof detail === "object" && (detail.message || detail.error)) ||
+          (typeof err?.response?.data?.message === "string" && err.response.data.message) ||
+          "Trends request limit reached. Please try again later.";
+      } else if (status === 503) {
+        msg =
+          (typeof detail === "string" && detail) ||
+          (detail && typeof detail === "object" && (detail.message || detail.error)) ||
+          "Trends is temporarily unavailable.";
+      } else if (typeof detail === "string" && detail.trim()) {
+        msg = detail;
+      } else if (detail && typeof detail === "object") {
+        msg = detail.message || detail.error || msg;
+      } else if (err?.message) {
+        msg = err.message;
+      }
+      console.error("[TrendingTopics] Fetch failed", { status, source: trendsSource, message: msg });
       setError(msg);
     } finally {
       setLoading(false);
     }
-  }, [initialKeywords]);
+  }, [initialKeywords, source]);
 
   useEffect(() => {
     if (open && initialKeywords.trim()) {

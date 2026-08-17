@@ -14,7 +14,23 @@ export interface VideoPlanRequest {
   reference_image_description?: string;
   source_content_id?: string;
   source_content_type?: 'blog' | 'story';
+  source_article_url?: string;
+  source_article_title?: string;
+  source_article_summary?: string;
   avatar_url?: string;
+}
+
+export interface YouTubeChannelBible {
+  channel_name?: string;
+  niche: string;
+  target_audience: string;
+  default_video_goal: string;
+  default_cta: string;
+  brand_style: string;
+  visual_style_guide: string;
+  tone: string;
+  default_avatar_url?: string | null;
+  default_language?: string;
 }
 
 export interface VideoPlan {
@@ -33,6 +49,12 @@ export interface VideoPlan {
   visual_style: string;
   tone?: string;
   seo_keywords: string[];
+  title_suggestions?: string[];
+  selected_title?: string;
+  duration_metadata?: {
+    target_seconds?: number;
+    max_scenes?: number;
+  };
   duration_type: string;
   estimated_duration?: string;
   auto_generated_avatar_url?: string;
@@ -624,5 +646,41 @@ export const youtubeApi = {
   }> {
     const response = await apiClient.get(`${API_BASE}/publish/${taskId}`);
     return response.data;
+  },
+
+  async getChannelBible(): Promise<{
+    success: boolean;
+    bible: YouTubeChannelBible;
+    source?: 'saved' | 'onboarding';
+  }> {
+    try {
+      const response = await apiClient.get(`${API_BASE}/channel-bible`);
+      return response.data;
+    } catch (error: any) {
+      const status = error.response?.status;
+      if (status === 401) {
+        throw new Error('Please sign in again.');
+      }
+      const detail = error.response?.data?.detail || error.response?.data?.message || error.message;
+      throw new Error(detail || 'Failed to load channel bible');
+    }
+  },
+
+  async saveChannelBible(profile: YouTubeChannelBible): Promise<{
+    success: boolean;
+    bible: YouTubeChannelBible;
+  }> {
+    try {
+      const response = await apiClient.put(`${API_BASE}/channel-bible`, profile);
+      return response.data;
+    } catch (error: any) {
+      const status = error.response?.status;
+      if (status === 401) {
+        throw new Error('Please sign in again.');
+      }
+      const detail = error.response?.data?.detail || error.response?.data?.message || error.message;
+      console.error('[youtubeApi] saveChannelBible failed', { status });
+      throw new Error(detail || 'Failed to save channel bible');
+    }
   },
 };

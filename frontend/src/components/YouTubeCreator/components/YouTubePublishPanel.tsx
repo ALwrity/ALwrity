@@ -19,6 +19,11 @@ interface YouTubePublishPanelProps {
 }
 
 function buildVideoTitle(videoPlan: VideoPlan | null, scenes: Scene[]): string {
+  const selectedTitle = videoPlan?.selected_title?.trim();
+  if (selectedTitle) {
+    return selectedTitle.slice(0, 100);
+  }
+
   const summaryTitle = videoPlan?.video_summary?.trim();
   if (summaryTitle) {
     return summaryTitle.slice(0, 100);

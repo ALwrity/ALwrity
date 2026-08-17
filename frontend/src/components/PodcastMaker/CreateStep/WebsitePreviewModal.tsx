@@ -51,6 +51,8 @@ interface WebsitePreviewModalProps {
   onClose: () => void;
   onUseTextOnly: () => void;
   onAnalyzeContent: () => void;
+  useTextLabel?: string;
+  showAnalyzeButton?: boolean;
 }
 
 export const WebsitePreviewModal: React.FC<WebsitePreviewModalProps> = ({
@@ -59,6 +61,8 @@ export const WebsitePreviewModal: React.FC<WebsitePreviewModalProps> = ({
   onClose,
   onUseTextOnly,
   onAnalyzeContent,
+  useTextLabel = "Use Text Only",
+  showAnalyzeButton = true,
 }) => {
   if (!extractedData) return null;
 
@@ -488,25 +492,27 @@ color: "#64748b",
           Cancel
         </Button>
 
-        <Button
-          variant="contained"
-          startIcon={<AnalyzeIcon sx={{ fontSize: "1rem" }} />}
-          onClick={onAnalyzeContent}
-          disabled
-          sx={{
-            textTransform: "none",
-            fontWeight: 600,
-            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-            opacity: 0.6,
-            px: 2,
-            py: 1,
-            "&:hover": {
-              background: "linear-gradient(135deg, #7c8ff0 0%, #8a5cb3 100%)",
-            },
-          }}
-        >
-          Analyze Content (Coming Soon)
-        </Button>
+        {showAnalyzeButton && (
+          <Button
+            variant="contained"
+            startIcon={<AnalyzeIcon sx={{ fontSize: "1rem" }} />}
+            onClick={onAnalyzeContent}
+            disabled
+            sx={{
+              textTransform: "none",
+              fontWeight: 600,
+              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              opacity: 0.6,
+              px: 2,
+              py: 1,
+              "&:hover": {
+                background: "linear-gradient(135deg, #7c8ff0 0%, #8a5cb3 100%)",
+              },
+            }}
+          >
+            Analyze Content (Coming Soon)
+          </Button>
+        )}
 
         <Button
           variant="contained"
@@ -525,7 +531,7 @@ color: "#64748b",
             },
           }}
         >
-          Use Text Only
+          {useTextLabel}
         </Button>
       </DialogActions>
     </Dialog>

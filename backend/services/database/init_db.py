@@ -76,6 +76,7 @@ import models.user_business_info  # noqa: E402, F401
 import models.video_models  # noqa: E402, F401
 import models.website_analysis_monitoring_models  # noqa: E402, F401
 import models.youtube_task_models  # noqa: E402, F401
+import models.youtube_channel_bible_models  # noqa: E402, F401
 import models.platform_analytics  # noqa: E402, F401
 
 _ALEMBIC_INI_PATH = Path(__file__).resolve().parents[2] / "alembic.ini"
