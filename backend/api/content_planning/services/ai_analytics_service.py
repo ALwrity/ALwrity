@@ -244,6 +244,8 @@ class ContentPlanningAIAnalyticsService:
                 "processing_time": f"{total_time:.2f}s",
                 "personalized_data_used": True,
                 "data_source": "ai_analysis",
+                # E.3 (deferred): STRUCTURED consumer — read canonical_profile.brand_voice ONLY
+                # (unified persona-or-website, §2.2); legacy writing_tone/voice is the shim, removed at E.4.
                 "user_profile": {
                     "website_url": personalized_inputs.get('website_analysis', {}).get('website_url', ''),
                     "content_types": personalized_inputs.get('canonical_profile', {}).get('content_types', []),

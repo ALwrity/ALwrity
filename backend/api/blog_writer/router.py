@@ -1014,10 +1014,11 @@ async def medium_generation_status(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/rewrite/start")
-async def start_blog_rewrite(request: Dict[str, Any]) -> Dict[str, Any]:
+async def start_blog_rewrite(request: Dict[str, Any], current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     """Start blog rewrite task with user feedback."""
     try:
-        task_id = service.start_blog_rewrite(request)
+        user_id = str(current_user.get('id', ''))
+        task_id = service.start_blog_rewrite(request, user_id=user_id)
         return {"task_id": task_id, "status": "started"}
     except Exception as e:
         logger.error(f"Failed to start blog rewrite: {e}", exc_info=True)

@@ -56,6 +56,9 @@ class ResearchService:
         try:
             from services.cache.research_cache import research_cache
             
+            # PHASE C SKIP (persona voice): research is SEO/topic-driven (keywords,
+            # search intent, competitors) — not brand voice. `industry`/`target_audience`
+            # here are SEO targeting signals, not style. Style/topic separation.
             topic = request.topic or ", ".join(request.keywords)
             industry = request.industry or (request.persona.industry if request.persona and request.persona.industry else "General")
             target_audience = getattr(request.persona, 'target_audience', 'General') if request.persona else 'General'
@@ -403,6 +406,9 @@ class ResearchService:
             from services.cache.persistent_research_cache import persistent_research_cache
             from api.blog_writer.task_manager import task_manager
             
+            # PHASE C SKIP (persona voice): research is SEO/topic-driven (keywords,
+            # search intent, competitors) — not brand voice. `industry`/`target_audience`
+            # here are SEO targeting signals, not style. Style/topic separation.
             topic = request.topic or ", ".join(request.keywords)
             industry = request.industry or (request.persona.industry if request.persona and request.persona.industry else "General")
             target_audience = getattr(request.persona, 'target_audience', 'General') if request.persona else 'General'

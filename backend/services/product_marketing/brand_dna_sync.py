@@ -53,6 +53,9 @@ class BrandDNASyncService:
                 "competitive_positioning": {},
             }
             
+            # E.3 (deferred): STRUCTURED consumer — read canonical_profile.brand_voice ONLY
+            # (unified persona-or-website, §2.2); legacy writing_tone/voice below is the
+            # migration shim, removed at E.4.
             # Layer 1: Canonical Profile (Priority)
             brand_tokens["writing_style"] = {
                 "tone": canonical_profile.get('writing_tone', 'professional'),
@@ -93,6 +96,9 @@ class BrandDNASyncService:
                     brand_tokens["visual_identity"]["style_guidelines"] = style_guidelines
             
             # Extract persona data
+            # E.3 (deferred) follow-up #2: `corePersona`/`platformPersonas` here are
+            # camelCase, but PersonaData.to_dict() emits `core_persona`/`platform_personas`
+            # (snake_case) — this read silently yields {}. Fix as a SEPARATE labeled commit.
             if persona_data:
                 core_persona = persona_data.get('corePersona') or {}
                 platform_personas = persona_data.get('platformPersonas') or {}

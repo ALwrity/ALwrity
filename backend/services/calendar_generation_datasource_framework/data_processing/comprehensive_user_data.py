@@ -48,6 +48,8 @@ class ComprehensiveUserDataProcessor:
             db = self.db_session if self.db_session else SessionLocal()
             try:
                 integrated_data = await self.integration_service.process_onboarding_data(str(user_id), db)
+                # E.3 (deferred): STRUCTURED consumer — read canonical_profile.brand_voice ONLY
+                # (unified persona-or-website, §2.2); legacy writing_tone/voice is the shim, removed at E.4.
                 onboarding_data = integrated_data.get('canonical_profile', {})
             finally:
                 if not self.db_session:

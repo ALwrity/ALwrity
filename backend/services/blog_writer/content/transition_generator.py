@@ -87,6 +87,10 @@ Requirements:
 Generate only the transition text, no explanations or formatting.
 """
 
+        # PHASE C SKIP (persona voice): transitions are structural glue between
+        # sections (1-2 sentences), not brand-voice content — and this generator is
+        # sync with no user_id to resolve the persona. Style/topic separation:
+        # persona belongs in section content, not in the transition.
         try:
             result = gemini_text_response(
                 prompt=prompt,

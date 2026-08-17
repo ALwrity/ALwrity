@@ -42,6 +42,9 @@ class PersonalizationService:
             integrated_data = integration_service.get_integrated_data_sync(user_id, db)
             canonical_profile = integrated_data.get('canonical_profile', {})
             
+            # E.3 (deferred): STRUCTURED consumer — read canonical_profile.brand_voice ONLY
+            # (unified persona-or-website, §2.2); legacy writing_tone/voice below is the
+            # migration shim, removed at E.4.
             # Map strictly from Canonical Profile
             preferences = {
                 "industry": canonical_profile.get("industry"),

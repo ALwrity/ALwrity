@@ -80,6 +80,16 @@ def _save_persona_data(db: Session, user_id: str, data: Dict[str, Any]) -> None:
     pd.selected_platforms = data.get("selected_platforms", [])
     db.commit()
 
+    # Rebuild the Brand Brain (canonical_profile) so it picks up the freshly
+    # saved persona. This is the single choke point covering persona-save,
+    # generate-personas, and async generation (none of which run through
+    # complete_step). Best-effort: a refresh failure never fails the save.
+    try:
+        from api.content_planning.services.content_strategy.onboarding import OnboardingDataIntegrationService
+        OnboardingDataIntegrationService().refresh_integrated_data_sync(user_id, db)
+    except Exception as refresh_err:
+        logger.warning(f"Could not refresh Brand Brain after persona save for {user_id}: {refresh_err}")
+
 
 # ---------------------------------------------------------------------------
 # Durable task store (DB-backed, replaces the transient in-memory dict)
@@ -761,6 +771,19 @@ async def generate_platform_persona(
     saved = persona_data_service.save_platform_persona(user_id, platform, generated)
     if not saved:
         logger.warning(f"Could not persist {platform} persona for {user_id}")
+    else:
+        # Rebuild the Brand Brain so canonical_profile picks up the new persona.
+        # Best-effort: a failed refresh never fails the persona generation.
+        try:
+            refresh_db = get_session_for_user(user_id)
+            if refresh_db:
+                try:
+                    from api.content_planning.services.content_strategy.onboarding import OnboardingDataIntegrationService
+                    OnboardingDataIntegrationService().refresh_integrated_data_sync(user_id, refresh_db)
+                finally:
+                    refresh_db.close()
+        except Exception as refresh_err:
+            logger.warning(f"Could not refresh Brand Brain after {platform} persona generation: {refresh_err}")
 
     logger.info(f"Generated + saved {platform} persona for {user_id}")
     return {"success": True, "platform": platform, "persona": generated}

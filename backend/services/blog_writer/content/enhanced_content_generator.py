@@ -14,6 +14,7 @@ from .source_url_manager import SourceURLManager
 from .context_memory import ContextMemory
 from .transition_generator import TransitionGenerator
 from .flow_analyzer import FlowAnalyzer
+from .persona_block import resolve_curated_persona
 
 
 class EnhancedContentGenerator:
@@ -29,12 +30,14 @@ class EnhancedContentGenerator:
         urls = self.url_manager.pick_relevant_urls(section, research) if not research_context else []
         global_research_context = self._build_global_research_context(research, competitive_advantage)
         prompt = self._build_prompt(section, prev_summary, research_context, urls, global_research_context)
+        # Curated persona in the SYSTEM prompt (style layer); topic/section stays in the user prompt.
+        persona_block = resolve_curated_persona(user_id, 'blog')
         content_text: str = ""
         try:
             ai_resp = llm_text_gen(
                 prompt=prompt,
                 json_struct=None,
-                system_prompt=None,
+                system_prompt=persona_block or None,
                 user_id=user_id
             )
             if isinstance(ai_resp, dict) and ai_resp.get("text"):

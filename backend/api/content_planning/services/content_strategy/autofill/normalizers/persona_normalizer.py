@@ -18,6 +18,8 @@ async def normalize_persona_data(persona_data: Dict[str, Any]) -> Dict[str, Any]
     
     logger.warning(f"🔍 normalize_persona_data received keys: {list(persona_data.keys())}")
     
+    # E.3 (deferred): raw persona_data read bypasses canonical_profile — route via
+    # canonical_profile.persona.platform_personas (verbatim, §5).
     # Extract core persona data
     core_persona = persona_data.get('core_persona') or persona_data.get('corePersona')
     platform_personas = persona_data.get('platform_personas') or persona_data.get('platformPersonas')

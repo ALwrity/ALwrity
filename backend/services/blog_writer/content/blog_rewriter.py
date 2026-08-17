@@ -11,6 +11,7 @@ from typing import Dict, Any
 from loguru import logger
 
 from services.llm_providers.gemini_provider import gemini_structured_json_response
+from .persona_block import resolve_curated_persona
 
 
 class BlogRewriter:
@@ -19,7 +20,7 @@ class BlogRewriter:
     def __init__(self, task_manager):
         self.task_manager = task_manager
     
-    def start_blog_rewrite(self, request: Dict[str, Any]) -> str:
+    def start_blog_rewrite(self, request: Dict[str, Any], user_id: str = None) -> str:
         """Start blog rewrite task with user feedback."""
         try:
             # Extract request data
@@ -52,7 +53,8 @@ class BlogRewriter:
                 feedback=feedback,
                 tone=tone,
                 audience=audience,
-                focus=focus
+                focus=focus,
+                user_id=user_id
             )
             
             logger.info(f"Blog rewrite task started: {task_id}")
@@ -73,11 +75,15 @@ class BlogRewriter:
             tone = kwargs.get("tone")
             audience = kwargs.get("audience")
             focus = kwargs.get("focus")
+            user_id = kwargs.get("user_id")
             
             # Update task status
             self.task_manager.update_task_status(task_id, "processing", "Analyzing current content and feedback...")
             
-            # Build rewrite prompt with user feedback
+            # Build rewrite prompt with user feedback.
+            # Curated persona goes in the SYSTEM prompt (style layer); the user's
+            # explicit tone/audience in the feedback still overrides it.
+            persona_block = resolve_curated_persona(user_id, 'blog')
             system_prompt = f"""You are an expert blog writer in {datetime.now().year}, tasked with rewriting content based on user feedback. 
             
             Current Blog Title: {title}
@@ -87,6 +93,10 @@ class BlogRewriter:
             {f"Focus Area: {focus}" if focus else ""}
             
             Your task is to rewrite the blog content to address the user's feedback while maintaining the core structure and research insights."""
+            if persona_block:
+                system_prompt += f"\n\n{persona_block}"
+                if tone or audience:
+                    system_prompt += "\n\nWhen a Desired Tone or Target Audience is given above, it takes precedence over the brand persona's tone and audience."
             
             # Prepare content for rewrite
             full_content = f"Title: {title}\n\n"

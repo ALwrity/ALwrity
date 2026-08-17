@@ -112,6 +112,8 @@ def build_input_data_points(*, website_raw: Dict[str, Any], research_raw: Dict[s
             'competitor_urls': [c.get('competitor_url') or c.get('url', '') for c in competitor_raw]
         }
 
+    # E.3 (deferred): raw persona_data read bypasses canonical_profile — route via
+    # canonical_profile.persona.platform_personas (verbatim, §5).
     if persona_raw:
         input_data_points['brand_voice'] = {
             'core_persona': persona_raw.get('core_persona') or persona_raw.get('corePersona', 'Not available'),
