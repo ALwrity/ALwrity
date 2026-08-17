@@ -83,6 +83,14 @@ async def generate_platform_persona_task(user_id: str, platform: str) -> None:
                         f"Scheduled {platform} persona generation completed for user {user_id} "
                         f"({execution_time:.1f}s)"
                     )
+                    # Index the freshly generated platform persona into SIF so
+                    # agents can retrieve it as soon as it is ready (incremental,
+                    # idempotent upsert — never blocks this task on failure).
+                    try:
+                        from api.onboarding_utils.onboarding_task_scheduler import _sync_persona_to_sif
+                        await _sync_persona_to_sif(user_id)
+                    except Exception as sif_err:
+                        logger.warning(f"Persona SIF sync failed for {platform} (user {user_id}): {sif_err}")
                 else:
                     logger.warning(f"Failed to save {platform} persona for user {user_id}")
             else:

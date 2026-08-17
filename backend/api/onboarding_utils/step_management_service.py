@@ -486,6 +486,16 @@ class StepManagementService:
             except Exception as flat_err:
                 logger.warning(f"Failed to persist step 4 flat context for user {user_id}: {flat_err}")
 
+            # Index the freshly saved core persona into SIF (fire-and-forget).
+            # Platform personas are indexed incrementally by their own scheduler;
+            # this ensures the core persona is retrievable immediately after
+            # step 4, even before the background platform personas finish.
+            try:
+                from api.onboarding_utils.onboarding_task_scheduler import _fire_persona_sif_sync
+                _fire_persona_sif_sync(user_id)
+            except Exception as sif_err:
+                logger.warning(f"Failed to schedule persona SIF sync for user {user_id}: {sif_err}")
+
             return True
         except Exception as e:
             logger.error(f"Error saving persona data for user {user_id}: {e}")

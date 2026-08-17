@@ -31,9 +31,22 @@ The system-prompt / user-prompt split preserves per-topic creativity:
 We inject the persona ONLY into the style layer, never the topic.
 
 =============================================================================
+PHASE 0 — CONTRACT (the single source of truth)
+=============================================================================
+PersonaData is the ONLY persona store. get_persona_context_for_generation is
+the shared synthesis. Precedence when merging sources: persona (curated) >
+website_analysis (raw crawl) > research_preferences (user-selected), with
+provenance tracked. The legacy WritingPersona / "canonical profile" brand_voice
+are NOT authoritative and are scheduled for retirement (see PHASE MAP).
+
+=============================================================================
 PHASE MAP
 =============================================================================
-A   SIF persona indexing          services/intelligence/sif/_sync.py            (done)
+0   Contract (this note)                                             (agreed)
+A   SIF persona indexing            services/intelligence/sif/_sync.py            (done)
+A2  SIF trigger after persona gen   onboarding_task_scheduler._sync_persona_to_sif
+                                   + platform_persona_scheduler + step_management
+                                   service._save_persona_data                    (done)
 B   Curated extractor             services/persona/persona_context.py           (done)
 C.1 Resolver                      this module                                   (done)
 C.2 LinkedIn post injection       linkedin/.../post_prompts.py +
@@ -44,6 +57,8 @@ C.2/3 follow-ups (LinkedIn article/carousel/video builders; blog
      exact points + instructions.
 D   Agent-facing semantic retrieval — NOT wired. grep "PHASE D FOLLOW-UP"
      (services/intelligence/sif/_context.py get_step4_persona_context query).
+E   Brand Brain enrichment (canonical_profile.persona) — deferred; do NOT
+     attempt shallowly. Retire legacy WritingPersona + canonical brand_voice.
 =============================================================================
 """
 

@@ -344,3 +344,34 @@ async def _run_sif_now(user_id: str, website_url: str):
             session.close()
     except Exception as e:
         logger.warning(f"[_run_sif_now] Non-blocking SIF trigger failed: {e}")
+
+
+async def _sync_persona_to_sif(user_id: str):
+    """Index the user's persona (core + platforms) into SIF — lightweight, non-blocking.
+
+    Only syncs persona data (no harvest/content/guardian), so it is cheap and
+    safe to fire after each persona slice is generated. Idempotent: index_content
+    upserts by persona doc id. Errors are logged, never raised — the onboarding
+    flow is never blocked by SIF.
+    """
+    try:
+        from services.intelligence.sif_integration import SIFIntegrationService
+        sif_service = SIFIntegrationService(user_id)
+        await sif_service.sync_persona_data_to_sif()
+    except Exception as e:
+        logger.warning(f"[_sync_persona_to_sif] Non-blocking persona SIF sync failed for {user_id}: {e}")
+
+
+def _fire_persona_sif_sync(user_id: str):
+    """Fire-and-forget a persona SIF sync from a sync call site.
+
+    Runs ``_sync_persona_to_sif`` in a background thread so the sync caller
+    (which may be a synchronous method) is never blocked or made to wait.
+    """
+    import asyncio as _asyncio
+    try:
+        _asyncio.get_event_loop().run_in_executor(
+            None, lambda: _asyncio.run(_sync_persona_to_sif(user_id))
+        )
+    except Exception as e:
+        logger.warning(f"[_fire_persona_sif_sync] Failed to schedule persona SIF sync for {user_id}: {e}")
