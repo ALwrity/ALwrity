@@ -19,8 +19,7 @@ export interface PersonaTaskStatus {
 
 export interface UsePersonaPollingOptions {
   interval?: number; // Polling interval in milliseconds
-  maxAttempts?: number; // Maximum number of polling attempts (default: 180 = 6 minutes at 2s interval)
-  maxDuration?: number; // Maximum polling duration in milliseconds (default: 10 minutes)
+  maxDuration?: number; // Absolute safety net in ms (default: 30 minutes). The backend drives terminal state (completed/failed); this only guards against a truly hung backend.
   onProgress?: (message: string, progress: number) => void; // Callback for progress updates
   onComplete?: (result: any) => void; // Callback when task completes
   onError?: (error: string) => void; // Callback when task fails
@@ -41,8 +40,7 @@ export interface UsePersonaPollingReturn {
 export function usePersonaPolling(options: UsePersonaPollingOptions = {}): UsePersonaPollingReturn {
   const {
     interval = 2000, // 2 seconds default
-    maxAttempts = 180, // 6 minutes at 2s interval
-    maxDuration = 600000, // 10 minutes in milliseconds
+    maxDuration = 1800000, // 30 minutes — generous safety net; backend drives terminal state
     onProgress,
     onComplete,
     onError
@@ -68,11 +66,8 @@ export function usePersonaPolling(options: UsePersonaPollingOptions = {}): UsePe
   }, [isPolling, currentStatus, progress, currentStep, progressMessages.length]);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const attemptsRef = useRef(0);
   const currentTaskIdRef = useRef<string | null>(null);
   const startTimeRef = useRef<number>(0);
-  const stuckProgressRef = useRef<number>(0);
-  const stuckCountRef = useRef<number>(0);
 
   const stopPolling = useCallback(() => {
     console.log('stopPersonaPolling called');
@@ -82,11 +77,8 @@ export function usePersonaPolling(options: UsePersonaPollingOptions = {}): UsePe
     }
     console.log('Setting isPolling to false');
     setIsPolling(false);
-    attemptsRef.current = 0;
     currentTaskIdRef.current = null;
     startTimeRef.current = 0;
-    stuckProgressRef.current = 0;
-    stuckCountRef.current = 0;
   }, []);
 
   const startPolling = useCallback((taskId: string) => {
@@ -105,10 +97,7 @@ export function usePersonaPolling(options: UsePersonaPollingOptions = {}): UsePe
     setProgressMessages([]);
     setResult(null);
     setError(null);
-    attemptsRef.current = 0;
     startTimeRef.current = Date.now();
-    stuckProgressRef.current = 0;
-    stuckCountRef.current = 0;
 
     const poll = async () => {
       if (!currentTaskIdRef.current) {
@@ -116,16 +105,9 @@ export function usePersonaPolling(options: UsePersonaPollingOptions = {}): UsePe
         return;
       }
 
-      // Check max attempts
-      if (attemptsRef.current >= maxAttempts) {
-        console.error('Persona polling: Max attempts reached');
-        setError('Persona generation timed out - please try again later');
-        onError?.('Persona generation timed out after maximum attempts');
-        stopPolling();
-        return;
-      }
-
-      // Check max duration
+      // Absolute safety net against a truly hung backend. The backend drives
+      // the terminal state (completed/failed) — including its own LLM timeout —
+      // so this should only fire if the backend never responds.
       const elapsed = Date.now() - startTimeRef.current;
       if (elapsed >= maxDuration) {
         console.error('Persona polling: Max duration reached');
@@ -143,21 +125,6 @@ export function usePersonaPolling(options: UsePersonaPollingOptions = {}): UsePe
         setCurrentStatus(status.status);
         setProgress(status.progress);
         setCurrentStep(status.current_step);
-
-        // Detect stuck progress (same progress for 20+ consecutive polls = ~40 seconds)
-        if (status.progress === stuckProgressRef.current) {
-          stuckCountRef.current++;
-          if (stuckCountRef.current >= 20) {
-            console.error('Persona polling: Progress stuck at', status.progress, 'for too long');
-            setError('Persona generation appears stuck - please try again or contact support');
-            onError?.('Persona generation stuck - no progress for extended period');
-            stopPolling();
-            return;
-          }
-        } else {
-          stuckProgressRef.current = status.progress;
-          stuckCountRef.current = 0;
-        }
 
         // Update progress messages
         if (status.progress_messages && status.progress_messages.length > 0) {
@@ -181,8 +148,6 @@ export function usePersonaPolling(options: UsePersonaPollingOptions = {}): UsePe
           onError?.(status.error || 'Persona generation failed');
           stopPolling();
         }
-
-        attemptsRef.current++;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
         console.error('Persona polling error:', errorMessage);
@@ -222,7 +187,7 @@ export function usePersonaPolling(options: UsePersonaPollingOptions = {}): UsePe
     // Start polling immediately, then at intervals
     poll();
     intervalRef.current = setInterval(poll, interval);
-  }, [isPolling, interval, maxAttempts, maxDuration, onProgress, onComplete, onError, stopPolling]);
+  }, [isPolling, interval, maxDuration, onProgress, onComplete, onError, stopPolling]);
 
   // Cleanup on unmount
   useEffect(() => {
