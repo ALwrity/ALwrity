@@ -2,8 +2,9 @@ import React from "react";
 import "@testing-library/jest-dom";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ChannelBiblePanel } from "./ChannelBiblePanel";
+import { YouTubeChannelBible } from "../../../services/youtubeApi";
 
-const bible = {
+const bible: YouTubeChannelBible = {
   channel_name: "",
   niche: "",
   target_audience: "Founders",
@@ -16,12 +17,19 @@ const bible = {
   default_language: "",
 };
 
-const emptyBible = {
+const emptyBible: YouTubeChannelBible = {
   ...bible,
   target_audience: "",
 };
 
-function renderPanel(profile, handlers) {
+function renderPanel(
+  profile: YouTubeChannelBible,
+  handlers: {
+    onChange: jest.Mock;
+    onSave: jest.Mock;
+    onApplyToThisVideo: jest.Mock;
+  },
+) {
   render(
     <ChannelBiblePanel
       bible={profile}
