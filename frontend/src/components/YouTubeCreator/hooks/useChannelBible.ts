@@ -193,3 +193,5 @@ export function useChannelBible({
     applyBibleToThisVideo,
   };
 }
+
+export default useChannelBible;

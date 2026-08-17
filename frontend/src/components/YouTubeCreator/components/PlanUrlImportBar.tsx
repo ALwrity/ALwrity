@@ -219,7 +219,7 @@ export const PlanUrlImportBar: React.FC<PlanUrlImportBarProps> = ({
   };
 
   return (
-    <Box sx={{ mt: 1.5 }}>
+    <Box sx={{ mt: 1.5 }} data-tour="yt-url-import">
       <Typography variant="caption" sx={{ color: "#64748b", display: "block", mb: 1 }}>
         Have a blog or article? Paste the URL and we will turn it into a video idea.
       </Typography>
