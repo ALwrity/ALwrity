@@ -57,6 +57,7 @@ def build_planning_prompt(
     source_article_url: Optional[str] = None,
     source_article_title: Optional[str] = None,
     source_article_summary: Optional[str] = None,
+    channel_bible_context: str = "",
 ) -> str:
     """Build the LLM planning prompt (optionally including shorts scenes)."""
     source_context = ""
@@ -117,6 +118,7 @@ Follow these guidelines:
 - Max scenes: {duration_context['max_scenes']}
 
 {persona_context if persona_data else ""}
+{channel_bible_context if channel_bible_context else ""}
 {source_context if source_content_id else ""}
 {source_article_context}
 {image_context if reference_image_description else ""}

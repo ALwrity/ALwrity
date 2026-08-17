@@ -41,21 +41,67 @@ async def create_video_plan(
             f"has_source_article={has_source_article}, article_host={article_host}"
         )
 
+        target_audience = request.target_audience
+        video_goal = request.video_goal
+        brand_style = request.brand_style
+        reference_image_description = request.reference_image_description
+        channel_bible_context = ""
+        has_channel_bible = False
+        try:
+            from services.database import get_session_for_user
+            from services.youtube.channel_bible import (
+                apply_to_plan_inputs,
+                get_or_create,
+                serialize_for_prompt,
+            )
+
+            bible_db = get_session_for_user(user_id)
+            if bible_db is not None:
+                try:
+                    bible, _source = get_or_create(bible_db, user_id)
+                    filled = apply_to_plan_inputs(
+                        bible,
+                        target_audience=target_audience,
+                        video_goal=video_goal,
+                        brand_style=brand_style,
+                        reference_image_description=reference_image_description,
+                    )
+                    target_audience = filled["target_audience"]
+                    video_goal = filled["video_goal"]
+                    brand_style = filled["brand_style"]
+                    reference_image_description = filled["reference_image_description"]
+                    channel_bible_context = serialize_for_prompt(bible)
+                    has_channel_bible = bool(channel_bible_context)
+                finally:
+                    bible_db.close()
+        except Exception as bible_err:
+            logger.warning(
+                "[YouTubeAPI] Channel bible load failed; continuing without bible. err=%s",
+                bible_err,
+                exc_info=True,
+            )
+
+        logger.info(
+            "[YouTubeAPI] Plan bible context has_channel_bible=%s",
+            has_channel_bible,
+        )
+
         planner = YouTubePlannerService()
         plan = await planner.generate_plan(
             user_idea=request.user_idea,
             duration_type=request.duration_type,
             video_type=request.video_type,
-            target_audience=request.target_audience,
-            video_goal=request.video_goal,
-            brand_style=request.brand_style,
-            reference_image_description=request.reference_image_description,
+            target_audience=target_audience,
+            video_goal=video_goal,
+            brand_style=brand_style,
+            reference_image_description=reference_image_description,
             user_id=user_id,
             avatar_url=request.avatar_url,
             enable_research=request.enable_research,
             source_article_url=request.source_article_url,
             source_article_title=request.source_article_title,
             source_article_summary=request.source_article_summary,
+            channel_bible_context=channel_bible_context,
         )
 
         return VideoPlanResponse(

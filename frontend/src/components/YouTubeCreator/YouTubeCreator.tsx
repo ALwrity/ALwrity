@@ -32,6 +32,7 @@ import { useCostEstimate } from './hooks/useCostEstimate';
 import { useImageGenerationPolling } from './hooks/useImageGenerationPolling';
 import HeaderControls from '../shared/HeaderControls';
 import { useYouTubeCreatorState } from '../../hooks/useYouTubeCreatorState';
+import { useChannelBible } from './hooks/useChannelBible';
 import { ContentAsset } from '../../hooks/useContentAssets';
 import { AudioGenerationSettings } from '../../components/shared/AudioSettingsModal';
 import type { YouTubeImageGenerationSettings } from './shared';
@@ -63,6 +64,24 @@ const YouTubeCreator: React.FC = () => {
     combineScenes,
     activeStep: persistedActiveStep,
   } = state;
+
+  const {
+    channelBible,
+    bibleLoading,
+    bibleSaving,
+    bibleError,
+    setChannelBible,
+    saveChannelBible,
+    applyBibleToThisVideo,
+  } = useChannelBible({
+    targetAudience,
+    videoGoal,
+    brandStyle,
+    referenceImage,
+    avatarUrl,
+    language,
+    updateState,
+  });
 
   // Local UI state (not persisted)
   const [activeStep, setActiveStep] = useState(persistedActiveStep);
@@ -917,6 +936,13 @@ const YouTubeCreator: React.FC = () => {
           onRemoveAvatar={handleRemoveAvatar}
           onMakePresentable={handleMakePresentable}
           onAvatarSelectFromLibrary={handleAvatarSelectFromLibrary}
+          channelBible={channelBible}
+          bibleLoading={bibleLoading}
+          bibleSaving={bibleSaving}
+          bibleError={bibleError}
+          onBibleChange={setChannelBible}
+          onSaveBible={saveChannelBible}
+          onApplyBible={applyBibleToThisVideo}
         />
       )}
 

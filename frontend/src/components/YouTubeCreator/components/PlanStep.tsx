@@ -55,6 +55,8 @@ import { useAvatarBlobUrl } from '../hooks/useAvatarBlobUrl';
 import { SelectWithCustom } from './SelectWithCustom';
 import { PlanTopicDiscoveryBar } from './PlanTopicDiscoveryBar';
 import { PlanUrlImportBar, type YouTubeSourceArticle } from './PlanUrlImportBar';
+import { ChannelBiblePanel } from './ChannelBiblePanel';
+import type { YouTubeChannelBible } from '../../../services/youtubeApi';
 
 interface PlanStepProps {
   userIdea: string;
@@ -84,6 +86,13 @@ interface PlanStepProps {
   onRemoveAvatar: () => void;
   onMakePresentable: () => void;
   onAvatarSelectFromLibrary: (asset: ContentAsset) => void;
+  channelBible: YouTubeChannelBible | null;
+  bibleLoading?: boolean;
+  bibleSaving?: boolean;
+  bibleError?: string | null;
+  onBibleChange: (bible: YouTubeChannelBible) => void;
+  onSaveBible: () => void;
+  onApplyBible: () => void;
 }
 
 export const PlanStep: React.FC<PlanStepProps> = React.memo(({
@@ -114,6 +123,13 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
   onRemoveAvatar,
   onMakePresentable,
   onAvatarSelectFromLibrary,
+  channelBible,
+  bibleLoading = false,
+  bibleSaving = false,
+  bibleError = null,
+  onBibleChange,
+  onSaveBible,
+  onApplyBible,
 }) => {
   // Memoize operation objects to avoid recreating on every render
   const videoPlanningOperation = useMemo(
@@ -140,19 +156,19 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
     if (targetAudience && !TARGET_AUDIENCE_OPTIONS.some(opt => opt.value === targetAudience)) {
       setCustomTargetAudience(targetAudience);
     }
-  }, []); // Only on mount
+  }, [targetAudience]);
 
   useEffect(() => {
     if (videoGoal && !VIDEO_GOAL_OPTIONS.some(opt => opt.value === videoGoal)) {
       setCustomVideoGoal(videoGoal);
     }
-  }, []); // Only on mount
+  }, [videoGoal]);
 
   useEffect(() => {
     if (brandStyle && !BRAND_STYLE_OPTIONS.some(opt => opt.value === brandStyle)) {
       setCustomBrandStyle(brandStyle);
     }
-  }, []); // Only on mount
+  }, [brandStyle]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -181,6 +197,18 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
         </Typography>
 
         <Stack spacing={2.5}>
+          <ChannelBiblePanel
+            bible={channelBible}
+            loading={bibleLoading}
+            saving={bibleSaving}
+            error={bibleError}
+            disabled={loading}
+            planAvatarUrl={avatarUrl}
+            onChange={onBibleChange}
+            onSave={onSaveBible}
+            onApplyToThisVideo={onApplyBible}
+          />
+
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
               <InputLabel sx={labelSx} required>

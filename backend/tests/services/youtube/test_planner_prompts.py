@@ -91,3 +91,22 @@ class TestTitleSuggestionsPrompt:
         assert "selected_title" in schema["properties"]
         assert "title_suggestions" not in schema["required"]
         assert "selected_title" not in schema["required"]
+
+
+class TestChannelBiblePrompt:
+    def test_empty_context_omits_bible_block(self):
+        from services.youtube.planner_prompts import build_planning_prompt
+
+        prompt = build_planning_prompt(**_base_kwargs())
+        assert "<youtube_channel_bible>" not in prompt
+
+    def test_context_is_included_when_passed(self):
+        from services.youtube.planner_prompts import build_planning_prompt
+
+        prompt = build_planning_prompt(
+            **_base_kwargs(
+                channel_bible_context="<youtube_channel_bible>\n- Niche: Budget travel\n</youtube_channel_bible>"
+            )
+        )
+        assert "<youtube_channel_bible>" in prompt
+        assert "Budget travel" in prompt

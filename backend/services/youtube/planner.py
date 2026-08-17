@@ -53,6 +53,7 @@ class YouTubePlannerService:
         source_article_url: Optional[str] = None,
         source_article_title: Optional[str] = None,
         source_article_summary: Optional[str] = None,
+        channel_bible_context: str = "",
     ) -> Dict[str, Any]:
         """
         Generate a comprehensive video plan from user input.
@@ -63,7 +64,8 @@ class YouTubePlannerService:
         try:
             logger.info(
                 f"[YouTubePlanner] Generating plan: idea={user_idea[:50]}..., "
-                f"duration={duration_type}, video_type={video_type}, user={user_id}"
+                f"duration={duration_type}, video_type={video_type}, user={user_id}, "
+                f"has_channel_bible={bool((channel_bible_context or '').strip())}"
             )
 
             video_type_config = {}
@@ -152,6 +154,7 @@ class YouTubePlannerService:
                 reference_image_description=reference_image_description,
                 research_context=research_context,
                 include_scenes=include_scenes,
+                channel_bible_context=channel_bible_context or "",
             )
             json_struct = build_plan_json_struct(
                 include_scenes=include_scenes,
