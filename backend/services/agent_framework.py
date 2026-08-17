@@ -217,6 +217,8 @@ class BaseALwrityAgent(ABC):
             svc = OnboardingDataIntegrationService()
             integrated = svc.get_integrated_data_sync(self.user_id, db) or {}
             website_analysis = integrated.get("website_analysis") or {}
+            # E.3 (deferred): STRUCTURED consumer — read canonical_profile.brand_voice ONLY
+            # (unified persona-or-website, §2.2); legacy writing_tone/voice is the shim, removed at E.4.
             canonical = integrated.get("canonical_profile") or {}
 
             website_url = (

@@ -54,9 +54,12 @@ class OnboardingDataIntegrationService:
         self.data_freshness_threshold = timedelta(hours=24)
         self.max_analysis_age = timedelta(days=7)
 
-    def get_integrated_data_sync(self, user_id: str, db: Session) -> Dict[str, Any]:
+    def get_integrated_data_sync(self, user_id: str, db: Session, force_rebuild: bool = False) -> Dict[str, Any]:
         """Synchronous version of process_onboarding_data for sync contexts.
            Note: Does not include async data sources like GSC/Bing analytics.
+
+           ``force_rebuild=True`` skips the cached canonical_profile so the Brand
+           Brain is rebuilt fresh (used right after persona generation).
         """
         try:
             # Get all onboarding data sources (DB only)
@@ -73,13 +76,17 @@ class OnboardingDataIntegrationService:
             gsc_analytics = {}
             bing_analytics = {}
 
-            # Use stored canonical profile when available (avoids redundant recomputation)
+            # Use stored canonical profile when available AND fresh (TTL), unless a
+            # rebuild is explicitly requested (e.g. right after persona generation).
             existing_record = db.query(OnboardingDataIntegration).filter(
                 OnboardingDataIntegration.user_id == user_id
             ).first()
-            if existing_record and existing_record.canonical_profile:
-                canonical_profile = existing_record.canonical_profile
-            else:
+            canonical_profile = None
+            if not force_rebuild and existing_record and existing_record.canonical_profile:
+                updated_at = existing_record.updated_at
+                if updated_at is None or (datetime.utcnow() - updated_at) <= self.data_freshness_threshold:
+                    canonical_profile = existing_record.canonical_profile
+            if canonical_profile is None:
                 canonical_profile = self._build_canonical_profile(
                     website_analysis,
                     research_preferences,
@@ -148,17 +155,33 @@ class OnboardingDataIntegrationService:
     async def refresh_integrated_data(self, user_id: str, db: Session) -> None:
         """
         Refresh and store integrated data (DB-only sources) to ensure SSOT is up-to-date.
-        This is a lightweight version of process_onboarding_data suitable for calling
-        after individual step completion.
+        Force-rebuilds the canonical_profile (never re-caches a stale copy), so callers
+        can invoke this after a source change (e.g. persona generation) to refresh the
+        Brand Brain.
         """
         try:
-            # Re-use sync logic but await the storage
-            integrated_data = self.get_integrated_data_sync(user_id, db)
-            await self._store_integrated_data(user_id, integrated_data, db)
+            # Re-use sync logic but force a fresh canonical_profile rebuild, then store.
+            integrated_data = self.get_integrated_data_sync(user_id, db, force_rebuild=True)
+            self._store_integrated_data(user_id, integrated_data, db)
             logger.info(f"Refreshed integrated data (SSOT) for user {user_id}")
         except Exception as e:
             logger.error(f"Failed to refresh integrated data for user {user_id}: {e}")
             # Non-blocking failure
+
+    def refresh_integrated_data_sync(self, user_id: str, db: Session) -> None:
+        """Synchronous force-rebuild + store, for sync callers (e.g. persona save).
+
+        Same behavior as ``refresh_integrated_data`` but callable without an
+        event loop. Used from ``step4_persona_routes._save_persona_data`` so the
+        Brand Brain rebuilds in the same choke point that persists the persona.
+        """
+        try:
+            integrated_data = self.get_integrated_data_sync(user_id, db, force_rebuild=True)
+            self._store_integrated_data(user_id, integrated_data, db)
+            logger.info(f"Refreshed integrated data (SSOT, sync) for user {user_id}")
+        except Exception as e:
+            logger.error(f"Failed to refresh integrated data (sync) for user {user_id}: {e}")
+            # Best-effort: never fail the caller (persona save) on a refresh error.
 
     async def store_competitive_sitemap_benchmarking(self, user_id: str, report: Dict[str, Any], db: Session) -> bool:
         try:
@@ -321,7 +344,7 @@ class OnboardingDataIntegrationService:
             logger.info(f"  - Confidence: {data_quality.get('confidence', 0):.2f}")
 
             # Store integrated data
-            await self._store_integrated_data(user_id, integrated_data, db)
+            self._store_integrated_data(user_id, integrated_data, db)
 
             logger.info(f"Onboarding data processed successfully for user: {user_id}")
             return integrated_data
@@ -499,6 +522,83 @@ class OnboardingDataIntegrationService:
             logger.error(f"Error getting onboarding session for user {user_id}: {str(e)}")
             return {}
 
+    def _build_persona_synthesis(self, persona_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Map ``PersonaData.core_persona`` into a compact structured ``persona`` block.
+
+        Read paths mirror ``PersonaPromptBuilder.get_persona_schema`` (the generator
+        contract). Returns ``None`` when there is no core_persona, so the block is
+        ABSENT (not empty) for no-persona users — never populated from website data.
+        """
+        if not persona_data or not isinstance(persona_data, dict):
+            return None
+        core = persona_data.get('core_persona') or persona_data.get('corePersona')
+        if not core or not isinstance(core, dict):
+            return None
+
+        identity = core.get('identity') or {}
+        tonal = core.get('tonal_range') or {}
+        linguistic = core.get('linguistic_fingerprint') or {}
+        lexical = linguistic.get('lexical_features') or {}
+        rhetorical = linguistic.get('rhetorical_devices') or {}
+        stylistic = core.get('stylistic_constraints') or {}
+
+        return {
+            'identity': {
+                'persona_name': identity.get('persona_name'),
+                'archetype': identity.get('archetype'),
+                'core_belief': identity.get('core_belief'),
+                'brand_voice_description': identity.get('brand_voice_description'),
+            },
+            'tonal_range': {
+                'default_tone': tonal.get('default_tone'),
+                'permissible_tones': tonal.get('permissible_tones') or [],
+                'forbidden_tones': tonal.get('forbidden_tones') or [],
+                'emotional_range': tonal.get('emotional_range'),
+            },
+            'linguistic_fingerprint': {
+                'go_to_phrases': lexical.get('go_to_phrases') or [],
+                'go_to_words': lexical.get('go_to_words') or [],
+                'avoid_words': lexical.get('avoid_words') or [],
+                'vocabulary_level': lexical.get('vocabulary_level'),
+                'storytelling_style': rhetorical.get('storytelling_style'),
+            },
+            'stylistic_constraints': {
+                'punctuation': stylistic.get('punctuation') or {},
+                'formatting': stylistic.get('formatting') or {},
+            },
+            'quality_metrics': persona_data.get('quality_metrics') or {},
+            # Verbatim mirror of PersonaData.platform_personas (E.2b). No consumer
+            # reads a normalized platform slice from canonical_profile (they read the
+            # raw persona_data), so keep it lossless rather than inventing a shape.
+            'platform_personas': persona_data.get('platform_personas') or persona_data.get('platformPersonas') or {},
+        }
+
+    def _build_brand_voice(self, persona_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Build a flat, structured ``brand_voice`` summary from the persona (NOT prose).
+
+        Present only when a persona exists (source ``persona_core``); never populated
+        from ``website_analysis.writing_style`` (that legacy path is retired in E.4).
+        """
+        if not persona_data or not isinstance(persona_data, dict):
+            return None
+        core = persona_data.get('core_persona') or persona_data.get('corePersona')
+        if not core or not isinstance(core, dict):
+            return None
+
+        identity = core.get('identity') or {}
+        tonal = core.get('tonal_range') or {}
+        linguistic = core.get('linguistic_fingerprint') or {}
+        lexical = linguistic.get('lexical_features') or {}
+
+        return {
+            'default_tone': tonal.get('default_tone'),
+            'voice_description': identity.get('brand_voice_description'),
+            'go_to_phrases': lexical.get('go_to_phrases') or [],
+            'avoid_words': lexical.get('avoid_words') or [],
+            'vocabulary_level': lexical.get('vocabulary_level'),
+            'emotional_range': tonal.get('emotional_range'),
+        }
+
     def _build_canonical_profile(
         self,
         website_analysis: Dict[str, Any],
@@ -515,6 +615,9 @@ class OnboardingDataIntegrationService:
                 if isinstance(persona_data, dict):
                     core_persona = persona_data.get('corePersona') or persona_data.get('core_persona')
 
+            persona_block = self._build_persona_synthesis(persona_data)
+            brand_voice = self._build_brand_voice(persona_data)
+
             website_target = {}
             if website_analysis and isinstance(website_analysis, dict):
                 value = website_analysis.get('target_audience') or {}
@@ -527,12 +630,10 @@ class OnboardingDataIntegrationService:
                 if isinstance(value, dict):
                     research_target = value
 
+            # industry source-of-record = WebsiteAnalysis (persona has no `industry`
+            # field), fallback ResearchPreferences — matches §3.
             industry = None
-            if core_persona and isinstance(core_persona, dict):
-                value = core_persona.get('industry')
-                if value:
-                    industry = value
-            if not industry and website_target:
+            if website_target:
                 value = website_target.get('industry_focus')
                 if value:
                     industry = value
@@ -543,21 +644,18 @@ class OnboardingDataIntegrationService:
 
             target_audience = None
             target_source = None
-            if core_persona and isinstance(core_persona, dict):
-                value = core_persona.get('target_audience')
+            # ResearchPreferences is the explicit user choice — source-of-record for
+            # target_audience (§3). Read it before the crawl-inferred website value.
+            if research_target:
+                value = research_target.get('demographics') or research_target.get('target_audience')
                 if value:
                     target_audience = value
-                    target_source = 'persona_core'
+                    target_source = 'research_preferences'
             if not target_audience and website_target:
                 value = website_target.get('demographics') or website_target.get('target_audience')
                 if value:
                     target_audience = value
                     target_source = 'website_analysis'
-            if not target_audience and research_target:
-                value = research_target.get('demographics') or research_target.get('target_audience')
-                if value:
-                    target_audience = value
-                    target_source = 'research_preferences'
 
             writing_style = {}
             if website_analysis and isinstance(website_analysis, dict):
@@ -691,16 +789,14 @@ class OnboardingDataIntegrationService:
                 'content_types': content_source,
                 'brand_identity': brand_source,
                 'platform_preferences': platform_source,
+                'persona': 'persona_core' if persona_block else None,
+                'brand_voice': 'persona_core' if brand_voice else None,
                 'seo_profile': 'website_analysis' if website_analysis else None
             }
-            if core_persona and isinstance(core_persona, dict) and core_persona.get('industry'):
-                sources['industry'] = 'persona_core'
-            elif website_target.get('industry_focus'):
+            if website_target.get('industry_focus'):
                 sources['industry'] = 'website_analysis'
             elif research_target.get('industry_focus'):
                 sources['industry'] = 'research_preferences'
-            elif linkedin_profile and linkedin_profile.get('industry'):
-                sources['industry'] = 'linkedin_profile'
 
             competitive_sitemap_benchmarking = {}
             try:
@@ -746,6 +842,8 @@ class OnboardingDataIntegrationService:
                 'auto_research': auto_research,
                 'factual_content': factual_content,
                 'business_info': business_info,
+                'persona': persona_block,
+                'brand_voice': brand_voice,
                 'sources': sources
             }
         except Exception as e:
@@ -936,7 +1034,7 @@ class OnboardingDataIntegrationService:
             logger.error(f"Error checking API data availability: {str(e)}")
             return False
 
-    async def _store_integrated_data(self, user_id: str, integrated_data: Dict[str, Any], db: Session) -> None:
+    def _store_integrated_data(self, user_id: str, integrated_data: Dict[str, Any], db: Session) -> None:
         """Store integrated onboarding data."""
         try:
             # Create or update integrated data record

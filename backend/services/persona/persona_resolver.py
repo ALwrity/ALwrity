@@ -57,9 +57,18 @@ C.2/3 follow-ups (LinkedIn article/carousel/video builders; blog
      exact points + instructions.
 D   Agent-facing semantic retrieval — NOT wired. grep "PHASE D FOLLOW-UP"
      (services/intelligence/sif/_context.py get_step4_persona_context query).
-E   Brand Brain enrichment (canonical_profile.persona) — deferred; do NOT
-     attempt shallowly. Retire legacy WritingPersona + canonical brand_voice.
-=============================================================================
+E   Brand Brain enrichment (canonical_profile.persona + brand_voice):
+      E.1  rebuild trigger + TTL                                      (done)
+      E.2  structured persona + brand_voice blocks + verbatim
+           platform_personas (E.2b)                                   (done)
+      E.3  batch 1 (strategy_service)                                 (done)
+      E.3  rest + E.4 (delete legacy writing_tone/voice + WritingPersona)
+                                                                      (deferred)
+      Authoritative spec: docs/Content strategy/phase-e-brand-brain-persona-contract.md
+      Per-consumer markers: grep "# E.3 (deferred)".
+      NOTE: brand_voice is now the SINGLE voice field (persona-or-website, §2.2);
+      "precedence" was retired in favor of "distinct facts resolved, with provenance."
+============================================================================
 """
 
 from typing import Dict, Optional

@@ -524,6 +524,9 @@ class ResearchPersonaService:
             if isinstance(canonical_business, dict):
                 business_info.update(canonical_business)
 
+            # E.3 (deferred): STRUCTURED consumer — read canonical_profile.brand_voice ONLY
+            # (unified persona-or-website, §2.2); this file's own business_info/canonical
+            # logic is the migration shim, removed at E.4.
             # Use canonical profile data (SSOT) instead of manual logic if possible
             # The canonical profile already handles logic for industry/target_audience from various sources
             if not business_info.get('industry') and canonical_profile.get('industry'):

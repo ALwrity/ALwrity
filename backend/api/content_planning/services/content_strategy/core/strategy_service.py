@@ -290,6 +290,14 @@ class EnhancedStrategyService:
                     strategy.preferred_formats = canonical_profile.get('content_types')
                     auto_populated_fields['preferred_formats'] = 'canonical_profile'
 
+                # Block-level persona voice (E.3): prefer the whole structured
+                # persona `brand_voice` block; the legacy website_analysis.style_guidelines
+                # extraction below is the fallback for no-persona users. Never mix fields.
+                brand_voice_block = canonical_profile.get('brand_voice')
+                if isinstance(brand_voice_block, dict) and brand_voice_block:
+                    strategy.brand_voice = brand_voice_block
+                    auto_populated_fields['brand_voice'] = 'canonical_profile'
+
             if isinstance(website_analysis, dict) and website_analysis:
                 writing_style = website_analysis.get('writing_style') or {}
                 if isinstance(writing_style, dict) and writing_style:
@@ -303,10 +311,13 @@ class EnhancedStrategyService:
                         strategy.target_audience = target_audience
                         auto_populated_fields['target_audience'] = 'website_analysis'
 
-                style_guidelines = website_analysis.get('style_guidelines') or {}
-                if isinstance(style_guidelines, dict) and style_guidelines:
-                    strategy.brand_voice = extract_brand_voice_from_guidelines(style_guidelines)
-                    auto_populated_fields['brand_voice'] = 'website_analysis'
+                # Fallback: only populate brand_voice from the legacy crawl if the
+                # persona block did not already supply it (block-level, not per-field).
+                if 'brand_voice' not in auto_populated_fields:
+                    style_guidelines = website_analysis.get('style_guidelines') or {}
+                    if isinstance(style_guidelines, dict) and style_guidelines:
+                        strategy.brand_voice = extract_brand_voice_from_guidelines(style_guidelines)
+                        auto_populated_fields['brand_voice'] = 'website_analysis'
 
                 data_sources['website_analysis'] = website_analysis
 

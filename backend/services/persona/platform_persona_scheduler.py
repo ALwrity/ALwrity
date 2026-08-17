@@ -91,6 +91,14 @@ async def generate_platform_persona_task(user_id: str, platform: str) -> None:
                         await _sync_persona_to_sif(user_id)
                     except Exception as sif_err:
                         logger.warning(f"Persona SIF sync failed for {platform} (user {user_id}): {sif_err}")
+
+                    # Rebuild the Brand Brain (canonical_profile) so it picks up the
+                    # new platform persona. Awaited within this background task;
+                    # a failure is tolerated and never blocks the task.
+                    try:
+                        await integration_service.refresh_integrated_data(user_id, db)
+                    except Exception as refresh_err:
+                        logger.warning(f"Brand Brain refresh failed for {platform} (user {user_id}): {refresh_err}")
                 else:
                     logger.warning(f"Failed to save {platform} persona for user {user_id}")
             else:

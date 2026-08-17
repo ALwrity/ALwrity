@@ -495,6 +495,8 @@ SEO ANALYSIS RESULTS:
         # Get more content context (key sections instead of just first 1000 chars)
         content_preview = self._extract_content_highlights(blog_content)
         
+        # PHASE C SKIP (persona voice): SEO metadata (title/description) is search-
+        # engine-driven (keywords, click-through), not brand voice. Style/topic separation.
         prompt = f"""
 Generate comprehensive, personalized SEO metadata for this blog post. 
 

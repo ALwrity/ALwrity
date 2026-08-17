@@ -9,6 +9,7 @@ from datetime import datetime
 from loguru import logger
 
 from models.blog_models import BlogResearchResponse, BlogOutlineSection
+from .persona_block import resolve_curated_persona
 
 
 class IntroductionGenerator:
@@ -110,7 +111,6 @@ REQUIREMENTS FOR EACH INTRODUCTION:
   1. First: Problem-focused (highlight the challenge readers face)
   2. Second: Benefit-focused (emphasize the value and outcomes)
   3. Third: Story/statistic-focused (use a compelling fact or narrative hook)
-- Maintain a professional yet engaging tone
 - Avoid generic phrases - be specific and benefit-driven
 - Where possible, incorporate specific insights from the competitive landscape and search intent above
 - Write introductions that feel current (you are writing in {datetime.now().year}), but avoid stating the year unless it's essential to the story
@@ -180,12 +180,18 @@ Return ONLY a JSON array of exactly 3 introductions:
         
         logger.info(f"Generating blog introductions for user {user_id}")
         
+        # Curated persona in the SYSTEM prompt (style layer); topic/keywords stay user-driven.
+        persona_block = resolve_curated_persona(user_id, 'blog')
+        system_prompt = "You are an expert content writer specializing in creating compelling blog introductions that hook readers and clearly communicate value."
+        if persona_block:
+            system_prompt += f"\n\n{persona_block}"
+        
         try:
             # Generate introductions using structured JSON response
             result = llm_text_gen(
                 prompt=prompt,
                 json_struct=schema,
-                system_prompt="You are an expert content writer specializing in creating compelling blog introductions that hook readers and clearly communicate value.",
+                system_prompt=system_prompt,
                 user_id=user_id
             )
             

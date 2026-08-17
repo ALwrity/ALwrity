@@ -23,6 +23,8 @@ class StrategyCopilotService:
         try:
             # Get user onboarding data
             integrated_data = await self.onboarding_integration_service.process_onboarding_data(user_id, self.db)
+            # E.3 (deferred): STRUCTURED consumer — read canonical_profile.brand_voice ONLY
+            # (unified persona-or-website, §2.2); legacy writing_tone/voice is the shim, removed at E.4.
             onboarding_data = integrated_data.get('canonical_profile', {})
             
             # Build prompt for category generation
@@ -82,6 +84,8 @@ class StrategyCopilotService:
         try:
             # Get user data for context
             integrated_data = await self.onboarding_integration_service.process_onboarding_data(user_id, self.db)
+            # E.3 (deferred): STRUCTURED consumer — read canonical_profile.brand_voice ONLY
+            # (unified persona-or-website, §2.2); legacy writing_tone/voice is the shim, removed at E.4.
             onboarding_data = integrated_data.get('canonical_profile', {})
             
             # Build analysis prompt
@@ -119,6 +123,8 @@ class StrategyCopilotService:
             
             # Get user data
             integrated_data = await self.onboarding_integration_service.process_onboarding_data(user_id, self.db)
+            # E.3 (deferred): STRUCTURED consumer — read canonical_profile.brand_voice ONLY
+            # (unified persona-or-website, §2.2); legacy writing_tone/voice is the shim, removed at E.4.
             onboarding_data = integrated_data.get('canonical_profile', {})
             
             # Build suggestions prompt

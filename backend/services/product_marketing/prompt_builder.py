@@ -56,6 +56,9 @@ class ProductMarketingPromptBuilder(AIPromptOptimizer):
             
             enhanced_prompt = base_prompt
             
+            # E.3 (deferred): PROMPT consumer — render prose from the unified
+            # canonical_profile.brand_voice (persona-or-website, §2.2), NOT raw PersonaData.
+            # Legacy writing_tone/voice below is the migration shim, removed at E.4.
             # 1. Brand Voice & Tone (Canonical)
             tone = canonical_profile.get('writing_tone')
             voice = canonical_profile.get('writing_voice')
@@ -174,6 +177,9 @@ class ProductMarketingPromptBuilder(AIPromptOptimizer):
             
             enhanced_prompt = base_request
             
+            # E.3 (deferred): PROMPT consumer — render prose from the unified
+            # canonical_profile.brand_voice (persona-or-website, §2.2), NOT raw PersonaData.
+            # Legacy writing_tone/voice below is the migration shim, removed at E.4.
             # 1. Brand Voice & Tone (Canonical)
             tone = canonical_profile.get('writing_tone')
             voice = canonical_profile.get('writing_voice')

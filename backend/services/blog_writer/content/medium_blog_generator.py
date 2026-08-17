@@ -20,6 +20,7 @@ from models.blog_models import (
 )
 from services.llm_providers.main_text_generation import llm_text_gen
 from services.cache.persistent_content_cache import persistent_content_cache
+from .persona_block import resolve_curated_persona
 
 
 def _resolve_persona_block(req, user_id: str) -> str:
@@ -32,13 +33,9 @@ def _resolve_persona_block(req, user_id: str) -> str:
     persona constrains HOW the brand writes, never WHAT it writes about.
     Falls back to the legacy ``req.persona`` (or "") when no curated persona.
     """
-    try:
-        from services.persona.persona_resolver import resolve_persona_context
-        curated = resolve_persona_context(user_id, 'blog')
-        if curated:
-            return curated
-    except Exception as e:
-        logger.warning(f"Curated persona resolve failed (falling back to req.persona): {e}")
+    curated = resolve_curated_persona(user_id, 'blog')
+    if curated:
+        return curated
 
     if req.persona:
         return f"""

@@ -124,6 +124,8 @@ async def get_story_context(
         if isinstance(style_analysis, dict):
             brand_name = style_analysis.get("brand_name") or style_analysis.get("site_title")
 
+        # E.3 (deferred): STRUCTURED consumer — read canonical_profile.brand_voice ONLY
+        # (unified persona-or-website, §2.2); legacy writing_tone below is the shim, removed at E.4.
         writing_tone = canonical_profile.get("writing_tone")
         target_audience = canonical_profile.get("target_audience")
 

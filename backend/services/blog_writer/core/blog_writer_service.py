@@ -546,6 +546,6 @@ class BlogWriterService:
             logger.error(f"Advanced flow analysis error: {e}")
             return {"error": str(e)}
 
-    def start_blog_rewrite(self, request: Dict[str, Any]) -> str:
+    def start_blog_rewrite(self, request: Dict[str, Any], user_id: str = None) -> str:
         """Start blog rewrite task with user feedback."""
-        return self.blog_rewriter.start_blog_rewrite(request)
+        return self.blog_rewriter.start_blog_rewrite(request, user_id=user_id)
