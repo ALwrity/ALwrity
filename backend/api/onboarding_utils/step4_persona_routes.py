@@ -31,8 +31,6 @@ from models.onboarding import OnboardingSession, PersonaData
 from models.persona_task_models import PersonaGenerationTask
 from models.base import Base
 
-PERSONA_CACHE_TTL_HOURS = 24
-
 
 def _get_session_or_404(db: Session, user_id: str) -> OnboardingSession:
     """Get the onboarding session for a user, or raise 404."""
@@ -45,17 +43,19 @@ def _get_session_or_404(db: Session, user_id: str) -> OnboardingSession:
 
 
 def _load_persona_data(db: Session, user_id: str) -> Optional[Dict[str, Any]]:
-    """Load cached persona from DB. Returns None if missing or stale."""
+    """Load the user's persisted persona from the DB.
+
+    This is the durable SSOT store (``PersonaData``), NOT a TTL cache. Once a
+    persona is generated it stays until the user explicitly regenerates or edits
+    it — cache / localStorage / TTL are client-side optimizations layered on top,
+    never a reason to drop the persisted persona.
+    """
     session = db.query(OnboardingSession).filter(
         OnboardingSession.user_id == user_id
     ).first()
     if not session or not session.persona_data:
         return None
     pd = session.persona_data
-    if pd.updated_at and (datetime.now() - pd.updated_at) > timedelta(hours=PERSONA_CACHE_TTL_HOURS):
-        db.delete(pd)
-        db.commit()
-        return None
     return {
         "success": True,
         "core_persona": pd.core_persona,
