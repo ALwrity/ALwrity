@@ -7,6 +7,14 @@ description: ALwrity Content Strategy - AI-powered strategic planning, persona d
 ALwrity's Content Strategy module is the brain of your content marketing efforts, providing AI-powered strategic planning, persona development, and content calendar generation to help you create a comprehensive, data-driven content marketing strategy.
 
 ## What is Content Strategy?
+## Current implementation status
+
+For the latest verified implementation state, see:
+
+- [Content Strategy Implementation Status (Verified)](./implementation-status)
+
+This overview explains capabilities; the status page is the source of truth for what is currently implemented versus planned.
+
 
 Content strategy is the planning, development, and management of content to achieve specific business objectives. ALwrity's AI-powered approach transforms complex strategic planning into an automated, intelligent process that delivers measurable results.
 
