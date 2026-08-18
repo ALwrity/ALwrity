@@ -113,12 +113,18 @@ export const MOBILE_PRIMARY_WORKFLOW_IDS: readonly YouTubeWorkflowCardId[] = [
   "create",
 ];
 
-/** Require YouTube OAuth when disconnected. */
-export const CONNECT_GATED_WORKFLOW_IDS: readonly YouTubeWorkflowCardId[] = [
+/** When true, all Studio Hub wedges open without OAuth connect gates (testing mode). */
+export const STUDIO_HUB_UNLOCK_ALL_FOR_TESTING = true;
+
+const DEFAULT_CONNECT_GATED_WORKFLOW_IDS: readonly YouTubeWorkflowCardId[] = [
   "analysis",
   "engagement",
   "remarket",
 ];
+
+/** Wedges that require YouTube OAuth when disconnected. Empty while testing unlock is on. */
+export const CONNECT_GATED_WORKFLOW_IDS: readonly YouTubeWorkflowCardId[] =
+  STUDIO_HUB_UNLOCK_ALL_FOR_TESTING ? [] : DEFAULT_CONNECT_GATED_WORKFLOW_IDS;
 
 export const PLAN_PINNED_HINT_KEY = "youtube_dashboard_plan_hint_dismissed";
 
