@@ -86,6 +86,7 @@ class YouTubeCommentsService:
                 "success": False,
                 "error_code": "inbox_failed",
                 "message": str(e),
+                "comments": [],
             }
 
     def draft_reply(

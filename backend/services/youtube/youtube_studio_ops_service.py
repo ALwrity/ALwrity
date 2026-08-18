@@ -88,7 +88,7 @@ class YouTubeStudioOpsService:
             return {"success": True, "videos": videos, "message": f"Loaded {len(videos)} videos."}
         except Exception as e:
             logger.error(f"YouTube list_channel_videos failed for {user_id}: {e}")
-            return {"success": False, "error_code": "list_failed", "message": str(e)}
+            return {"success": False, "error_code": "list_failed", "message": str(e), "videos": []}
 
     def list_playlists(
         self,
@@ -119,7 +119,7 @@ class YouTubeStudioOpsService:
             return {"success": True, "playlists": playlists, "message": "Playlists loaded."}
         except Exception as e:
             logger.error(f"YouTube list_playlists failed for {user_id}: {e}")
-            return {"success": False, "error_code": "playlists_failed", "message": str(e)}
+            return {"success": False, "error_code": "playlists_failed", "message": str(e), "playlists": []}
 
     def add_video_to_playlist(
         self,
