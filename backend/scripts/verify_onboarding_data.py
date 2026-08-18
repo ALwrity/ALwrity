@@ -68,29 +68,6 @@ def verify_onboarding_session(user_id: str, db):
         logger.error(f"Error verifying onboarding session: {e}")
         return None
 
-def verify_api_keys(session_id: int, user_id: str, db):
-    """Verify API keys data (Step 1)."""
-    try:
-        from models.onboarding import APIKey
-        
-        api_keys = db.query(APIKey).filter(
-            APIKey.session_id == session_id
-        ).all()
-        
-        if api_keys:
-            logger.info(f"✅ Step 1 (API Keys): Found {len(api_keys)} API key(s)")
-            for key in api_keys:
-                # Mask the key for security
-                masked_key = f"{key.key[:8]}...{key.key[-4:]}" if len(key.key) > 12 else "***"
-                logger.info(f"   - Provider: {key.provider}")
-                logger.info(f"     Key: {masked_key}")
-                logger.info(f"     Created: {key.created_at}")
-        else:
-            logger.warning(f"⚠️  Step 1 (API Keys): No API keys found")
-            
-    except Exception as e:
-        logger.error(f"Error verifying API keys: {e}")
-
 def verify_website_analysis(session_id: int, user_id: str, db):
     """Verify website analysis data (Step 2)."""
     try:
@@ -227,13 +204,12 @@ def count_all_records(db):
     
     try:
         from models.onboarding import (
-            OnboardingSession, APIKey, WebsiteAnalysis, 
+            OnboardingSession, WebsiteAnalysis, 
             ResearchPreferences, PersonaData
         )
         
         counts = {
             "Onboarding Sessions": db.query(OnboardingSession).count(),
-            "API Keys": db.query(APIKey).count(),
             "Website Analyses": db.query(WebsiteAnalysis).count(),
             "Research Preferences": db.query(ResearchPreferences).count(),
             "Persona Data": db.query(PersonaData).count(),

@@ -270,7 +270,7 @@ async def get_onboarding_state(current_user: Dict[str, Any]):
     try:
         from services.database.sessions import get_session_for_user
         from models.onboarding import (
-            OnboardingSession, APIKey, WebsiteAnalysis,
+            OnboardingSession, WebsiteAnalysis,
             ResearchPreferences, PersonaData, CompetitorAnalysis
         )
         from sqlalchemy import select, desc
@@ -300,11 +300,6 @@ async def get_onboarding_state(current_user: Dict[str, Any]):
 
             sid = onboarding_session.id
             step_data = {}
-
-            # API Keys
-            api_keys = session.execute(select(APIKey).where(APIKey.session_id == sid)).scalars().all()
-            if api_keys:
-                step_data["api_keys"] = {k.provider: k.key for k in api_keys if k.key}
 
             # Website
             website = session.execute(

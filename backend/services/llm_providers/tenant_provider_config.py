@@ -20,7 +20,7 @@ class TenantProviderConfig:
 class TenantProviderConfigResolver:
     """Resolves per-request provider, model policy, and credential source.
 
-    Priority: tenant-scoped DB key (future vault hook) -> environment defaults.
+    Credential source: platform environment variables only (BYOK retired — D1).
     """
 
     _PROVIDER_ALIASES: Dict[str, Tuple[str, ...]] = {
@@ -86,11 +86,9 @@ class TenantProviderConfigResolver:
         )
 
     def resolve_provider_key(self, provider: str, user_id: Optional[str]) -> Tuple[Optional[str], str]:
+        # D1 (retire BYOK): the platform supplies all provider keys via environment.
+        # Per-user tenant DB keys are dead; _get_tenant_key_from_db is removed in D2.
         normalized = self._normalize_provider(provider)
-
-        tenant_key = self._get_tenant_key_from_db(user_id=user_id, provider=normalized)
-        if tenant_key:
-            return tenant_key, "tenant_db"
 
         env_key = self._get_key_from_env(normalized)
         if env_key:
@@ -122,40 +120,6 @@ class TenantProviderConfigResolver:
         if provider_l in ("hf", "huggingface", "hf_response_api"):
             return "huggingface"
         return provider_l
-
-    def _get_tenant_key_from_db(self, user_id: Optional[str], provider: str) -> Optional[str]:
-        if not user_id:
-            return None
-        try:
-            from services.database import get_session_for_user
-            from models.onboarding import OnboardingSession, APIKey
-
-            db = get_session_for_user(user_id)
-            if not db:
-                return None
-            try:
-                session = (
-                    db.query(OnboardingSession)
-                    .filter(OnboardingSession.user_id == user_id)
-                    .order_by(OnboardingSession.updated_at.desc())
-                    .first()
-                )
-                if not session:
-                    return None
-
-                aliases = self._PROVIDER_ALIASES.get(provider, (provider,))
-                rec = (
-                    db.query(APIKey)
-                    .filter(APIKey.session_id == session.id, APIKey.provider.in_(aliases))
-                    .order_by(APIKey.updated_at.desc())
-                    .first()
-                )
-                return rec.key if rec and rec.key else None
-            finally:
-                db.close()
-        except Exception as exc:
-            logger.debug("Tenant DB key lookup failed for provider=%s user_id=%s: %s", provider, user_id, exc)
-            return None
 
     def _get_key_from_env(self, provider: str) -> Optional[str]:
         for env_var in self._ENV_VARS.get(provider, ()):  # pragma: no branch

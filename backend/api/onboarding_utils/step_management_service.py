@@ -12,7 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from api.content_planning.services.content_strategy.onboarding import OnboardingDataIntegrationService
 from services.database import get_db
-from models.onboarding import OnboardingSession, APIKey, WebsiteAnalysis, ResearchPreferences, PersonaData, CompetitorAnalysis, PlatformIntegration
+from models.onboarding import OnboardingSession, WebsiteAnalysis, ResearchPreferences, PersonaData, CompetitorAnalysis, PlatformIntegration
 from services.intelligence.agent_flat_context import AgentFlatContextStore
 
 class StepManagementService:
@@ -48,35 +48,6 @@ class StepManagementService:
             db.refresh(session)
 
         return session
-
-    def _save_api_key(self, user_id: str, provider: str, api_key: str, db: Session) -> bool:
-        """Save API key directly to database."""
-        try:
-            session = self._get_or_create_session(user_id, db)
-            
-            existing_key = db.query(APIKey).filter(
-                APIKey.session_id == session.id,
-                APIKey.provider == provider
-            ).first()
-            
-            if existing_key:
-                existing_key.key = api_key
-                existing_key.updated_at = datetime.utcnow()
-            else:
-                new_key = APIKey(
-                    session_id=session.id,
-                    provider=provider,
-                    key=api_key
-                )
-                db.add(new_key)
-            
-            db.commit()
-
-            return True
-        except Exception as e:
-            logger.error(f"Error saving API key for user {user_id}: {e}")
-            db.rollback()
-            raise e
 
     def _save_website_analysis(self, user_id: str, analysis_data: Dict[str, Any], db: Session) -> bool:
         """Save website analysis directly to database."""
@@ -220,7 +191,22 @@ class StepManagementService:
                     # Skip metadata fields and id
                     if key in ['id', 'session_id', 'created_at', 'updated_at']:
                         continue
-                        
+                    # Merge per-platform research instead of overwriting:
+                    # - content_types: union (never drop a platform's types)
+                    # - research_depth: keep the deeper setting
+                    if key == 'content_types' and isinstance(value, list):
+                        existing_ct = getattr(existing_prefs, 'content_types', None)
+                        if isinstance(existing_ct, list):
+                            merged_ct = list(existing_ct)
+                            for ct in value:
+                                if ct not in merged_ct:
+                                    merged_ct.append(ct)
+                            value = merged_ct
+                    elif key == 'research_depth' and isinstance(value, str):
+                        depth_rank = {"Basic": 1, "Standard": 2, "Expert": 3, "Comprehensive": 4}
+                        existing_depth = getattr(existing_prefs, 'research_depth', None)
+                        if existing_depth and depth_rank.get(existing_depth, 0) >= depth_rank.get(value, 0):
+                            continue
                     if hasattr(existing_prefs, key) and value is not None:
                         setattr(existing_prefs, key, value)
                 existing_prefs.updated_at = datetime.utcnow()
@@ -442,6 +428,34 @@ class StepManagementService:
             logger.warning(f"Failed to save Step 5 integrations for user {user_id}: {e}")
             return False
 
+    def record_connected_platform(self, user_id: str, platform: str, db: Session) -> bool:
+        """Idempotently record a connected platform on the session's PlatformIntegration.
+
+        ``connected_platforms`` is the single source of truth for "which platforms
+        this user connected" (website / linkedin / facebook / twitter / etc.).
+        Populated incrementally as each platform connects during Step 1 (Connect
+        Platforms), instead of the retired Step 5 integrations step.
+        """
+        try:
+            from models.onboarding import PlatformIntegration
+            session = self._get_or_create_session(user_id, db)
+            if session.platform_integrations:
+                pi = session.platform_integrations
+            else:
+                pi = PlatformIntegration(session_id=session.id)
+                db.add(pi)
+            connected = list(pi.connected_platforms or [])
+            if platform not in connected:
+                connected.append(platform)
+            pi.connected_platforms = connected
+            pi.updated_at = datetime.utcnow()
+            db.commit()
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to record connected platform {platform} for user {user_id}: {e}")
+            db.rollback()
+            return False
+
     def _save_persona_data(self, user_id: str, persona_data: Dict[str, Any], db: Session) -> bool:
         """Save persona data directly to database."""
         try:
@@ -452,9 +466,23 @@ class StepManagementService:
             ).first()
             
             if existing:
-                existing.core_persona = persona_data.get('corePersona')
-                existing.platform_personas = persona_data.get('platformPersonas')
-                existing.quality_metrics = persona_data.get('qualityMetrics')
+                # Shared core persona: first non-empty write wins (the website flow's
+                # core is generated from ALL connected platforms' data). A later
+                # platform persona must NOT clobber it.
+                new_core = persona_data.get('corePersona')
+                if new_core:
+                    existing.core_persona = new_core
+                # Per-platform personas: MERGE (dict union) — never drop a platform.
+                existing_platforms = existing.platform_personas or {}
+                new_platforms = persona_data.get('platformPersonas') or {}
+                if isinstance(existing_platforms, dict) and isinstance(new_platforms, dict):
+                    merged = dict(existing_platforms)
+                    merged.update(new_platforms)
+                    existing.platform_personas = merged
+                elif new_platforms:
+                    existing.platform_personas = new_platforms
+                if persona_data.get('qualityMetrics'):
+                    existing.quality_metrics = persona_data.get('qualityMetrics')
                 existing.selected_platforms = persona_data.get('selectedPlatforms', [])
                 existing.updated_at = datetime.utcnow()
             else:
@@ -786,18 +814,16 @@ class StepManagementService:
             raise HTTPException(status_code=500, detail="Internal server error")
     
     async def skip_step(self, step_number: int, current_user: Dict[str, Any]) -> Dict[str, Any]:
-        """Skip a step (for optional steps)."""
+        """Skip a step (for optional steps).
+
+        Per-step "skipped" status was never persisted (the legacy
+        ``OnboardingProgress`` kept it in-memory only), so the honest
+        equivalent is to advance ``current_step`` past the skipped step.
+        """
         try:
-            from services.onboarding.api_key_manager import get_onboarding_progress_for_user
+            from services.onboarding.progress_service import OnboardingProgressService
             user_id = str(current_user.get('clerk_user_id') or current_user.get('id'))
-            progress = get_onboarding_progress_for_user(user_id)
-            step = progress.get_step_data(step_number)
-            
-            if not step:
-                raise HTTPException(status_code=404, detail=f"Step {step_number} not found")
-            
-            # Mark step as skipped
-            progress.mark_step_skipped(step_number)
+            OnboardingProgressService().update_step(user_id, step_number + 1)
             
             return {
                 "message": f"Step {step_number} skipped successfully",
@@ -807,26 +833,4 @@ class StepManagementService:
             raise
         except Exception as e:
             logger.error(f"Error skipping step: {str(e)}")
-            raise HTTPException(status_code=500, detail="Internal server error")
-    
-    async def validate_step_access(self, step_number: int, current_user: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate if user can access a specific step."""
-        try:
-            user_id = str(current_user.get('clerk_user_id') or current_user.get('id'))
-            progress = get_onboarding_progress_for_user(user_id)
-            
-            if not progress.can_proceed_to_step(step_number):
-                return {
-                    "can_proceed": False,
-                    "validation_errors": [f"Cannot proceed to step {step_number}. Complete previous steps first."],
-                    "step_status": "locked"
-                }
-            
-            return {
-                "can_proceed": True,
-                "validation_errors": [],
-                "step_status": "available"
-            }
-        except Exception as e:
-            logger.error(f"Error validating step access: {str(e)}")
             raise HTTPException(status_code=500, detail="Internal server error")

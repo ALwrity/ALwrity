@@ -27,7 +27,24 @@ class OnboardingCompletionService:
     """Service for handling onboarding completion logic."""
     
     def __init__(self):
-        self.required_steps = [1, 2, 3, 4, 5]
+        # Canonical 4-step onboarding: 1=Connect Platforms, 2=Research,
+        # 3=Personalization. "Finish" (4) is complete_onboarding itself.
+        self.required_steps = [1, 2, 3]
+
+    @staticmethod
+    def _is_platform_connected(user_id: str, platform: str, db) -> bool:
+        """Return True if ``platform`` is in the session's connected_platforms."""
+        try:
+            from models.onboarding import OnboardingSession
+            session = db.query(OnboardingSession).filter(
+                OnboardingSession.user_id == user_id
+            ).order_by(OnboardingSession.updated_at.desc()).first()
+            if not session or not session.platform_integrations:
+                return False
+            connected = session.platform_integrations.connected_platforms or []
+            return platform in connected
+        except Exception:
+            return False
 
     def _normalize_competitor_analysis_for_deep_task(self, competitors: Any) -> List[Dict[str, Any]]:
         """Normalize Step 3 competitor analysis records to deep-task competitor schema."""
@@ -131,73 +148,58 @@ class OnboardingCompletionService:
             user_id = str(current_user.get('id'))
             progress_service = OnboardingProgressService()
 
-            # Detect LinkedIn onboarding — strategy's step5 already handles everything
-            from models.onboarding import OnboardingSession
-            db_check = get_session_for_user(user_id)
+            # Single 4-step onboarding flow: validate + complete + schedule
+            # per-platform tasks. LinkedIn tasks are gated on "linkedin" being
+            # present in PlatformIntegration.connected_platforms.
+            missing_steps = await self._validate_required_steps_database(user_id)
+            if missing_steps:
+                missing_steps_str = ", ".join(missing_steps)
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot complete onboarding. The following steps must be completed first: {missing_steps_str}"
+                )
+
+            await self._validate_api_keys(user_id)
+
+            # Persona is generated at Step 4 (via /step4/generate-personas) and
+            # persisted to PersonaData (SSOT). The legacy WritingPersona producer
+            # was retired in E.4 Phase 3; report generation from the SSOT store.
+            persona_generated = PersonaDataService().get_user_persona_data(user_id) is not None
+
+            success = progress_service.complete_onboarding(user_id)
+            if not success:
+                raise HTTPException(status_code=500, detail="Failed to mark onboarding as complete")
+
+            # Completion initializes the user environment and schedules
+            # per-platform recurring tasks.
+            db = get_session_for_user(user_id)
             try:
-                session = db_check.query(OnboardingSession).filter(
-                    OnboardingSession.user_id == user_id
-                ).order_by(OnboardingSession.updated_at.desc()).first()
-                is_linkedin = session and session.onboarding_type == "linkedin"
-            except Exception:
-                is_linkedin = False
-            finally:
-                db_check.close()
-
-            if not is_linkedin:
-                # Website onboarding: full validation + task scheduling
-                missing_steps = await self._validate_required_steps_database(user_id)
-                if missing_steps:
-                    missing_steps_str = ", ".join(missing_steps)
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Cannot complete onboarding. The following steps must be completed first: {missing_steps_str}"
-                    )
-
-                await self._validate_api_keys(user_id)
-
-                # Persona is generated at Step 4 (via /step4/generate-personas) and
-                # persisted to PersonaData (SSOT). The legacy WritingPersona producer
-                # was retired in E.4 Phase 3; report generation from the SSOT store.
-                persona_generated = PersonaDataService().get_user_persona_data(user_id) is not None
-
-                success = progress_service.complete_onboarding(user_id)
-                if not success:
-                    raise HTTPException(status_code=500, detail="Failed to mark onboarding as complete")
-
-                # ── Step 6: tasks already scheduled at Steps 2-5 ───────────────
-                logger.info(f"[complete_onboarding] Step 6: scheduling only progressive_setup "
-                            f"(other tasks were already scheduled at Steps 2-5)")
-
-                db = get_session_for_user(user_id)
                 try:
-                    try:
-                        from services.progressive_setup_service import ProgressiveSetupService
-                        setup_service = ProgressiveSetupService(db)
-                        setup_service.initialize_user_environment(user_id)
-                        scheduled_tasks.append("progressive_setup")
-                        logger.info(f"Initialized user environment for {user_id}")
-                    except Exception as e:
-                        failed_tasks.append({"task": "progressive_setup", "error": str(e)})
-                        logger.warning(f"Failed to initialize user environment for {user_id}: {e}")
-
-                    db.commit()
+                    from services.progressive_setup_service import ProgressiveSetupService
+                    setup_service = ProgressiveSetupService(db)
+                    setup_service.initialize_user_environment(user_id)
+                    scheduled_tasks.append("progressive_setup")
+                    logger.info(f"Initialized user environment for {user_id}")
                 except Exception as e:
-                    db.rollback()
-                    failed_tasks.append({"task": "progressive_setup_db", "error": str(e)})
-                    logger.error(f"Failed to commit progressive setup for user {user_id}: {e}")
-                finally:
-                    db.close()
-            else:
-                # LinkedIn onboarding: strategy already validated, ran progressive setup,
-                # marked complete, and scheduled all tasks. Just confirm.
-                logger.info(f"[complete_onboarding] LinkedIn onboarding for {user_id} — strategy already handled completion")
-                success = progress_service.complete_onboarding(user_id)
-                if not success:
-                    raise HTTPException(status_code=500, detail="Failed to mark onboarding as complete")
-                persona_generated = True
-                scheduled_tasks = ["linkedin_profile_sync", "linkedin_post_analytics_sync",
-                                   "linkedin_growth_reanalysis", "oauth_token_monitoring"]
+                    failed_tasks.append({"task": "progressive_setup", "error": str(e)})
+                    logger.warning(f"Failed to initialize user environment for {user_id}: {e}")
+
+                # Schedule LinkedIn recurring tasks when LinkedIn is connected.
+                if self._is_platform_connected(user_id, "linkedin", db):
+                    from api.onboarding_utils.onboarding_task_scheduler import schedule_linkedin_tasks
+                    schedule_linkedin_tasks(user_id, db)
+                    scheduled_tasks.extend([
+                        "linkedin_profile_sync", "linkedin_post_analytics_sync",
+                        "linkedin_growth_reanalysis", "oauth_token_monitoring",
+                    ])
+
+                db.commit()
+            except Exception as e:
+                db.rollback()
+                failed_tasks.append({"task": "progressive_setup_db", "error": str(e)})
+                logger.error(f"Failed to commit progressive setup for user {user_id}: {e}")
+            finally:
+                db.close()
             
             try:
                 from services.agent_activity_service import AgentActivityService
@@ -287,24 +289,7 @@ class OnboardingCompletionService:
                 for step_num in self.required_steps:
                     step_completed = False
                     
-                    if step_num == 1:
-                        api_keys_data = integrated_data.get('api_keys_data', {})
-                        step_completed = bool(
-                            api_keys_data.get('openai_api_key') or 
-                            api_keys_data.get('anthropic_api_key') or 
-                            api_keys_data.get('google_api_key')
-                        )
-                        if not step_completed:
-                            has_global_providers = bool(
-                                os.getenv("EXA_API_KEY") or
-                                os.getenv("GEMINI_API_KEY") or
-                                os.getenv("OPENAI_API_KEY") or
-                                os.getenv("ANTHROPIC_API_KEY") or
-                                os.getenv("GOOGLE_API_KEY")
-                            )
-                            if has_global_providers:
-                                step_completed = True
-                    elif step_num == 2:
+                    if step_num == 1:  # Connect Platforms (website)
                         if is_linkedin_onboarding:
                             # LinkedIn onboarding uses profile + post analysis instead of website analysis
                             from services.integrations.linkedin.profile_repository import ProfileRepository
@@ -317,23 +302,17 @@ class OnboardingCompletionService:
                         else:
                             website = integrated_data.get('website_analysis', {})
                             step_completed = bool(website and (website.get('website_url') or website.get('writing_style')))
-                    elif step_num == 3:
+                    elif step_num == 2:  # Research
                         research = integrated_data.get('research_preferences', {})
                         step_completed = bool(research and (research.get('research_depth') or research.get('content_types')))
-                    elif step_num == 4:
+                    elif step_num == 3:  # Personalization (persona)
                         persona = integrated_data.get('persona_data', {})
                         step_completed = bool(persona and (persona.get('corePersona') or persona.get('core_persona') or persona.get('platformPersonas') or persona.get('platform_personas')))
                         if not step_completed:
                             logger.warning(
-                                f"Step 4 incomplete for user {user_id}: no persona data found. "
-                                f"Step will be auto-passed only if user has explicitly reached step 4."
+                                f"Step 3 incomplete for user {user_id}: no persona data found. "
+                                f"Step will be auto-passed only if user has explicitly reached step 3."
                             )
-                    elif step_num == 5:
-                        integrations_data = integrated_data.get('platform_integrations', {})
-                        integrations_complete = bool(integrations_data.get('connected_platforms'))
-                        step_completed = integrations_complete or True
-                        if step_completed and not integrations_complete:
-                            logger.info(f"Step 5 auto-passed for user {user_id}: integrations are optional")
 
                     if not step_completed and current_step >= step_num:
                         step_completed = True
@@ -352,42 +331,25 @@ class OnboardingCompletionService:
             return ["Validation error"]
     
     async def _validate_api_keys(self, user_id: str):
-        """Validate that API keys are configured for the current user (SSOT or environment)."""
+        """Validate platform API configuration (env-only; BYOK retired — D1).
+
+        The platform supplies all provider keys via environment variables
+        (subscription model); per-user keys are gone. The text provider is
+        chosen by the ``GPT_PROVIDER`` env flag (the LLM gateway resolves the
+        actual key at request time), so we only require that flag to be set —
+        never a hardcoded provider list. ``user_id`` is kept for signature
+        compatibility.
+        """
         try:
-            db = get_session_for_user(user_id)
-            try:
-                integration_service = OnboardingDataIntegrationService()
-                integrated_data = await integration_service.process_onboarding_data(user_id, db)
-            finally:
-                db.close()
-            
-            api_keys_data = integrated_data.get('api_keys_data', {}) if integrated_data else {}
-            
-            has_user_keys = bool(
-                api_keys_data.get('openai_api_key') or 
-                api_keys_data.get('anthropic_api_key') or 
-                api_keys_data.get('google_api_key') or
-                api_keys_data.get('exa_api_key') or
-                api_keys_data.get('gemini_api_key')
-            )
-
-            has_env_keys = bool(
-                os.getenv("OPENAI_API_KEY") or
-                os.getenv("ANTHROPIC_API_KEY") or
-                os.getenv("GOOGLE_API_KEY") or
-                os.getenv("EXA_API_KEY") or
-                os.getenv("GEMINI_API_KEY")
-            )
-
-            if not (has_user_keys or has_env_keys):
+            if not os.getenv("GPT_PROVIDER", "").strip():
                 raise HTTPException(
                     status_code=400,
-                    detail="Cannot complete onboarding. At least one AI provider API key must be configured in your account."
+                    detail="Cannot complete onboarding. Platform API provider (GPT_PROVIDER) is not configured."
                 )
         except HTTPException:
             raise
         except Exception:
             raise HTTPException(
                 status_code=400,
-                detail="Cannot complete onboarding. API key validation failed."
+                detail="Cannot complete onboarding. Platform API configuration validation failed."
             )

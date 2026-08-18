@@ -17,7 +17,6 @@ from models.onboarding import (
     OnboardingSession,
     WebsiteAnalysis,
     ResearchPreferences,
-    APIKey,
     PersonaData,
     CompetitorAnalysis,
     SEOPageAudit,
@@ -65,7 +64,6 @@ class OnboardingDataIntegrationService:
             # Get all onboarding data sources (DB only)
             website_analysis = self._get_website_analysis(user_id, db)
             research_preferences = self._get_research_preferences(user_id, db)
-            api_keys_data = self._get_api_keys_data(user_id, db)
             onboarding_session = self._get_onboarding_session(user_id, db)
             persona_data = self._get_persona_data(user_id, db)
             competitor_analysis = self._get_competitor_analysis(user_id, db)
@@ -99,12 +97,11 @@ class OnboardingDataIntegrationService:
 
             platform_integrations = self._get_platform_integrations(user_id, db)
 
-            data_quality = self._assess_data_quality(website_analysis, research_preferences, api_keys_data, persona_data, competitor_analysis, gsc_analytics, bing_analytics)
+            data_quality = self._assess_data_quality(website_analysis, research_preferences, persona_data, competitor_analysis, gsc_analytics, bing_analytics)
 
             integrated_data = {
                 'website_analysis': website_analysis,
                 'research_preferences': research_preferences,
-                'api_keys_data': api_keys_data,
                 'onboarding_session': onboarding_session,
                 'persona_data': persona_data,
                 'competitor_analysis': competitor_analysis,
@@ -119,8 +116,6 @@ class OnboardingDataIntegrationService:
             }
 
             # ── Structured data integration summary ──
-            step1_keys = api_keys_data.get('total_keys', 0) if api_keys_data else 0
-            step1_providers = api_keys_data.get('providers', []) if api_keys_data else []
             step2_url = website_analysis.get('website_url', '') if website_analysis else ''
             step3_depth = research_preferences.get('research_depth', '') if research_preferences else ''
             step3_ct = research_preferences.get('content_types', []) if research_preferences else []
@@ -132,12 +127,11 @@ class OnboardingDataIntegrationService:
 
             lines = [
                 f"[DataIntegration] ✅ Data status for user {user_id}:",
-                f"   ├─ Step 1 (API Keys):    {'✓' if step1_keys else '—'} {step1_keys} provider(s) {step1_providers if step1_providers else ''}".rstrip(),
-                f"   ├─ Step 2 (Website):     {'✓' if step2_url else '—'} {step2_url or 'no data'}".rstrip(),
-                f"   ├─ Step 3 (Research):    {'✓' if step3_depth else '—'} depth={step3_depth or 'none'}, types={len(step3_ct) if step3_ct else 0}".rstrip(),
-                f"   ├─ Step 3 (Competitors): {'✓' if comp_count else '—'} {comp_count} competitor(s), deep={deep_comp_status}".rstrip(),
-                f"   ├─ Step 4 (Persona):     {'✓' if persona_core else '—'}{' core_persona present' if persona_core else ' no persona data'}".rstrip(),
-                f"   ├─ Step 5 (Integrations):{'✓' if platforms else '—'} {platforms if platforms else 'no platforms'}".rstrip(),
+                f"   ├─ Step 1 (Connect):     {'✓' if step2_url else '—'} {step2_url or 'no data'}".rstrip(),
+                f"   ├─ Step 2 (Research):    {'✓' if step3_depth else '—'} depth={step3_depth or 'none'}, types={len(step3_ct) if step3_ct else 0}".rstrip(),
+                f"   ├─ Step 2 (Competitors): {'✓' if comp_count else '—'} {comp_count} competitor(s), deep={deep_comp_status}".rstrip(),
+                f"   ├─ Step 3 (Persona):     {'✓' if persona_core else '—'}{' core_persona present' if persona_core else ' no persona data'}".rstrip(),
+                f"   ├─ Connected platforms:  {'✓' if platforms else '—'} {platforms if platforms else 'no platforms'}".rstrip(),
                 f"   ├─ Canonical Profile:    {'✓' if canonical_profile.get('industry') else '—'} industry={canonical_profile.get('industry', 'none')}".rstrip(),
                 f"   └─ Data Quality:         completeness={dq.get('completeness', 0):.2f}, freshness={dq.get('freshness', 0):.2f}, overall={dq.get('overall_score', 0):.2f}".rstrip(),
             ]
@@ -289,7 +283,6 @@ class OnboardingDataIntegrationService:
             # Get all onboarding data sources
             website_analysis = self._get_website_analysis(user_id, db)
             research_preferences = self._get_research_preferences(user_id, db)
-            api_keys_data = self._get_api_keys_data(user_id, db)
             onboarding_session = self._get_onboarding_session(user_id, db)
             persona_data = self._get_persona_data(user_id, db)
             competitor_analysis = self._get_competitor_analysis(user_id, db)
@@ -301,7 +294,6 @@ class OnboardingDataIntegrationService:
             logger.info(f"Data source status for user {user_id}:")
             logger.info(f"  - Website analysis: {'✅ Found' if website_analysis else '❌ Missing'}")
             logger.info(f"  - Research preferences: {'✅ Found' if research_preferences else '❌ Missing'}")
-            logger.info(f"  - API keys data: {'✅ Found' if api_keys_data else '❌ Missing'}")
             logger.info(f"  - Onboarding session: {'✅ Found' if onboarding_session else '❌ Missing'}")
             logger.info(f"  - Persona data: {'✅ Found' if persona_data else '❌ Missing'}")
             logger.info(f"  - Competitor analysis: {'✅ Found' if competitor_analysis else '❌ Missing'}")
@@ -322,7 +314,6 @@ class OnboardingDataIntegrationService:
             integrated_data = {
                 'website_analysis': website_analysis,
                 'research_preferences': research_preferences,
-                'api_keys_data': api_keys_data,
                 'onboarding_session': onboarding_session,
                 'persona_data': persona_data,
                 'competitor_analysis': competitor_analysis,
@@ -331,7 +322,7 @@ class OnboardingDataIntegrationService:
                 'gsc_analytics': gsc_analytics,
                 'bing_analytics': bing_analytics,
                 'canonical_profile': canonical_profile,
-                'data_quality': self._assess_data_quality(website_analysis, research_preferences, api_keys_data, persona_data, competitor_analysis, gsc_analytics, bing_analytics),
+                'data_quality': self._assess_data_quality(website_analysis, research_preferences, persona_data, competitor_analysis, gsc_analytics, bing_analytics),
                 'processing_timestamp': datetime.utcnow().isoformat()
             }
 
@@ -454,43 +445,6 @@ class OnboardingDataIntegrationService:
 
         except Exception as e:
             logger.error(f"Error getting research preferences for user {user_id}: {str(e)}")
-            return {}
-
-    def _get_api_keys_data(self, user_id: str, db: Session) -> Dict[str, Any]:
-        """Get API keys data for the user."""
-        try:
-            # Get the latest onboarding session for the user
-            session = db.query(OnboardingSession).filter(
-                OnboardingSession.user_id == user_id
-            ).order_by(OnboardingSession.updated_at.desc()).first()
-            
-            if not session:
-                logger.info(f"No onboarding session found for user {user_id}")
-                return {}
-            
-            # Get all API keys for this session
-            api_keys = db.query(APIKey).filter(
-                APIKey.session_id == session.id
-            ).all()
-            
-            if not api_keys:
-                logger.info(f"No API keys found for user {user_id}")
-                return {}
-            
-            # Convert to dictionary format
-            api_data = {
-                'api_keys': [key.to_dict() for key in api_keys],
-                'total_keys': len(api_keys),
-                'providers': [key.provider for key in api_keys],
-                'data_freshness': self._calculate_freshness(session.updated_at),
-                'confidence_level': 0.8
-            }
-            
-            logger.info(f"Retrieved {len(api_keys)} API keys for user {user_id}")
-            return api_data
-
-        except Exception as e:
-            logger.error(f"Error getting API keys data for user {user_id}: {str(e)}")
             return {}
 
     def _get_onboarding_session(self, user_id: str, db: Session) -> Dict[str, Any]:
@@ -892,7 +846,7 @@ class OnboardingDataIntegrationService:
             logger.error(f"Error building competitor SEO benchmarks: {str(e)}")
             return {}
 
-    def _assess_data_quality(self, website_analysis: Dict, research_preferences: Dict, api_keys_data: Dict, persona_data: Dict = None, competitor_analysis: List = None, gsc_analytics: Dict = None, bing_analytics: Dict = None) -> Dict[str, Any]:
+    def _assess_data_quality(self, website_analysis: Dict, research_preferences: Dict, persona_data: Dict = None, competitor_analysis: List = None, gsc_analytics: Dict = None, bing_analytics: Dict = None) -> Dict[str, Any]:
         """Assess the quality and completeness of onboarding data."""
         try:
             quality_metrics = {
@@ -920,11 +874,6 @@ class OnboardingDataIntegrationService:
                 total_fields += 1
                 if research_preferences.get(field):
                     filled_fields += 1
-
-            # API keys completeness
-            total_fields += 1
-            if api_keys_data:
-                filled_fields += 1
 
             # Persona data completeness
             total_fields += 1
@@ -973,8 +922,6 @@ class OnboardingDataIntegrationService:
                 relevance_score += 0.20
             if research_preferences.get('research_topics'):
                 relevance_score += 0.15
-            if api_keys_data:
-                relevance_score += 0.10
             if persona_data and persona_data.get('core_persona'):
                 relevance_score += 0.15
             if competitor_analysis and len(competitor_analysis) > 0:
@@ -1047,7 +994,6 @@ class OnboardingDataIntegrationService:
             if existing_record:
                 existing_record.website_analysis_data = integrated_data.get('website_analysis', {})
                 existing_record.research_preferences_data = integrated_data.get('research_preferences', {})
-                existing_record.api_keys_data = integrated_data.get('api_keys_data', {})
                 existing_record.canonical_profile = cp
                 existing_record.updated_at = datetime.utcnow()
             else:
@@ -1055,7 +1001,6 @@ class OnboardingDataIntegrationService:
                     'user_id': user_id,
                     'website_analysis_data': integrated_data.get('website_analysis', {}),
                     'research_preferences_data': integrated_data.get('research_preferences', {}),
-                    'api_keys_data': integrated_data.get('api_keys_data', {}),
                     'canonical_profile': cp,
                     'created_at': datetime.utcnow(),
                     'updated_at': datetime.utcnow()
@@ -1353,13 +1298,11 @@ class OnboardingDataIntegrationService:
                 integrated_data = {
                     'website_analysis': record.website_analysis_data or {},
                     'research_preferences': record.research_preferences_data or {},
-                    'api_keys_data': record.api_keys_data or {},
                     'onboarding_session': {},
                     'canonical_profile': record.canonical_profile or {},
                     'data_quality': self._assess_data_quality(
                         record.website_analysis_data or {},
-                        record.research_preferences_data or {},
-                        record.api_keys_data or {}
+                        record.research_preferences_data or {}
                     ),
                     'processing_timestamp': record.updated_at.isoformat()
                 }

@@ -54,15 +54,39 @@ class WebsiteOnboardingStrategy:
 
         if step_number == 1 and request_data:
             self._complete_website_step2(svc, user_id, request_data, db)
+            await self._run_linkedin_if_connected("connect_linkedin", svc, user_id, request_data, db)
         elif step_number == 2 and request_data:
             self._complete_website_step3(svc, user_id, request_data, db)
+            await self._run_linkedin_if_connected("research_linkedin", svc, user_id, request_data, db)
         elif step_number == 3 and request_data:
             self._complete_website_step4(svc, user_id, request_data, db)
+            await self._run_linkedin_if_connected("persona_linkedin", svc, user_id, request_data, db)
 
         return {"warnings": warnings if warnings else None}
 
+    async def _run_linkedin_if_connected(self, method_name: str, svc, user_id, request_data, db) -> None:
+        """Run a LinkedIn strategy method only when the user has connected LinkedIn.
+
+        Delegates to ``connect_linkedin`` / ``research_linkedin`` /
+        ``persona_linkedin`` (by name) from the shared website step handlers, so
+        website and LinkedIn platforms compose into one flow. Website-only users
+        (no LinkedIn credentials) are skipped — backward-compatible.
+        """
+        try:
+            from services.integrations.linkedin_oauth import LinkedInOAuthService
+            LinkedInOAuthService().resolve_credentials(user_id)
+        except Exception:
+            return  # LinkedIn not connected; nothing to do
+
+        try:
+            from .linkedin_strategy import LinkedInOnboardingStrategy
+            method = getattr(LinkedInOnboardingStrategy(), method_name)
+            await method(svc, user_id, request_data, db)
+        except Exception as e:
+            logger.warning(f"[website] LinkedIn {method_name} failed (non-blocking): {e}")
+
     # ------------------------------------------------------------------
-    # Step 1 (was Step 2) -- Website analysis + schedule tasks
+    # Step 1 -- Connect Platforms (website analysis) + schedule tasks
     # ------------------------------------------------------------------
 
     def _complete_website_step2(self, svc, user_id, request_data, db):
@@ -74,6 +98,7 @@ class WebsiteOnboardingStrategy:
                 saved = svc._save_website_analysis(user_id, website_data, db)
                 if saved:
                     logger.info(f" Saved website analysis for user {user_id}")
+                    svc.record_connected_platform(user_id, "website", db)
 
                     website_url = website_data.get('website') or website_data.get('website_url')
                     if website_url:
@@ -96,7 +121,7 @@ class WebsiteOnboardingStrategy:
                 ) from e
 
     # ------------------------------------------------------------------
-    # Step 2 (was Step 3) -- Research preferences + competitors + schedule tasks
+    # Step 2 -- Research preferences + competitors + schedule tasks
     # ------------------------------------------------------------------
 
     def _complete_website_step3(self, svc, user_id, request_data, db):
@@ -162,7 +187,7 @@ class WebsiteOnboardingStrategy:
                 ) from e
 
     # ------------------------------------------------------------------
-    # Step 3 (was Step 4) -- Persona data + schedule tasks
+    # Step 3 -- Personalization (persona data) + schedule tasks
     # ------------------------------------------------------------------
 
     def _complete_website_step4(self, svc, user_id, request_data, db):

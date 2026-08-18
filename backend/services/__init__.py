@@ -1,12 +1,6 @@
 """Services package for ALwrity backend."""
 
-from .onboarding.api_key_manager import (
-    APIKeyManager,
-    OnboardingProgress,
-    get_onboarding_progress,
-    StepStatus,
-    StepData
-)
+from .onboarding.api_key_manager import APIKeyManager
 from .validation import check_all_api_keys
 
 from .translation import (
@@ -29,10 +23,6 @@ from .dubbing import (
 __all__ = [
     # Onboarding
     'APIKeyManager',
-    'OnboardingProgress',
-    'get_onboarding_progress',
-    'StepStatus',
-    'StepData',
     'check_all_api_keys',
     # Translation (common module)
     'translate_text',

@@ -18,15 +18,8 @@ from api.onboarding import (
     get_step_data,
     complete_step,
     skip_step,
-    validate_step_access,
-    get_api_keys,
-    get_api_keys_for_onboarding,
-    save_api_key,
-    validate_api_keys,
-    start_onboarding,
     complete_onboarding,
     reset_onboarding,
-    get_resume_info,
     get_onboarding_config,
     get_provider_setup_info,
     get_all_providers_info,
@@ -141,110 +134,7 @@ class OnboardingManager:
                 logger.error(f"Error in step_skip: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
-        @self.app.get("/api/onboarding/step/{step_number}/validate")
-        async def step_validate(step_number: int, current_user: dict = Depends(get_current_user)):
-            """Validate if user can access a specific step."""
-            try:
-                return await validate_step_access(step_number, current_user)
-            except HTTPException as he:
-                raise he
-            except Exception as e:
-                logger.error(f"Error in step_validate: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
-
-        # API key management endpoints
-        @self.app.get("/api/onboarding/api-keys")
-        async def api_keys():
-            """Get all configured API keys (masked)."""
-            try:
-                return await get_api_keys()
-            except Exception as e:
-                logger.error(f"Error in api_keys: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
-
-        @self.app.get("/api/onboarding/api-keys/onboarding")
-        async def api_keys_for_onboarding(current_user: dict = Depends(get_current_user)):
-            """Get all configured API keys for onboarding (unmasked)."""
-            try:
-                return await get_api_keys_for_onboarding(current_user)
-            except Exception as e:
-                logger.error(f"Error in api_keys_for_onboarding: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
-
-        @self.app.post("/api/onboarding/api-keys")
-        async def api_key_save(request: APIKeyRequest, current_user: dict = Depends(get_current_user)):
-            """Save an API key for a provider."""
-            try:
-                return await save_api_key(request, current_user)
-            except Exception as e:
-                logger.error(f"Error in api_key_save: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
-
-        @self.app.get("/api/onboarding/api-keys/validate")
-        async def api_key_validate():
-            """Get API key validation status and configuration."""
-            try:
-                import os
-                from dotenv import load_dotenv
-                
-                # Load environment variables
-                backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                env_path = os.path.join(backend_dir, ".env")
-                load_dotenv(env_path, override=True)
-                
-                # Check for required API keys (backend only)
-                api_keys = {}
-                required_keys = {
-                    'GEMINI_API_KEY': 'gemini',
-                    'EXA_API_KEY': 'exa'
-                    # Note: CopilotKit is frontend-only, validated separately
-                }
-                
-                missing_keys = []
-                configured_providers = []
-                
-                for env_var, provider in required_keys.items():
-                    key_value = os.getenv(env_var)
-                    if key_value and key_value.strip():
-                        api_keys[provider] = key_value.strip()
-                        configured_providers.append(provider)
-                    else:
-                        missing_keys.append(provider)
-                
-                # Determine if all required keys are present
-                required_providers = ['gemini', 'exa']  # Backend keys only
-                all_required_present = all(provider in configured_providers for provider in required_providers)
-                
-                result = {
-                    "api_keys": api_keys,
-                    "validation_results": {
-                        "gemini": {"valid": 'gemini' in configured_providers, "status": "configured" if 'gemini' in configured_providers else "missing"},
-                        "exa": {"valid": 'exa' in configured_providers, "status": "configured" if 'exa' in configured_providers else "missing"}
-                    },
-                    "all_valid": all_required_present,
-                    "total_providers": len(configured_providers),
-                    "configured_providers": configured_providers,
-                    "missing_keys": missing_keys
-                }
-                
-                logger.info(f"API Key Validation Result: {result}")
-                return result
-            except Exception as e:
-                logger.error(f"Error in api_key_validate: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
-
         # Onboarding control endpoints
-        @self.app.post("/api/onboarding/start")
-        async def onboarding_start(current_user: dict = Depends(get_current_user)):
-            """Start a new onboarding session."""
-            try:
-                return await start_onboarding(current_user)
-            except HTTPException as he:
-                raise he
-            except Exception as e:
-                logger.error(f"Error in onboarding_start: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
-
         @self.app.post("/api/onboarding/complete")
         async def onboarding_complete(current_user: dict = Depends(get_current_user)):
             """Complete the onboarding process."""
@@ -274,16 +164,6 @@ class OnboardingManager:
                 return await get_tasks_status(current_user)
             except Exception as e:
                 logger.error(f"Error in onboarding_tasks_status: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
-
-        # Resume functionality
-        @self.app.get("/api/onboarding/resume")
-        async def onboarding_resume():
-            """Get information for resuming onboarding."""
-            try:
-                return await get_resume_info()
-            except Exception as e:
-                logger.error(f"Error in onboarding_resume: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
         # Configuration endpoints
@@ -575,13 +455,8 @@ class OnboardingManager:
                 "/api/onboarding/step/{step_number}",
                 "/api/onboarding/step/{step_number}/complete",
                 "/api/onboarding/step/{step_number}/skip",
-                "/api/onboarding/step/{step_number}/validate",
-                "/api/onboarding/api-keys",
-                "/api/onboarding/api-keys/onboarding",
-                "/api/onboarding/start",
                 "/api/onboarding/complete",
                 "/api/onboarding/reset",
-                "/api/onboarding/resume",
                 "/api/onboarding/config",
                 "/api/onboarding/providers/{provider}/setup",
                 "/api/onboarding/providers",
@@ -600,6 +475,6 @@ class OnboardingManager:
                 "/api/onboarding/step4/regenerate-persona",
                 "/api/onboarding/step4/persona-options"
             ],
-            "total_endpoints": 30,
+            "total_endpoints": 25,
             "status": "active"
         }

@@ -1,9 +1,9 @@
 """
 User API Key Context Manager
-Provides user-specific API keys to backend services.
+Provides API keys to backend services.
 
-In development: Uses .env file
-In production: Fetches from database per user
+Platform-env only (BYOK retired): every user uses the platform's provider
+keys from environment variables. Per-user DB keys were removed (D1/D2).
 """
 
 import os
@@ -34,19 +34,13 @@ class UserAPIKeyContext:
         self._is_local = os.getenv('DEPLOY_ENV', 'local') == 'local'
     
     def __enter__(self):
-        """Load API keys when entering context."""
-        if self._is_local:
-            # Local mode: Use .env file
-            self.keys = self._load_from_env()
-            logger.debug(f"[LOCAL] Loaded API keys from .env file")
-        elif self.user_id:
-            # Production mode: Fetch from database
-            self.keys = self._load_from_database(self.user_id)
-            logger.debug(f"[PRODUCTION] Loaded API keys from database for user {self.user_id}")
-        else:
-            logger.warning("No user_id provided in production mode - using empty keys")
-            self.keys = {}
-        
+        """Load platform API keys from environment (BYOK retired — D1).
+
+        The platform now supplies all provider keys via environment variables
+        for every user (subscription model). Per-user DB keys are dead; the
+        ``_load_from_database`` path is removed in D2.
+        """
+        self.keys = self._load_from_env()
         return self.keys
     
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -66,28 +60,6 @@ class UserAPIKeyContext:
             'serper': os.getenv('SERPER_API_KEY', ''),
             'firecrawl': os.getenv('FIRECRAWL_API_KEY', ''),
         }
-    
-    def _load_from_database(self, user_id: str) -> Dict[str, str]:
-        """Load API keys from database for specific user."""
-        try:
-            from api.content_planning.services.content_strategy.onboarding import OnboardingDataIntegrationService
-            from services.database import get_session_for_user
-            
-            integration_service = OnboardingDataIntegrationService()
-            db = get_session_for_user(user_id)
-            if not db:
-                logger.error(f"Failed to create DB session for user {user_id}")
-                return {}
-            try:
-                integrated_data = integration_service.get_integrated_data_sync(user_id, db)
-                keys = integrated_data.get('api_keys_data', {})
-                logger.info(f"Loaded {len(keys)} API keys from database (SSOT) for user {user_id}")
-                return keys
-            finally:
-                db.close()
-        except Exception as e:
-            logger.error(f"Failed to load API keys from database for user {user_id}: {e}")
-            return {}
     
     @staticmethod
     def get_user_key(user_id: Optional[str], provider: str) -> Optional[str]:

@@ -19,7 +19,6 @@ def _patch_sources(svc, build_mock):
     patchers = [
         patch.object(svc, "_get_website_analysis", return_value={}),
         patch.object(svc, "_get_research_preferences", return_value={}),
-        patch.object(svc, "_get_api_keys_data", return_value={}),
         patch.object(svc, "_get_onboarding_session", return_value={}),
         patch.object(svc, "_get_persona_data", return_value={}),
         patch.object(svc, "_get_competitor_analysis", return_value=[]),

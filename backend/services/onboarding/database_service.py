@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 
-from models.onboarding import OnboardingSession, APIKey, WebsiteAnalysis, ResearchPreferences, PersonaData
+from models.onboarding import OnboardingSession, WebsiteAnalysis, ResearchPreferences, PersonaData
 from services.database import get_db
 
 
@@ -242,79 +242,6 @@ class OnboardingDatabaseService:
             logger.error(f"Error updating progress: {e}")
             session_db.rollback()
             return False
-    
-    def save_api_key(self, user_id: str, provider: str, api_key: str, db: Session = None) -> bool:
-        """Save API key for user with isolation."""
-        session_db = db or self.db
-        if not session_db:
-            raise ValueError("Database session required")
-        
-        try:
-            # Get user's onboarding session
-            session = self.get_or_create_session(user_id, session_db)
-            
-            # Check if key already exists for this provider and session
-            existing_key = session_db.query(APIKey).filter(
-                APIKey.session_id == session.id,
-                APIKey.provider == provider
-            ).first()
-            
-            if existing_key:
-                # Update existing key
-                existing_key.key = api_key
-                existing_key.updated_at = datetime.now()
-                logger.info(f"Updated {provider} API key for user {user_id}")
-            else:
-                # Create new key
-                new_key = APIKey(
-                    session_id=session.id,
-                    provider=provider,
-                    key=api_key
-                )
-                session_db.add(new_key)
-                logger.info(f"Created new {provider} API key for user {user_id}")
-            
-            session_db.commit()
-            return True
-            
-        except SQLAlchemyError as e:
-            error_msg = f"Database error saving API key for user {user_id}, provider {provider}: {str(e)}"
-            logger.error(f"❌ {error_msg}")
-            import traceback
-            logger.error(f"   Traceback: {traceback.format_exc()}")
-            session_db.rollback()
-            # BLOCKING ERROR: Raise exception to prevent step completion
-            raise Exception(f"Critical database error: API key for {provider} could not be saved. Please try again or contact support.") from e
-        except Exception as e:
-            error_msg = f"Unexpected error saving API key for user {user_id}, provider {provider}: {str(e)}"
-            logger.error(f"❌ {error_msg}")
-            import traceback
-            logger.error(f"   Traceback: {traceback.format_exc()}")
-            if session_db:
-                session_db.rollback()
-            # BLOCKING ERROR: Raise exception to prevent step completion
-            raise Exception(f"Critical error: API key for {provider} could not be saved. Please try again or contact support.") from e
-    
-    def get_api_keys(self, user_id: str, db: Session = None) -> Dict[str, str]:
-        """Get all API keys for user."""
-        session_db = db or self.db
-        if not session_db:
-            raise ValueError("Database session required")
-        
-        try:
-            session = self.get_session_by_user(user_id, session_db)
-            if not session:
-                return {}
-            
-            keys = session_db.query(APIKey).filter(
-                APIKey.session_id == session.id
-            ).all()
-            
-            return {key.provider: key.key for key in keys}
-            
-        except SQLAlchemyError as e:
-            logger.error(f"Error getting API keys: {e}")
-            return {}
     
     def save_website_analysis(self, user_id: str, analysis_data: Dict[str, Any], db: Session = None) -> bool:
         """Save website analysis for user."""

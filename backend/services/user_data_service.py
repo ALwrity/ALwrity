@@ -8,7 +8,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from loguru import logger
 
-from models.onboarding import OnboardingSession, WebsiteAnalysis, APIKey, ResearchPreferences
+from models.onboarding import OnboardingSession, WebsiteAnalysis, ResearchPreferences
 from api.content_planning.services.content_strategy.onboarding import OnboardingDataIntegrationService
 
 class UserDataService:
@@ -69,7 +69,6 @@ class UserDataService:
             return {
                 'session': integrated_data.get('onboarding_session'),
                 'website_analysis': integrated_data.get('website_analysis'),
-                'api_keys': integrated_data.get('api_keys_data', {}).get('api_keys', []),
                 'research_preferences': integrated_data.get('research_preferences')
             }
             

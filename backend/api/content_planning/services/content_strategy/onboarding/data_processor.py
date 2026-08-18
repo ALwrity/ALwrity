@@ -9,7 +9,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 # Import database models
-from models.onboarding import OnboardingSession, WebsiteAnalysis, ResearchPreferences, APIKey
+from models.onboarding import OnboardingSession, WebsiteAnalysis, ResearchPreferences
 
 logger = logging.getLogger(__name__)
 
@@ -43,16 +43,10 @@ class OnboardingDataProcessor:
                 ResearchPreferences.session_id == onboarding_session.id
             ).first()
             
-            # Get API keys data
-            api_keys = db.query(APIKey).filter(
-                APIKey.session_id == onboarding_session.id
-            ).all()
-            
             # Process each data type
             processed_data = {
                 'website_analysis': await self._process_website_analysis(website_analysis),
                 'research_preferences': await self._process_research_preferences(research_preferences),
-                'api_keys_data': await self._process_api_keys_data(api_keys),
                 'session_data': self._process_session_data(onboarding_session)
             }
             
@@ -122,50 +116,6 @@ class OnboardingDataProcessor:
             logger.error(f"Error processing research preferences: {str(e)}")
             return {}
     
-    async def _process_api_keys_data(self, api_keys: List[APIKey]) -> Dict[str, Any]:
-        """Process API keys data."""
-        try:
-            processed_data = {
-                'analytics_data': {},
-                'social_media_data': {},
-                'competitor_data': {},
-                'last_updated': None
-            }
-            
-            for api_key in api_keys:
-                if api_key.provider == 'google_analytics':
-                    processed_data['analytics_data']['google_analytics'] = {
-                        'connected': True,
-                        'data_available': True,
-                        'metrics': api_key.metrics if api_key.metrics else {}
-                    }
-                elif api_key.provider == 'google_search_console':
-                    processed_data['analytics_data']['google_search_console'] = {
-                        'connected': True,
-                        'data_available': True,
-                        'metrics': api_key.metrics if api_key.metrics else {}
-                    }
-                elif api_key.provider in ['linkedin', 'twitter', 'facebook']:
-                    processed_data['social_media_data'][api_key.provider] = {
-                        'connected': True,
-                        'followers': api_key.metrics.get('followers', 0) if api_key.metrics else 0
-                    }
-                elif api_key.provider in ['semrush', 'ahrefs', 'moz']:
-                    processed_data['competitor_data'][api_key.provider] = {
-                        'connected': True,
-                        'competitors_analyzed': api_key.metrics.get('competitors_analyzed', 0) if api_key.metrics else 0
-                    }
-                
-                # Update last_updated if this key is more recent
-                if api_key.updated_at and (not processed_data['last_updated'] or api_key.updated_at > datetime.fromisoformat(processed_data['last_updated'])):
-                    processed_data['last_updated'] = api_key.updated_at.isoformat()
-            
-            return processed_data
-            
-        except Exception as e:
-            logger.error(f"Error processing API keys data: {str(e)}")
-            return {}
-    
     def _process_session_data(self, onboarding_session: OnboardingSession) -> Dict[str, Any]:
         """Process onboarding session data."""
         try:
@@ -188,7 +138,6 @@ class OnboardingDataProcessor:
         try:
             website_data = processed_data.get('website_analysis', {})
             research_data = processed_data.get('research_preferences', {})
-            api_data = processed_data.get('api_keys_data', {})
             session_data = processed_data.get('session_data', {})
             
             # Return data in nested format that field transformation service expects
@@ -250,7 +199,6 @@ class OnboardingDataProcessor:
         base_confidence = {
             'website_analysis': 0.8,
             'research_preferences': 0.7,
-            'api_keys_data': 0.6,
             'session_data': 0.9
         }
         

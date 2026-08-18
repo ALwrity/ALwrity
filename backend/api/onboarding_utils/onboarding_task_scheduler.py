@@ -1,7 +1,7 @@
 """
 Onboarding Task Scheduler
-Shared task scheduling logic used by step_management_service.py (Steps 2-5)
-and onboarding_completion_service.py (Step 6).
+Shared task scheduling logic used by step_management_service.py (Steps 1-3)
+and onboarding_completion_service.py (completion).
 All scheduling is non-blocking -- step completion never fails on scheduling errors.
 """
 
@@ -311,6 +311,101 @@ def schedule_step4_tasks(user_id: str, db: Optional[Session] = None):
                 _record_task_in_session(db, user_id, f"persona_{platform['id']}", step=4)
     except Exception as e:
         logger.warning(f"[onboarding_step4] Non-blocking: failed to schedule platform personas: {e}")
+
+
+def schedule_linkedin_tasks(user_id: str, db) -> None:
+    """Schedule recurring LinkedIn background tasks after onboarding completes.
+
+    Creates DB-backed scheduler tasks (profile sync, post analytics sync,
+    growth reanalysis, OAuth monitoring). All errors are non-blocking.
+    """
+    from datetime import datetime, timezone, timedelta
+    from models.linkedin_monitoring_models import (
+        LinkedInProfileSyncTask,
+        LinkedInPostAnalyticsSyncTask,
+        LinkedInGrowthReanalysisTask,
+    )
+
+    now = datetime.now(timezone.utc)
+
+    try:
+        _upsert_task(
+            db, LinkedInProfileSyncTask,
+            user_id=user_id,
+            filters={"user_id": user_id},
+            defaults={
+                "status": "active",
+                "next_execution": now + timedelta(days=7),
+                "frequency_days": 7,
+                "payload": {
+                    "created_from": "onboarding_completion",
+                    "description": "Re-run LinkedIn profile pipeline (Phases 1-5)",
+                },
+            },
+        )
+        db.commit()
+        logger.info(f"[schedule_linkedin_tasks] Scheduled linkedin_profile_sync for {user_id}")
+        _record_task_in_session(db, user_id, "linkedin_profile_sync", step=6,
+                                details={"frequency": 7, "frequency_unit": "days"})
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"[schedule_linkedin_tasks] Non-blocking: failed to schedule linkedin_profile_sync: {e}")
+
+    try:
+        _upsert_task(
+            db, LinkedInPostAnalyticsSyncTask,
+            user_id=user_id,
+            filters={"user_id": user_id},
+            defaults={
+                "status": "active",
+                "next_execution": now + timedelta(hours=24),
+                "frequency_hours": 24,
+                "payload": {
+                    "created_from": "onboarding_completion",
+                    "post_limit": 50,
+                    "description": "Sync last 50 posts + engagement metrics from Unipile",
+                },
+            },
+        )
+        db.commit()
+        logger.info(f"[schedule_linkedin_tasks] Scheduled linkedin_post_analytics_sync for {user_id}")
+        _record_task_in_session(db, user_id, "linkedin_post_analytics_sync", step=6,
+                                details={"frequency": 24, "frequency_unit": "hours"})
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"[schedule_linkedin_tasks] Non-blocking: failed to schedule linkedin_post_analytics_sync: {e}")
+
+    try:
+        _upsert_task(
+            db, LinkedInGrowthReanalysisTask,
+            user_id=user_id,
+            filters={"user_id": user_id},
+            defaults={
+                "status": "active",
+                "next_execution": now + timedelta(hours=72),
+                "frequency_hours": 72,
+                "payload": {
+                    "created_from": "onboarding_completion",
+                    "description": "Re-run ConsolidatedGrowthService.analyze_all() to capture trending topic drift",
+                },
+            },
+        )
+        db.commit()
+        logger.info(f"[schedule_linkedin_tasks] Scheduled linkedin_growth_reanalysis for {user_id}")
+        _record_task_in_session(db, user_id, "linkedin_growth_reanalysis", step=6,
+                                details={"frequency": 72, "frequency_unit": "hours"})
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"[schedule_linkedin_tasks] Non-blocking: failed to schedule linkedin_growth_reanalysis: {e}")
+
+    try:
+        from services.oauth_token_monitoring_service import create_oauth_monitoring_tasks
+        create_oauth_monitoring_tasks(user_id, db, ['linkedin'])
+        db.commit()
+        logger.info(f"[schedule_linkedin_tasks] Created OAuth monitoring task for {user_id}")
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"[schedule_linkedin_tasks] Non-blocking: failed to create OAuth monitoring task: {e}")
 
 
 async def _run_sif_now(user_id: str, website_url: str):

@@ -46,7 +46,5 @@ def get_strategy(onboarding_type: Optional[str]) -> PlatformOnboardingStrategy:
 # registration order: website first (default fallback), then any future
 # platforms that will be added below.
 from .website_strategy import WebsiteOnboardingStrategy  # noqa: E402
-from .linkedin_strategy import LinkedInOnboardingStrategy  # noqa: E402
 
 register_strategy(WebsiteOnboardingStrategy())
-register_strategy(LinkedInOnboardingStrategy())

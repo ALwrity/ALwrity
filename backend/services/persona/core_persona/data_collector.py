@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from loguru import logger
 
 from services.database import get_db_session
-from models.onboarding import OnboardingSession, WebsiteAnalysis, ResearchPreferences, APIKey
+from models.onboarding import OnboardingSession, WebsiteAnalysis, ResearchPreferences
 
 # Path tuples used to walk the onboarding_data tree looking for text that
 # the deterministic linguistic analyzer can compute metrics on. We keep
@@ -77,11 +77,6 @@ class OnboardingDataCollector:
                 ResearchPreferences.session_id == onboarding_session.id
             ).first()
             
-            # Get API keys
-            api_keys = session.query(APIKey).filter(
-                APIKey.session_id == onboarding_session.id
-            ).all()
-            
             # Compile comprehensive data with ALL available information
             onboarding_data = {
                 "session_info": {
@@ -92,7 +87,6 @@ class OnboardingDataCollector:
                     "started_at": onboarding_session.started_at.isoformat() if onboarding_session.started_at else None,
                     "updated_at": onboarding_session.updated_at.isoformat() if onboarding_session.updated_at else None
                 },
-                "api_keys": [key.to_dict() for key in api_keys] if api_keys else [],
                 "website_analyses": [analysis.to_dict() for analysis in website_analyses] if website_analyses else [],
                 "research_preferences": research_prefs.to_dict() if research_prefs else None,
                 

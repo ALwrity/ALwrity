@@ -23,17 +23,10 @@ from .onboarding_utils.endpoints_core import (
 from .onboarding_utils.endpoints_management import (
     complete_step as _complete_step_impl,
     skip_step as _skip_step_impl,
-    validate_step_access as _validate_step_access_impl,
-    start_onboarding as _start_onboarding_impl,
     complete_onboarding as _complete_onboarding_impl,
     reset_onboarding as _reset_onboarding_impl,
-    get_resume_info as _get_resume_info_impl,
 )
 from .onboarding_utils.endpoints_config_data import (
-    get_api_keys,
-    get_api_keys_for_onboarding,
-    save_api_key,
-    validate_api_keys,
     get_onboarding_config,
     get_provider_setup_info,
     get_all_providers_info,
@@ -72,24 +65,12 @@ async def skip_step(step_number: int, current_user: Dict[str, Any]):
     return await _skip_step_impl(step_number, current_user)
 
 
-async def validate_step_access(step_number: int, current_user: Dict[str, Any]):
-    return await _validate_step_access_impl(step_number, current_user)
-
-
-async def start_onboarding(current_user: Dict[str, Any]):
-    return await _start_onboarding_impl(current_user)
-
-
 async def complete_onboarding(current_user: Dict[str, Any]):
     return await _complete_onboarding_impl(current_user)
 
 
 async def reset_onboarding(current_user: Dict[str, Any], hard: bool = False):
     return await _reset_onboarding_impl(current_user, hard=hard)
-
-
-async def get_resume_info():
-    return await _get_resume_info_impl()
 
 
 __all__ = [name for name in globals().keys() if not name.startswith('_')]

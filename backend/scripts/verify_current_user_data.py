@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from loguru import logger
 from services.database import SessionLocal
-from models.onboarding import OnboardingSession, APIKey, WebsiteAnalysis, ResearchPreferences
+from models.onboarding import OnboardingSession, WebsiteAnalysis, ResearchPreferences
 
 def verify_user_data():
     """Check what user_id format is being used."""
@@ -25,12 +25,6 @@ def verify_user_data():
             logger.info(f"  User ID: {session.user_id} (type: {type(session.user_id).__name__})")
             logger.info(f"  Current Step: {session.current_step}")
             logger.info(f"  Progress: {session.progress}%")
-            
-            # Check API keys for this session
-            api_keys = db.query(APIKey).filter(APIKey.session_id == session.id).all()
-            logger.info(f"  API Keys: {len(api_keys)} found")
-            for key in api_keys:
-                logger.info(f"    - {key.provider}")
             
             # Check website analysis
             website = db.query(WebsiteAnalysis).filter(WebsiteAnalysis.session_id == session.id).first()
