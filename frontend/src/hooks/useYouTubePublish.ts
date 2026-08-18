@@ -8,6 +8,8 @@ interface YouTubeChannel {
   expires_at: string;
   connected_at: string;
   is_active: boolean;
+  analytics_ready?: boolean;
+  needs_reconnect_for_analytics?: boolean;
 }
 
 interface YouTubePublishState {

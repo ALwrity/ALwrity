@@ -66,6 +66,33 @@ const DEFAULT_STATE: YouTubeCreatorState = {
 
 const STORAGE_KEY = 'youtube_creator_state';
 
+export const YOUTUBE_CREATOR_STATE_KEY = STORAGE_KEY;
+
+export function getYouTubeCreatorStateSnapshot(): YouTubeCreatorState {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return {
+        ...DEFAULT_STATE,
+        ...parsed,
+        scenes: Array.isArray(parsed.scenes) ? parsed.scenes : [],
+      };
+    }
+  } catch (error) {
+    console.error('[getYouTubeCreatorStateSnapshot] Failed to read state', error);
+  }
+  return { ...DEFAULT_STATE };
+}
+
+export function clearYouTubeCreatorStateStorage(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (error) {
+    console.error('[clearYouTubeCreatorStateStorage] Failed', error);
+  }
+}
+
 export const useYouTubeCreatorState = () => {
   const [state, setState] = useState<YouTubeCreatorState>(() => {
     // Initialize from localStorage if available

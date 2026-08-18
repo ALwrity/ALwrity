@@ -1,0 +1,278 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import "./youtube-dashboard-layout.css";
+import { YouTubeRadialWorkflow } from "./YouTubeRadialWorkflow";
+import { YouTubeMobileWorkflowGrid } from "./YouTubeMobileWorkflowGrid";
+import { YouTubeChannelHub } from "./YouTubeChannelHub";
+import { computeYouTubeRadialLayout } from "./youtubeRadialLayout";
+import {
+  CONNECT_GATED_WORKFLOW_IDS,
+  type YouTubeWorkflowCardId,
+} from "./youtubeWorkflowConfig";
+import { YouTubeWorkflowModals } from "./YouTubeWorkflowModals";
+import { YouTubeRightRail } from "./YouTubeRightRail";
+import { YouTubeTodayGrowth } from "./YouTubeTodayGrowth";
+import { YouTubeResumeDraftChip } from "./YouTubeResumeDraftChip";
+import { YouTubeCopilotFab } from "./YouTubeCopilotFab";
+import {
+  openYouTubeCreator,
+  YT_OPEN_WEDGE_EVENT,
+  type YouTubeOpenWedgeDetail,
+} from "./youtubeStudioEvents";
+import type { YouTubeCreatorState } from "../../../hooks/useYouTubeCreatorState";
+import type { YouTubeChannelBible } from "../../../services/youtubeApi";
+
+const DESKTOP_MIN_WIDTH_PX = 961;
+
+function useIsDesktop(): boolean {
+  const [desktop, setDesktop] = useState(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return true;
+    return window.matchMedia(`(min-width: ${DESKTOP_MIN_WIDTH_PX}px)`).matches;
+  });
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    const mq = window.matchMedia(`(min-width: ${DESKTOP_MIN_WIDTH_PX}px)`);
+    const onChange = () => setDesktop(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return desktop;
+}
+
+export interface YouTubeStudioHubProps {
+  connected: boolean;
+  channelName?: string | null;
+  channelBible?: YouTubeChannelBible | null;
+  oauthLoading?: boolean;
+  onConnect: () => void;
+  creatorState: YouTubeCreatorState;
+  onClearDraft: () => void;
+  needsAnalyticsReconnect?: boolean;
+}
+
+export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
+  connected,
+  channelName,
+  channelBible,
+  oauthLoading = false,
+  onConnect,
+  creatorState,
+  onClearDraft,
+  needsAnalyticsReconnect = false,
+}) => {
+  const isDesktop = useIsDesktop();
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(640);
+  const [containerHeight, setContainerHeight] = useState(0);
+  const [workflowModal, setWorkflowModal] = useState<YouTubeWorkflowCardId | null>(
+    null,
+  );
+  const [connectGateOpen, setConnectGateOpen] = useState(false);
+
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return undefined;
+    const readDimensions = () => {
+      if (el.clientWidth > 0) setContainerWidth(el.clientWidth);
+      if (el.parentElement && el.parentElement.clientHeight > 0) {
+        setContainerHeight(el.parentElement.clientHeight);
+      }
+    };
+    readDimensions();
+    const ro = new ResizeObserver(readDimensions);
+    ro.observe(el);
+    if (el.parentElement) {
+      const parentRo = new ResizeObserver(readDimensions);
+      parentRo.observe(el.parentElement);
+      return () => {
+        ro.disconnect();
+        parentRo.disconnect();
+      };
+    }
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const onOpenWedge = (event: Event) => {
+      const detail = (event as CustomEvent<YouTubeOpenWedgeDetail>).detail;
+      if (!detail?.wedge) return;
+      if (
+        !connected &&
+        CONNECT_GATED_WORKFLOW_IDS.includes(detail.wedge)
+      ) {
+        setConnectGateOpen(true);
+        return;
+      }
+      setWorkflowModal(detail.wedge);
+    };
+    window.addEventListener(YT_OPEN_WEDGE_EVENT, onOpenWedge);
+    return () => window.removeEventListener(YT_OPEN_WEDGE_EVENT, onOpenWedge);
+  }, [connected]);
+
+  const layout = useMemo(
+    () => computeYouTubeRadialLayout(containerWidth, containerHeight || undefined),
+    [containerWidth, containerHeight],
+  );
+
+  const hasDraft = Boolean(
+    creatorState.userIdea?.trim() ||
+      creatorState.videoPlan ||
+      (creatorState.scenes && creatorState.scenes.length > 0),
+  );
+
+  const draftPreview =
+    creatorState.videoPlan?.selected_title ||
+    creatorState.videoPlan?.title_suggestions?.[0] ||
+    creatorState.userIdea?.slice(0, 120) ||
+    "Untitled video draft";
+
+  const handleCardAction = useCallback(
+    (cardId: YouTubeWorkflowCardId) => {
+      if (!connected && CONNECT_GATED_WORKFLOW_IDS.includes(cardId)) {
+        setConnectGateOpen(true);
+        return;
+      }
+      setWorkflowModal(cardId);
+    },
+    [connected],
+  );
+
+  return (
+    <div className="yt-studio-hub" data-tour="yt-studio-hub">
+      <div className="yt-studio-hub-main">
+        <div className="yt-studio-hub-toolbar">
+          <YouTubeTodayGrowth />
+          <YouTubeResumeDraftChip
+            hasDraft={hasDraft}
+            preview={draftPreview}
+            onDiscard={onClearDraft}
+          />
+        </div>
+
+        <div className="yt-nudge">
+          AI drafts scripts and replies — you review, then publish. Start with Plan or Create.
+        </div>
+
+        <div className="yt-studio-hub-hero">
+          <div className="yt-studio-hub-heading">
+            <h2>Your YouTube channel, at a glance</h2>
+            <p>
+              Six steps, one cockpit — plan niche authority, create with HITL review, publish
+              cleanly, analyse growth, engage daily, and remarket winners.
+            </p>
+          </div>
+
+          <div className="yt-studio-hub-canvas" ref={canvasRef}>
+            {isDesktop ? (
+              <>
+                <YouTubeRadialWorkflow
+                  layout={layout}
+                  onCardAction={handleCardAction}
+                  connected={connected}
+                />
+                <div
+                  className="yt-studio-hub-hub"
+                  style={{ width: layout.hubVisualR * 2 }}
+                >
+                  <YouTubeChannelHub
+                    hubSize={layout.hubVisualR * 2}
+                    connected={connected}
+                    channelName={channelName}
+                    niche={channelBible?.niche || null}
+                    isLoading={oauthLoading}
+                    onConnect={onConnect}
+                    onCreateVideo={() => openYouTubeCreator({ step: 0 })}
+                  />
+                </div>
+              </>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 20,
+                }}
+              >
+                <YouTubeChannelHub
+                  hubSize={180}
+                  connected={connected}
+                  channelName={channelName}
+                  niche={channelBible?.niche || null}
+                  isLoading={oauthLoading}
+                  onConnect={onConnect}
+                  onCreateVideo={() => openYouTubeCreator({ step: 0 })}
+                />
+                <YouTubeMobileWorkflowGrid
+                  onCardAction={handleCardAction}
+                  connected={connected}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <YouTubeWorkflowModals
+          activeModal={workflowModal}
+          onClose={() => setWorkflowModal(null)}
+          connected={connected}
+          onRequestConnect={() => {
+            setWorkflowModal(null);
+            setConnectGateOpen(true);
+          }}
+          creatorState={creatorState}
+          onClearDraft={onClearDraft}
+          channelBibleNiche={channelBible?.niche || null}
+        />
+
+        {connectGateOpen && (
+          <div className="yt-modal-backdrop" role="presentation" onClick={() => setConnectGateOpen(false)}>
+            <div
+              className="yt-modal-card"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Connect YouTube"
+              style={{ width: "min(420px, 100%)" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="yt-modal-header">
+                <h2>Connect YouTube</h2>
+                <button
+                  type="button"
+                  className="yt-modal-close"
+                  onClick={() => setConnectGateOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <p className="yt-modal-intro">
+                Analysis, Engagement, and Remarket unlock after you connect your channel. Plan and
+                Create stay available offline.
+              </p>
+              <button
+                type="button"
+                className="yt-rail-btn yt-rail-btn--primary"
+                onClick={() => {
+                  setConnectGateOpen(false);
+                  onConnect();
+                }}
+              >
+                Connect YouTube
+              </button>
+            </div>
+          </div>
+        )}
+
+        <YouTubeCopilotFab />
+      </div>
+
+      <YouTubeRightRail
+        connected={connected}
+        channelName={channelName}
+        onConnect={onConnect}
+        isDesktop={isDesktop}
+        needsAnalyticsReconnect={needsAnalyticsReconnect}
+      />
+    </div>
+  );
+};
