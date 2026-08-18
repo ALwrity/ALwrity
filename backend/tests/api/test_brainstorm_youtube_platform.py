@@ -57,6 +57,19 @@ class TestIdeasPromptBuilders:
         )
         assert "CHANNEL BIBLE CONTEXT" not in user_prompt
 
+    def test_youtube_prompt_includes_optional_context_blocks(self):
+        from services.brainstorm.ideas_prompt_builders import build_youtube_ideas_prompts
+
+        _, user_prompt = build_youtube_ideas_prompts(
+            seed="Cooking tips",
+            count=3,
+            sources_block="1. Example",
+            trending_context="YOUTUBE TRENDING SIGNALS:\n- Rising query: pasta",
+            repurpose_context="SAVED YOUTUBE IDEAS:\n- Old idea",
+        )
+        assert "YOUTUBE TRENDING SIGNALS" in user_prompt
+        assert "SAVED YOUTUBE IDEAS" in user_prompt
+
     def test_normalize_platform_defaults_to_linkedin(self):
         from services.brainstorm.ideas_prompt_builders import normalize_platform
 
@@ -132,3 +145,39 @@ class TestBrainstormIdeasPlatformRoute:
             assert llm.call_args.kwargs["system_prompt"] == "sys"
             assert "YouTube video ideas" in llm.call_args.kwargs["prompt"]
             assert len(result.ideas) == 3
+
+    @pytest.mark.asyncio
+    async def test_youtube_platform_passes_trending_and_repurpose_flags(self):
+        from api.brainstorm import IdeaItem, IdeasRequest, generate_brainstorm_ideas
+
+        fake_ideas = [
+            IdeaItem(prompt="Video idea 1", rationale="r", evidence=None),
+            IdeaItem(prompt="Video idea 2", rationale="r", evidence=None),
+            IdeaItem(prompt="Video idea 3", rationale="r", evidence=None),
+        ]
+
+        with patch("api.brainstorm.search_exa", new_callable=AsyncMock) as search, \
+             patch("api.brainstorm.llm_text_gen", return_value={"ideas": []}), \
+             patch("api.brainstorm._parse_llm_ideas", return_value=fake_ideas), \
+             patch("api.brainstorm.fetch_youtube_trends_context", new_callable=AsyncMock) as trends, \
+             patch("api.brainstorm.fetch_youtube_saved_ideas_context") as repurpose, \
+             patch("api.brainstorm.build_youtube_ideas_prompts") as youtube_builder:
+            search.return_value = ([], "")
+            trends.return_value = "YOUTUBE TRENDING SIGNALS:\n- Rising query: travel"
+            repurpose.return_value = "SAVED YOUTUBE IDEAS:\n- Saved angle"
+            youtube_builder.return_value = ("sys", "prompt")
+
+            req = IdeasRequest(
+                seed="travel tips",
+                count=5,
+                platform="youtube",
+                include_trending=True,
+                include_repurpose=True,
+            )
+            await generate_brainstorm_ideas(req, current_user={"id": "u1"})
+
+            trends.assert_awaited_once()
+            repurpose.assert_called_once()
+            kwargs = youtube_builder.call_args.kwargs
+            assert "YOUTUBE TRENDING SIGNALS" in kwargs.get("trending_context", "")
+            assert "SAVED YOUTUBE IDEAS" in kwargs.get("repurpose_context", "")

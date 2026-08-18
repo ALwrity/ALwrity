@@ -71,6 +71,8 @@ def build_youtube_ideas_prompts(
     count: int,
     sources_block: str,
     channel_bible_context: Optional[str] = None,
+    trending_context: Optional[str] = None,
+    repurpose_context: Optional[str] = None,
 ) -> Tuple[str, str]:
     """
     Build YouTube video-idea brainstorm prompts.
@@ -81,6 +83,10 @@ def build_youtube_ideas_prompts(
     today_str = date.today().strftime("%B %d, %Y")
     bible = (channel_bible_context or "").strip()
     bible_block = f"\nCHANNEL BIBLE CONTEXT:\n{bible}\n" if bible else ""
+    trending = (trending_context or "").strip()
+    trending_block = f"\n{trending}\n" if trending else ""
+    repurpose = (repurpose_context or "").strip()
+    repurpose_block = f"\n{repurpose}\n" if repurpose else ""
 
     sys_prompt = (
         "You are an expert YouTube content strategist who proposes specific, non-generic "
@@ -93,7 +99,7 @@ def build_youtube_ideas_prompts(
     prompt = f"""TODAY'S DATE: {today_str}
 
 SEED IDEA: {seed}
-{bible_block}
+{bible_block}{trending_block}{repurpose_block}
 RECENT WEB SOURCES (numbered list):
 {sources_block}
 

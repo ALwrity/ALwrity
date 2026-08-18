@@ -26,6 +26,10 @@ from services.brainstorm.personalized_service import (
     gather_personalization_data,
 )
 from services.brainstorm.search_service import search_exa
+from services.brainstorm.youtube_brainstorm_context_service import (
+    fetch_youtube_saved_ideas_context,
+    fetch_youtube_trends_context,
+)
 from services.database import get_session_for_user
 from services.llm_providers.main_text_generation import llm_text_gen
 
@@ -62,6 +66,14 @@ class IdeasRequest(BaseModel):
     channel_bible_context: Optional[str] = Field(
         default=None,
         description="Optional YouTube Channel Bible serialize_for_prompt blob",
+    )
+    include_trending: bool = Field(
+        default=False,
+        description="YouTube only: include Google Trends (YouTube search interest) context",
+    )
+    include_repurpose: bool = Field(
+        default=False,
+        description="YouTube only: include saved YouTube brainstorm ideas for repurposing",
     )
 
 
@@ -191,19 +203,60 @@ async def generate_brainstorm_ideas(
         logger.info(
             f"[Brainstorm] /ideas request — platform={platform}, has_seed={bool((req.seed or '').strip())}, "
             f"seed_preview={seed_preview!r}, count={req.count}, has_channel_bible={has_channel_bible}, "
+            f"include_trending={req.include_trending}, include_repurpose={req.include_repurpose}, "
             f"persona={req.persona.persona_name if req.persona else None}"
         )
 
-        sources, content = await search_exa(req.seed)
+        try:
+            sources, content = await search_exa(req.seed)
+        except Exception as exc:
+            logger.error(
+                f"[Brainstorm] Exa search failed platform={platform} seed_preview={seed_preview!r}: {exc}",
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=502,
+                detail="Web research is temporarily unavailable. Please try again shortly.",
+            ) from exc
+
         logger.info(f"[Brainstorm] Exa returned {len(sources)} source(s) platform={platform}")
         sources_block = content or "(no web sources found)"
 
         if platform == "youtube":
+            trending_context = ""
+            repurpose_context = ""
+
+            if req.include_trending:
+                try:
+                    trending_context = await fetch_youtube_trends_context(req.seed, user_id)
+                except Exception as exc:
+                    logger.warning(
+                        f"[Brainstorm] YouTube trends context failed (continuing without trends): {exc}",
+                        exc_info=True,
+                    )
+
+            if req.include_repurpose:
+                try:
+                    repurpose_context = fetch_youtube_saved_ideas_context(user_id)
+                except Exception as exc:
+                    logger.warning(
+                        f"[Brainstorm] YouTube repurpose context failed (continuing without saved ideas): {exc}",
+                        exc_info=True,
+                    )
+
+            logger.info(
+                f"[Brainstorm] YouTube source chips — channel_bible={has_channel_bible}, "
+                f"trending_selected={req.include_trending}, trends_in_prompt={bool(trending_context)}, "
+                f"repurpose_selected={req.include_repurpose}, repurpose_in_prompt={bool(repurpose_context)}"
+            )
+
             sys_prompt, prompt = build_youtube_ideas_prompts(
                 seed=req.seed,
                 count=req.count,
                 sources_block=sources_block,
                 channel_bible_context=req.channel_bible_context,
+                trending_context=trending_context or None,
+                repurpose_context=repurpose_context or None,
             )
         else:
             persona_block = ""

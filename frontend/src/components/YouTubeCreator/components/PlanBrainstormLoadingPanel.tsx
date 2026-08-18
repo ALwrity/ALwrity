@@ -8,10 +8,14 @@ import { YOUTUBE_BRAINSTORM_LOADER_MESSAGES } from "../utils/youtubeBrainstormLo
 
 interface PlanBrainstormLoadingPanelProps {
   loaderMessageIndex: number;
+  includeTrending?: boolean;
+  includeRepurpose?: boolean;
 }
 
 export const PlanBrainstormLoadingPanel: React.FC<PlanBrainstormLoadingPanelProps> = ({
   loaderMessageIndex,
+  includeTrending = false,
+  includeRepurpose = false,
 }) => {
   const message =
     YOUTUBE_BRAINSTORM_LOADER_MESSAGES[
@@ -54,6 +58,16 @@ export const PlanBrainstormLoadingPanel: React.FC<PlanBrainstormLoadingPanelProp
         <Typography component="li" variant="caption">
           Searching the web via Exa
         </Typography>
+        {includeTrending ? (
+          <Typography component="li" variant="caption">
+            Fetching YouTube search interest from Google Trends
+          </Typography>
+        ) : null}
+        {includeRepurpose ? (
+          <Typography component="li" variant="caption">
+            Reviewing your saved YouTube brainstorm ideas
+          </Typography>
+        ) : null}
         <Typography component="li" variant="caption">
           Analyzing sources for video angles
         </Typography>

@@ -49,7 +49,6 @@ describe("PlanBrainstormPanel", () => {
   });
 
   it("does not call generate when seed and niche are empty", async () => {
-    // Override hook for this case via module mock state — panel disables Generate
     render(
       <PlanBrainstormPanel
         userIdea=""
@@ -147,5 +146,38 @@ describe("PlanBrainstormPanel", () => {
     fireEvent.click(screen.getByText(/Brainstorm video ideas/i));
     expect(screen.getByRole("status")).toBeInTheDocument();
     expect(screen.getByText(/Analyzing content and extracting insights/i)).toBeInTheDocument();
+  });
+
+  it("toggles trending as a source chip instead of opening a trends modal", () => {
+    render(
+      <PlanBrainstormPanel
+        userIdea="Japan travel"
+        channelBible={null}
+        onUseIdea={onUseIdea}
+      />,
+    );
+
+    fireEvent.click(screen.getByText(/Brainstorm video ideas/i));
+    const trendingChip = screen.getByRole("button", { name: "Trending" });
+    fireEvent.click(trendingChip);
+
+    expect(screen.queryByText(/Select trends topic/i)).not.toBeInTheDocument();
+    expect(trendingChip).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("loads saved ideas when repurpose chip is toggled on", () => {
+    render(
+      <PlanBrainstormPanel
+        userIdea="Japan travel"
+        channelBible={null}
+        onUseIdea={onUseIdea}
+      />,
+    );
+
+    fireEvent.click(screen.getByText(/Brainstorm video ideas/i));
+    fireEvent.click(screen.getByRole("button", { name: "Repurpose" }));
+
+    expect(mockLoadSaved).toHaveBeenCalled();
+    expect(screen.getByText(/Saved video ideas/i)).toBeInTheDocument();
   });
 });

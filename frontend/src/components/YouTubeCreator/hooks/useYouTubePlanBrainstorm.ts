@@ -85,11 +85,17 @@ interface UseYouTubePlanBrainstormParams {
   channelBible: YouTubeChannelBible | null;
   /** When true, include Channel Bible context in /ideas requests. */
   useChannelBible: boolean;
+  /** When true, include Google Trends (YouTube) context in /ideas requests. */
+  includeTrending: boolean;
+  /** When true, include saved YouTube brainstorm ideas in /ideas requests. */
+  includeRepurpose: boolean;
 }
 
 export function useYouTubePlanBrainstorm({
   channelBible,
   useChannelBible,
+  includeTrending,
+  includeRepurpose,
 }: UseYouTubePlanBrainstormParams) {
   const [phase, setPhase] = useState<YouTubeBrainstormPhase>("idle");
   const [ideas, setIdeas] = useState<YouTubeBrainstormIdea[]>([]);
@@ -134,9 +140,17 @@ export function useYouTubePlanBrainstorm({
     return String(hash);
   }, []);
 
-  const getCacheKey = useCallback((seed: string, hasBible: boolean) => {
-    return `${CACHE_PREFIX}${seed.trim().toLowerCase()}_bible=${hasBible ? "1" : "0"}`;
-  }, []);
+  const getCacheKey = useCallback(
+    (seed: string, hasBible: boolean, trending: boolean, repurpose: boolean) => {
+      return (
+        `${CACHE_PREFIX}${seed.trim().toLowerCase()}` +
+        `_bible=${hasBible ? "1" : "0"}` +
+        `_trending=${trending ? "1" : "0"}` +
+        `_repurpose=${repurpose ? "1" : "0"}`
+      );
+    },
+    [],
+  );
 
   const getCachedIdeas = useCallback((cacheKey: string): BrainstormCacheData | null => {
     try {
@@ -199,11 +213,17 @@ export function useYouTubePlanBrainstorm({
 
       const includeBible = useChannelBible && hasChannelBibleIdentity(channelBible);
       const channelBibleContext = includeBible ? buildChannelBibleContext(channelBible) : "";
-      const cacheKey = getCacheKey(seed, Boolean(channelBibleContext));
+      const cacheKey = getCacheKey(
+        seed,
+        Boolean(channelBibleContext),
+        includeTrending,
+        includeRepurpose,
+      );
 
       console.info(
         `[YouTubeBrainstorm] Generating ideas seed_preview=${seed.slice(0, 50)} ` +
-          `has_channel_bible=${Boolean(channelBibleContext)}`,
+          `has_channel_bible=${Boolean(channelBibleContext)} ` +
+          `include_trending=${includeTrending} include_repurpose=${includeRepurpose}`,
       );
 
       if (!forceRefresh) {
@@ -227,6 +247,8 @@ export function useYouTubePlanBrainstorm({
           count: 5,
           platform: "youtube",
           channel_bible_context: channelBibleContext || undefined,
+          include_trending: includeTrending,
+          include_repurpose: includeRepurpose,
         });
         const list = Array.isArray(response.data?.ideas) ? response.data.ideas : [];
         const srcList = Array.isArray(response.data?.sources) ? response.data.sources : [];
@@ -252,6 +274,8 @@ export function useYouTubePlanBrainstorm({
       clearLoaderInterval,
       getCacheKey,
       getCachedIdeas,
+      includeRepurpose,
+      includeTrending,
       resolveEffectiveSeed,
       setCachedIdeas,
       startLoaderAnimation,

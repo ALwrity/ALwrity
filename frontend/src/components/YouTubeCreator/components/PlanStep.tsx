@@ -53,7 +53,6 @@ import { ContentAsset } from '../../../hooks/useContentAssets';
 import { buildVideoPlanningOperation, buildImageEditingOperation } from '../utils/operationHelpers';
 import { useAvatarBlobUrl } from '../hooks/useAvatarBlobUrl';
 import { SelectWithCustom } from './SelectWithCustom';
-import { PlanTopicDiscoveryBar } from './PlanTopicDiscoveryBar';
 import { PlanUrlImportBar, type YouTubeSourceArticle } from './PlanUrlImportBar';
 import { ChannelBiblePanel } from './ChannelBiblePanel';
 import { PlanBrainstormPanel } from './PlanBrainstormPanel';
@@ -241,11 +240,6 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
               userIdea={userIdea}
               channelBible={channelBible}
               onUseIdea={onIdeaChange}
-              disabled={loading}
-            />
-            <PlanTopicDiscoveryBar
-              userIdea={userIdea}
-              onIdeaChange={onIdeaChange}
               disabled={loading}
             />
             <PlanUrlImportBar

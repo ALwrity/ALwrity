@@ -11,7 +11,6 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
   Link,
   Stack,
@@ -20,53 +19,12 @@ import {
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import LightbulbOutlinedIcon from "@mui/icons-material/LightbulbOutlined";
-import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
-import TravelExploreOutlinedIcon from "@mui/icons-material/TravelExploreOutlined";
-import ReplayOutlinedIcon from "@mui/icons-material/ReplayOutlined";
 import type { YouTubeChannelBible } from "../../../services/youtubeApi";
 import { hasChannelBibleIdentity } from "../utils/channelBibleContext";
 import { useYouTubePlanBrainstorm } from "../hooks/useYouTubePlanBrainstorm";
 import { PlanBrainstormLoadingPanel } from "./PlanBrainstormLoadingPanel";
+import { PlanBrainstormSourceChips } from "./PlanBrainstormSourceChips";
 import { helperSx, inputSx, labelSx } from "../styles";
-
-const SOURCE_CHIPS = [
-  {
-    id: "channel_bible" as const,
-    label: "Channel Bible",
-    color: "#2563eb",
-    Icon: MenuBookOutlinedIcon,
-  },
-  {
-    id: "web_research" as const,
-    label: "Web research",
-    color: "#667eea",
-    Icon: TravelExploreOutlinedIcon,
-  },
-  {
-    id: "repurpose" as const,
-    label: "Repurpose",
-    color: "#10b981",
-    Icon: ReplayOutlinedIcon,
-  },
-];
-
-function sourceChipSx(color: string, active: boolean, disabledChip = false) {
-  return {
-    background: active ? `${color}26` : `${color}14`,
-    color: disabledChip ? "#9ca3af" : color,
-    border: `1px solid ${active ? color : `${color}66`}`,
-    fontWeight: 600,
-    fontSize: "0.8125rem",
-    "& .MuiChip-icon": {
-      color: disabledChip ? "#9ca3af" : color,
-    },
-    "&:hover": disabledChip
-      ? {}
-      : {
-          background: `${color}33`,
-        },
-  };
-}
 
 export interface PlanBrainstormPanelProps {
   userIdea: string;
@@ -85,6 +43,8 @@ export const PlanBrainstormPanel: React.FC<PlanBrainstormPanelProps> = ({
   const [hasUserEditedSeed, setHasUserEditedSeed] = useState(false);
   const [seed, setSeed] = useState(() => userIdea.trim() || niche);
   const [useChannelBible, setUseChannelBible] = useState(() => hasChannelBibleIdentity(channelBible));
+  const [includeTrending, setIncludeTrending] = useState(false);
+  const [includeRepurpose, setIncludeRepurpose] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -105,9 +65,13 @@ export const PlanBrainstormPanel: React.FC<PlanBrainstormPanelProps> = ({
     save,
     loadSaved,
     hashPrompt,
-  } = useYouTubePlanBrainstorm({ channelBible, useChannelBible });
+  } = useYouTubePlanBrainstorm({
+    channelBible,
+    useChannelBible,
+    includeTrending,
+    includeRepurpose,
+  });
 
-  // Prefill seed from idea/niche only until the user edits the field manually.
   useEffect(() => {
     if (hasUserEditedSeed) return;
     const preferred = userIdea.trim() || niche;
@@ -132,8 +96,9 @@ export const PlanBrainstormPanel: React.FC<PlanBrainstormPanelProps> = ({
     void run(seed);
   };
 
-  const handleToggleSaved = () => {
-    const next = !showSaved;
+  const handleToggleRepurpose = () => {
+    const next = !includeRepurpose;
+    setIncludeRepurpose(next);
     setShowSaved(next);
     if (next) {
       void loadSaved();
@@ -192,49 +157,17 @@ export const PlanBrainstormPanel: React.FC<PlanBrainstormPanelProps> = ({
             InputLabelProps={{ sx: labelSx }}
           />
 
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            {SOURCE_CHIPS.map((chip) => {
-              const ChipIcon = chip.Icon;
-              if (chip.id === "channel_bible") {
-                const bibleDisabled =
-                  disabled || loading || !hasChannelBibleIdentity(channelBible);
-                return (
-                  <Chip
-                    key={chip.id}
-                    icon={<ChipIcon sx={{ fontSize: "0.875rem !important" }} />}
-                    label={chip.label}
-                    onClick={() => setUseChannelBible((v) => !v)}
-                    disabled={bibleDisabled}
-                    size="small"
-                    sx={sourceChipSx(chip.color, useChannelBible, bibleDisabled)}
-                  />
-                );
-              }
-              if (chip.id === "web_research") {
-                return (
-                  <Chip
-                    key={chip.id}
-                    icon={<ChipIcon sx={{ fontSize: "0.875rem !important" }} />}
-                    label={chip.label}
-                    size="small"
-                    sx={sourceChipSx(chip.color, true)}
-                    title="Web research via Exa is always used when generating ideas"
-                  />
-                );
-              }
-              return (
-                <Chip
-                  key={chip.id}
-                  icon={<ChipIcon sx={{ fontSize: "0.875rem !important" }} />}
-                  label={chip.label}
-                  onClick={handleToggleSaved}
-                  disabled={disabled || loading}
-                  size="small"
-                  sx={sourceChipSx(chip.color, showSaved, disabled || loading)}
-                />
-              );
-            })}
-          </Stack>
+          <PlanBrainstormSourceChips
+            useChannelBible={useChannelBible}
+            includeTrending={includeTrending}
+            includeRepurpose={includeRepurpose}
+            hasChannelBible={hasChannelBibleIdentity(channelBible)}
+            disabled={disabled}
+            loading={loading}
+            onToggleChannelBible={() => setUseChannelBible((value) => !value)}
+            onToggleTrending={() => setIncludeTrending((value) => !value)}
+            onToggleRepurpose={handleToggleRepurpose}
+          />
 
           <Box>
             <Button
@@ -254,7 +187,13 @@ export const PlanBrainstormPanel: React.FC<PlanBrainstormPanelProps> = ({
             ) : null}
           </Box>
 
-          {loading ? <PlanBrainstormLoadingPanel loaderMessageIndex={loaderMessageIndex} /> : null}
+          {loading ? (
+            <PlanBrainstormLoadingPanel
+              loaderMessageIndex={loaderMessageIndex}
+              includeTrending={includeTrending}
+              includeRepurpose={includeRepurpose}
+            />
+          ) : null}
 
           {seedError ? <Alert severity="error">{seedError}</Alert> : null}
           {saveError ? <Alert severity="warning">{saveError}</Alert> : null}
