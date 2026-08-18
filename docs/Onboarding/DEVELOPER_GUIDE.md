@@ -83,13 +83,13 @@ backend/api/onboarding_utils/
 - `reset_onboarding()` - Reset onboarding progress
 - `get_resume_info()` - Resume information for incomplete sessions
 
-#### 8. PersonaManagementService
-**Purpose**: Handles persona generation and management
-**Key Methods**:
-- `check_persona_generation_readiness()` - Validate persona readiness
-- `generate_persona_preview()` - Generate preview without saving
-- `generate_writing_persona()` - Generate and save persona
-- `get_user_writing_personas()` - Retrieve user personas
+#### 8. PersonaManagementService (removed)
+> Deprecated and removed during the Brand Brain E.4 migration. Persona generation
+> now flows through `api/onboarding_utils/step4_persona_routes.py`
+> (`generate_writing_personas` / `generate_writing_personas_async`) and reads/writes
+> `PersonaData` via `services/persona_data_service.py`. The legacy
+> `check_persona_generation_readiness`, `generate_persona_preview`,
+> `generate_writing_persona`, and `get_user_writing_personas` endpoints no longer exist.
 
 ## 🔧 Integration Points
 

@@ -144,46 +144,6 @@ async def get_research_preferences_data(current_user: Dict[str, Any]):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-async def check_persona_generation_readiness(user_id: int = 1):
-    try:
-        from api.onboarding_utils.persona_management_service import PersonaManagementService
-        persona_service = PersonaManagementService()
-        return await persona_service.check_persona_generation_readiness(user_id)
-    except Exception as e:
-        logger.error(f"Error checking persona readiness: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-async def generate_persona_preview(user_id: int = 1):
-    try:
-        from api.onboarding_utils.persona_management_service import PersonaManagementService
-        persona_service = PersonaManagementService()
-        return await persona_service.generate_persona_preview(user_id)
-    except Exception as e:
-        logger.error(f"Error generating persona preview: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-async def generate_writing_persona(user_id: str):
-    try:
-        from api.onboarding_utils.persona_management_service import PersonaManagementService
-        persona_service = PersonaManagementService()
-        return await persona_service.generate_writing_persona(user_id)
-    except Exception as e:
-        logger.error(f"Error generating writing persona: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-async def get_user_writing_personas(user_id: int = 1):
-    try:
-        from api.onboarding_utils.persona_management_service import PersonaManagementService
-        persona_service = PersonaManagementService()
-        return await persona_service.get_user_writing_personas(user_id)
-    except Exception as e:
-        logger.error(f"Error getting user personas: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
 async def save_business_info(business_info: dict):
     try:
         from api.onboarding_utils.business_info_service import BusinessInfoService

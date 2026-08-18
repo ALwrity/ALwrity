@@ -10,21 +10,17 @@ from middleware.auth_middleware import get_current_user
 from services.database import get_db
 
 from api.persona import (
-    generate_persona,
     get_user_personas,
     get_persona_details,
     get_platform_persona,
     get_persona_summary,
     update_persona,
     delete_persona,
-    validate_persona_generation_readiness,
-    generate_persona_preview,
     get_supported_platforms,
     validate_linkedin_persona,
     optimize_linkedin_persona,
     validate_facebook_persona,
     optimize_facebook_persona,
-    PersonaGenerationRequest,
     LinkedInPersonaValidationRequest,
     LinkedInPersonaValidationResponse,
     LinkedInOptimizationRequest,
@@ -40,15 +36,6 @@ from api.persona import update_platform_persona, generate_platform_persona, chec
 
 # Create router
 router = APIRouter(prefix="/api/personas", tags=["personas"])
-
-@router.post("/generate")
-async def generate_persona_endpoint(
-    request: PersonaGenerationRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user),
-):
-    """Generate a new writing persona from onboarding data."""
-    user_id = str(current_user.get('id'))
-    return await generate_persona(user_id, request)
 
 @router.get("/user")
 async def get_user_personas_endpoint(current_user: Dict[str, Any] = Depends(get_current_user)):
@@ -108,22 +95,6 @@ async def delete_persona_endpoint(
     """Delete a persona."""
     user_id = int(current_user.get("id"))
     return await delete_persona(user_id, persona_id)
-
-@router.get("/check/readiness")
-async def check_persona_readiness_endpoint(
-    current_user: Dict[str, Any] = Depends(get_current_user),
-):
-    """Check if user has sufficient data for persona generation."""
-    user_id = int(current_user.get("id"))
-    return await validate_persona_generation_readiness(user_id)
-
-@router.get("/preview/generate")
-async def generate_preview_endpoint(
-    current_user: Dict[str, Any] = Depends(get_current_user),
-):
-    """Generate a preview of the writing persona without saving."""
-    user_id = int(current_user.get("id"))
-    return await generate_persona_preview(user_id)
 
 @router.get("/platforms/supported")
 async def get_supported_platforms_endpoint():
@@ -220,7 +191,7 @@ async def validate_content_endpoint(
             raise HTTPException(status_code=400, detail="Platform and content are required")
         
         engine = PersonaReplicationEngine()
-        persona_data = engine.persona_service.get_persona_for_platform(user_id, platform)
+        persona_data = engine.persona_service.get_platform_persona(user_id, platform)
         
         if not persona_data:
             raise HTTPException(status_code=404, detail="No persona found for platform")
@@ -229,7 +200,7 @@ async def validate_content_endpoint(
         
         return {
             "validation_result": validation_result,
-            "persona_id": persona_data["core_persona"]["id"],
+            "persona_id": user_id,
             "platform": platform
         }
         

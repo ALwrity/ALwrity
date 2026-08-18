@@ -11,30 +11,28 @@ from models.linkedin_models import LinkedInOutlineSection
 class ArticlePromptBuilder:
     """Builder class for LinkedIn article generation prompts."""
     
-    # ==========================================================================
-    # PHASE C FOLLOW-UP — persona context injection (NOT YET WIRED)
-    # This builder uses the legacy `persona` dict only. To complete the curated
-    # brand-voice injection: (1) add a `persona_context: Optional[str] = None`
-    # param, (2) prefer it over the legacy `persona` dict (mirror
-    # PostPromptBuilder.build_post_prompt), (3) resolve it in
-    # content_generator.generate_grounded_article_content via
-    # resolve_persona_context(user_id, 'linkedin') when there is no
-    # persona_override. Keep the persona in the STYLE layer only — topic/outline
-    # stay user-driven (brand voice constrains HOW, never WHAT).
-    # ==========================================================================
     @staticmethod
-    def build_article_prompt(request: Any, persona: Optional[Dict[str, Any]] = None) -> str:
+    def build_article_prompt(request: Any, persona: Optional[Dict[str, Any]] = None, persona_context: Optional[str] = None) -> str:
         """
         Build prompt for article generation.
         
         Args:
             request: LinkedInArticleRequest object containing generation parameters
+            persona: Legacy persona dict (fallback when no curated context).
+            persona_context: Curated brand-voice block (preferred when present).
             
         Returns:
             Formatted prompt string for article generation
         """
         persona_block = ""
-        if persona:
+        if persona_context and persona_context.strip():
+            # Curated brand-voice block (resolved from onboarding PersonaData via
+            # resolve_persona_context) takes precedence over the legacy persona
+            # dict below — brand voice is enforced from onboarding, while the
+            # TOPIC / OUTLINE below stay user-driven (HOW the brand writes, never
+            # WHAT it writes about).
+            persona_block = persona_context.strip()
+        elif persona:
             try:
                 core = persona.get('core_persona', persona)
                 platform_adaptation = persona.get('platform_adaptation', persona.get('platform_persona', {}))

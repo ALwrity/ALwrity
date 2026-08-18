@@ -14,6 +14,6 @@ export {
 // Re-export types for convenience
 export type { 
   PlatformType,
-  WritingPersona,
-  PlatformAdaptation 
+  CorePersona,
+  PlatformPersona 
 } from '../../../types/PlatformPersonaTypes';

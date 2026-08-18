@@ -1,27 +1,29 @@
 /**
  * Platform Persona Types
- * TypeScript interfaces mapping to backend persona models from PR #226
+ * SSOT-aligned persona shapes derived from PersonaData (models.onboarding).
+ * The legacy WritingPersona / PlatformAdaptation DB-model mirrors were retired
+ * in E.4; consumers now read the flattened SSOT shape below.
  */
 
-// Core Writing Persona Interface
-export interface WritingPersona {
+// Platform Types
+export type PlatformType = 
+  | "twitter" 
+  | "linkedin" 
+  | "instagram" 
+  | "facebook" 
+  | "blog" 
+  | "medium" 
+  | "substack";
+
+// Core Persona (flattened from PersonaData.core_persona.identity + linguistic_fingerprint)
+export interface CorePersona {
   id: number;
-  user_id: number;
   persona_name: string;
   archetype: string;
   core_belief: string;
   brand_voice_description: string;
   linguistic_fingerprint: LinguisticFingerprint;
-  platform_adaptations: PlatformAdaptation[];
-  onboarding_session_id: number;
-  source_website_analysis: any;
-  source_research_preferences: any;
-  ai_analysis_version: string;
   confidence_score: number;
-  analysis_date: string;
-  created_at: string;
-  updated_at: string;
-  is_active: boolean;
 }
 
 // Linguistic Fingerprint Interface
@@ -60,20 +62,9 @@ export interface RhetoricalDevices {
   persuasion_techniques: string[];
 }
 
-// Platform Types
-export type PlatformType = 
-  | "twitter" 
-  | "linkedin" 
-  | "instagram" 
-  | "facebook" 
-  | "blog" 
-  | "medium" 
-  | "substack";
-
-// Platform Adaptation Interface
-export interface PlatformAdaptation {
+// Platform Persona (flattened from PersonaData.platform_personas[platform])
+export interface PlatformPersona {
   id: number;
-  writing_persona_id: number;
   platform_type: PlatformType;
   sentence_metrics: PlatformSentenceMetrics;
   lexical_features: PlatformLexicalFeatures;
@@ -85,8 +76,6 @@ export interface PlatformAdaptation {
   posting_frequency: PostingFrequency;
   content_types: ContentTypes;
   platform_best_practices: PlatformBestPractices;
-  created_at: string;
-  updated_at: string;
 }
 
 // Platform-Specific Sentence Metrics
@@ -173,138 +162,4 @@ export interface PlatformBestPractices {
   engagement_tactics: string[];
   content_strategies: string[];
   growth_hacks: string[];
-}
-
-// Persona Analysis Result Interface
-export interface PersonaAnalysisResult {
-  id: number;
-  writing_persona_id: number;
-  analysis_prompt: string;
-  linguistic_analysis: any;
-  platform_recommendations: any;
-  confidence_score: number;
-  analysis_date: string;
-  ai_model_version: string;
-}
-
-// Persona Validation Result Interface
-export interface PersonaValidationResult {
-  id: number;
-  writing_persona_id: number;
-  stylometric_accuracy: number;
-  consistency_score: number;
-  platform_compliance: number;
-  user_satisfaction: number;
-  validation_date: string;
-  improvement_suggestions: string[];
-}
-
-// API Response Interfaces
-export interface PersonaGenerationResponse {
-  success: boolean;
-  persona_id?: number;
-  message: string;
-  confidence_score?: number;
-  data_sufficiency?: number;
-  platforms_generated?: string[];
-}
-
-export interface PersonaReadinessResponse {
-  ready: boolean;
-  message: string;
-  missing_steps: string[];
-  data_sufficiency: number;
-  recommendations?: string[];
-}
-
-export interface PersonaPreviewResponse {
-  preview: {
-    identity: {
-      persona_name: string;
-      archetype: string;
-      core_belief: string;
-      brand_voice_description: string;
-    };
-    linguistic_fingerprint: any;
-    tonal_range: any;
-    sample_platform: {
-      platform: string;
-      adaptation: any;
-    };
-  };
-  confidence_score: number;
-  data_sufficiency: number;
-}
-
-// Platform Information Interface
-export interface PlatformInfo {
-  id: string;
-  name: string;
-  description: string;
-  character_limit?: number;
-  optimal_length?: string;
-  word_count?: string;
-  seo_optimized?: boolean;
-  storytelling_focus?: boolean;
-  subscription_focus?: boolean;
-}
-
-// Supported Platforms Response Interface
-export interface SupportedPlatformsResponse {
-  platforms: PlatformInfo[];
-}
-
-// User Personas Response Interface
-export interface UserPersonasResponse {
-  personas: WritingPersona[];
-  total_count: number;
-  active_count: number;
-}
-
-// Platform Persona Response Interface
-export interface PlatformPersonaResponse {
-  platform_type: PlatformType;
-  sentence_metrics: PlatformSentenceMetrics;
-  lexical_features: PlatformLexicalFeatures;
-  content_format_rules: ContentFormatRules;
-  engagement_patterns: EngagementPatterns;
-  platform_best_practices: PlatformBestPractices;
-}
-
-// Content Generation Request Interface
-export interface ContentGenerationRequest {
-  platform: PlatformType;
-  topic: string;
-  content_type: string;
-  additional_context?: string;
-}
-
-// Content Generation Response Interface
-export interface ContentGenerationResponse {
-  success: boolean;
-  content: string;
-  metadata: {
-    character_count: number;
-    word_count: number;
-    persona_compliance_score: number;
-    platform_optimization_score: number;
-    generated_at: string;
-  };
-  suggestions?: string[];
-}
-
-// Export Persona Request Interface
-export interface ExportPersonaRequest {
-  platform: PlatformType;
-  format: "prompt" | "json" | "markdown";
-  include_metadata?: boolean;
-}
-
-// Export Persona Response Interface
-export interface ExportPersonaResponse {
-  success: boolean;
-  content: string;
-  format: string;
-  export_date: string;
-  version: string;
 }

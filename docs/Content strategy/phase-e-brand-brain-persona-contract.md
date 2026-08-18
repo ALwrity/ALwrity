@@ -180,10 +180,19 @@ Goal: every consumer routes through `canonical_profile` (structured → `brand_v
 E.4 deletes the legacy voice store so there is **nothing left to fall back to** — this is what makes the read-time SSOT final. Order matters: `brand_voice` must already be the unified persona-or-website field (§2.2) **before** the legacy fields are deleted, or no-persona users lose their voice.
 
 1. `canonical_profile.writing_tone/voice/complexity/engagement` — deleted **only after** `brand_voice` is unified (persona-or-website, §2.2).
-2. `WritingPersona` / `PlatformPersona` / `EnhancedWritingPersona` models (`models/persona_models.py`, `models/enhanced_persona_models.py`).
+2. `WritingPersona` / `PlatformPersona` / `EnhancedWritingPersona` models (`models/persona_models.py`, `models/enhanced_persona_models.py`). Deleting `EnhancedWritingPersona` requires first deleting the legacy half of `persona_quality_improver.py` (object methods `assess_persona_quality` / `improve_persona_from_feedback` / `learn_from_content_performance` + their `_assess_*`/`_apply_*` helpers query it; keep the migrated `_comprehensive`/`_dict` half).
 3. `PersonaAnalysisService` (deprecated; `services/persona_analysis_service.py`).
 4. `_generate_persona_from_onboarding` (`onboarding_completion_service.py:392-435`).
-5. Legacy consumers: `services/linkedin/content_generator.py` (`get_persona_for_platform`), `services/linkedin_comment_assistant_draft_service.py`, `api/persona.py`, frontend `PlatformPersonaProvider.tsx`.
+5. Legacy consumers (all `get_persona_for_platform` / `get_user_personas` / legacy-model readers — 8 backend files + frontend):
+   - `services/persona_replication_engine.py` (2 sites)
+   - `services/linkedin/content_generator.py` (delete legacy fetch; keep C.2 prose path)
+   - `services/linkedin_comment_assistant_draft_service.py` (+ fix `_resolve_industry` → read `canonical_profile.industry`, not `core_persona.industry`)
+   - `api/facebook_writer/services/base_service.py`
+   - `api/persona_routes.py` (via replication engine)
+   - `api/persona.py` (producer + `get_user_personas` + 4 injected endpoints)
+   - `alwrity_utils/health_checker.py` (`session.query(WritingPersona).first()`)
+   - `services/persona/persona_quality_improver.py` (legacy half)
+   - frontend `PlatformPersonaProvider.tsx`
 
 ---
 
@@ -193,10 +202,36 @@ E.4 deletes the legacy voice store so there is **nothing left to fall back to** 
 E.1  rebuild trigger + TTL                              ✅ done
 E.2  persona + brand_voice blocks (structured mapper)   ✅ done (incl. verbatim platform_personas)
 E.3  route consumers through canonical_profile only     ⏸ batch 1 done (strategy_service); batches 2–4 deferred
-E.4  delete legacy voice store (removes the shim)       ⏳ gated on full E.3
+E.4  delete legacy voice store (removes the shim)       🔨 in progress — Phases 1–6 done, 7 (E2E gate) pending
 ```
 
 `E.2`'s structured mapper is **independent of `persona_context.py`** (the prose renderer); both derive from the same `PersonaData`.
+
+### E.4 status — Phases 1–6 done (uncommitted on `main`)
+
+| Phase | Scope | Status |
+|---|---|---|
+| 1 | Migrate 5 `get_persona_for_platform` consumers → `PersonaDataService` | ✅ done |
+| 2 | `api/persona.py`: retire producer + legacy endpoints + `PersonaAnalysisService` dep | ✅ done |
+| 3 | Remove `_generate_persona_from_onboarding` producer (`onboarding_completion_service.py`) | ✅ done |
+| 4 | `health_checker.py` + `persona_quality_improver.py` legacy half | ✅ done |
+| 5 | Frontend `PlatformPersonaProvider.tsx` | ✅ done |
+| 6 | Delete `models/persona_models.py`, `models/enhanced_persona_models.py`, `services/persona_analysis_service.py` | ✅ done |
+| 7 | E2E gate (LinkedIn write, Facebook write, comment industry, replication, health check) | ⏳ pending |
+
+**Phase 1 regressions caught + fixed before Phase 2:**
+- Article path (`generate_grounded_article_content`) was silently losing its persona after `_get_cached_persona_data` returned `None`; wired it to C.2 `persona_context` (mirrors the post path), so `ArticlePromptBuilder.build_article_prompt` now prefers the curated brand-voice block.
+- `linkedin_comment_assistant_draft_service._load_persona` was coercing `user_id` to `int` before `PersonaDataService.get_platform_persona` (which queries a String `OnboardingSession.user_id` column); now passes the string `user_id` verbatim.
+
+**Phase 2 detail:** removed `generate_persona` (legacy producer), `validate_persona_generation_readiness`, `generate_persona_preview`, the `get_persona_service` dependency, the unused `PersonaAnalysisService` injection on the 4 validate/optimize endpoints, and the now-dead `PersonaManagementService` class. The wrapper chain itself (`onboarding_endpoints.py` → `endpoints_config_data.py`) is still live — only its **4 legacy persona re-exports** (`check_persona_generation_readiness`, `generate_persona_preview`, `generate_writing_persona`, `get_user_writing_personas`) were dropped, since none were routed (frontend uses the `/step4/*` flow). `api/persona.py` no longer imports `PersonaAnalysisService`.
+
+**Phase 3 detail:** removed `_generate_persona_from_onboarding` (the last live `PersonaAnalysisService` importer) from `onboarding_completion_service.py`. `complete_onboarding` now derives `persona_generated` from `PersonaDataService().get_user_persona_data(user_id) is not None` (the SSOT `PersonaData` store) instead of firing the legacy `WritingPersona` producer — persona is already generated at Step 4, so completion just reports it. `PersonaAnalysisService` now has **zero live importers** (only its own definition + harmless comments/docstrings/logger config remain for Phase 6). Note: `regression_onboarding_completion_service.py` is a stale standalone harness (not in `tests/`; `pytest.ini` sets `testpaths = tests`) whose deep-competitor assertion tests behavior that moved to `onboarding_task_scheduler.py`, and it fails in isolation due to global `sys.modules` clobbering — both pre-existing, out of E.4 scope.
+
+**Phase 4 detail:** `alwrity_utils/health_checker.py` `database_health_check` now verifies the SSOT `OnboardingSession` + `PersonaData` tables (from `models.onboarding`) instead of the legacy `WritingPersona`/`PlatformPersona`/`PersonaAnalysisResult`/`PersonaValidationResult` tables. `services/persona/persona_quality_improver.py` had its legacy object-method half deleted (`assess_persona_quality`, `improve_persona_from_feedback`, `learn_from_content_performance` + their `_assess_*`/`_apply_*`/`_save_*` helpers that queried `EnhancedWritingPersona`/`PersonaQualityMetrics`/`PersonaLearningData`), leaving only the migrated dict-based `_comprehensive`/`_dict` methods (`assess_persona_quality_comprehensive`, `improve_persona_quality`) that `step4_persona_routes` and `linkedin_strategy` already use. The `models.enhanced_persona_models` import was removed. After Phase 4, the only live importers of the legacy model files are `services/persona_analysis_service.py`, `services/database/init_db.py`, and `alembic_migrations/env.py` — all removed/updated in Phase 6.
+
+**Phase 5 detail (frontend):** `PlatformPersonaProvider.tsx` already read the SSOT API (`getUserPersonas`/`getPlatformPersona` → `PersonaData` format); the remaining "legacy" was the `WritingPersona`/`PlatformAdaptation` TS type modeling (mirroring the DB models deleted in Phase 6). Retired those types in `types/PlatformPersonaTypes.ts`, replacing them with SSOT-aligned `CorePersona`/`PlatformPersona` (same flattened consumer-facing fields, legacy-only fields dropped), and updated the provider + the two type importers (`PersonaContext/index.ts`, `CopilotKit/PlatformPersonaChat.tsx`). Also removed the dead `api/persona.ts` functions `checkPersonaReadiness`/`generatePersonaPreview`/`generateWritingPersona` (hit nonexistent/removed endpoints) and the orphaned `OnboardingWizard/PersonaGenerationStep.tsx` (the live Step 4 flow is `OnboardingWizard/PersonaStep/`). Verified with `npx tsc --noEmit` (exit 0).
+
+**Phase 6 detail (delete):** deleted `services/persona_analysis_service.py`, `models/persona_models.py` (`WritingPersona`/`PlatformPersona`/`PersonaAnalysisResult`/`PersonaValidationResult`), and `models/enhanced_persona_models.py` (`EnhancedWritingPersona`/`EnhancedPlatformPersona`/`PersonaQualityMetrics`/`PersonaLearningData`). Removed the bare `import models.persona_models` / `import models.enhanced_persona_models` lines from `services/database/init_db.py` and `alembic_migrations/env.py` (so `Base.metadata` no longer registers the retired tables — `create_all` only ever adds, never drops, so existing DBs keep their old tables). Cleaned `logging_config.py` (dropped `persona_analysis_service` logger) and `app.py` (stale comment). Verified zero live references to any legacy model class and 143 persona/blog_writer/onboarding tests pass. The `regression_onboarding_completion_service.py` mock was already swapped to `persona_data_service` in Phase 3, so no `PersonaAnalysisService` text remained there.
 
 ### E.3 status — paused after batch 1 (test before proceeding)
 
@@ -228,3 +263,5 @@ Rules to honor when resuming:
 1. **LinkedIn-onboarding industry is not wired.** `_build_canonical_profile`'s `industry` value derivation reads only `website_analysis.target_audience.industry_focus` → `research_preferences.target_audience.industry_focus`. It never reads `linkedin_profile.industry` (the profile's industry), even though the old `sources` dict had a dead `linkedin_profile` branch. For LinkedIn onboarding (no website), `industry` will be `None`. Fix: wire `linkedin_profile.industry` into the value derivation, with `sources.industry = 'linkedin_profile'`. Separate ticket, out of E-scope.
 
 2. **`PersonaData.to_dict()` vs camelCase readers.** Some legacy consumers read `persona_data.get('platformPersonas')` (camelCase) while `PersonaData.to_dict()` emits `platform_personas` (snake_case) — see `brand_dna_sync.py:98` vs `:199`. This is a pre-existing case-mismatch that silently yields `{}`. Verify and align during E.3 when those consumers are migrated.
+
+3. **Onboarding FinalStep summary reads legacy `core_persona` field names (post-E.4 follow-up).** `onboarding_summary_service.py:_get_personalization_settings` (`:126-129`) read `core_persona.writing_style` / `.target_audience` / `.brand_voice` / `.tone`, none of which the SSOT `PersonaData.core_persona` (`identity.{archetype, brand_voice_description}`, `tonal_range`, `linguistic_fingerprint`, `stylistic_constraints`) produces — so `personalization_settings` silently fell back to defaults. **FIXED**: the method now reads `identity.brand_voice_description` + `tonal_range.default_tone` and pulls `writing_style`/`target_audience`/`content_focus` from `research_preferences` (the correct source). Also fixed `persona_quality_improver._assess_platform_consistency` to a tone-based check instead of the retired `brand_voice.keywords` overlap (which always scored 0). Tests: `tests/services/test_persona_schema_migration.py`. Remaining legacy-schema reader (out of scope, already `# E.3 (deferred)`-marked in code): `content_strategy/autofill/normalizers/persona_normalizer.py` reads many legacy `core_persona` field names (`archetype`, `tone`, `demographics`, …) and needs the full E.3 canonical-profile route-through, not a one-liner.

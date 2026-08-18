@@ -11,7 +11,6 @@ from services.onboarding.api_key_manager import get_api_key_manager
 from services.database import get_session_for_user
 from services.website_analysis_service import WebsiteAnalysisService
 from services.research_preferences_service import ResearchPreferencesService
-from services.persona_analysis_service import PersonaAnalysisService
 from api.content_planning.services.content_strategy.onboarding import OnboardingDataIntegrationService
 from models.onboarding import OnboardingSession
 
@@ -117,30 +116,33 @@ class OnboardingSummaryService:
             }
     
     def _get_personalization_settings(self, research_preferences: Optional[Dict[str, Any]], persona_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Get personalization settings based on research preferences and persona data."""
-        if persona_data and isinstance(persona_data, dict):
-            platform_personas = persona_data.get('platform_personas') or {}
-            linkedin_persona = platform_personas.get('linkedin') if isinstance(platform_personas, dict) else None
-            core = persona_data.get('core_persona') or {}
-            if linkedin_persona or core:
-                return {
-                    "writing_style": linkedin_persona.get('writing_style', core.get('writing_style', 'professional')) if linkedin_persona else core.get('writing_style', 'professional'),
-                    "target_audience": linkedin_persona.get('target_audience', core.get('target_audience', 'general')) if linkedin_persona else core.get('target_audience', 'general'),
-                    "brand_voice": linkedin_persona.get('brand_voice', core.get('brand_voice', '')) if linkedin_persona else core.get('brand_voice', ''),
-                    "tone": linkedin_persona.get('tone', core.get('tone', '')) if linkedin_persona else core.get('tone', ''),
-                    "content_focus": research_preferences.get('content_focus', 'informative') if research_preferences else 'informative'
-                }
-        if research_preferences:
-            return {
-                "writing_style": research_preferences.get('writing_style', 'professional'),
-                "target_audience": research_preferences.get('target_audience', 'general'),
-                "content_focus": research_preferences.get('content_focus', 'informative')
-            }
-        return {
-            "writing_style": "professional",
-            "target_audience": "general",
-            "content_focus": "informative"
+        """Get personalization settings based on research preferences and persona data.
+
+        Writing style / target audience / content focus come from research
+        preferences (not the persona). Brand voice and tone come from the SSOT
+        PersonaData schema: ``core_persona.identity.brand_voice_description`` and
+        ``core_persona.tonal_range.default_tone`` (the legacy ``core_persona.brand_voice``
+        / ``.tone`` / ``.writing_style`` / ``.target_audience`` field names no longer
+        exist in the new schema).
+        """
+        rp = research_preferences or {}
+        settings = {
+            "writing_style": rp.get('writing_style', 'professional'),
+            "target_audience": rp.get('target_audience', 'general'),
+            "content_focus": rp.get('content_focus', 'informative')
         }
+
+        if persona_data and isinstance(persona_data, dict):
+            core = persona_data.get('core_persona') or {}
+            identity = core.get('identity') or {}
+            tonal_range = core.get('tonal_range') or {}
+            brand_voice = identity.get('brand_voice_description', '')
+            tone = tonal_range.get('default_tone', '')
+            if brand_voice or tone:
+                settings["brand_voice"] = brand_voice
+                settings["tone"] = tone
+
+        return settings
 
     def _get_integrations(self, payload: Optional[Dict[str, Any]], is_linkedin: bool) -> Dict[str, Any]:
         """Get integration / content preference data from session payload."""
