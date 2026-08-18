@@ -23,7 +23,7 @@ from services.linkedin_comment_assistant_draft_cache_service import (
     LinkedInCommentAssistantDraftCacheService,
 )
 from services.llm_providers.main_text_generation import llm_text_gen
-from services.persona_analysis_service import PersonaAnalysisService
+from services.persona_data_service import PersonaDataService
 
 _LOG_PREFIX = "[CommentAssistantDraft]"
 
@@ -72,20 +72,14 @@ def _classify_llm_error(exc: Exception) -> str:
 
 
 def _load_persona(user_id: str) -> Optional[dict[str, Any]]:
-    """Load the user's LinkedIn persona from the shared persona service."""
-    try:
-        uid_int = int(user_id)
-    except (ValueError, TypeError):
-        logger.warning(
-            "{} Cannot parse user_id as int for persona lookup user_id={}",
-            _LOG_PREFIX,
-            _mask_user_id(user_id),
-        )
-        return None
+    """Load the user's LinkedIn persona from the shared persona service.
 
+    `user_id` is a string Clerk ID (OnboardingSession.user_id is a String column),
+    so it must be passed to PersonaDataService verbatim — never coerced to int.
+    """
     try:
-        persona_service = PersonaAnalysisService()
-        return persona_service.get_persona_for_platform(uid_int, "linkedin")
+        persona_service = PersonaDataService()
+        return persona_service.get_platform_persona(user_id, "linkedin")
     except Exception as exc:
         logger.warning(
             "{} Persona load failed user_id={}: {}",
@@ -96,14 +90,29 @@ def _load_persona(user_id: str) -> Optional[dict[str, Any]]:
         return None
 
 
-def _resolve_industry(persona_data: Optional[dict[str, Any]]) -> str:
-    """Resolve industry from persona or default to General."""
-    if not persona_data:
-        return "General"
-    core = persona_data.get("core_persona") or {}
-    industry = core.get("industry") or core.get("sector") or ""
-    if isinstance(industry, str) and industry.strip():
-        return industry.strip()
+def _resolve_industry(user_id: str) -> str:
+    """Resolve industry from the Brand Brain (canonical_profile.industry).
+
+    The persona (PersonaData) does NOT carry industry — it lives in
+    website_analysis/canonical_profile. Defaults to "General" when unavailable.
+    """
+    try:
+        from services.database import get_session_for_user
+        from api.content_planning.services.content_strategy.onboarding import OnboardingDataIntegrationService
+
+        db = get_session_for_user(user_id)
+        if not db:
+            return "General"
+        try:
+            integrated = OnboardingDataIntegrationService().get_integrated_data_sync(user_id, db)
+            canonical = integrated.get("canonical_profile") or {}
+            industry = canonical.get("industry") or ""
+            if isinstance(industry, str) and industry.strip():
+                return industry.strip()
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning(f"{_LOG_PREFIX} industry resolve failed user={_mask_user_id(user_id)}: {exc}")
     return "General"
 
 
@@ -325,7 +334,7 @@ async def _draft_reply_core(
                 )
 
     persona_data = _load_persona(user_id)
-    industry = _resolve_industry(persona_data)
+    industry = _resolve_industry(user_id)
     logger.info(
         "{} persona loaded user={} has_persona={} industry={}",
         _LOG_PREFIX,

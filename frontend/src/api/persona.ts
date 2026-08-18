@@ -5,11 +5,6 @@
 
 import { apiClient } from './client';
 
-export interface PersonaGenerationRequest {
-  onboarding_session_id?: number;
-  force_regenerate?: boolean;
-}
-
 export interface PersonaResponse {
   persona_id: number;
   persona_name: string;
@@ -18,42 +13,6 @@ export interface PersonaResponse {
   confidence_score: number;
   platforms: string[];
   created_at: string;
-}
-
-export interface PersonaGenerationResponse {
-  success: boolean;
-  persona_id?: number;
-  message: string;
-  confidence_score?: number;
-  data_sufficiency?: number;
-  platforms_generated?: string[];
-}
-
-export interface PersonaReadinessResponse {
-  ready: boolean;
-  message: string;
-  missing_steps: string[];
-  data_sufficiency: number;
-  recommendations?: string[];
-}
-
-export interface PersonaPreviewResponse {
-  preview: {
-    identity: {
-      persona_name: string;
-      archetype: string;
-      core_belief: string;
-      brand_voice_description: string;
-    };
-    linguistic_fingerprint: any;
-    tonal_range: any;
-    sample_platform: {
-      platform: string;
-      adaptation: any;
-    };
-  };
-  confidence_score: number;
-  data_sufficiency: number;
 }
 
 export interface PlatformInfo {
@@ -71,51 +30,6 @@ export interface PlatformInfo {
 export interface SupportedPlatformsResponse {
   platforms: PlatformInfo[];
 }
-
-/**
- * Check if user has sufficient onboarding data for persona generation
- */
-export const checkPersonaReadiness = async (userId: number = 1): Promise<PersonaReadinessResponse> => {
-  try {
-    const response = await apiClient.get('/api/onboarding/persona-readiness', {
-      params: { user_id: userId }
-    });
-    return response.data;
-  } catch (error: any) {
-    console.error('Error checking persona readiness:', error);
-    throw new Error(error.response?.data?.detail || 'Failed to check persona readiness');
-  }
-};
-
-/**
- * Generate a preview of the writing persona without saving
- */
-export const generatePersonaPreview = async (userId: number = 1): Promise<PersonaPreviewResponse> => {
-  try {
-    const response = await apiClient.get('/api/onboarding/persona-preview', {
-      params: { user_id: userId }
-    });
-    return response.data;
-  } catch (error: any) {
-    console.error('Error generating persona preview:', error);
-    throw new Error(error.response?.data?.detail || 'Failed to generate persona preview');
-  }
-};
-
-/**
- * Generate and save a writing persona from onboarding data
- */
-export const generateWritingPersona = async (userId: number = 1, request: PersonaGenerationRequest = {}): Promise<PersonaGenerationResponse> => {
-  try {
-    const response = await apiClient.post('/api/personas/generate', request, {
-      params: { user_id: userId }
-    });
-    return response.data;
-  } catch (error: any) {
-    console.error('Error generating writing persona:', error);
-    throw new Error(error.response?.data?.detail || 'Failed to generate writing persona');
-  }
-};
 
 /**
  * Get all writing personas for a user

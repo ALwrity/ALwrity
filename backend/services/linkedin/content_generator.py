@@ -26,7 +26,6 @@ from services.linkedin.content_generator_prompts import (
     VideoScriptGenerator
 )
 from services.llm_providers.main_text_generation import llm_text_gen
-from services.persona_analysis_service import PersonaAnalysisService
 import time
 
 
@@ -47,47 +46,13 @@ class ContentGenerator:
         self.video_script_generator = VideoScriptGenerator(citation_manager, quality_analyzer)
     
     def _get_cached_persona_data(self, user_id: str, platform: str) -> Optional[Dict[str, Any]]:
+        """Return None — the legacy WritingPersona fetch was retired (E.4).
+
+        The curated C.2 prose path (``resolve_persona_context``) is now the sole
+        persona source for LinkedIn content generation. Callers already fall back
+        to ``persona_context`` when this returns None.
         """
-        Get persona data with caching for LinkedIn platform.
-        
-        Args:
-            user_id: User ID to get persona for
-            platform: Platform type (linkedin)
-            
-        Returns:
-            Persona data or None if not available
-        """
-        cache_key = f"{platform}_persona_{user_id}"
-        current_time = time.time()
-        
-        # Check cache first
-        if cache_key in self._persona_cache and cache_key in self._cache_timestamps:
-            cache_age = current_time - self._cache_timestamps[cache_key]
-            if cache_age < self._cache_duration:
-                logger.debug(f"Using cached persona data for user {user_id} (age: {cache_age:.1f}s)")
-                return self._persona_cache[cache_key]
-            else:
-                # Cache expired, remove it
-                logger.debug(f"Cache expired for user {user_id}, refreshing...")
-                del self._persona_cache[cache_key]
-                del self._cache_timestamps[cache_key]
-        
-        # Fetch fresh data
-        try:
-            persona_service = PersonaAnalysisService()
-            persona_data = persona_service.get_persona_for_platform(user_id, platform)
-            
-            # Cache the result
-            if persona_data:
-                self._persona_cache[cache_key] = persona_data
-                self._cache_timestamps[cache_key] = current_time
-                logger.debug(f"Cached persona data for user {user_id}")
-            
-            return persona_data
-            
-        except Exception as e:
-            logger.warning(f"Could not load persona data for {platform} content generation: {e}")
-            return None
+        return None
     
     def _clear_persona_cache(self, user_id: str = None):
         """
@@ -547,17 +512,15 @@ class ContentGenerator:
     async def generate_grounded_article_content(self, request, research_sources: List, user_id: str = None) -> Dict[str, Any]:
         """Generate article content using provider-agnostic llm_text_gen with structured JSON output."""
         try:
-            # NOTE (Phase C follow-up): this article path is NOT yet wired to the
-            # curated persona_context — it still uses the legacy persona via
-            # ArticlePromptBuilder.build_article_prompt. To complete it, mirror
-            # generate_grounded_post_content above: resolve persona_context when
-            # there is no persona_override, then add a persona_context= param to
-            # ArticlePromptBuilder.build_article_prompt and pass it through.
-            # The carousel / video-script builders are the same follow-up pattern.
             # Build the prompt using persona if available
             persona_data = None
             if user_id:
                 persona_data = self._get_cached_persona_data(user_id, 'linkedin')
+            # Curated brand-voice injection — mirror the post path (C.2). Resolve
+            # the onboarding persona (PersonaData) into a compact Brand Voice
+            # block and prefer it over the legacy path, but only when there is no
+            # session persona_override so an explicit override always wins.
+            persona_context = None
             if getattr(request, 'persona_override', None):
                 try:
                     override = request.persona_override
@@ -574,7 +537,10 @@ class ContentGenerator:
                         persona_data = override
                 except Exception:
                     pass
-            prompt = ArticlePromptBuilder.build_article_prompt(request, persona=persona_data)
+            elif user_id:
+                from services.persona.persona_resolver import resolve_persona_context
+                persona_context = resolve_persona_context(user_id, 'linkedin')
+            prompt = ArticlePromptBuilder.build_article_prompt(request, persona=persona_data, persona_context=persona_context)
             
             # Inject research context (highlights/summary prioritized)
             research_context = self._build_research_context(research_sources)

@@ -7,7 +7,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { CopilotSidebar } from '@copilotkit/react-ui';
 import { usePlatformPersonaContext } from '../PersonaContext';
-import { PlatformType, WritingPersona, PlatformAdaptation } from '../../../types/PlatformPersonaTypes';
+import { PlatformType, CorePersona, PlatformPersona } from '../../../types/PlatformPersonaTypes';
 
 // Platform-specific chat configurations
 interface PlatformChatConfig {
@@ -20,8 +20,8 @@ interface PlatformChatConfig {
 // Platform chat configurations
 const getPlatformChatConfig = (
   platform: PlatformType,
-  corePersona: WritingPersona | null,
-  platformPersona: PlatformAdaptation | null
+  corePersona: CorePersona | null,
+  platformPersona: PlatformPersona | null
 ): PlatformChatConfig => {
   const baseConfig = {
     systemMessage: `You are an expert ${platform} content strategist and writer.`,
@@ -55,8 +55,8 @@ const getPlatformChatConfig = (
 // Enhanced system message generator
 const generateEnhancedSystemMessage = (
   platform: PlatformType,
-  corePersona: WritingPersona | null,
-  platformPersona: PlatformAdaptation | null
+  corePersona: CorePersona | null,
+  platformPersona: PlatformPersona | null
 ): string => {
   if (!corePersona || !platformPersona) {
     return `You are an expert ${platform} content strategist and writer. Provide helpful advice for creating engaging ${platform} content.`;

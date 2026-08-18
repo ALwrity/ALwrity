@@ -36,13 +36,11 @@ class HealthChecker:
         """Database health check endpoint including persona tables verification."""
         try:
             from services.database import get_db_session
-            from models.persona_models import (
-                WritingPersona, 
-                PlatformPersona, 
-                PersonaAnalysisResult, 
-                PersonaValidationResult
-            )
-            
+            # E.4: the legacy WritingPersona/PlatformPersona/PersonaAnalysisResult/
+            # PersonaValidationResult tables were retired. The SSOT persona store is
+            # now OnboardingSession + PersonaData (models.onboarding).
+            from models.onboarding import OnboardingSession, PersonaData
+
             session = get_db_session()
             if not session:
                 return {
@@ -51,31 +49,19 @@ class HealthChecker:
                     "timestamp": datetime.utcnow().isoformat()
                 }
             
-            # Test all persona tables
+            # Test the SSOT persona tables
             tables_status = {}
             try:
-                session.query(WritingPersona).first()
-                tables_status["writing_personas"] = "ok"
+                session.query(OnboardingSession).first()
+                tables_status["onboarding_sessions"] = "ok"
             except Exception as e:
-                tables_status["writing_personas"] = f"error: {str(e)}"
+                tables_status["onboarding_sessions"] = f"error: {str(e)}"
             
             try:
-                session.query(PlatformPersona).first()
-                tables_status["platform_personas"] = "ok"
+                session.query(PersonaData).first()
+                tables_status["persona_data"] = "ok"
             except Exception as e:
-                tables_status["platform_personas"] = f"error: {str(e)}"
-            
-            try:
-                session.query(PersonaAnalysisResult).first()
-                tables_status["persona_analysis_results"] = "ok"
-            except Exception as e:
-                tables_status["persona_analysis_results"] = f"error: {str(e)}"
-            
-            try:
-                session.query(PersonaValidationResult).first()
-                tables_status["persona_validation_results"] = "ok"
-            except Exception as e:
-                tables_status["persona_validation_results"] = f"error: {str(e)}"
+                tables_status["persona_data"] = f"error: {str(e)}"
             
             session.close()
             

@@ -90,7 +90,7 @@ def _install_module_chain(name):
 def _load_service_module(fake_db, integrated_data):
     _install_module_chain("api.content_planning.services.content_strategy.onboarding")
     _install_module_chain("services.database")
-    _install_module_chain("services.persona_analysis_service")
+    _install_module_chain("services.persona_data_service")
     _install_module_chain("services.research.research_persona_scheduler")
     _install_module_chain("services.persona.facebook.facebook_persona_scheduler")
     _install_module_chain("services.onboarding.progress_service")
@@ -110,8 +110,12 @@ def _load_service_module(fake_db, integrated_data):
     )
 
     _install_stub_module(
-        "services.persona_analysis_service",
-        PersonaAnalysisService=type("PersonaAnalysisService", (), {}),
+        "services.persona_data_service",
+        PersonaDataService=type(
+            "PersonaDataService",
+            (),
+            {"get_user_persona_data": lambda self, user_id: None},
+        ),
     )
 
     _install_stub_module(
@@ -197,12 +201,8 @@ async def test_complete_onboarding_schedules_deep_competitor_task_from_competito
     async def _validate_api_keys(*args, **kwargs):
         return None
 
-    async def _generate_persona(*args, **kwargs):
-        return False
-
     monkeypatch.setattr(module.OnboardingCompletionService, "_validate_required_steps_database", _validate_steps)
     monkeypatch.setattr(module.OnboardingCompletionService, "_validate_api_keys", _validate_api_keys)
-    monkeypatch.setattr(module.OnboardingCompletionService, "_generate_persona_from_onboarding", _generate_persona)
 
     result = await service.complete_onboarding({"id": "user-1"})
 

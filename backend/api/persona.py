@@ -3,49 +3,14 @@ Persona API endpoints for ALwrity.
 Handles writing persona generation, management, and platform-specific adaptations.
 """
 
-from fastapi import HTTPException, Depends
-from pydantic import BaseModel, Field
-from typing import Dict, Any, List, Optional
+from fastapi import HTTPException
+from pydantic import BaseModel
+from typing import Dict, Any, List
 from datetime import datetime
 from loguru import logger
 from sqlalchemy.orm import Session
 
-from services.persona_analysis_service import PersonaAnalysisService
-from services.database import get_db
 from services.persona.platform_registry import get_enabled_platforms
-
-class PersonaGenerationRequest(BaseModel):
-    """Request model for persona generation."""
-    onboarding_session_id: Optional[int] = Field(None, description="Specific onboarding session ID to use")
-    force_regenerate: bool = Field(False, description="Force regeneration even if persona exists")
-
-class PersonaResponse(BaseModel):
-    """Response model for persona data."""
-    persona_id: int
-    persona_name: str
-    archetype: str
-    core_belief: str
-    confidence_score: float
-    platforms: List[str]
-    created_at: str
-
-class PlatformPersonaResponse(BaseModel):
-    """Response model for platform-specific persona."""
-    platform_type: str
-    sentence_metrics: Dict[str, Any]
-    lexical_features: Dict[str, Any]
-    content_format_rules: Dict[str, Any]
-    engagement_patterns: Dict[str, Any]
-    platform_best_practices: Dict[str, Any]
-
-class PersonaGenerationResponse(BaseModel):
-    """Response model for persona generation result."""
-    success: bool
-    persona_id: Optional[int] = None
-    message: str
-    confidence_score: Optional[float] = None
-    data_sufficiency: Optional[float] = None
-    platforms_generated: List[str] = []
 
 class LinkedInPersonaValidationRequest(BaseModel):
     """Request model for LinkedIn persona validation."""
@@ -64,53 +29,6 @@ class LinkedInPersonaValidationResponse(BaseModel):
     quality_issues: List[str]
     strengths: List[str]
     validation_details: Dict[str, Any]
-
-# Dependency to get persona service
-def get_persona_service() -> PersonaAnalysisService:
-    """Get the persona analysis service instance."""
-    return PersonaAnalysisService()
-
-async def generate_persona(user_id: str, request: PersonaGenerationRequest):
-    """Generate a new writing persona from onboarding data."""
-    try:
-        logger.info(f"Generating persona for user {user_id}")
-        
-        persona_service = get_persona_service()
-        
-        # Check if persona already exists and force_regenerate is False
-        if not request.force_regenerate:
-            existing_personas = persona_service.get_user_personas(user_id)
-            if existing_personas:
-                return PersonaGenerationResponse(
-                    success=False,
-                    message="Persona already exists. Use force_regenerate=true to create a new one.",
-                    persona_id=existing_personas[0]["id"]
-                )
-        
-        # Generate new persona
-        result = persona_service.generate_persona_from_onboarding(
-            user_id=user_id,
-            onboarding_session_id=request.onboarding_session_id
-        )
-        
-        if "error" in result:
-            return PersonaGenerationResponse(
-                success=False,
-                message=result["error"]
-            )
-        
-        return PersonaGenerationResponse(
-            success=True,
-            persona_id=result["persona_id"],
-            message="Persona generated successfully",
-            confidence_score=result["analysis_metadata"]["confidence_score"],
-            data_sufficiency=result["analysis_metadata"].get("data_sufficiency", 0.0),
-            platforms_generated=list(result["platform_personas"].keys())
-        )
-        
-    except Exception as e:
-        logger.error(f"Error generating persona: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate persona: {str(e)}")
 
 async def get_user_personas(user_id: str):
     """Get all personas for a user using PersonaData."""
@@ -418,90 +336,6 @@ async def check_facebook_persona(user_id: str, db: Session):
         logger.error(f"Error checking Facebook persona for user {user_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-async def validate_persona_generation_readiness(user_id: int):
-    """Check if user has sufficient onboarding data for persona generation."""
-    try:
-        persona_service = get_persona_service()
-        
-        # Get onboarding data
-        onboarding_data = persona_service._collect_onboarding_data(user_id)
-        
-        if not onboarding_data:
-            return {
-                "ready": False,
-                "message": "No onboarding data found. Please complete onboarding first.",
-                "missing_steps": ["All onboarding steps"],
-                "data_sufficiency": 0.0
-            }
-        
-        data_sufficiency = persona_service._calculate_data_sufficiency(onboarding_data)
-        
-        missing_steps = []
-        if not onboarding_data.get("website_analysis"):
-            missing_steps.append("Website Analysis (Step 2)")
-        if not onboarding_data.get("research_preferences"):
-            missing_steps.append("Research Preferences (Step 3)")
-        
-        ready = data_sufficiency >= 50.0  # Require at least 50% data sufficiency
-        
-        return {
-            "ready": ready,
-            "message": "Ready for persona generation" if ready else "Insufficient data for reliable persona generation",
-            "missing_steps": missing_steps,
-            "data_sufficiency": data_sufficiency,
-            "recommendations": [
-                "Complete website analysis for better style detection",
-                "Provide research preferences for content type optimization"
-            ] if not ready else []
-        }
-        
-    except Exception as e:
-        logger.error(f"Error validating persona generation readiness: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to validate readiness: {str(e)}")
-
-async def generate_persona_preview(user_id: str):
-    """Generate a preview of what the persona would look like without saving."""
-    try:
-        persona_service = get_persona_service()
-        
-        # Get onboarding data
-        onboarding_data = persona_service._collect_onboarding_data(user_id)
-        
-        if not onboarding_data:
-            raise HTTPException(status_code=400, detail="No onboarding data available")
-        
-        # Generate core persona (without saving)
-        core_persona = persona_service._generate_core_persona(onboarding_data)
-        
-        if "error" in core_persona:
-            raise HTTPException(status_code=400, detail=core_persona["error"])
-        
-        # Generate sample platform adaptation (just one for preview)
-        sample_platform = "linkedin"
-        platform_preview = persona_service._generate_single_platform_persona(
-            core_persona, sample_platform, onboarding_data
-        )
-        
-        return {
-            "preview": {
-                "identity": core_persona.get("identity", {}),
-                "linguistic_fingerprint": core_persona.get("linguistic_fingerprint", {}),
-                "tonal_range": core_persona.get("tonal_range", {}),
-                "sample_platform": {
-                    "platform": sample_platform,
-                    "adaptation": platform_preview
-                }
-            },
-            "confidence_score": core_persona.get("confidence_score", 0.0),
-            "data_sufficiency": persona_service._calculate_data_sufficiency(onboarding_data)
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error generating persona preview: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate preview: {str(e)}")
-
 async def get_supported_platforms():
     """Get list of supported platforms for persona generation (from the registry)."""
     return {
@@ -525,7 +359,6 @@ class LinkedInOptimizationResponse(BaseModel):
 
 async def validate_linkedin_persona(
     request: LinkedInPersonaValidationRequest,
-    persona_service: PersonaAnalysisService = Depends(get_persona_service)
 ):
     """
     Validate LinkedIn persona data for completeness and quality.
@@ -558,7 +391,6 @@ async def validate_linkedin_persona(
 
 async def optimize_linkedin_persona(
     request: LinkedInOptimizationRequest,
-    persona_service: PersonaAnalysisService = Depends(get_persona_service)
 ):
     """
     Optimize LinkedIn persona data for maximum algorithm performance.
@@ -639,7 +471,6 @@ class FacebookOptimizationResponse(BaseModel):
 
 async def validate_facebook_persona(
     request: FacebookPersonaValidationRequest,
-    persona_service: PersonaAnalysisService = Depends(get_persona_service)
 ):
     """
     Validate Facebook persona data for completeness and quality.
@@ -672,7 +503,6 @@ async def validate_facebook_persona(
 
 async def optimize_facebook_persona(
     request: FacebookOptimizationRequest,
-    persona_service: PersonaAnalysisService = Depends(get_persona_service)
 ):
     """
     Optimize Facebook persona data for maximum algorithm performance.

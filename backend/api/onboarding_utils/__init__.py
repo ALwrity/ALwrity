@@ -9,7 +9,6 @@ from .business_info_service import BusinessInfoService
 from .api_key_management_service import APIKeyManagementService
 from .step_management_service import StepManagementService
 from .onboarding_control_service import OnboardingControlService
-from .persona_management_service import PersonaManagementService
 
 __all__ = [
     'OnboardingCompletionService',
@@ -18,6 +17,5 @@ __all__ = [
     'BusinessInfoService',
     'APIKeyManagementService',
     'StepManagementService',
-    'OnboardingControlService',
-    'PersonaManagementService'
+    'OnboardingControlService'
 ]

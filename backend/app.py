@@ -131,7 +131,7 @@ seo_tools_router = None
 if _is_full_mode():
     from routers.seo_tools import router as seo_tools_router
 
-# Skip heavy services in feature-only modes (PersonaAnalysisService, etc.)
+# Skip heavy services in feature-only modes
 if _is_full_mode():
     from api.brainstorm import router as brainstorm_router
     from api.images import router as images_router

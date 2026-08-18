@@ -45,7 +45,6 @@ import models.content_strategy_state_models  # noqa: E402, F401
 import models.crawled_content  # noqa: E402, F401
 import models.daily_workflow_models  # noqa: E402, F401
 import models.enhanced_calendar_models  # noqa: E402, F401
-import models.enhanced_persona_models  # noqa: E402, F401
 import models.enhanced_strategy_models  # noqa: E402, F401
 import models.gsc_brainstorm_cache_models  # noqa: E402, F401
 import models.linkedin_brainstorm_saved_ideas_db_models  # noqa: E402, F401
@@ -57,7 +56,6 @@ import models.linkedin_watchdog_db_models  # noqa: E402, F401
 import models.monitoring_models  # noqa: E402, F401
 import models.oauth_token_monitoring_models  # noqa: E402, F401
 import models.onboarding  # noqa: E402, F401
-import models.persona_models  # noqa: E402, F401
 import models.platform_insights_monitoring_models  # noqa: E402, F401
 import models.podcast_models  # noqa: E402, F401
 import models.post_analytics_snapshot_model  # noqa: E402, F401

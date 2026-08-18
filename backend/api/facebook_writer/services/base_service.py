@@ -11,7 +11,7 @@ backend_path = Path(__file__).parent.parent.parent.parent
 sys.path.append(str(backend_path))
 
 from services.llm_providers.gemini_provider import gemini_text_response, gemini_structured_json_response
-from services.persona_analysis_service import PersonaAnalysisService
+from services.persona_data_service import PersonaDataService
 from typing import Dict, Any, Optional
 import time
 
@@ -22,7 +22,7 @@ class FacebookWriterBaseService:
     def __init__(self):
         """Initialize the base service."""
         self.logger = logger
-        self.persona_service = PersonaAnalysisService()
+        self.persona_service = PersonaDataService()
         
         # Persona caching
         self._persona_cache: Dict[str, Dict[str, Any]] = {}
@@ -182,7 +182,7 @@ class FacebookWriterBaseService:
         
         # Fetch fresh data
         try:
-            persona_data = self.persona_service.get_persona_for_platform(user_id, 'facebook')
+            persona_data = self.persona_service.get_platform_persona(user_id, 'facebook')
             
             # Cache the result
             if persona_data:
@@ -230,16 +230,16 @@ class FacebookWriterBaseService:
         
         try:
             core_persona = persona_data.get('core_persona', {})
-            platform_persona = persona_data.get('platform_adaptation', {})
+            platform_persona = persona_data.get('platform_persona', {})
             
             if not core_persona:
                 return base_prompt
             
             persona_guidance = f"""
 PERSONA-AWARE WRITING GUIDANCE:
-- PERSONA: {core_persona.get('persona_name', 'Unknown')} ({core_persona.get('archetype', 'Unknown')})
-- CORE BELIEF: {core_persona.get('core_belief', 'Unknown')}
-- CONFIDENCE SCORE: {core_persona.get('confidence_score', 0)}%
+- PERSONA: {core_persona.get('identity', {}).get('persona_name', 'Unknown')} ({core_persona.get('identity', {}).get('archetype', 'Unknown')})
+- CORE BELIEF: {core_persona.get('identity', {}).get('core_belief', 'Unknown')}
+- CONFIDENCE SCORE: {core_persona.get('confidence', 0)}%
 
 PLATFORM OPTIMIZATION (Facebook):
 - CHARACTER LIMIT: {platform_persona.get('content_format_rules', {}).get('character_limit', '63206')} characters

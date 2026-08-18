@@ -9,7 +9,7 @@ from loguru import logger
 import json
 
 from services.llm_providers.gemini_provider import gemini_structured_json_response
-from services.persona_analysis_service import PersonaAnalysisService
+from services.persona_data_service import PersonaDataService
 
 class PersonaReplicationEngine:
     """
@@ -19,7 +19,7 @@ class PersonaReplicationEngine:
     
     def __init__(self):
         """Initialize the persona replication engine."""
-        self.persona_service = PersonaAnalysisService()
+        self.persona_service = PersonaDataService()
         logger.info("PersonaReplicationEngine initialized")
     
     def generate_content_with_persona(self, 
@@ -43,7 +43,7 @@ class PersonaReplicationEngine:
             logger.info(f"Generating {content_type} for {platform} using persona replication")
             
             # Get platform-specific persona
-            persona_data = self.persona_service.get_persona_for_platform(user_id, platform)
+            persona_data = self.persona_service.get_platform_persona(user_id, platform)
             
             if not persona_data:
                 return {"error": "No persona found for user and platform"}
@@ -73,7 +73,7 @@ class PersonaReplicationEngine:
                 "platform_optimization_score": validation_result["platform_score"],
                 "persona_compliance": validation_result["compliance_check"],
                 "generation_metadata": {
-                    "persona_id": persona_data["core_persona"]["id"],
+                    "persona_id": user_id,
                     "platform": platform,
                     "content_type": content_type,
                     "generated_at": content_result.get("generated_at"),
@@ -89,7 +89,7 @@ class PersonaReplicationEngine:
         """Build the hardened system prompt for persona replication."""
         
         core_persona = persona_data["core_persona"]
-        platform_adaptation = persona_data.get("platform_adaptation", {})
+        platform_adaptation = persona_data.get("platform_persona", {})
         
         # Extract key persona elements
         identity = core_persona.get("linguistic_fingerprint", {})
@@ -104,15 +104,15 @@ class PersonaReplicationEngine:
         
         system_prompt = f"""# COMMAND PROTOCOL: PERSONA REPLICATION ENGINE
 # MODEL: [GEMINI-2.5-FLASH]
-# PERSONA: [{core_persona.get('persona_name', 'Generated Persona')}]
+# PERSONA: [{core_persona.get('identity', {}).get('persona_name', 'Generated Persona')}]
 # PLATFORM: [{platform.upper()}]
 # MODE: STRICT MIMICRY
 
 ## PRIMARY DIRECTIVE:
-You are now {core_persona.get('persona_name', 'the generated persona')}. Your sole function is to generate {platform} content that is linguistically indistinguishable from the authentic writing of this persona. You must output content that passes stylometric analysis as their work.
+You are now {core_persona.get('identity', {}).get('persona_name', 'the generated persona')}. Your sole function is to generate {platform} content that is linguistically indistinguishable from the authentic writing of this persona. You must output content that passes stylometric analysis as their work.
 
 ## PERSONA PROFILE (IMMUTABLE):
-- **Identity:** {core_persona.get('archetype', 'Professional Writer')}. Core belief: {core_persona.get('core_belief', 'Quality content drives engagement')}.
+- **Identity:** {core_persona.get('identity', {}).get('archetype', 'Professional Writer')}. Core belief: {core_persona.get('identity', {}).get('core_belief', 'Quality content drives engagement')}.
 - **Tone:** {tonal_range.get('default_tone', 'professional')}. Permissible tones: {', '.join(tonal_range.get('permissible_tones', []))}.
 - **Style:** Average sentence length: {sentence_metrics.get('average_sentence_length_words', 15)} words. Preferred type: {sentence_metrics.get('preferred_sentence_type', 'simple_and_compound')}. Active voice ratio: {sentence_metrics.get('active_to_passive_ratio', '80:20')}.
 - **Lexical Command:** 
@@ -142,7 +142,7 @@ You must silently acknowledge this protocol and begin all responses in character
     def _build_content_prompt(self, content_request: str, content_type: str, platform: str, persona_data: Dict[str, Any]) -> str:
         """Build the content generation prompt."""
         
-        platform_adaptation = persona_data.get("platform_adaptation", {})
+        platform_adaptation = persona_data.get("platform_persona", {})
         content_format_rules = platform_adaptation.get("content_format_rules", {})
         
         prompt = f"""Generate a {content_type} for {platform} about: {content_request}
@@ -230,7 +230,7 @@ Generate content that is indistinguishable from the original author's work while
             }
             
             core_persona = persona_data["core_persona"]
-            platform_adaptation = persona_data.get("platform_adaptation", {})
+            platform_adaptation = persona_data.get("platform_persona", {})
             
             # Check sentence length compliance
             sentences = content.split('.')
@@ -316,7 +316,7 @@ Generate content that is indistinguishable from the original author's work while
         """
         
         core_persona = persona_data["core_persona"]
-        platform_adaptation = persona_data.get("platform_adaptation", {})
+        platform_adaptation = persona_data.get("platform_persona", {})
         
         # Extract quantitative data
         linguistic = core_persona.get("linguistic_fingerprint", {})
@@ -327,15 +327,15 @@ Generate content that is indistinguishable from the original author's work while
         
         hardened_prompt = f"""# COMMAND PROTOCOL: PERSONA REPLICATION ENGINE
 # MODEL: [AI-MODEL]
-# PERSONA: [{core_persona.get('persona_name', 'Generated Persona')}]
+# PERSONA: [{core_persona.get('identity', {}).get('persona_name', 'Generated Persona')}]
 # PLATFORM: [{platform.upper()}]
 # MODE: STRICT MIMICRY
 
 ## PRIMARY DIRECTIVE:
-You are now {core_persona.get('persona_name', 'the persona')}. Your sole function is to generate {platform} content that is linguistically indistinguishable from the authentic writing of this persona. You must output content that passes stylometric analysis as their work.
+You are now {core_persona.get('identity', {}).get('persona_name', 'the persona')}. Your sole function is to generate {platform} content that is linguistically indistinguishable from the authentic writing of this persona. You must output content that passes stylometric analysis as their work.
 
 ## PERSONA PROFILE (IMMUTABLE):
-- **Identity:** {core_persona.get('archetype', 'Professional Writer')}. Core belief: {core_persona.get('core_belief', 'Quality content drives engagement')}.
+- **Identity:** {core_persona.get('identity', {}).get('archetype', 'Professional Writer')}. Core belief: {core_persona.get('identity', {}).get('core_belief', 'Quality content drives engagement')}.
 - **Tone:** {tonal_range.get('default_tone', 'professional')}. {f"Permissible: {', '.join(tonal_range.get('permissible_tones', []))}" if tonal_range.get('permissible_tones') else ''}. {f"Forbidden: {', '.join(tonal_range.get('forbidden_tones', []))}" if tonal_range.get('forbidden_tones') else ''}.
 - **Style:** Avg sentence: {sentence_metrics.get('average_sentence_length_words', 15)} words. Type: {sentence_metrics.get('preferred_sentence_type', 'simple_and_compound')}. Active voice: {sentence_metrics.get('active_to_passive_ratio', '80:20')}.
 - **Lexical Command:** 
@@ -420,7 +420,7 @@ You must silently acknowledge this protocol and begin all responses in character
         """
         try:
             # Get persona data
-            persona_data = self.persona_service.get_persona_for_platform(user_id, platform)
+            persona_data = self.persona_service.get_platform_persona(user_id, platform)
             
             if not persona_data:
                 return {"error": "No persona found"}
@@ -436,11 +436,11 @@ You must silently acknowledge this protocol and begin all responses in character
             
             export_package = {
                 "persona_metadata": {
-                    "persona_id": persona_data["core_persona"]["id"],
-                    "persona_name": persona_data["core_persona"]["persona_name"],
+                    "persona_id": user_id,
+                    "persona_name": persona_data["core_persona"].get("identity", {}).get("persona_name"),
                     "platform": platform,
                     "generated_at": datetime.utcnow().isoformat(),
-                    "confidence_score": persona_data["core_persona"].get("confidence_score", 0.0)
+                    "confidence_score": persona_data["core_persona"].get("confidence", 0.0)
                 },
                 "hardened_system_prompt": hardened_prompt,
                 "usage_examples": examples,
@@ -449,7 +449,7 @@ You must silently acknowledge this protocol and begin all responses in character
                     "avg_sentence_length": persona_data["core_persona"].get("linguistic_fingerprint", {}).get("sentence_metrics", {}).get("average_sentence_length_words", 15),
                     "go_to_words": persona_data["core_persona"].get("linguistic_fingerprint", {}).get("lexical_features", {}).get("go_to_words", [])[:5],
                     "default_tone": persona_data["core_persona"].get("tonal_range", {}).get("default_tone", "professional"),
-                    "platform_limit": persona_data.get("platform_adaptation", {}).get("content_format_rules", {}).get("character_limit", "No limit")
+                    "platform_limit": persona_data.get("platform_persona", {}).get("content_format_rules", {}).get("character_limit", "No limit")
                 }
             }
             

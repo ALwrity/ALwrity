@@ -8,8 +8,8 @@ import React, { createContext, useContext, useState, useEffect, useMemo, ReactNo
 import { useCopilotReadable } from '@copilotkit/react-core';
 import { useAuth } from '@clerk/clerk-react';
 import { 
-  WritingPersona, 
-  PlatformAdaptation, 
+  CorePersona, 
+  PlatformPersona, 
   PlatformType
 } from '../../../types/PlatformPersonaTypes';
 import { 
@@ -18,9 +18,8 @@ import {
 } from '../../../api/persona';
 import { shouldSkipOnboarding } from '../../../utils/demoMode';
 
-const LINKEDIN_DEFAULT_CORE_PERSONA: WritingPersona = {
+const LINKEDIN_DEFAULT_CORE_PERSONA: CorePersona = {
   id: 0,
-  user_id: 0,
   persona_name: 'LinkedIn Professional',
   archetype: 'Thought Leader',
   core_belief: 'Sharing knowledge drives professional growth',
@@ -50,21 +49,11 @@ const LINKEDIN_DEFAULT_CORE_PERSONA: WritingPersona = {
       persuasion_techniques: ['logic', 'credibility'],
     },
   },
-  platform_adaptations: [],
-  onboarding_session_id: 0,
-  source_website_analysis: {},
-  source_research_preferences: {},
-  ai_analysis_version: '1.0',
   confidence_score: 0.5,
-  analysis_date: new Date().toISOString(),
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-  is_active: true,
 };
 
-const LINKEDIN_DEFAULT_PLATFORM_PERSONA: PlatformAdaptation = {
+const LINKEDIN_DEFAULT_PLATFORM_PERSONA: PlatformPersona = {
   id: 0,
-  writing_persona_id: 0,
   platform_type: 'linkedin',
   sentence_metrics: {
     optimal_length: '150-300 words',
@@ -132,14 +121,12 @@ const LINKEDIN_DEFAULT_PLATFORM_PERSONA: PlatformAdaptation = {
     content_strategies: ['value_first', 'authentic_voice'],
     growth_hacks: ['cross_promotion', 'collaboration'],
   },
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
 };
 
 // Context interface
 interface PlatformPersonaContextType {
-  corePersona: WritingPersona | null;
-  platformPersona: PlatformAdaptation | null;
+  corePersona: CorePersona | null;
+  platformPersona: PlatformPersona | null;
   platform: PlatformType;
   loading: boolean;
   error: string | null;
@@ -165,8 +152,8 @@ const CACHE_DURATION = 5 * 60 * 1000;
  * with child components that also call useCopilotReadable.
  */
 const PersonaCopilotInjector: React.FC<{
-  corePersona: WritingPersona | null;
-  platformPersona: PlatformAdaptation | null;
+  corePersona: CorePersona | null;
+  platformPersona: PlatformPersona | null;
   platform: PlatformType;
   children: ReactNode;
 }> = ({ corePersona, platformPersona, platform, children }) => {
@@ -260,13 +247,11 @@ export const PlatformPersonaProvider: React.FC<PlatformPersonaProviderProps> = (
   // Get Clerk user ID
   const { userId } = useAuth();
   
-  // Convert string userId to number for legacy API compatibility
-  const numericUserId = userId ? 1 : 1; // Use 1 as placeholder, API uses Clerk ID from auth
   // State management — seed defaults immediately in feature-gated mode
-  const [corePersona, setCorePersona] = useState<WritingPersona | null>(
+  const [corePersona, setCorePersona] = useState<CorePersona | null>(
     skipOnboarding ? LINKEDIN_DEFAULT_CORE_PERSONA : null
   );
-  const [platformPersona, setPlatformPersona] = useState<PlatformAdaptation | null>(
+  const [platformPersona, setPlatformPersona] = useState<PlatformPersona | null>(
     skipOnboarding ? LINKEDIN_DEFAULT_PLATFORM_PERSONA : null
   );
   const [loading, setLoading] = useState(!skipOnboarding);
@@ -363,10 +348,9 @@ export const PlatformPersonaProvider: React.FC<PlatformPersonaProviderProps> = (
         const corePersonaData = primaryPersona.core_persona || primaryPersona;
         const identity = corePersonaData.identity || {};
         
-        // Convert API response to WritingPersona format
-        const convertedPersona: WritingPersona = {
+        // Convert API response to CorePersona format
+        const convertedPersona: CorePersona = {
           id: primaryPersona.id || corePersonaData.id || 1,
-          user_id: numericUserId, // Use numeric ID for legacy compatibility
           persona_name: identity.persona_name || corePersonaData.persona_name || primaryPersona.persona_name || 'Untitled Persona',
           archetype: identity.archetype || corePersonaData.archetype || primaryPersona.archetype || 'General',
           core_belief: identity.core_belief || corePersonaData.core_belief || primaryPersona.core_belief || '',
@@ -396,17 +380,8 @@ export const PlatformPersonaProvider: React.FC<PlatformPersonaProviderProps> = (
               persuasion_techniques: ["logic", "credibility"]
             }
           },
-          platform_adaptations: [],
-          onboarding_session_id: 1,
-          source_website_analysis: {},
-          source_research_preferences: {},
-          ai_analysis_version: "1.0",
           confidence_score: primaryPersona.quality_metrics?.overall_score ? primaryPersona.quality_metrics.overall_score / 100 : 
                             (corePersonaData.confidence_score || primaryPersona.confidence_score || 0),
-          analysis_date: corePersonaData.created_at || primaryPersona.created_at,
-          created_at: primaryPersona.created_at,
-          updated_at: primaryPersona.updated_at || primaryPersona.created_at,
-          is_active: true
         };
         
         setCorePersona(convertedPersona);
@@ -431,10 +406,9 @@ export const PlatformPersonaProvider: React.FC<PlatformPersonaProviderProps> = (
         const platformPersona = platformPersonaResponse.platform_persona || {};
         const corePersonaFromPlatform = platformPersonaResponse.core_persona || {};
         
-        // Convert API response to PlatformAdaptation format
-        const convertedPlatformPersona: PlatformAdaptation = {
+        // Convert API response to PlatformPersona format
+        const convertedPlatformPersona: PlatformPersona = {
           id: 1,
-          writing_persona_id: corePersona?.id || 1,
           platform_type: platform,
           sentence_metrics: platformPersona.sentence_metrics || {
             optimal_length: "150-300 words",
@@ -501,9 +475,7 @@ export const PlatformPersonaProvider: React.FC<PlatformPersonaProviderProps> = (
             engagement_tactics: ["ask_questions", "share_stories"],
             content_strategies: ["value_first", "authentic_voice"],
             growth_hacks: ["cross_promotion", "collaboration"]
-          },
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          }
         };
         
         setPlatformPersona(convertedPlatformPersona);

@@ -126,7 +126,6 @@ def setup_clean_logging():
             'linkedin_persona_service',
             'facebook_persona_service',
             'core_persona_service',
-            'persona_analysis_service',
             'ai_service_manager',
             'ai_engine_service',
             'website_analyzer',
