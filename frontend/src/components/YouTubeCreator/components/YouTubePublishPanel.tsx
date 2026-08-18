@@ -1,16 +1,22 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
+  FormControl,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import { Scene, VideoPlan } from '../../../services/youtubeApi';
 import { useYouTubePublish } from '../../../hooks/useYouTubePublish';
+import { toYouTubePublishAtIso } from './youtubePublishSchedule';
 
 interface YouTubePublishPanelProps {
   videoUrl: string | null;
@@ -48,15 +54,20 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
 }) => {
   const youtube = useYouTubePublish();
   const activeChannel = youtube.activeChannel;
+  const [privacy, setPrivacy] = useState<'public' | 'private' | 'unlisted'>('unlisted');
+  const [scheduleLocal, setScheduleLocal] = useState('');
 
   const publishTitle = useMemo(() => buildVideoTitle(videoPlan, scenes), [videoPlan, scenes]);
   const publishDescription = useMemo(() => buildVideoDescription(videoPlan), [videoPlan]);
 
   const handlePublish = () => {
     if (!videoUrl) return;
+    const publishAt = toYouTubePublishAtIso(scheduleLocal);
     youtube.publishToYouTube(videoUrl, publishTitle, {
       description: publishDescription,
       tags: ['alwrity', 'youtube', 'ai-video'],
+      privacy_status: publishAt ? 'private' : privacy,
+      publish_at: publishAt,
     });
   };
 
@@ -75,7 +86,8 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
             5️⃣ Connect & Publish to YouTube
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Connect your YouTube account and publish the generated video directly from ALwrity.
+            Connect your YouTube account and publish or schedule the generated video. Scheduled
+            uploads stay private until go-live (HITL).
           </Typography>
         </Box>
 
@@ -115,6 +127,37 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
           </Alert>
         )}
 
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <FormControl size="small" sx={{ minWidth: 160 }}>
+            <InputLabel id="yt-privacy-label">Privacy</InputLabel>
+            <Select
+              labelId="yt-privacy-label"
+              label="Privacy"
+              value={privacy}
+              disabled={Boolean(scheduleLocal)}
+              onChange={(e) => setPrivacy(e.target.value as typeof privacy)}
+            >
+              <MenuItem value="unlisted">Unlisted</MenuItem>
+              <MenuItem value="private">Private</MenuItem>
+              <MenuItem value="public">Public</MenuItem>
+            </Select>
+          </FormControl>
+          <TextField
+            size="small"
+            type="datetime-local"
+            label="Schedule (optional)"
+            InputLabelProps={{ shrink: true }}
+            value={scheduleLocal}
+            onChange={(e) => setScheduleLocal(e.target.value)}
+            helperText={
+              scheduleLocal
+                ? 'Will upload as private until this time (UTC converted).'
+                : 'Leave empty to publish now'
+            }
+            sx={{ minWidth: 240 }}
+          />
+        </Stack>
+
         <Button
           variant="contained"
           color="error"
@@ -125,7 +168,9 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
         >
           {youtube.publishState.publishing
             ? youtube.publishState.progress || 'Publishing...'
-            : 'Publish to YouTube'}
+            : scheduleLocal
+              ? 'Schedule on YouTube'
+              : 'Publish to YouTube'}
         </Button>
 
         {youtube.publishState.videoUrl && (

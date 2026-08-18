@@ -168,6 +168,7 @@ export function useYouTubePublish() {
       privacy_status?: string;
       category_id?: string;
       made_for_kids?: boolean;
+      publish_at?: string;
     }
   ) => {
     const channel = status.channels.find((c) => c.is_active);
@@ -195,6 +196,7 @@ export function useYouTubePublish() {
         privacy_status: options?.privacy_status || 'unlisted',
         category_id: options?.category_id || '22',
         made_for_kids: options?.made_for_kids || false,
+        publish_at: options?.publish_at,
       });
 
       const taskId = result.task_id;
