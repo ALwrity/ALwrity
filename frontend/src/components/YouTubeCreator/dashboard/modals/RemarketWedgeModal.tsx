@@ -1,5 +1,6 @@
 import React from "react";
 import { YouTubeActionModal, YouTubeToolTile } from "../YouTubeActionModal";
+import { resolveOAuthTileClick } from "../studioHubTileActions";
 import { WEDGE_MODAL_INTROS } from "../youtubeWorkflowConfig";
 import type { RemarketWedgeProps } from "./wedgeModalTypes";
 
@@ -7,6 +8,8 @@ export const RemarketWedgeModal: React.FC<RemarketWedgeProps> = ({
   open,
   onClose,
   goCreate,
+  connected,
+  onRequestConnect,
   creatorState,
   onOpenStale,
   onNavigateBlog,
@@ -79,7 +82,9 @@ export const RemarketWedgeModal: React.FC<RemarketWedgeProps> = ({
           title="Stale Video Refresh"
           description="New title/thumb/desc for buried winners — HITL apply."
           hitl
-          onClick={onOpenStale}
+          onClick={() =>
+            resolveOAuthTileClick(connected, "stale_refresh", onOpenStale, onRequestConnect)
+          }
         />
         <YouTubeToolTile
           icon="📺"

@@ -1,5 +1,6 @@
 import React from "react";
 import { YouTubeActionModal, YouTubeToolTile } from "../YouTubeActionModal";
+import { resolveOAuthTileClick } from "../studioHubTileActions";
 import { WEDGE_MODAL_INTROS } from "../youtubeWorkflowConfig";
 import type { PublishWedgeProps } from "./wedgeModalTypes";
 
@@ -7,6 +8,8 @@ export const PublishWedgeModal: React.FC<PublishWedgeProps> = ({
   open,
   onClose,
   goCreate,
+  connected,
+  onRequestConnect,
   creatorState,
   onOpenDrafts,
   onOpenCoach,
@@ -35,7 +38,14 @@ export const PublishWedgeModal: React.FC<PublishWedgeProps> = ({
         title="Publish to YouTube"
         description="Connect & upload with title, description, and privacy."
         hitl
-        onClick={() => goCreate({ step: 3 })}
+        onClick={() =>
+          resolveOAuthTileClick(
+            connected,
+            "publish_to_youtube",
+            () => goCreate({ step: 3 }),
+            onRequestConnect,
+          )
+        }
       />
       <YouTubeToolTile
         icon="🎯"
@@ -58,14 +68,18 @@ export const PublishWedgeModal: React.FC<PublishWedgeProps> = ({
         title="Schedule Publish"
         description="Peak-time publish — private until go-live on YouTube."
         hitl
-        onClick={onOpenSchedule}
+        onClick={() =>
+          resolveOAuthTileClick(connected, "schedule_publish", onOpenSchedule, onRequestConnect)
+        }
       />
       <YouTubeToolTile
         icon="📚"
         accent="#64748b"
         title="Playlist / Series Attach"
         description="Package published videos into playlists for retention."
-        onClick={onOpenPlaylist}
+        onClick={() =>
+          resolveOAuthTileClick(connected, "playlist_attach", onOpenPlaylist, onRequestConnect)
+        }
       />
     </div>
   </YouTubeActionModal>

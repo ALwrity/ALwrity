@@ -5,6 +5,7 @@ import { YouTubeMobileWorkflowGrid } from "./YouTubeMobileWorkflowGrid";
 import { YouTubeChannelHub } from "./YouTubeChannelHub";
 import { computeYouTubeRadialLayout } from "./youtubeRadialLayout";
 import type { YouTubeWorkflowCardId } from "./youtubeWorkflowConfig";
+import { resolveWedgeNavigation } from "./studioHubWedgeNavigation";
 import { YouTubeWorkflowModals } from "./YouTubeWorkflowModals";
 import { YouTubeRightRail } from "./YouTubeRightRail";
 import { YouTubeTodayGrowth } from "./YouTubeTodayGrowth";
@@ -66,6 +67,8 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
   const [workflowModal, setWorkflowModal] = useState<YouTubeWorkflowCardId | null>(
     null,
   );
+  const [connectGateOpen, setConnectGateOpen] = useState(false);
+
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return undefined;
@@ -93,11 +96,16 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
     const onOpenWedge = (event: Event) => {
       const detail = (event as CustomEvent<YouTubeOpenWedgeDetail>).detail;
       if (!detail?.wedge) return;
-      setWorkflowModal(detail.wedge);
+      resolveWedgeNavigation(
+        detail.wedge,
+        connected,
+        setWorkflowModal,
+        () => setConnectGateOpen(true),
+      );
     };
     window.addEventListener(YT_OPEN_WEDGE_EVENT, onOpenWedge);
     return () => window.removeEventListener(YT_OPEN_WEDGE_EVENT, onOpenWedge);
-  }, []);
+  }, [connected]);
 
   const layout = useMemo(
     () => computeYouTubeRadialLayout(containerWidth, containerHeight || undefined),
@@ -112,9 +120,17 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
     creatorState.userIdea?.slice(0, 120) ||
     "Untitled video draft";
 
-  const handleCardAction = useCallback((cardId: YouTubeWorkflowCardId) => {
-    setWorkflowModal(cardId);
-  }, []);
+  const handleCardAction = useCallback(
+    (cardId: YouTubeWorkflowCardId) => {
+      resolveWedgeNavigation(
+        cardId,
+        connected,
+        setWorkflowModal,
+        () => setConnectGateOpen(true),
+      );
+    },
+    [connected],
+  );
 
   return (
     <div className="yt-studio-hub" data-tour="yt-studio-hub">
@@ -153,7 +169,11 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
           <div className="yt-studio-hub-canvas" ref={canvasRef}>
             {isDesktop ? (
               <>
-                <YouTubeRadialWorkflow layout={layout} onCardAction={handleCardAction} />
+                <YouTubeRadialWorkflow
+                  layout={layout}
+                  onCardAction={handleCardAction}
+                  connected={connected}
+                />
                 <div
                   className="yt-studio-hub-hub"
                   style={{ width: layout.hubVisualR * 2 }}
@@ -187,7 +207,10 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
                   onConnect={onConnect}
                   onCreateVideo={() => openYouTubeCreator({ step: 0 })}
                 />
-                <YouTubeMobileWorkflowGrid onCardAction={handleCardAction} />
+                <YouTubeMobileWorkflowGrid
+                  onCardAction={handleCardAction}
+                  connected={connected}
+                />
               </div>
             )}
           </div>
@@ -196,10 +219,50 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
         <YouTubeWorkflowModals
           activeModal={workflowModal}
           onClose={() => setWorkflowModal(null)}
+          connected={connected}
+          onRequestConnect={onConnect}
           creatorState={creatorState}
           onClearDraft={onClearDraft}
           channelBibleNiche={channelBible?.niche || null}
         />
+
+        {connectGateOpen && (
+          <div className="yt-modal-backdrop" role="presentation" onClick={() => setConnectGateOpen(false)}>
+            <div
+              className="yt-modal-card"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Connect YouTube"
+              style={{ width: "min(420px, 100%)" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="yt-modal-header">
+                <h2>Connect YouTube</h2>
+                <button
+                  type="button"
+                  className="yt-modal-close"
+                  onClick={() => setConnectGateOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <p className="yt-modal-intro">
+                Analysis, Engagement, and Remarket unlock after you connect your channel. Plan and
+                Create stay available offline.
+              </p>
+              <button
+                type="button"
+                className="yt-rail-btn yt-rail-btn--primary"
+                onClick={() => {
+                  setConnectGateOpen(false);
+                  onConnect();
+                }}
+              >
+                Connect YouTube
+              </button>
+            </div>
+          </div>
+        )}
 
         <YouTubeCopilotFab />
       </div>
