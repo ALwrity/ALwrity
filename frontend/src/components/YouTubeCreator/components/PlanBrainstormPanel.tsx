@@ -26,6 +26,7 @@ import ReplayOutlinedIcon from "@mui/icons-material/ReplayOutlined";
 import type { YouTubeChannelBible } from "../../../services/youtubeApi";
 import { hasChannelBibleIdentity } from "../utils/channelBibleContext";
 import { useYouTubePlanBrainstorm } from "../hooks/useYouTubePlanBrainstorm";
+import { PlanBrainstormLoadingPanel } from "./PlanBrainstormLoadingPanel";
 import { helperSx, inputSx, labelSx } from "../styles";
 
 const SOURCE_CHIPS = [
@@ -81,6 +82,7 @@ export const PlanBrainstormPanel: React.FC<PlanBrainstormPanelProps> = ({
   disabled = false,
 }) => {
   const niche = (channelBible?.niche || "").trim();
+  const [hasUserEditedSeed, setHasUserEditedSeed] = useState(false);
   const [seed, setSeed] = useState(() => userIdea.trim() || niche);
   const [useChannelBible, setUseChannelBible] = useState(() => hasChannelBibleIdentity(channelBible));
   const [showSaved, setShowSaved] = useState(false);
@@ -98,18 +100,19 @@ export const PlanBrainstormPanel: React.FC<PlanBrainstormPanelProps> = ({
     savedLoading,
     savedListError,
     isUsingCache,
+    loaderMessageIndex,
     run,
     save,
     loadSaved,
     hashPrompt,
   } = useYouTubePlanBrainstorm({ channelBible, useChannelBible });
 
-  // Prefill seed from niche when idea box is empty and niche becomes available
+  // Prefill seed from idea/niche only until the user edits the field manually.
   useEffect(() => {
-    if (!seed.trim() && niche) {
-      setSeed(niche);
-    }
-  }, [niche, seed]);
+    if (hasUserEditedSeed) return;
+    const preferred = userIdea.trim() || niche;
+    setSeed(preferred);
+  }, [hasUserEditedSeed, userIdea, niche]);
 
   useEffect(() => {
     if (hasChannelBibleIdentity(channelBible)) {
@@ -119,6 +122,11 @@ export const PlanBrainstormPanel: React.FC<PlanBrainstormPanelProps> = ({
 
   const loading = phase === "loading";
   const canGenerate = !disabled && !loading && Boolean((seed.trim() || niche));
+
+  const handleSeedChange = (value: string) => {
+    setHasUserEditedSeed(true);
+    setSeed(value);
+  };
 
   const handleGenerate = () => {
     void run(seed);
@@ -167,15 +175,17 @@ export const PlanBrainstormPanel: React.FC<PlanBrainstormPanelProps> = ({
             label="Topic seed"
             placeholder="Example: 'Budget travel for first-time visitors to Japan'"
             value={seed}
-            onChange={(e) => setSeed(e.target.value)}
+            onChange={(e) => handleSeedChange(e.target.value)}
             disabled={disabled || loading}
             fullWidth
             multiline
             minRows={2}
             helperText={
-              niche && !userIdea.trim()
-                ? `Using Channel Bible niche as default seed when empty: ${niche.slice(0, 60)}`
-                : "Enter a seed, or leave empty to use your Channel Bible niche."
+              hasUserEditedSeed
+                ? "Enter a seed, or leave empty to use your Channel Bible niche when generating."
+                : niche && !userIdea.trim()
+                  ? `Prefilled from Channel Bible niche. You can edit or clear this field.`
+                  : "Enter a seed, or leave empty to use your Channel Bible niche."
             }
             sx={inputSx}
             FormHelperTextProps={{ sx: helperSx }}
@@ -243,6 +253,8 @@ export const PlanBrainstormPanel: React.FC<PlanBrainstormPanelProps> = ({
               </Typography>
             ) : null}
           </Box>
+
+          {loading ? <PlanBrainstormLoadingPanel loaderMessageIndex={loaderMessageIndex} /> : null}
 
           {seedError ? <Alert severity="error">{seedError}</Alert> : null}
           {saveError ? <Alert severity="warning">{saveError}</Alert> : null}

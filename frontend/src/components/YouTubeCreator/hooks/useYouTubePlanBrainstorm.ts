@@ -10,6 +10,7 @@ import {
   buildChannelBibleContext,
   hasChannelBibleIdentity,
 } from "../utils/channelBibleContext";
+import { YOUTUBE_BRAINSTORM_LOADER_MESSAGES } from "../utils/youtubeBrainstormLoaderMessages";
 
 export interface YouTubeBrainstormIdea {
   prompt: string;
@@ -101,8 +102,27 @@ export function useYouTubePlanBrainstorm({
   const [savedLoading, setSavedLoading] = useState(false);
   const [savedListError, setSavedListError] = useState<string | null>(null);
   const [isUsingCache, setIsUsingCache] = useState(false);
+  const [loaderMessageIndex, setLoaderMessageIndex] = useState(0);
   const lastSeedRef = useRef("");
   const isRunningRef = useRef(false);
+  const loaderIntervalRef = useRef<number | null>(null);
+
+  const clearLoaderInterval = useCallback(() => {
+    if (loaderIntervalRef.current != null) {
+      window.clearInterval(loaderIntervalRef.current);
+      loaderIntervalRef.current = null;
+    }
+  }, []);
+
+  const startLoaderAnimation = useCallback(() => {
+    clearLoaderInterval();
+    setLoaderMessageIndex(0);
+    loaderIntervalRef.current = window.setInterval(() => {
+      setLoaderMessageIndex((idx) =>
+        Math.min(idx + 1, YOUTUBE_BRAINSTORM_LOADER_MESSAGES.length - 1),
+      );
+    }, 700);
+  }, [clearLoaderInterval]);
 
   const hashPrompt = useCallback((prompt: string) => {
     let hash = 0;
@@ -175,6 +195,7 @@ export function useYouTubePlanBrainstorm({
       setSeedError(null);
       setSaveError(null);
       setPhase("loading");
+      startLoaderAnimation();
 
       const includeBible = useChannelBible && hasChannelBibleIdentity(channelBible);
       const channelBibleContext = includeBible ? buildChannelBibleContext(channelBible) : "";
@@ -188,6 +209,7 @@ export function useYouTubePlanBrainstorm({
       if (!forceRefresh) {
         const cached = getCachedIdeas(cacheKey);
         if (cached) {
+          clearLoaderInterval();
           setIdeas(cached.ideas);
           setSources(cached.sources || []);
           setIsUsingCache(true);
@@ -220,16 +242,19 @@ export function useYouTubePlanBrainstorm({
         console.error("[YouTubeBrainstorm] Generate failed:", message);
         // Keep last good cards on soft failure (do not clear ideas)
       } finally {
+        clearLoaderInterval();
         setPhase("results");
         isRunningRef.current = false;
       }
     },
     [
       channelBible,
+      clearLoaderInterval,
       getCacheKey,
       getCachedIdeas,
       resolveEffectiveSeed,
       setCachedIdeas,
+      startLoaderAnimation,
       useChannelBible,
     ],
   );
@@ -300,13 +325,16 @@ export function useYouTubePlanBrainstorm({
     setSources([]);
     setSeedError(null);
     setIsUsingCache(false);
-  }, []);
+    clearLoaderInterval();
+    setLoaderMessageIndex(0);
+  }, [clearLoaderInterval]);
 
   useEffect(() => {
     return () => {
       isRunningRef.current = false;
+      clearLoaderInterval();
     };
-  }, []);
+  }, [clearLoaderInterval]);
 
   return {
     phase,
@@ -320,6 +348,8 @@ export function useYouTubePlanBrainstorm({
     savedLoading,
     savedListError,
     isUsingCache,
+    loaderMessageIndex,
+    loaderMessages: YOUTUBE_BRAINSTORM_LOADER_MESSAGES,
     run,
     save,
     loadSaved,

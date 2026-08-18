@@ -8,6 +8,8 @@ const mockSave = jest.fn();
 const mockLoadSaved = jest.fn();
 const mockHashPrompt = jest.fn((p: string) => `hash:${p}`);
 
+let mockHookState: Record<string, unknown> = {};
+
 jest.mock("../hooks/useYouTubePlanBrainstorm", () => ({
   useYouTubePlanBrainstorm: () => ({
     phase: "results",
@@ -27,12 +29,14 @@ jest.mock("../hooks/useYouTubePlanBrainstorm", () => ({
     savedLoading: false,
     savedListError: null,
     isUsingCache: false,
+    loaderMessageIndex: 0,
     run: mockRun,
     save: mockSave,
     loadSaved: mockLoadSaved,
     resetResults: jest.fn(),
     resolveEffectiveSeed: (s: string) => s.trim(),
     hashPrompt: mockHashPrompt,
+    ...mockHookState,
   }),
 }));
 
@@ -41,6 +45,7 @@ describe("PlanBrainstormPanel", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockHookState = {};
   });
 
   it("does not call generate when seed and niche are empty", async () => {
@@ -97,5 +102,50 @@ describe("PlanBrainstormPanel", () => {
     await waitFor(() => {
       expect(mockSave).toHaveBeenCalledWith(0);
     });
+  });
+
+  it("keeps the seed field empty after the user clears a prefilled niche", async () => {
+    render(
+      <PlanBrainstormPanel
+        userIdea=""
+        channelBible={{
+          niche: "Budget Japan travel",
+          target_audience: "",
+          default_video_goal: "",
+          default_cta: "",
+          brand_style: "",
+          visual_style_guide: "",
+          tone: "",
+        }}
+        onUseIdea={onUseIdea}
+      />,
+    );
+
+    fireEvent.click(screen.getByText(/Brainstorm video ideas/i));
+    const seedInput = screen.getByLabelText(/Topic seed/i);
+    expect(seedInput).toHaveValue("Budget Japan travel");
+
+    fireEvent.change(seedInput, { target: { value: "" } });
+    expect(seedInput).toHaveValue("");
+  });
+
+  it("shows the loading panel while ideas are generating", () => {
+    mockHookState = {
+      phase: "loading",
+      ideas: [],
+      loaderMessageIndex: 1,
+    };
+
+    render(
+      <PlanBrainstormPanel
+        userIdea="Japan travel"
+        channelBible={null}
+        onUseIdea={onUseIdea}
+      />,
+    );
+
+    fireEvent.click(screen.getByText(/Brainstorm video ideas/i));
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.getByText(/Analyzing content and extracting insights/i)).toBeInTheDocument();
   });
 });
