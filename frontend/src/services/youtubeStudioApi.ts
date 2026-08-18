@@ -1,4 +1,4 @@
-import { apiClient } from "../../api/client";
+import { apiClient } from "../api/client";
 
 const API_BASE = "/api/youtube";
 

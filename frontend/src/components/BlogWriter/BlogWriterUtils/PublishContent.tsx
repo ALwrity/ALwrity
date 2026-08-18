@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { queueYouTubeCreatorOpen } from '../../YouTubeCreator/dashboard/youtubeStudioEvents';
 import { apiClient } from '../../../api/client';
 import { wordpressAPI, WordPressSite, WordPressPublishRequest } from '../../../api/wordpress';
 import { blogWriterApi, BlogSEOMetadataResponse } from '../../../services/blogWriterApi';
@@ -68,6 +70,7 @@ export const PublishContent: React.FC<PublishContentProps> = ({
     handleWixConnectionSuccess,
     validateWixContent,
   } = useWixPublish();
+  const navigate = useNavigate();
 
   const [wordpressSites, setWordpressSites] = useState<WordPressSite[]>([]);
   const [checkingWP, setCheckingWP] = useState(false);
@@ -558,6 +561,21 @@ export const PublishContent: React.FC<PublishContentProps> = ({
               style={{ ...btnStyle, background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0' }}
             >
               {copyDone ? 'Copied!' : 'Copy HTML'}
+            </button>
+            <button
+              onClick={() => {
+                const idea = (blogTitle || '').trim() || 'Turn this blog into a YouTube video';
+                queueYouTubeCreatorOpen({
+                  step: 0,
+                  userIdea: idea,
+                  focusUrlImport: true,
+                });
+                navigate('/youtube-creator?tab=creator');
+              }}
+              style={{ ...btnStyle, background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' }}
+              title="Open YouTube Video Creator with this post as the starting idea"
+            >
+              Create YouTube video
             </button>
             {isSupported && (
               <button

@@ -30,7 +30,6 @@
     "src"
   ],
   "exclude": [
-    "node_modules",
-    "src/components/YouTubeCreator/dashboard"
+    "node_modules"
   ]
 } 

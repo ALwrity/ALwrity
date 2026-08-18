@@ -7,8 +7,8 @@ jest.mock("../../../utils/fetchMediaBlobUrl", () => ({
   appendAuthTokenToUrl: jest.fn(),
 }));
 
-const mockedFetchMediaBlobUrl = fetchMediaBlobUrl as jest.MockedFunction<typeof fetchMediaBlobUrl>;
-const mockedAppendAuthTokenToUrl = appendAuthTokenToUrl as jest.MockedFunction<typeof appendAuthTokenToUrl>;
+const mockedFetchMediaBlobUrl = jest.mocked(fetchMediaBlobUrl);
+const mockedAppendAuthTokenToUrl = jest.mocked(appendAuthTokenToUrl);
 
 describe("useAuthenticatedMediaSrc", () => {
   beforeEach(() => {
