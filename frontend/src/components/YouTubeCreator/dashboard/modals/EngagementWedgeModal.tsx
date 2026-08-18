@@ -7,8 +7,6 @@ export const EngagementWedgeModal: React.FC<EngagementWedgeProps> = ({
   open,
   onClose,
   goCreate,
-  connected,
-  onRequestConnect,
   creatorState,
   onOpenComments,
   onOpenCommunity,
@@ -26,7 +24,7 @@ export const EngagementWedgeModal: React.FC<EngagementWedgeProps> = ({
         title="Comment Reply Assistant"
         description="Draft replies in your persona — you send (HITL)."
         hitl
-        onClick={() => (connected ? onOpenComments() : onRequestConnect())}
+        onClick={onOpenComments}
       />
       <YouTubeToolTile
         icon="📌"
@@ -56,7 +54,7 @@ export const EngagementWedgeModal: React.FC<EngagementWedgeProps> = ({
         title="Engage Queue"
         description="Open comment inbox for your daily reply routine."
         hitl
-        onClick={() => (connected ? onOpenComments() : onRequestConnect())}
+        onClick={onOpenComments}
       />
     </div>
   </YouTubeActionModal>

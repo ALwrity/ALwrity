@@ -6,8 +6,6 @@ import type { AnalysisWedgeProps } from "./wedgeModalTypes";
 export const AnalysisWedgeModal: React.FC<AnalysisWedgeProps> = ({
   open,
   onClose,
-  connected,
-  onRequestConnect,
   onOpenPulse,
   onOpenStale,
   onOpenSeo,
@@ -25,19 +23,15 @@ export const AnalysisWedgeModal: React.FC<AnalysisWedgeProps> = ({
         icon="📊"
         accent="#8b5cf6"
         title="Channel Pulse"
-        description={
-          connected
-            ? "Subscribers, views, and 28-day watch metrics."
-            : "Connect YouTube to unlock channel pulse."
-        }
-        onClick={() => (connected ? onOpenPulse() : onRequestConnect())}
+        description="Subscribers, views, and 28-day watch metrics."
+        onClick={onOpenPulse}
       />
       <YouTubeToolTile
         icon="📈"
         accent="#0ea5e9"
         title="Video Performance"
         description="Recent uploads with view/like signals from your channel."
-        onClick={() => (connected ? onOpenStale() : onRequestConnect())}
+        onClick={onOpenStale}
       />
       <YouTubeToolTile
         icon="🔎"
@@ -60,7 +54,7 @@ export const AnalysisWedgeModal: React.FC<AnalysisWedgeProps> = ({
         accent="#f59e0b"
         title="Audience / Retention"
         description="Avg view duration and watch-time tips."
-        onClick={() => (connected ? onOpenRetention() : onRequestConnect())}
+        onClick={onOpenRetention}
       />
     </div>
   </YouTubeActionModal>

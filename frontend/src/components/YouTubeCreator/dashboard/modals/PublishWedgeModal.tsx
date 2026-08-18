@@ -7,8 +7,6 @@ export const PublishWedgeModal: React.FC<PublishWedgeProps> = ({
   open,
   onClose,
   goCreate,
-  connected,
-  onRequestConnect,
   creatorState,
   onOpenDrafts,
   onOpenCoach,
@@ -37,13 +35,7 @@ export const PublishWedgeModal: React.FC<PublishWedgeProps> = ({
         title="Publish to YouTube"
         description="Connect & upload with title, description, and privacy."
         hitl
-        onClick={() => {
-          if (!connected) {
-            onRequestConnect();
-            return;
-          }
-          goCreate({ step: 3 });
-        }}
+        onClick={() => goCreate({ step: 3 })}
       />
       <YouTubeToolTile
         icon="🎯"
@@ -66,20 +58,14 @@ export const PublishWedgeModal: React.FC<PublishWedgeProps> = ({
         title="Schedule Publish"
         description="Peak-time publish — private until go-live on YouTube."
         hitl
-        onClick={() => {
-          if (!connected) onRequestConnect();
-          else onOpenSchedule();
-        }}
+        onClick={onOpenSchedule}
       />
       <YouTubeToolTile
         icon="📚"
         accent="#64748b"
         title="Playlist / Series Attach"
         description="Package published videos into playlists for retention."
-        onClick={() => {
-          if (!connected) onRequestConnect();
-          else onOpenPlaylist();
-        }}
+        onClick={onOpenPlaylist}
       />
     </div>
   </YouTubeActionModal>

@@ -1,14 +1,12 @@
 import React from "react";
 import { YouTubeActionModal, YouTubeToolTile } from "../YouTubeActionModal";
 import { WEDGE_MODAL_INTROS } from "../youtubeWorkflowConfig";
-import type { NotifyWedgeProps } from "./wedgeModalTypes";
+import type { PlanWedgeProps } from "./wedgeModalTypes";
 
-export const PlanWedgeModal: React.FC<NotifyWedgeProps> = ({
+export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
   open,
   onClose,
   goCreate,
-  markNotify,
-  notifyKeys,
   channelBibleNiche,
   onOpenBible,
 }) => (
@@ -46,26 +44,22 @@ export const PlanWedgeModal: React.FC<NotifyWedgeProps> = ({
         accent="#f59e0b"
         title="YouTube Trends"
         description="Native demand signals for your niche."
-        comingSoon
-        onClick={() => markNotify("yt_trends")}
+        onClick={() => goCreate({ step: 0 })}
       />
       <YouTubeToolTile
         icon="🗓️"
         accent="#8b5cf6"
         title="Series Planner"
         description="Sketch 3–5 slots for the week — cadence without a full calendar."
-        comingSoon
-        onClick={() => markNotify("series_planner")}
+        onClick={() => goCreate({ step: 0 })}
       />
       <YouTubeToolTile
         icon="🧠"
         accent="#ec4899"
         title="Brainstorm & Saved Ideas"
         description="Capture HITL-approved ideas for later."
-        comingSoon
-        onClick={() => markNotify("brainstorm")}
+        onClick={() => goCreate({ step: 0 })}
       />
     </div>
-    {notifyKeys.yt_trends && <p className="yt-modal-intro">We’ll notify you when Trends ships.</p>}
   </YouTubeActionModal>
 );
