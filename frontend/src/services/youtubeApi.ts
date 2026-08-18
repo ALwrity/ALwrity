@@ -610,7 +610,22 @@ export const youtubeApi = {
     return response.data;
   },
 
-  async getYouTubeStatus(): Promise<{ success: boolean; connected: boolean; channels: Array<{ token_id: number; channel_id: string; channel_name: string; expires_at: string; connected_at: string; is_active: boolean }> }> {
+  async getYouTubeStatus(): Promise<{
+    success: boolean;
+    connected: boolean;
+    analytics_ready?: boolean;
+    channels: Array<{
+      token_id: number;
+      channel_id: string;
+      channel_name: string;
+      expires_at: string;
+      connected_at: string;
+      is_active: boolean;
+      scope?: string;
+      analytics_ready?: boolean;
+      needs_reconnect_for_analytics?: boolean;
+    }>;
+  }> {
     const response = await apiClient.get(`${API_BASE}/oauth/status`);
     return response.data;
   },
@@ -631,6 +646,7 @@ export const youtubeApi = {
     privacy_status?: string;
     category_id?: string;
     made_for_kids?: boolean;
+    publish_at?: string;
   }): Promise<{ success: boolean; task_id?: string; error?: string; message: string }> {
     const response = await apiClient.post(`${API_BASE}/publish`, params);
     return response.data;
@@ -682,5 +698,95 @@ export const youtubeApi = {
       console.error('[youtubeApi] saveChannelBible failed', { status });
       throw new Error(detail || 'Failed to save channel bible');
     }
+  },
+
+  async getChannelPulse(params?: { days?: number; token_id?: number }): Promise<any> {
+    const response = await apiClient.get(`${API_BASE}/analytics/pulse`, { params });
+    return response.data;
+  },
+
+  async getRetentionSummary(params?: { days?: number; token_id?: number }): Promise<any> {
+    const response = await apiClient.get(`${API_BASE}/analytics/retention`, { params });
+    return response.data;
+  },
+
+  async getCommentInbox(params?: { max_results?: number; token_id?: number }): Promise<any> {
+    const response = await apiClient.get(`${API_BASE}/comments/inbox`, { params });
+    return response.data;
+  },
+
+  async draftCommentReply(body: {
+    comment_text: string;
+    video_title?: string;
+    channel_niche?: string;
+    persona_notes?: string;
+  }): Promise<any> {
+    const response = await apiClient.post(`${API_BASE}/comments/draft-reply`, body);
+    return response.data;
+  },
+
+  async sendCommentReply(body: {
+    parent_id: string;
+    text: string;
+    token_id?: number;
+  }): Promise<any> {
+    const response = await apiClient.post(`${API_BASE}/comments/reply`, body);
+    return response.data;
+  },
+
+  async listChannelVideos(params?: { max_results?: number; token_id?: number }): Promise<any> {
+    const response = await apiClient.get(`${API_BASE}/studio/videos`, { params });
+    return response.data;
+  },
+
+  async listPlaylists(params?: { max_results?: number; token_id?: number }): Promise<any> {
+    const response = await apiClient.get(`${API_BASE}/studio/playlists`, { params });
+    return response.data;
+  },
+
+  async addVideoToPlaylist(body: {
+    playlist_id: string;
+    video_id: string;
+    token_id?: number;
+  }): Promise<any> {
+    const response = await apiClient.post(`${API_BASE}/studio/playlists/add`, body);
+    return response.data;
+  },
+
+  async suggestStaleRefresh(body: {
+    title: string;
+    description?: string;
+    tags?: string[];
+    niche?: string;
+  }): Promise<any> {
+    const response = await apiClient.post(`${API_BASE}/studio/stale-refresh/suggest`, body);
+    return response.data;
+  },
+
+  async updateVideoMetadata(body: {
+    video_id: string;
+    title?: string;
+    description?: string;
+    tags?: string[];
+    token_id?: number;
+  }): Promise<any> {
+    const response = await apiClient.post(`${API_BASE}/studio/videos/update-metadata`, body);
+    return response.data;
+  },
+
+  async communityPostIdeas(body?: {
+    niche?: string;
+    recent_title?: string;
+  }): Promise<any> {
+    const response = await apiClient.post(`${API_BASE}/studio/community-ideas`, body || {});
+    return response.data;
+  },
+
+  async contentGapIdeas(body?: {
+    niche?: string;
+    recent_titles?: string[];
+  }): Promise<any> {
+    const response = await apiClient.post(`${API_BASE}/studio/content-gaps`, body || {});
+    return response.data;
   },
 };
