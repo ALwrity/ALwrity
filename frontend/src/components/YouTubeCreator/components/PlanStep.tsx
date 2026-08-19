@@ -58,6 +58,7 @@ import { ChannelBiblePanel } from './ChannelBiblePanel';
 import { PlanBrainstormPanel } from './PlanBrainstormPanel';
 import { PlanResearchToggle } from './PlanResearchToggle';
 import { PlanPromptPreview } from './PlanPromptPreview';
+import { PlanGenerationLoadingPanel } from './PlanGenerationLoadingPanel';
 import type { YouTubeChannelBible } from '../../../services/youtubeApi';
 
 interface PlanStepProps {
@@ -700,6 +701,10 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
             enableResearch={enableResearch}
             channelBible={channelBible}
           />
+
+          {loading ? (
+            <PlanGenerationLoadingPanel enableResearch={enableResearch} />
+          ) : null}
 
           <OperationButton
             operation={videoPlanningOperation}
