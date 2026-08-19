@@ -106,6 +106,9 @@ def llm_text_gen(
             elif primary_provider in ['hf_response_api', 'huggingface', 'hf']:
                 gpt_provider = "huggingface"
                 model = "openai/gpt-oss-120b:cerebras"
+            elif primary_provider in ['orcarouter', 'orca']:
+                gpt_provider = "orcarouter"
+                model = os.getenv('ORCAROUTER_MODEL', 'orcarouter/auto')
             elif primary_provider in ['openai', 'gpt']:
                 gpt_provider = "openai"
                 model = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
@@ -117,6 +120,9 @@ def llm_text_gen(
             if preferred_provider in ['wavespeed', 'wave']:
                 gpt_provider = "wavespeed"
                 model = os.getenv('WAVESPEED_TEXT_MODEL', 'openai/gpt-oss-120b')
+            elif preferred_provider in ['orcarouter', 'orca']:
+                gpt_provider = "orcarouter"
+                model = os.getenv('ORCAROUTER_MODEL', 'orcarouter/auto')
             elif preferred_provider in ['openai', 'gpt']:
                 gpt_provider = "openai"
                 model = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
@@ -142,6 +148,9 @@ def llm_text_gen(
             elif selected_provider == "huggingface":
                 gpt_provider = "huggingface"
                 model = provider_cfg.model_policy.get("default_model") or "openai/gpt-oss-120b:cerebras"
+            elif selected_provider in ["orcarouter", "orca"]:
+                gpt_provider = "orcarouter"
+                model = provider_cfg.model_policy.get("default_model") or "orcarouter/auto"
         
         # Map short model names to full paths for HF
         if model_list and gpt_provider == "huggingface":
@@ -170,6 +179,8 @@ def llm_text_gen(
             available_providers.append("huggingface")
         if api_key_manager.get_api_key("wavespeed"):
             available_providers.append("wavespeed")
+        if api_key_manager.get_api_key("orcarouter"):
+            available_providers.append("orcarouter")
         
         logger.warning(
             f"[llm_text_gen][{flow_tag}] Provider preflight: env_provider='{env_provider or 'auto'}', "
@@ -197,6 +208,8 @@ def llm_text_gen(
             os.environ.setdefault("GOOGLE_API_KEY", resolved_key)
         elif gpt_provider == "huggingface" and resolved_key:
             os.environ["HF_TOKEN"] = resolved_key
+        elif gpt_provider == "orcarouter" and resolved_key:
+            os.environ["ORCAROUTER_API_KEY"] = resolved_key
 
         if gpt_provider == "huggingface" and preferred_hf_models:
             model = preferred_hf_models[0]
@@ -221,6 +234,11 @@ def llm_text_gen(
         elif gpt_provider == "openai":
             provider_enum = APIProvider.OPENAI
             actual_provider_name = "openai"
+        elif gpt_provider == "orcarouter":
+            # OrcaRouter is an OpenAI-compatible gateway; reuse the OPENAI enum for
+            # subscription/usage tracking (same pattern as HuggingFace -> MISTRAL).
+            provider_enum = APIProvider.OPENAI
+            actual_provider_name = "orcarouter"
         
         if not provider_enum:
             # For unknown providers, try to proceed without subscription tracking
@@ -406,9 +424,32 @@ def llm_text_gen(
                 api_took_ms = (time.time() - t1) * 1000
                 total_ms = (time.time() - t0) * 1000
                 logger.warning(f"[llm_text_gen][{flow_tag}] wavespeed: user={user_id} import_took={(t1-t0)*1000:.0f}ms api_took={api_took_ms:.0f}ms total={total_ms:.0f}ms")
+            elif gpt_provider == "orcarouter":
+                from services.llm_providers.orcarouter_provider import (
+                    orcarouter_text_response,
+                    orcarouter_structured_json_response,
+                )
+                if json_struct:
+                    response_text = orcarouter_structured_json_response(
+                        prompt=prompt,
+                        schema=json_struct,
+                        model=model or "orcarouter/auto",
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        system_prompt=system_instructions
+                    )
+                else:
+                    response_text = orcarouter_text_response(
+                        prompt=prompt,
+                        model=model or "orcarouter/auto",
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        top_p=top_p,
+                        system_prompt=system_instructions
+                    )
             else:
                 logger.error(f"[llm_text_gen] Unknown provider: {gpt_provider}")
-                raise RuntimeError(f"Unknown LLM provider: {gpt_provider}. Supported providers: google, huggingface, wavespeed")
+                raise RuntimeError(f"Unknown LLM provider: {gpt_provider}. Supported providers: google, huggingface, wavespeed, orcarouter")
             
             # TRACK USAGE after successful API call
             if response_text:
@@ -593,7 +634,8 @@ def get_api_key(gpt_provider: str, user_id: Optional[str] = None) -> Optional[st
     try:
         provider_mapping = {
             "google": "gemini",
-            "huggingface": "huggingface"
+            "huggingface": "huggingface",
+            "orcarouter": "orcarouter"
         }
         mapped_provider = provider_mapping.get(gpt_provider, gpt_provider)
         key, _source = tenant_provider_config_resolver.resolve_provider_key(mapped_provider, user_id=user_id)

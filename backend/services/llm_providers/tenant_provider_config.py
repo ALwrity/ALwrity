@@ -31,6 +31,7 @@ class TenantProviderConfigResolver:
         "stability": ("stability", "stability_api_key"),
         "wavespeed": ("wavespeed", "wavespeed_api_key"),
         "openai": ("openai", "openai_api_key"),
+        "orcarouter": ("orcarouter", "orca", "orcarouter_api_key"),
     }
 
     _ENV_VARS: Dict[str, Tuple[str, ...]] = {
@@ -39,6 +40,7 @@ class TenantProviderConfigResolver:
         "stability": ("STABILITY_API_KEY",),
         "wavespeed": ("WAVESPEED_API_KEY",),
         "openai": ("OPENAI_API_KEY",),
+        "orcarouter": ("ORCAROUTER_API_KEY",),
     }
 
     _ENV_PROVIDER_DEFAULTS: Dict[str, str] = {
@@ -51,6 +53,7 @@ class TenantProviderConfigResolver:
     _DEFAULT_MODELS: Dict[Tuple[str, str], str] = {
         ("text", "google"): "gemini-2.0-flash-001",
         ("text", "huggingface"): "mistralai/Mistral-7B-Instruct-v0.3:groq",
+        ("text", "orcarouter"): "orcarouter/auto",
         ("image", "wavespeed"): "flux-kontext-pro",
         ("image", "huggingface"): "black-forest-labs/FLUX.1-Krea-dev",
         ("video", "huggingface"): "tencent/HunyuanVideo",
@@ -121,6 +124,8 @@ class TenantProviderConfigResolver:
             return "gemini"
         if provider_l in ("hf", "huggingface", "hf_response_api"):
             return "huggingface"
+        if provider_l in ("orcarouter", "orca"):
+            return "orcarouter"
         return provider_l
 
     def _get_tenant_key_from_db(self, user_id: Optional[str], provider: str) -> Optional[str]:

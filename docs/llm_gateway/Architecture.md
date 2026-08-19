@@ -35,6 +35,7 @@ ALwrity’s LLM Gateway lives under [llm_providers](file:///C:/Users/diksha%20ra
 - **Provider Implementations**:
   - Gemini text: [gemini_provider.py](file:///C:/Users/diksha%20rawat/Desktop/ALwrity/backend/services/llm_providers/gemini_provider.py)
   - Hugging Face text: [huggingface_provider.py](file:///C:/Users/diksha%20rawat/Desktop/ALwrity/backend/services/llm_providers/huggingface_provider.py)
+  - OrcaRouter text: [orcarouter_provider.py](file:///C:/Users/diksha%20rawat/Desktop/ALwrity/backend/services/llm_providers/orcarouter_provider.py)
   - Hugging Face image: [hf_provider.py](file:///C:/Users/diksha%20rawat/Desktop/ALwrity/backend/services/llm_providers/image_generation/hf_provider.py)
   - WaveSpeed video: [wavespeed_provider.py](file:///C:/Users/diksha%20rawat/Desktop/ALwrity/backend/services/llm_providers/video_generation/wavespeed_provider.py)
 
@@ -60,6 +61,8 @@ These contracts ensure consistent options/result types so downstream UI and logg
   - Loaded and validated in [gemini_provider.py](file:///C:/Users/diksha%20rawat/Desktop/ALwrity/backend/services/llm_providers/gemini_provider.py#L101-L116)
 - Hugging Face: HF_TOKEN
   - Loaded and validated in [huggingface_provider.py](file:///C:/Users/diksha%20rawat/Desktop/ALwrity/backend/services/llm_providers/huggingface_provider.py#L90-L105)
+- OrcaRouter: ORCAROUTER_API_KEY
+  - Loaded and validated in [orcarouter_provider.py](file:///C:/Users/diksha%20rawat/Desktop/ALwrity/backend/services/llm_providers/orcarouter_provider.py#L80-L95)
 - Hugging Face image defaults: HF_IMAGE_MODEL
   - Used in [image_generation/hf_provider.py](file:///C:/Users/diksha%20rawat/Desktop/ALwrity/backend/services/llm_providers/image_generation/hf_provider.py#L17-L21)
 - Provider clients must never log secrets; logs are provider‑scoped via get_service_logger.
