@@ -1,0 +1,242 @@
+/**
+ * YouTube Studio Hub rail pills, Knowledge Centre portal, Co-Pilot FAB.
+ * Mirrors LinkedIn Studio placement and hover behavior with YouTube accents.
+ */
+
+.yt-rail-icon-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 2px solid #fecaca;
+  border-radius: 999px;
+  background: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.12);
+  overflow: hidden;
+  transition:
+    min-width 0.2s ease,
+    padding 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.yt-rail-icon-trigger-icon {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.yt-rail-icon-trigger-label {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+  flex: 1;
+  transition: max-width 0.2s ease, opacity 0.15s ease;
+}
+
+.yt-rail-icon-trigger:hover,
+.yt-rail-icon-trigger--open {
+  min-width: 168px;
+  padding: 0 44px 0 14px;
+}
+
+.yt-rail-icon-trigger:hover .yt-rail-icon-trigger-label,
+.yt-rail-icon-trigger--open .yt-rail-icon-trigger-label {
+  max-width: 120px;
+  opacity: 1;
+}
+
+.yt-rail-icon-trigger--library {
+  border-color: #f9a8d4;
+  background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%);
+  box-shadow: 0 4px 16px rgba(236, 72, 153, 0.28);
+}
+
+.yt-rail-icon-trigger--library .yt-rail-icon-trigger-icon {
+  background: linear-gradient(145deg, #f472b6 0%, #ec4899 100%);
+  color: #ffffff;
+}
+
+.yt-rail-icon-trigger--library .yt-rail-icon-trigger-label {
+  color: #be185d;
+}
+
+.yt-rail-icon-trigger--library:hover,
+.yt-rail-icon-trigger--library.yt-rail-icon-trigger--open {
+  background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%);
+  border-color: #ec4899;
+  box-shadow: 0 6px 22px rgba(219, 39, 119, 0.35);
+}
+
+.yt-rail-icon-trigger--knowledge {
+  border-color: #c4b5fd;
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.28);
+}
+
+.yt-rail-icon-trigger--knowledge .yt-rail-icon-trigger-icon {
+  background: linear-gradient(145deg, #a78bfa 0%, #7c3aed 100%);
+  color: #ffffff;
+}
+
+.yt-rail-icon-trigger--knowledge .yt-rail-icon-trigger-label {
+  color: #6d28d9;
+}
+
+.yt-rail-icon-trigger--knowledge:hover,
+.yt-rail-icon-trigger--knowledge.yt-rail-icon-trigger--open {
+  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+  border-color: #8b5cf6;
+  box-shadow: 0 6px 22px rgba(124, 58, 237, 0.35);
+}
+
+.yt-knowledge-center-rail {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.yt-knowledge-center-panel {
+  background: #ffffff;
+  border: 2px solid #fecaca;
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(220, 38, 38, 0.16);
+  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.yt-knowledge-center-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.yt-knowledge-center-panel-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #b91c1c;
+}
+
+.yt-kc-item-title {
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.yt-kc-item-desc {
+  font-size: 11px;
+  color: #606060;
+  line-height: 1.35;
+}
+
+.yt-kc-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.yt-kc-faq {
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.yt-kc-faq summary {
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.yt-kc-faq p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #606060;
+}
+
+.yt-kc-ask textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #e5e5e5;
+  padding: 10px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.yt-studio-copilot-fab {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  pointer-events: auto;
+}
+
+.yt-copilot-fab-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 3px solid #ff0000;
+  background: #ffffff;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(255, 0, 0, 0.28);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.yt-copilot-fab-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px rgba(255, 0, 0, 0.38);
+}
+
+.yt-copilot-fab-btn-photo,
+.yt-copilot-fab-btn-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 50%;
+  display: block;
+}
+
+.yt-copilot-fab-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #b91c1c;
+  text-align: center;
+  max-width: 108px;
+  line-height: 1.2;
+}
+
+@media (max-width: 960px) {
+  .yt-studio-copilot-fab {
+    position: fixed;
+    left: auto;
+    right: 16px;
+    bottom: 16px;
+  }
+}

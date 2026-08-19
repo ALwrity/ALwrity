@@ -5,15 +5,20 @@ export const YouTubeCopilotFab: React.FC = () => {
   const [open, setOpen] = useState(false);
 
   return (
-    <>
+    <div className="yt-studio-copilot-fab">
       <button
         type="button"
-        className="yt-copilot-fab"
+        className="yt-copilot-fab-btn"
         data-tour="yt-ask-alwrity-fab"
         onClick={() => setOpen(true)}
+        aria-label="Ask ALwrity Co-Pilot"
+        title="Ask ALwrity Co-Pilot"
       >
-        Ask ALwrity Co-Pilot
+        <span className="yt-copilot-fab-btn-photo" aria-hidden>
+          <img src="/ask-alwrity-girl.png" alt="" />
+        </span>
       </button>
+      <span className="yt-copilot-fab-label">Ask ALwrity Co-Pilot</span>
       <YouTubeActionModal
         open={open}
         title="Ask ALwrity Co-Pilot"
@@ -26,6 +31,6 @@ export const YouTubeCopilotFab: React.FC = () => {
           you render.
         </p>
       </YouTubeActionModal>
-    </>
+    </div>
   );
 };

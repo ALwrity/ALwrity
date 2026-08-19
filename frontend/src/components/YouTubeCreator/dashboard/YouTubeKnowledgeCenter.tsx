@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { YouTubeActionModal } from "./YouTubeActionModal";
+import { YouTubeRailIconButton } from "./YouTubeRailIconButton";
 import {
   YOUTUBE_ASK_FAQ,
   YOUTUBE_KNOWLEDGE_CENTER_FEATURES,
@@ -14,14 +16,56 @@ interface YouTubeKnowledgeCenterProps {
 export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
   compact = false,
 }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [gridPos, setGridPos] = useState<{ bottom: number; right: number; width: number } | null>(
+    null,
+  );
   const [askOpen, setAskOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState<YouTubeKnowledgeFeature | null>(null);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
 
-  const features = useMemo(() => YOUTUBE_KNOWLEDGE_CENTER_FEATURES, []);
+  const features = useMemo(
+    () =>
+      YOUTUBE_KNOWLEDGE_CENTER_FEATURES.filter((f) =>
+        compact ? ["ask-alwrity", "quick-start", "studio-guide"].includes(f.id) : true,
+      ),
+    [compact],
+  );
+
+  const updateGridPosition = useCallback(() => {
+    const el = anchorRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const width = Math.min(720, window.innerWidth - 32);
+    const right = Math.max(16, window.innerWidth - rect.right);
+    setGridPos({
+      bottom: Math.max(16, window.innerHeight - rect.top + 8),
+      right,
+      width,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!expanded) return undefined;
+    updateGridPosition();
+    const onDocClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (anchorRef.current?.contains(target)) return;
+      if ((event.target as Element).closest?.(".yt-knowledge-center-portal")) return;
+      setExpanded(false);
+    };
+    window.addEventListener("resize", updateGridPosition);
+    document.addEventListener("mousedown", onDocClick);
+    return () => {
+      window.removeEventListener("resize", updateGridPosition);
+      document.removeEventListener("mousedown", onDocClick);
+    };
+  }, [expanded, updateGridPosition]);
 
   const handleAction = (feature: YouTubeKnowledgeFeature) => {
+    setExpanded(false);
     switch (feature.action) {
       case "askAlwrity":
         setAskOpen(true);
@@ -33,11 +77,6 @@ export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
       case "channelBible":
       case "multimodal":
         openYouTubeCreator({ step: 0 });
-        break;
-      case "persona":
-      case "studioGuide":
-      case "bestPractices":
-        setInfoOpen(feature);
         break;
       default:
         setInfoOpen(feature);
@@ -58,30 +97,67 @@ export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
     );
   };
 
-  return (
-    <div className="yt-rail-panel" data-tour="yt-knowledge-center">
-      <h3>Knowledge Centre</h3>
-      <div className="yt-kc-grid">
-        {features
-          .filter((f) => (compact ? ["ask-alwrity", "quick-start", "studio-guide"].includes(f.id) : true))
-          .map((feature) => (
-            <button
-              key={feature.id}
-              type="button"
-              className="yt-kc-item"
-              onClick={() => handleAction(feature)}
-            >
-              <span aria-hidden>{feature.icon}</span>
-              <span>
-                <div style={{ fontWeight: 800, fontSize: 13 }}>{feature.title}</div>
-                <div style={{ fontSize: 11, color: "#606060", lineHeight: 1.35 }}>
-                  {feature.description}
-                </div>
-              </span>
-            </button>
-          ))}
+  const panel = (
+    <div className="yt-knowledge-center-panel">
+      <div className="yt-knowledge-center-panel-header">
+        <h3 className="yt-knowledge-center-panel-title">Knowledge Centre</h3>
+        <button
+          type="button"
+          className="yt-modal-close"
+          aria-label="Close Knowledge Centre"
+          onClick={() => setExpanded(false)}
+        >
+          ×
+        </button>
       </div>
+      <div className="yt-kc-grid">
+        {features.map((feature) => (
+          <button
+            key={feature.id}
+            type="button"
+            className="yt-kc-item"
+            onClick={() => handleAction(feature)}
+          >
+            <span aria-hidden>{feature.icon}</span>
+            <span>
+              <div className="yt-kc-item-title">{feature.title}</div>
+              <div className="yt-kc-item-desc">{feature.description}</div>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
+  return (
+    <>
+      {expanded &&
+        gridPos &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="yt-knowledge-center-portal"
+            style={{
+              position: "fixed",
+              bottom: gridPos.bottom,
+              right: gridPos.right,
+              width: gridPos.width,
+              zIndex: 12000,
+            }}
+          >
+            {panel}
+          </div>,
+          document.body,
+        )}
+      <div ref={anchorRef} className="yt-knowledge-center-rail" data-tour="yt-knowledge-center">
+        <YouTubeRailIconButton
+          label="Knowledge Centre"
+          icon="knowledge"
+          onClick={() => setExpanded((open) => !open)}
+          open={expanded}
+          ariaExpanded={expanded}
+        />
+      </div>
       <YouTubeActionModal
         open={askOpen}
         title="Ask ALwrity"
@@ -89,11 +165,11 @@ export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
         onClose={() => setAskOpen(false)}
         maxWidth={560}
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="yt-kc-ask">
           {YOUTUBE_ASK_FAQ.map((faq) => (
-            <details key={faq.q} style={{ border: "1px solid #e5e5e5", borderRadius: 10, padding: 10 }}>
-              <summary style={{ fontWeight: 700, cursor: "pointer" }}>{faq.q}</summary>
-              <p style={{ margin: "8px 0 0", fontSize: 13, color: "#606060" }}>{faq.a}</p>
+            <details key={faq.q} className="yt-kc-faq">
+              <summary>{faq.q}</summary>
+              <p>{faq.a}</p>
             </details>
           ))}
           <textarea
@@ -101,14 +177,6 @@ export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="Ask anything about growing your YouTube channel with ALwrity…"
             rows={3}
-            style={{
-              width: "100%",
-              borderRadius: 10,
-              border: "1px solid #e5e5e5",
-              padding: 10,
-              fontFamily: "inherit",
-              resize: "vertical",
-            }}
           />
           <button type="button" className="yt-rail-btn yt-rail-btn--primary" onClick={handleAsk}>
             Ask ALwrity
@@ -116,7 +184,6 @@ export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
           {answer && <p className="yt-modal-intro">{answer}</p>}
         </div>
       </YouTubeActionModal>
-
       <YouTubeActionModal
         open={!!infoOpen}
         title={infoOpen?.title || ""}
@@ -139,6 +206,6 @@ export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
           Start with Plan
         </button>
       </YouTubeActionModal>
-    </div>
+    </>
   );
 };

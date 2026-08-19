@@ -11,7 +11,7 @@ interface YouTubeVideoCreatorHeaderProps {
 export const YouTubeVideoCreatorHeader: React.FC<YouTubeVideoCreatorHeaderProps> = ({
   onBack,
 }) => (
-  <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 2 }}>
+  <Box sx={{ mb: 1, display: "flex", alignItems: "center", gap: 2 }}>
     <Button
       startIcon={<ArrowBack />}
       onClick={onBack}
@@ -20,7 +20,7 @@ export const YouTubeVideoCreatorHeader: React.FC<YouTubeVideoCreatorHeaderProps>
     >
       Back to Dashboard
     </Button>
-    <Typography variant="h4" sx={{ flexGrow: 1, fontWeight: 700 }}>
+    <Typography variant="h4" sx={{ flexGrow: 1, fontWeight: 700, color: YT_TEXT }}>
       YouTube Creator Studio
     </Typography>
     <HeaderControls colorMode="light" showAlerts={true} showUser={true} />
