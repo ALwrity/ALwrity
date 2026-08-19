@@ -1,0 +1,11 @@
+# Doc RAG service dependencies (opt-in; install from backend/)
+txtai[pipeline-data]>=9.0.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.24.0
+pyyaml>=6.0
+loguru>=0.7.2
+pydantic>=2.5.0
+python-dotenv>=1.0.0
+markdown>=3.5.0
+arq>=0.26.0
+redis>=5.0.0
