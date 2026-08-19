@@ -19,6 +19,7 @@ from services.youtube.planner_prompts import (
     build_plan_json_struct,
 )
 from services.youtube.planner_research import perform_exa_research
+from services.youtube.planner_generation import attach_plan_generation_metadata
 from services.persona.youtube.youtube_persona_service import YouTubePersonaService
 
 logger = get_service_logger("youtube.planner")
@@ -170,7 +171,8 @@ class YouTubePlannerService:
                 prompt=planning_prompt,
                 system_prompt=PLANNER_SYSTEM_PROMPT,
                 user_id=user_id,
-                json_struct=json_struct
+                json_struct=json_struct,
+                flow_type="youtube_plan",
             )
 
             if isinstance(response, dict):
@@ -214,6 +216,21 @@ class YouTubePlannerService:
 
             if source_article_url:
                 plan_data["source_article_url"] = source_article_url
+
+            try:
+                plan_data = attach_plan_generation_metadata(
+                    plan_data,
+                    system_prompt=PLANNER_SYSTEM_PROMPT,
+                    user_prompt=planning_prompt,
+                    research_enabled=research_enabled,
+                    research_context=research_context,
+                )
+            except Exception as meta_err:
+                logger.exception(
+                    "[YouTubePlanner] Generation metadata attach failed; "
+                    "returning plan without prompt transparency. err=%s",
+                    meta_err,
+                )
 
             logger.info("[YouTubePlanner] ✅ Plan generated successfully")
             return plan_data

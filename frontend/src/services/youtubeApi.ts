@@ -18,6 +18,7 @@ export interface VideoPlanRequest {
   source_article_title?: string;
   source_article_summary?: string;
   avatar_url?: string;
+  enable_research?: boolean;
 }
 
 export interface YouTubeChannelBible {
@@ -31,6 +32,22 @@ export interface YouTubeChannelBible {
   tone: string;
   default_avatar_url?: string | null;
   default_language?: string;
+}
+
+export interface VideoPlanResearchSource {
+  title?: string;
+  url?: string;
+  excerpt?: string;
+}
+
+export interface VideoPlanGeneration {
+  text_gateway?: string;
+  configured_provider?: string;
+  system_prompt?: string;
+  user_prompt?: string;
+  research_enabled?: boolean;
+  research_injected?: boolean;
+  json_schema_applied?: boolean;
 }
 
 export interface VideoPlan {
@@ -65,6 +82,10 @@ export interface VideoPlan {
     energy?: string;
   };
   avatar_prompt?: string; // AI prompt used to generate the avatar
+  research_enabled?: boolean;
+  research_sources?: VideoPlanResearchSource[];
+  research_sources_count?: number;
+  generation?: VideoPlanGeneration;
 }
 
 export interface Scene {

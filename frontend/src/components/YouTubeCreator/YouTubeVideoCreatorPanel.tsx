@@ -32,6 +32,7 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
     language,
     languageBoost,
     videoPlan,
+    enableResearch,
     scenes,
     editingSceneId,
     editedScene,
@@ -129,6 +130,7 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
     editedScene,
     makingPresentable,
     sourceArticle,
+    enableResearch,
     updateState,
     setLoading,
     setError,
@@ -244,6 +246,7 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
         setChannelBible={setChannelBible}
         saveChannelBible={saveChannelBible}
         applyBibleToThisVideo={applyBibleToThisVideo}
+        enableResearch={enableResearch}
         handleBuildScenes={planHandlers.handleBuildScenes}
         handleEditScene={planHandlers.handleEditScene}
         handleSaveScene={planHandlers.handleSaveScene}

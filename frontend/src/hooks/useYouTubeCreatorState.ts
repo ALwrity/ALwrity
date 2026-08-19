@@ -20,6 +20,8 @@ export interface YouTubeCreatorState {
   
   // Step 1: Plan output
   videoPlan: VideoPlan | null;
+  /** Include Exa web research in the plan prompt (LinkedIn-style). Default true. */
+  enableResearch: boolean;
   
   // Step 2: Scenes
   scenes: Scene[];
@@ -53,6 +55,7 @@ const DEFAULT_STATE: YouTubeCreatorState = {
   language: 'en',
   languageBoost: 'English',
   videoPlan: null,
+  enableResearch: true,
   scenes: [],
   editingSceneId: null,
   editedScene: null,
@@ -77,6 +80,8 @@ export function getYouTubeCreatorStateSnapshot(): YouTubeCreatorState {
         ...DEFAULT_STATE,
         ...parsed,
         scenes: Array.isArray(parsed.scenes) ? parsed.scenes : [],
+        enableResearch:
+          typeof parsed.enableResearch === "boolean" ? parsed.enableResearch : true,
       };
     }
   } catch (error) {
@@ -107,6 +112,8 @@ export const useYouTubeCreatorState = () => {
           ...parsed,
           // Ensure arrays are arrays (not null/undefined)
           scenes: Array.isArray(parsed.scenes) ? parsed.scenes : [],
+          enableResearch:
+            typeof parsed.enableResearch === "boolean" ? parsed.enableResearch : true,
           // Ensure dates are preserved
           createdAt: parsed.createdAt || new Date().toISOString(),
           updatedAt: parsed.updatedAt || new Date().toISOString(),

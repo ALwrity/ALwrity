@@ -20,6 +20,7 @@ interface PlanSceneHandlerArgs {
   editedScene: Partial<Scene> | null;
   makingPresentable: boolean;
   sourceArticle: YouTubeSourceArticle | null;
+  enableResearch: boolean;
   updateState: (updates: Partial<YouTubeCreatorState>) => void;
   setLoading: (v: boolean) => void;
   setError: (v: string | null) => void;
@@ -46,6 +47,7 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
     editedScene,
     makingPresentable,
     sourceArticle,
+    enableResearch,
     updateState,
     setLoading,
     setError,
@@ -67,6 +69,11 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
     setSuccess(null);
 
     try {
+      console.info("[YouTubeCreator] Generating plan", {
+        durationType,
+        enableResearch,
+        ideaLen: userIdea.trim().length,
+      });
       const response = await youtubeApi.createPlan({
         user_idea: userIdea,
         duration_type: durationType,
@@ -79,9 +86,19 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
         source_article_url: sourceArticle?.url,
         source_article_title: sourceArticle?.title,
         source_article_summary: sourceArticle?.summary,
+        enable_research: enableResearch,
       });
 
       if (response.success && response.plan) {
+        const generation = response.plan.generation;
+        console.info("[YouTubeCreator] Plan generated", {
+          durationType,
+          enableResearch,
+          hasGeneration: Boolean(generation),
+          researchInjected: Boolean(generation?.research_injected),
+          userPromptLen: generation?.user_prompt?.length ?? 0,
+          sourceCount: response.plan.research_sources_count ?? response.plan.research_sources?.length ?? 0,
+        });
         const updates: Partial<YouTubeCreatorState> = { videoPlan: response.plan };
         if (response.plan.auto_generated_avatar_url) {
           updates.avatarUrl = response.plan.auto_generated_avatar_url;
@@ -95,9 +112,18 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
           setSuccess(null);
         }, 2000);
       } else {
+        console.warn("[YouTubeCreator] Plan generation returned unsuccessful response", {
+          message: response.message,
+          enableResearch,
+        });
         setError(response.message || "Failed to generate plan");
       }
     } catch (err: any) {
+      console.error("[YouTubeCreator] Plan generation failed", {
+        enableResearch,
+        durationType,
+        error: err?.message || String(err),
+      });
       setError(err.message || "Failed to generate video plan");
     } finally {
       setLoading(false);
@@ -112,6 +138,7 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
     referenceImage,
     avatarUrl,
     sourceArticle,
+    enableResearch,
     updateState,
     setActiveStep,
     setError,

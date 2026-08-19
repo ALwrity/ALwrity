@@ -56,6 +56,8 @@ import { SelectWithCustom } from './SelectWithCustom';
 import { PlanUrlImportBar, type YouTubeSourceArticle } from './PlanUrlImportBar';
 import { ChannelBiblePanel } from './ChannelBiblePanel';
 import { PlanBrainstormPanel } from './PlanBrainstormPanel';
+import { PlanResearchToggle } from './PlanResearchToggle';
+import { PlanPromptPreview } from './PlanPromptPreview';
 import type { YouTubeChannelBible } from '../../../services/youtubeApi';
 
 interface PlanStepProps {
@@ -93,6 +95,8 @@ interface PlanStepProps {
   onBibleChange: (bible: YouTubeChannelBible) => void;
   onSaveBible: () => void;
   onApplyBible: () => void;
+  enableResearch: boolean;
+  onEnableResearchChange: (enabled: boolean) => void;
 }
 
 export const PlanStep: React.FC<PlanStepProps> = React.memo(({
@@ -130,6 +134,8 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
   onBibleChange,
   onSaveBible,
   onApplyBible,
+  enableResearch,
+  onEnableResearchChange,
 }) => {
   // Memoize operation objects to avoid recreating on every render
   const videoPlanningOperation = useMemo(
@@ -676,6 +682,24 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
               </Box>
             </Stack>
           </Paper>
+
+          <PlanResearchToggle
+            enabled={enableResearch}
+            disabled={loading}
+            onChange={onEnableResearchChange}
+          />
+
+          <PlanPromptPreview
+            userIdea={userIdea}
+            durationType={durationType}
+            videoType={videoType}
+            targetAudience={targetAudience}
+            videoGoal={videoGoal}
+            brandStyle={brandStyle}
+            language={language}
+            enableResearch={enableResearch}
+            channelBible={channelBible}
+          />
 
           <OperationButton
             operation={videoPlanningOperation}
