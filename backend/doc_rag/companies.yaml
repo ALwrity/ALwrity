@@ -1,0 +1,36 @@
+# Fictional company tenants mapped to docs/ folder prefixes.
+# Longest matching prefix wins during ingest.
+
+companies:
+  AcmeContent:
+    description: Content intelligence, SEO, research, and strategy docs
+    folders:
+      - SEO
+      - SIF
+      - Content Plan
+      - Content strategy
+      - Content Audit
+      - Research
+      - ALwrity Researcher
+      - ALwrity Prompts
+      - flat_file_context
+
+  StudioMedia:
+    description: Creative studios and media production docs
+    folders:
+      - image studio
+      - Video Studio
+      - YouTube Studio
+      - story writer
+      - Podcast_maker
+      - product marketing
+
+  PlatformOps:
+    description: Platform, billing, onboarding, and integration docs
+    folders:
+      - Billing_Subscription
+      - Onboarding
+      - Alwrity copilot
+      - llm_gateway
+      - subscription
+    root_files: true  # docs/*.md at repo docs root
