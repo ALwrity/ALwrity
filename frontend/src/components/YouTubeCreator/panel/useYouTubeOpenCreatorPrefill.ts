@@ -5,6 +5,13 @@ import {
   consumePendingOpenCreator,
   type YouTubeOpenCreatorDetail,
 } from "./youtubeOpenCreatorEvents";
+import { queueYouTubePlanFocus } from "./youtubePlanFocus";
+
+function scrollToTourTarget(selector: string): void {
+  window.setTimeout(() => {
+    document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, 250);
+}
 
 /**
  * Applies Blog/Studio deep-link prefill into the Video Creator pipeline.
@@ -33,12 +40,16 @@ export function useYouTubeOpenCreatorPrefill(
       const nextStep = typeof detail.step === "number" ? detail.step : 0;
       setActiveStep(nextStep);
       updateState({ activeStep: nextStep });
+      if (detail.focusBrainstorm || detail.focusSavedIdeas) {
+        queueYouTubePlanFocus({
+          brainstorm: Boolean(detail.focusBrainstorm || detail.focusSavedIdeas),
+          savedIdeas: Boolean(detail.focusSavedIdeas),
+        });
+      }
       if (detail.focusUrlImport) {
-        window.setTimeout(() => {
-          document
-            .querySelector('[data-tour="yt-url-import"]')
-            ?.scrollIntoView({ behavior: "smooth", block: "center" });
-        }, 250);
+        scrollToTourTarget('[data-tour="yt-url-import"]');
+      } else if (detail.focusBrainstorm || detail.focusSavedIdeas) {
+        scrollToTourTarget('[data-tour="yt-plan-brainstorm"]');
       }
       console.info("[YouTubeVideoCreatorPanel] Applied open-creator prefill", detail);
     };

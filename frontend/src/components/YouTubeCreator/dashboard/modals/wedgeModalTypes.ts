@@ -1,5 +1,6 @@
 import type { YouTubeOpenCreatorDetail } from "../youtubeStudioEvents";
 import type { YouTubeCreatorState } from "../../../../hooks/useYouTubeCreatorState";
+import type { YouTubeChannelBible } from "../../../../services/youtubeApi";
 
 export type GoCreateFn = (detail?: YouTubeOpenCreatorDetail) => void;
 
@@ -16,10 +17,9 @@ export interface GatedWedgeProps extends WedgeModalBaseProps {
 }
 
 export interface PlanWedgeProps extends WedgeModalBaseProps {
-  channelBibleNiche?: string | null;
-  onOpenBible: () => void;
   markNotify?: (key: string) => void;
   notifyKeys?: Record<string, boolean>;
+  channelBible?: YouTubeChannelBible | null;
 }
 
 export interface CreateWedgeProps extends WedgeModalBaseProps {

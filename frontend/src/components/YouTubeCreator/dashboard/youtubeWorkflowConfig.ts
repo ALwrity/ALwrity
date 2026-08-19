@@ -53,7 +53,7 @@ const CARD_DEFS: Array<
   {
     id: "plan",
     title: "Plan",
-    description: "Niche ideas, Channel Bible, trends, and series strategy",
+    description: "Niche ideas, trends, and series strategy",
     accent: "#6366f1",
   },
   {
@@ -121,7 +121,7 @@ export {
 export const PLAN_PINNED_HINT_KEY = "youtube_dashboard_plan_hint_dismissed";
 
 export const WEDGE_MODAL_INTROS: Record<YouTubeWorkflowCardId, string> = {
-  plan: "AI suggests topics for your niche — you pick the one that sounds like your channel.",
+  plan: "ALwrity suggests topics for your niche — you pick the one that sounds like your channel.",
   create:
     "Authority content for your niche — draft it like you’d say it on camera. HITL on every title and scene.",
   publish:

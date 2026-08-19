@@ -30,7 +30,6 @@ interface WorkflowHelperModalsProps {
   creatorState: YouTubeCreatorState;
   goCreate: GoCreateFn;
   onClearDraft: () => void;
-  bibleOpen: boolean;
   coachOpen: boolean;
   seoOpen: boolean;
   thumbOpen: boolean;
@@ -38,7 +37,6 @@ interface WorkflowHelperModalsProps {
   videosOpen: boolean;
   costText: string;
   videos: string[];
-  onCloseBible: () => void;
   onCloseCoach: () => void;
   onCloseSeo: () => void;
   onCloseThumb: () => void;
@@ -50,7 +48,6 @@ export const WorkflowHelperModals: React.FC<WorkflowHelperModalsProps> = ({
   creatorState,
   goCreate,
   onClearDraft,
-  bibleOpen,
   coachOpen,
   seoOpen,
   thumbOpen,
@@ -58,7 +55,6 @@ export const WorkflowHelperModals: React.FC<WorkflowHelperModalsProps> = ({
   videosOpen,
   costText,
   videos,
-  onCloseBible,
   onCloseCoach,
   onCloseSeo,
   onCloseThumb,
@@ -69,25 +65,6 @@ export const WorkflowHelperModals: React.FC<WorkflowHelperModalsProps> = ({
 
   return (
     <>
-      <YouTubeActionModal
-        open={bibleOpen}
-        title="Channel Bible"
-        intro="Open Video Creator → Plan step to edit and apply your Channel Bible."
-        onClose={onCloseBible}
-        maxWidth={480}
-      >
-        <button
-          type="button"
-          className="yt-rail-btn yt-rail-btn--primary"
-          onClick={() => {
-            onCloseBible();
-            goCreate({ step: 0 });
-          }}
-        >
-          Open Channel Bible in Plan
-        </button>
-      </YouTubeActionModal>
-
       <YouTubeActionModal
         open={coachOpen}
         title="Pre-Publish Coach"

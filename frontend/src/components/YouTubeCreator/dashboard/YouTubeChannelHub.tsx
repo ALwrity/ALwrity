@@ -7,18 +7,15 @@ interface YouTubeChannelHubProps {
   channelName?: string | null;
   niche?: string | null;
   isLoading?: boolean;
-  onConnect: () => void;
-  onCreateVideo: () => void;
 }
 
+/** Profile hub in the radial center — Connect CTA lives on the hub axis below the ring. */
 export const YouTubeChannelHub: React.FC<YouTubeChannelHubProps> = ({
   hubSize,
   connected,
   channelName,
   niche,
   isLoading = false,
-  onConnect,
-  onCreateVideo,
 }) => {
   return (
     <div
@@ -120,46 +117,6 @@ export const YouTubeChannelHub: React.FC<YouTubeChannelHubProps> = ({
             </span>
           )}
         </div>
-      )}
-
-      {connected ? (
-        <button
-          type="button"
-          onClick={onCreateVideo}
-          style={{
-            background: YT_RED,
-            color: "white",
-            border: "none",
-            padding: "10px 20px",
-            borderRadius: 50,
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: "pointer",
-            boxShadow: "0 6px 20px rgba(255,0,0,0.35)",
-            whiteSpace: "nowrap",
-          }}
-        >
-          Create Video
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={onConnect}
-          style={{
-            background: YT_RED,
-            color: "white",
-            border: "none",
-            padding: "10px 20px",
-            borderRadius: 50,
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: "pointer",
-            boxShadow: "0 6px 20px rgba(255,0,0,0.35)",
-            whiteSpace: "nowrap",
-          }}
-        >
-          Connect YouTube
-        </button>
       )}
     </div>
   );

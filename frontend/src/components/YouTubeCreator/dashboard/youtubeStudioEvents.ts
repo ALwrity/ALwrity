@@ -21,6 +21,10 @@ export interface YouTubeOpenCreatorDetail {
   durationType?: DurationType;
   userIdea?: string;
   focusUrlImport?: boolean;
+  /** Expand Plan brainstorm (Topic Discovery). */
+  focusBrainstorm?: boolean;
+  /** Expand brainstorm and load saved ideas. */
+  focusSavedIdeas?: boolean;
 }
 
 export interface YouTubeOpenWedgeDetail {

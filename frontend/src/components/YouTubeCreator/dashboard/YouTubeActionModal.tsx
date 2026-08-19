@@ -33,7 +33,7 @@ export const YouTubeActionModal: React.FC<YouTubeActionModalProps> = ({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        style={{ width: `min(${maxWidth}px, 100%)` }}
+        style={{ width: `min(${maxWidth}px, 100%)`, maxWidth: "97vw" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="yt-modal-header">

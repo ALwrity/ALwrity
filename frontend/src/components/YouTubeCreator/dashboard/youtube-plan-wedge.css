@@ -1,0 +1,171 @@
+/**
+ * YouTube Plan wedge two-column layout — LinkedIn Plan wedge pattern.
+ * Primary workspace left; Trends / Series Planner sidebar on the right.
+ */
+
+.yt-plan-wedge {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.yt-plan-wedge-main {
+  display: grid;
+  grid-template-columns: minmax(0, 85fr) minmax(200px, 15fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.yt-plan-wedge-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  align-self: start;
+  position: sticky;
+  top: 0;
+}
+
+.yt-plan-wedge-sidebar__label {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.yt-plan-wedge-sidebar__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.yt-plan-wedge-sidebar__stack .yt-tool-tile {
+  width: 100%;
+}
+
+.yt-plan-brainstorm {
+  min-width: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fff;
+  padding: 14px;
+}
+
+.yt-plan-brainstorm__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.yt-plan-brainstorm__icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.yt-plan-brainstorm__titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.yt-plan-brainstorm__title {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0f0f0f;
+}
+
+.yt-plan-brainstorm__subtitle {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #606060;
+  line-height: 1.45;
+}
+
+.yt-plan-brainstorm__saved-btn {
+  flex-shrink: 0;
+}
+
+.yt-plan-brainstorm__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.yt-plan-brainstorm__input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 0.88rem;
+  resize: vertical;
+  min-height: 72px;
+}
+
+.yt-plan-brainstorm__input:focus {
+  outline: 2px solid #fecaca;
+  border-color: #ff0000;
+}
+
+.yt-plan-brainstorm__section-label {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.yt-plan-brainstorm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.yt-plan-idea-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fff;
+}
+
+.yt-plan-idea-card__prompt {
+  margin: 0 0 6px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #111827;
+}
+
+.yt-plan-idea-card__meta {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  color: #4b5563;
+}
+
+.yt-plan-idea-card__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.yt-plan-saved-list {
+  border-top: 1px dashed #e5e7eb;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (max-width: 800px) {
+  .yt-plan-wedge-main {
+    grid-template-columns: 1fr;
+  }
+
+  .yt-plan-wedge-sidebar {
+    position: static;
+  }
+}
