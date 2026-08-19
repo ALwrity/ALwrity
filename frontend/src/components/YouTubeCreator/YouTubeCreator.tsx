@@ -4,9 +4,8 @@
  * Default tab is Video Creator. Studio Hub is Tab 2 (`?tab=hub`).
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Box, Container, Tab, Tabs } from "@mui/material";
+import { Box, Tab, Tabs } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { YT_BG, YT_BORDER, YT_TEXT } from "./constants";
 import { YouTubeVideoCreatorHeader } from "./panel/YouTubeVideoCreatorHeader";
 import { YouTubeVideoCreatorPanel } from "./YouTubeVideoCreatorPanel";
 import { YouTubeStudioHub } from "./dashboard/YouTubeStudioHub";
@@ -19,6 +18,8 @@ import {
 } from "../../hooks/useYouTubeCreatorState";
 import { useYouTubePublish } from "../../hooks/useYouTubePublish";
 import { youtubeApi, type YouTubeChannelBible } from "../../services/youtubeApi";
+import "./dashboard/youtube-dashboard-layout.css";
+import "./dashboard/youtube-rail-controls.css";
 
 const YouTubeCreator: React.FC = () => {
   const navigate = useNavigate();
@@ -34,6 +35,11 @@ const YouTubeCreator: React.FC = () => {
     document.title =
       tab === "hub" ? "YouTube Studio Hub | ALwrity" : "YouTube Creator Studio | ALwrity";
   }, [tab]);
+
+  useEffect(() => {
+    document.body.classList.add("youtube-studio-view");
+    return () => document.body.classList.remove("youtube-studio-view");
+  }, []);
 
   useEffect(() => {
     if (tab !== "hub") return undefined;
@@ -69,42 +75,38 @@ const YouTubeCreator: React.FC = () => {
   const onTabChange = (_e: React.SyntheticEvent, value: YouTubeStudioTab) => setTab(value);
 
   return (
-    <Container
-      maxWidth={tab === "hub" ? false : "lg"}
-      sx={{
-        py: 4,
-        backgroundColor: YT_BG,
-        color: YT_TEXT,
-        minHeight: "100vh",
-        borderRadius: 2,
-        border: `1px solid ${YT_BORDER}`,
-        boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
-        ...(tab === "hub" ? { maxWidth: 1400, mx: "auto" } : {}),
-      }}
-    >
-      <YouTubeVideoCreatorHeader onBack={() => navigate("/dashboard")} />
-      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
-        <Tabs value={tab} onChange={onTabChange} textColor="inherit" indicatorColor="secondary">
-          <Tab value="creator" label="Video Creator" />
-          <Tab value="hub" label="Studio Hub" />
+    <Box className="yt-studio-page" data-tab={tab}>
+      <Box className="yt-studio-page-header">
+        <YouTubeVideoCreatorHeader onBack={() => navigate("/dashboard")} />
+        <Tabs
+          value={tab}
+          onChange={onTabChange}
+          textColor="inherit"
+          indicatorColor="secondary"
+          sx={{ minHeight: 44, color: "#0f0f0f" }}
+        >
+          <Tab value="creator" label="Video Creator" sx={{ color: "#0f0f0f" }} />
+          <Tab value="hub" label="Studio Hub" sx={{ color: "#0f0f0f" }} />
         </Tabs>
       </Box>
 
-      {tab === "hub" ? (
-        <YouTubeStudioHub
-          connected={connected}
-          channelName={activeChannel?.channel_name}
-          channelBible={channelBible}
-          oauthLoading={oauthLoading}
-          onConnect={() => void connect()}
-          creatorState={hubDraft}
-          onClearDraft={onClearDraft}
-          needsAnalyticsReconnect={needsAnalyticsReconnect}
-        />
-      ) : (
-        <YouTubeVideoCreatorPanel />
-      )}
-    </Container>
+      <Box className={tab === "hub" ? "yt-studio-page-body" : "yt-studio-page-body yt-studio-page-body--creator"}>
+        {tab === "hub" ? (
+          <YouTubeStudioHub
+            connected={connected}
+            channelName={activeChannel?.channel_name}
+            channelBible={channelBible}
+            oauthLoading={oauthLoading}
+            onConnect={() => void connect()}
+            creatorState={hubDraft}
+            onClearDraft={onClearDraft}
+            needsAnalyticsReconnect={needsAnalyticsReconnect}
+          />
+        ) : (
+          <YouTubeVideoCreatorPanel />
+        )}
+      </Box>
+    </Box>
   );
 };
 

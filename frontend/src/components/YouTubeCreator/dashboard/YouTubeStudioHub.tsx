@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./youtube-dashboard-layout.css";
+import "./youtube-rail-controls.css";
 import { YouTubeRadialWorkflow } from "./YouTubeRadialWorkflow";
 import { YouTubeMobileWorkflowGrid } from "./YouTubeMobileWorkflowGrid";
 import { YouTubeChannelHub } from "./YouTubeChannelHub";
@@ -153,19 +154,7 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
           />
         </div>
 
-        <div className="yt-nudge">
-          AI drafts scripts and replies — you review, then publish. Start with Plan or Create.
-        </div>
-
         <div className="yt-studio-hub-hero">
-          <div className="yt-studio-hub-heading">
-            <h2>Your YouTube channel, at a glance</h2>
-            <p>
-              Six steps, one cockpit — plan niche authority, create with HITL review, publish
-              cleanly, analyse growth, engage daily, and remarket winners.
-            </p>
-          </div>
-
           <div className="yt-studio-hub-canvas" ref={canvasRef}>
             {isDesktop ? (
               <>

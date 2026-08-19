@@ -18,35 +18,22 @@ export const YouTubeRightRail: React.FC<YouTubeRightRailProps> = ({
   isDesktop,
   needsAnalyticsReconnect = false,
 }) => {
-  if (!isDesktop) {
-    return (
-      <div className="yt-studio-right-rail" style={{ width: "100%" }}>
-        <div className="yt-rail-panel" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          <YouTubeLibraryButton />
-        </div>
-        <YouTubeAnalyticsSidebar
-          connected={connected}
-          channelName={channelName}
-          onConnect={onConnect}
-          needsAnalyticsReconnect={needsAnalyticsReconnect}
-        />
-        <YouTubeKnowledgeCenter compact />
-      </div>
-    );
-  }
-
   return (
-    <aside className="yt-studio-right-rail" aria-label="Studio tools">
-      <div className="yt-rail-panel" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        <YouTubeLibraryButton />
-      </div>
+    <aside
+      className="yt-studio-right-rail"
+      aria-label="Studio tools"
+      style={isDesktop ? undefined : { width: "100%" }}
+    >
       <YouTubeAnalyticsSidebar
         connected={connected}
         channelName={channelName}
         onConnect={onConnect}
         needsAnalyticsReconnect={needsAnalyticsReconnect}
       />
-      <YouTubeKnowledgeCenter />
+      <div className="yt-studio-rail-actions">
+        <YouTubeLibraryButton />
+        <YouTubeKnowledgeCenter compact={!isDesktop} />
+      </div>
     </aside>
   );
 };
