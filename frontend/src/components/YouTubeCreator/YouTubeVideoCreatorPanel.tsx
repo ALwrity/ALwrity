@@ -16,9 +16,10 @@ import { useYouTubePlanAndSceneHandlers } from "./panel/useYouTubePlanAndSceneHa
 import { useYouTubeAssetAndRenderHandlers } from "./panel/useYouTubeAssetAndRenderHandlers";
 import { YouTubeVideoCreatorStepper } from "./panel/YouTubeVideoCreatorStepper";
 import { YouTubeVideoCreatorSteps } from "./panel/YouTubeVideoCreatorSteps";
+import { hasYouTubeCreatorDraft } from "./utils/youtubeCreatorDraftUtils";
 
 export const YouTubeVideoCreatorPanel: React.FC = () => {
-  const { state, updateState } = useYouTubeCreatorState();
+  const { state, updateState, clearState } = useYouTubeCreatorState();
   const {
     userIdea,
     durationType,
@@ -167,6 +168,24 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
   const onClearSuccess = useCallback(() => setSuccess(null), []);
   const onClearError = useCallback(() => setError(null), []);
 
+  const showStartNewVideo = useMemo(() => hasYouTubeCreatorDraft(state), [state]);
+
+  const handleStartNewVideo = useCallback(() => {
+    console.info("[YouTubeCreator] Starting new video — clearing session draft");
+    clearState();
+    setActiveStep(0);
+    setLoading(false);
+    setError(null);
+    setUploadingAvatar(false);
+    setMakingPresentable(false);
+    setRegeneratingAvatar(false);
+    setGeneratingImageSceneId(null);
+    setGeneratingAudioSceneId(null);
+    setSourceArticle(null);
+    setSuccess("Started a fresh video. Your Channel Bible is unchanged.");
+    window.setTimeout(() => setSuccess(null), 4000);
+  }, [clearState]);
+
   return (
     <Box sx={{ width: "100%" }}>
       <YouTubeVideoCreatorStepper
@@ -176,6 +195,9 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
         onNavigate={assetHandlers.handleStepNavigation}
         onClearSuccess={onClearSuccess}
         onClearError={onClearError}
+        showStartNewVideo={showStartNewVideo}
+        onStartNewVideo={handleStartNewVideo}
+        startNewVideoDisabled={loading}
       />
       <YouTubeVideoCreatorSteps
         activeStep={activeStep}

@@ -1,6 +1,7 @@
 import React from "react";
-import { Alert, Paper, Step, StepLabel, Stepper } from "@mui/material";
+import { Alert, Box, Paper, Step, StepLabel, Stepper } from "@mui/material";
 import { AnimatePresence, motion } from "framer-motion";
+import { StartNewVideoButton } from "../components/StartNewVideoButton";
 import { STEPS, YT_BORDER, YT_RED } from "../constants";
 
 interface YouTubeVideoCreatorStepperProps {
@@ -10,6 +11,9 @@ interface YouTubeVideoCreatorStepperProps {
   onNavigate: (step: number) => void;
   onClearSuccess: () => void;
   onClearError: () => void;
+  showStartNewVideo?: boolean;
+  onStartNewVideo?: () => void;
+  startNewVideoDisabled?: boolean;
 }
 
 export const YouTubeVideoCreatorStepper: React.FC<YouTubeVideoCreatorStepperProps> = ({
@@ -19,6 +23,9 @@ export const YouTubeVideoCreatorStepper: React.FC<YouTubeVideoCreatorStepperProp
   onNavigate,
   onClearSuccess,
   onClearError,
+  showStartNewVideo = false,
+  onStartNewVideo,
+  startNewVideoDisabled = false,
 }) => (
   <>
     <Paper
@@ -29,6 +36,11 @@ export const YouTubeVideoCreatorStepper: React.FC<YouTubeVideoCreatorStepperProp
         border: `1px solid ${YT_BORDER}`,
       }}
     >
+      {showStartNewVideo && onStartNewVideo ? (
+        <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+          <StartNewVideoButton onConfirm={onStartNewVideo} disabled={startNewVideoDisabled} />
+        </Box>
+      ) : null}
       <Stepper
         activeStep={activeStep}
         sx={{

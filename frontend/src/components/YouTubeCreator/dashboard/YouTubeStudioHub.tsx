@@ -9,6 +9,8 @@ import { YouTubeWorkflowModals } from "./YouTubeWorkflowModals";
 import { YouTubeRightRail } from "./YouTubeRightRail";
 import { YouTubeTodayGrowth } from "./YouTubeTodayGrowth";
 import { YouTubeResumeDraftChip } from "./YouTubeResumeDraftChip";
+import { StartNewVideoButton } from "../components/StartNewVideoButton";
+import { hasYouTubeCreatorDraft } from "../utils/youtubeCreatorDraftUtils";
 import { YouTubeCopilotFab } from "./YouTubeCopilotFab";
 import {
   openYouTubeCreator,
@@ -102,11 +104,7 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
     [containerWidth, containerHeight],
   );
 
-  const hasDraft = Boolean(
-    creatorState.userIdea?.trim() ||
-      creatorState.videoPlan ||
-      (creatorState.scenes && creatorState.scenes.length > 0),
-  );
+  const hasDraft = hasYouTubeCreatorDraft(creatorState);
 
   const draftPreview =
     creatorState.videoPlan?.selected_title ||
@@ -123,6 +121,15 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
       <div className="yt-studio-hub-main">
         <div className="yt-studio-hub-toolbar">
           <YouTubeTodayGrowth />
+          {hasDraft ? (
+            <StartNewVideoButton
+              variant="hub"
+              onConfirm={() => {
+                onClearDraft();
+                openYouTubeCreator({ step: 0 });
+              }}
+            />
+          ) : null}
           <YouTubeResumeDraftChip
             hasDraft={hasDraft}
             preview={draftPreview}

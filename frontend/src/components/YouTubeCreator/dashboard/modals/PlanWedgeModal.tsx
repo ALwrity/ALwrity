@@ -16,7 +16,7 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
         icon="💡"
         accent="#6366f1"
         title="Topic Discovery"
-        description="News, finance, research, and site ideas — pick one, then draft."
+        description="Brainstorm ideas, browse trends, and save picks for your next video."
         hitl
         onClick={() => goCreate({ step: 0 })}
       />

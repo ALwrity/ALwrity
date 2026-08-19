@@ -4,7 +4,6 @@ LinkedIn content ideas using the common LLM infrastructure (llm_text_gen).
 """
 import json
 import uuid
-from datetime import date
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +12,12 @@ from pydantic import BaseModel, Field
 
 from middleware.auth_middleware import get_current_user, get_optional_user
 from models.linkedin_brainstorm_saved_ideas_db_models import BrainstormSavedIdeaDB
+from services.brainstorm.ideas_prompt_builders import (
+    SUPPORTED_PLATFORMS,
+    build_linkedin_ideas_prompts,
+    build_youtube_ideas_prompts,
+    normalize_platform,
+)
 from services.brainstorm.personalized_service import (
     PERSONALIZED_JSON_STRUCT,
     PERSONALIZED_SYSTEM_PROMPT,
@@ -21,6 +26,10 @@ from services.brainstorm.personalized_service import (
     gather_personalization_data,
 )
 from services.brainstorm.search_service import search_exa
+from services.brainstorm.youtube_brainstorm_context_service import (
+    fetch_youtube_saved_ideas_context,
+    fetch_youtube_trends_context,
+)
 from services.database import get_session_for_user
 from services.llm_providers.main_text_generation import llm_text_gen
 
@@ -50,6 +59,22 @@ class IdeasRequest(BaseModel):
     persona: Optional[PersonaPayload] = None
     platformPersona: Optional[PlatformPersonaPayload] = None
     count: int = Field(5, ge=3, le=10, description="Number of ideas to generate")
+    platform: Optional[str] = Field(
+        default="linkedin",
+        description="Target platform for idea style: linkedin (default) or youtube",
+    )
+    channel_bible_context: Optional[str] = Field(
+        default=None,
+        description="Optional YouTube Channel Bible serialize_for_prompt blob",
+    )
+    include_trending: bool = Field(
+        default=False,
+        description="YouTube only: include Google Trends (YouTube search interest) context",
+    )
+    include_repurpose: bool = Field(
+        default=False,
+        description="YouTube only: include saved YouTube brainstorm ideas for repurposing",
+    )
 
 
 class IdeaItem(BaseModel):
@@ -163,57 +188,98 @@ async def generate_brainstorm_ideas(
     req: IdeasRequest,
     current_user: Optional[Dict[str, Any]] = Depends(get_optional_user),
 ) -> IdeasResponse:
-    """Search Exa for topic context and generate persona-aware brainstorm ideas."""
+    """Search Exa for topic context and generate platform-aware brainstorm ideas."""
     try:
         user_id = _resolve_user_id(current_user)
-        logger.info(f"[Brainstorm] /ideas request — seed={req.seed!r}, count={req.count}, persona={req.persona.persona_name if req.persona else None}")
+        platform = normalize_platform(req.platform)
+        if platform not in SUPPORTED_PLATFORMS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid platform '{req.platform}'. Supported: linkedin, youtube.",
+            )
 
-        sources, content = await search_exa(req.seed)
-        logger.info(f"[Brainstorm] Exa returned {len(sources)} source(s)")
-        sources_block = content or "(no web sources found)"
-
-        persona_block = ""
-        if req.persona:
-            parts = []
-            if req.persona.persona_name:
-                parts.append(req.persona.persona_name)
-            if req.persona.archetype:
-                parts.append(f"({req.persona.archetype})")
-            persona_block = "Persona: " + " ".join(parts) + "\n"
-
-        platform_block = ""
-        if req.platformPersona and req.platformPersona.content_format_rules:
-            limit = req.platformPersona.content_format_rules.get("character_limit")
-            platform_block = f"LinkedIn character limit: {limit}" if limit else ""
-
-        today_str = date.today().strftime("%B %d, %Y")
-        sys_prompt = (
-            "You are an enterprise-grade LinkedIn strategist who proposes specific, non-generic "
-            "content angles that executives can immediately use as post topics. "
-            "You ground every angle in real evidence from the provided web sources. "
-            "You never use markdown, emojis, or bullet points in the topic headline. "
-            "You prefer thought-leadership, contrarian takes backed by data, and practical playbooks. "
-            f"Today's date is {today_str}. Every angle must feel current as of this date."
+        seed_preview = (req.seed or "")[:50]
+        has_channel_bible = bool((req.channel_bible_context or "").strip())
+        logger.info(
+            f"[Brainstorm] /ideas request — platform={platform}, has_seed={bool((req.seed or '').strip())}, "
+            f"seed_preview={seed_preview!r}, count={req.count}, has_channel_bible={has_channel_bible}, "
+            f"include_trending={req.include_trending}, include_repurpose={req.include_repurpose}, "
+            f"persona={req.persona.persona_name if req.persona else None}"
         )
 
-        prompt = f"""TODAY'S DATE: {today_str}
+        try:
+            sources, content = await search_exa(req.seed)
+        except Exception as exc:
+            logger.error(
+                f"[Brainstorm] Exa search failed platform={platform} seed_preview={seed_preview!r}: {exc}",
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=502,
+                detail="Web research is temporarily unavailable. Please try again shortly.",
+            ) from exc
 
-SEED IDEA: {req.seed}
-{persona_block}{platform_block}
-RECENT WEB SOURCES (numbered list):
-{sources_block}
+        logger.info(f"[Brainstorm] Exa returned {len(sources)} source(s) platform={platform}")
+        sources_block = content or "(no web sources found)"
 
-Generate exactly {req.count} LinkedIn post angles in JSON.
+        if platform == "youtube":
+            trending_context = ""
+            repurpose_context = ""
 
-Each angle must be a JSON object with these fields:
-- prompt: short, specific headline (5-15 words, no markdown, no emojis, no bullets)
-- rationale: 1-2 sentences explaining why this resonates now
-- evidence: specific finding from a source above formatted as "Source [N]: <data point>", or null if none
+            if req.include_trending:
+                try:
+                    trending_context = await fetch_youtube_trends_context(req.seed, user_id)
+                except Exception as exc:
+                    logger.warning(
+                        f"[Brainstorm] YouTube trends context failed (continuing without trends): {exc}",
+                        exc_info=True,
+                    )
 
-Rules:
-- Avoid: latest trends, the future of, why you should, mastering, unlocking.
-- Prefer: contrarian with evidence, how-to with steps, or opinion with data.
-- Every angle must feel specific to {req.seed}, not generic."""
+            if req.include_repurpose:
+                try:
+                    repurpose_context = fetch_youtube_saved_ideas_context(user_id)
+                except Exception as exc:
+                    logger.warning(
+                        f"[Brainstorm] YouTube repurpose context failed (continuing without saved ideas): {exc}",
+                        exc_info=True,
+                    )
+
+            logger.info(
+                f"[Brainstorm] YouTube source chips — channel_bible={has_channel_bible}, "
+                f"trending_selected={req.include_trending}, trends_in_prompt={bool(trending_context)}, "
+                f"repurpose_selected={req.include_repurpose}, repurpose_in_prompt={bool(repurpose_context)}"
+            )
+
+            sys_prompt, prompt = build_youtube_ideas_prompts(
+                seed=req.seed,
+                count=req.count,
+                sources_block=sources_block,
+                channel_bible_context=req.channel_bible_context,
+                trending_context=trending_context or None,
+                repurpose_context=repurpose_context or None,
+            )
+        else:
+            persona_block = ""
+            if req.persona:
+                parts = []
+                if req.persona.persona_name:
+                    parts.append(req.persona.persona_name)
+                if req.persona.archetype:
+                    parts.append(f"({req.persona.archetype})")
+                persona_block = "Persona: " + " ".join(parts) + "\n"
+
+            platform_block = ""
+            if req.platformPersona and req.platformPersona.content_format_rules:
+                limit = req.platformPersona.content_format_rules.get("character_limit")
+                platform_block = f"LinkedIn character limit: {limit}" if limit else ""
+
+            sys_prompt, prompt = build_linkedin_ideas_prompts(
+                seed=req.seed,
+                count=req.count,
+                sources_block=sources_block,
+                persona_block=persona_block,
+                platform_block=platform_block,
+            )
 
         result = llm_text_gen(
             prompt=prompt,
@@ -234,10 +300,16 @@ Rules:
         )
 
         ideas = _parse_llm_ideas(result, IdeaItem)
-        logger.info(f"[Brainstorm] LLM returned type={type(result).__name__}, parsed {len(ideas)} idea(s)")
+        logger.info(
+            f"[Brainstorm] LLM returned type={type(result).__name__}, "
+            f"parsed {len(ideas)} idea(s), platform={platform}"
+        )
 
         if not ideas:
-            logger.warning(f"[Brainstorm] No ideas parsed from LLM response (type={type(result).__name__})")
+            logger.warning(
+                f"[Brainstorm] No ideas parsed from LLM response "
+                f"(type={type(result).__name__}, platform={platform})"
+            )
             raise HTTPException(
                 status_code=502,
                 detail="The AI model failed to generate brainstorm ideas. Please try again or rephrase your topic.",
