@@ -7,11 +7,13 @@ import {
   WEDGE_PANEL_GAP_DEG,
   type YouTubeWorkflowCardId,
 } from "./youtubeWorkflowConfig";
+import { isWedgeConnectGated } from "./studioHubAccessConfig";
 import type { YouTubeRadialLayout } from "./youtubeRadialLayout";
 
 interface YouTubeRadialWorkflowProps {
   layout: YouTubeRadialLayout;
   onCardAction: (cardId: YouTubeWorkflowCardId) => void;
+  connected?: boolean;
 }
 
 const PANEL_GAP_DEGREES = WEDGE_PANEL_GAP_DEG;
@@ -117,6 +119,7 @@ function wedgeLabelBox(
 export const YouTubeRadialWorkflow: React.FC<YouTubeRadialWorkflowProps> = ({
   layout,
   onCardAction,
+  connected = true,
 }) => {
   const [hoveredId, setHoveredId] = useState<YouTubeWorkflowCardId | null>(null);
   const [focusedId, setFocusedId] = useState<YouTubeWorkflowCardId | null>(null);
@@ -160,6 +163,7 @@ export const YouTubeRadialWorkflow: React.FC<YouTubeRadialWorkflowProps> = ({
     const isActive = isHovered || isFocused;
     const isRecommended =
       showRecommended && card.id === RECOMMENDED_WORKFLOW_CARD_ID;
+    const isConnectLocked = isWedgeConnectGated(card.id, connected);
     const panelStartDeg = card.startAngle - PANEL_GAP_DEGREES;
     const panelEndDeg = card.endAngle + PANEL_GAP_DEGREES;
     const iconHeaderGap = Math.max(5, Math.round(iconFontSize * 0.22));
@@ -217,24 +221,35 @@ export const YouTubeRadialWorkflow: React.FC<YouTubeRadialWorkflowProps> = ({
           }
         }}
       >
+        {isConnectLocked && (
+          <title>Connect YouTube to unlock {card.title}</title>
+        )}
         <path
           d={wedgePath}
           fill={
-            isActive
-              ? accentFill(card.accent, 0.2)
-              : isRecommended
-                ? accentFill(card.accent, 0.08)
-                : "url(#ytWedgeFill)"
+            isConnectLocked
+              ? "rgba(226, 232, 240, 0.88)"
+              : isActive
+                ? accentFill(card.accent, 0.2)
+                : isRecommended
+                  ? accentFill(card.accent, 0.08)
+                  : "url(#ytWedgeFill)"
           }
           stroke={
-            isActive || isRecommended ? card.accent : FRAME_COLOR
+            isConnectLocked
+              ? "rgba(148, 163, 184, 0.5)"
+              : isActive || isRecommended
+                ? card.accent
+                : FRAME_COLOR
           }
           strokeWidth={isActive ? 3 : isRecommended ? 2.4 : 1.2}
           strokeLinejoin="round"
           style={{
-            filter: isActive
-              ? `drop-shadow(0 18px 34px ${accentFill(card.accent, 0.65)})`
-              : "drop-shadow(0 2px 8px rgba(255,0,0,0.12))",
+            filter: isConnectLocked
+              ? "saturate(0.68) brightness(1.02)"
+              : isActive
+                ? `drop-shadow(0 18px 34px ${accentFill(card.accent, 0.65)})`
+                : "drop-shadow(0 2px 8px rgba(255,0,0,0.12))",
           }}
         />
         <foreignObject

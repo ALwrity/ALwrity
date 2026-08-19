@@ -87,7 +87,7 @@ export const YOUTUBE_ASK_FAQ: Array<{ q: string; a: string }> = [
     a: "Finish Render in Video Creator, then use Publish to YouTube (connect OAuth first). Confirm title, description, and privacy.",
   },
   {
-    q: "Why is Analysis locked?",
-    a: "Connect your YouTube channel. Live Analytics and comment tools ship next; SEO audit from your plan works today.",
+    q: "How do I use Analysis?",
+    a: "Open the Analysis wedge for Channel Pulse, video performance, SEO audit, content gaps, and retention. Connect YouTube OAuth for live channel data; plan-based tools work without OAuth.",
   },
 ];

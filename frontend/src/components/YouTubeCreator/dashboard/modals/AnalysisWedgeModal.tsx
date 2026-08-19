@@ -1,11 +1,14 @@
 import React from "react";
 import { YouTubeActionModal, YouTubeToolTile } from "../YouTubeActionModal";
+import { resolveOAuthTileClick } from "../studioHubTileActions";
 import { WEDGE_MODAL_INTROS } from "../youtubeWorkflowConfig";
 import type { AnalysisWedgeProps } from "./wedgeModalTypes";
 
 export const AnalysisWedgeModal: React.FC<AnalysisWedgeProps> = ({
   open,
   onClose,
+  connected,
+  onRequestConnect,
   onOpenPulse,
   onOpenStale,
   onOpenSeo,
@@ -24,14 +27,18 @@ export const AnalysisWedgeModal: React.FC<AnalysisWedgeProps> = ({
         accent="#8b5cf6"
         title="Channel Pulse"
         description="Subscribers, views, and 28-day watch metrics."
-        onClick={onOpenPulse}
+        onClick={() =>
+          resolveOAuthTileClick(connected, "channel_pulse", onOpenPulse, onRequestConnect)
+        }
       />
       <YouTubeToolTile
         icon="📈"
         accent="#0ea5e9"
         title="Video Performance"
         description="Recent uploads with view/like signals from your channel."
-        onClick={onOpenStale}
+        onClick={() =>
+          resolveOAuthTileClick(connected, "video_performance", onOpenStale, onRequestConnect)
+        }
       />
       <YouTubeToolTile
         icon="🔎"
@@ -54,7 +61,9 @@ export const AnalysisWedgeModal: React.FC<AnalysisWedgeProps> = ({
         accent="#f59e0b"
         title="Audience / Retention"
         description="Avg view duration and watch-time tips."
-        onClick={onOpenRetention}
+        onClick={() =>
+          resolveOAuthTileClick(connected, "retention", onOpenRetention, onRequestConnect)
+        }
       />
     </div>
   </YouTubeActionModal>

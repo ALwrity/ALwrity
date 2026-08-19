@@ -1,5 +1,6 @@
 import React from "react";
 import { YouTubeActionModal, YouTubeToolTile } from "../YouTubeActionModal";
+import { resolveOAuthTileClick } from "../studioHubTileActions";
 import { WEDGE_MODAL_INTROS } from "../youtubeWorkflowConfig";
 import type { EngagementWedgeProps } from "./wedgeModalTypes";
 
@@ -7,6 +8,8 @@ export const EngagementWedgeModal: React.FC<EngagementWedgeProps> = ({
   open,
   onClose,
   goCreate,
+  connected,
+  onRequestConnect,
   creatorState,
   onOpenComments,
   onOpenCommunity,
@@ -24,7 +27,14 @@ export const EngagementWedgeModal: React.FC<EngagementWedgeProps> = ({
         title="Comment Reply Assistant"
         description="Draft replies in your persona — you send (HITL)."
         hitl
-        onClick={onOpenComments}
+        onClick={() =>
+          resolveOAuthTileClick(
+            connected,
+            "comment_assistant",
+            onOpenComments,
+            onRequestConnect,
+          )
+        }
       />
       <YouTubeToolTile
         icon="📌"
@@ -54,7 +64,9 @@ export const EngagementWedgeModal: React.FC<EngagementWedgeProps> = ({
         title="Engage Queue"
         description="Open comment inbox for your daily reply routine."
         hitl
-        onClick={onOpenComments}
+        onClick={() =>
+          resolveOAuthTileClick(connected, "engage_queue", onOpenComments, onRequestConnect)
+        }
       />
     </div>
   </YouTubeActionModal>

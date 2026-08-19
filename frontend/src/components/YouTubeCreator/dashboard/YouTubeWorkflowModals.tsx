@@ -25,6 +25,8 @@ import {
 interface YouTubeWorkflowModalsProps {
   activeModal: YouTubeWorkflowCardId | null;
   onClose: () => void;
+  connected: boolean;
+  onRequestConnect: () => void;
   creatorState: YouTubeCreatorState;
   onClearDraft: () => void;
   channelBibleNiche?: string | null;
@@ -33,11 +35,14 @@ interface YouTubeWorkflowModalsProps {
 export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
   activeModal,
   onClose,
+  connected,
+  onRequestConnect,
   creatorState,
   onClearDraft,
   channelBibleNiche,
 }) => {
   const navigate = useNavigate();
+  const [notifyKeys, setNotifyKeys] = useState<Record<string, boolean>>({});
   const [coachOpen, setCoachOpen] = useState(false);
   const [seoOpen, setSeoOpen] = useState(false);
   const [thumbOpen, setThumbOpen] = useState(false);
@@ -73,6 +78,15 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
       setScheduleOpen(false);
     }
   }, [activeModal]);
+
+  const markNotify = useCallback((key: string) => {
+    setNotifyKeys((prev) => ({ ...prev, [key]: true }));
+    try {
+      localStorage.setItem(`yt_notify_${key}`, "1");
+    } catch (err) {
+      console.warn("[YouTubeWorkflowModals] notify preference save failed", err);
+    }
+  }, []);
 
   const loadVideos = useCallback(async () => {
     try {
@@ -123,6 +137,8 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         goCreate={goCreate}
         channelBibleNiche={channelBibleNiche}
         onOpenBible={() => setBibleOpen(true)}
+        markNotify={markNotify}
+        notifyKeys={notifyKeys}
       />
       <CreateWedgeModal
         open={activeModal === "create"}
@@ -136,6 +152,8 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         open={activeModal === "publish"}
         onClose={onClose}
         goCreate={goCreate}
+        connected={connected}
+        onRequestConnect={onRequestConnect}
         creatorState={creatorState}
         onOpenDrafts={() => {
           setVideosOpen(true);
@@ -153,6 +171,8 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         open={activeModal === "analysis"}
         onClose={onClose}
         goCreate={goCreate}
+        connected={connected}
+        onRequestConnect={onRequestConnect}
         onOpenPulse={() => setPulseOpen(true)}
         onOpenStale={() => setStaleOpen(true)}
         onOpenSeo={() => setSeoOpen(true)}
@@ -163,6 +183,8 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         open={activeModal === "engagement"}
         onClose={onClose}
         goCreate={goCreate}
+        connected={connected}
+        onRequestConnect={onRequestConnect}
         creatorState={creatorState}
         onOpenComments={() => setCommentsOpen(true)}
         onOpenCommunity={() => setCommunityOpen(true)}
@@ -171,6 +193,8 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         open={activeModal === "remarket"}
         onClose={onClose}
         goCreate={goCreate}
+        connected={connected}
+        onRequestConnect={onRequestConnect}
         creatorState={creatorState}
         onOpenStale={() => setStaleOpen(true)}
         onNavigateBlog={() => {
