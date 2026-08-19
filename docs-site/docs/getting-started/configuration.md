@@ -29,6 +29,9 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 # Anthropic API - Claude AI service
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
+# OrcaRouter API - Unified gateway to 200+ models
+ORCAROUTER_API_KEY=your_orcarouter_api_key_here
 ```
 
 #### Database Configuration
@@ -194,6 +197,21 @@ REACT_APP_GA_TRACKING_ID=your_ga_tracking_id_here
 3. Navigate to API Keys
 4. Create a new API key
 5. Add to `ANTHROPIC_API_KEY` in backend `.env`
+
+### 3b. OrcaRouter API
+
+**Purpose**: Unified gateway to 200+ models (OpenAI, Anthropic, Google, Meta and more) through a single OpenAI-compatible endpoint
+
+**Setup Steps**:
+1. Visit [OrcaRouter](https://www.orcarouter.ai)
+2. Sign in to your account
+3. Generate an API key (starts with `sk-orca-`)
+4. Add to `ORCAROUTER_API_KEY` in backend `.env`
+5. Optional: set `GPT_PROVIDER=orcarouter` in backend `.env` to route text generation through OrcaRouter
+
+**Usage Limits**:
+- Pay-per-use model
+- Single key gives access to models from multiple leading providers
 
 ### 4. Tavily API
 

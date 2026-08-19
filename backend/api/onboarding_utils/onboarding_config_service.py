@@ -26,7 +26,7 @@ class OnboardingConfigService:
                     "title": "AI LLM Providers",
                     "description": "Configure AI language model providers",
                     "required": True,
-                    "providers": ["openai", "gemini", "anthropic"]
+                    "providers": ["openai", "gemini", "anthropic", "orcarouter"]
                 },
                 {
                     "number": 2,
@@ -62,7 +62,7 @@ class OnboardingConfigService:
             "requirements": {
                 "min_api_keys": 1,
                 "required_providers": ["openai"],
-                "optional_providers": ["gemini", "anthropic"]
+                "optional_providers": ["gemini", "anthropic", "orcarouter"]
             }
         }
     
@@ -99,6 +99,13 @@ class OnboardingConfigService:
                 "name": "Anthropic",
                 "description": "Claude models for sophisticated content generation",
                 "setup_url": "https://console.anthropic.com/",
+                "required_fields": ["api_key"],
+                "optional_fields": []
+            },
+            "orcarouter": {
+                "name": "OrcaRouter",
+                "description": "Unified gateway to 200+ models (OpenAI, Anthropic, Google, Meta and more) through one OpenAI-compatible endpoint",
+                "setup_url": "https://www.orcarouter.ai",
                 "required_fields": ["api_key"],
                 "optional_fields": []
             }
