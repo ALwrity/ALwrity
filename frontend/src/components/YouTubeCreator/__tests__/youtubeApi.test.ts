@@ -29,10 +29,12 @@ describe('youtubeApi', () => {
       const request = {
         user_idea: 'AI coding assistant',
         duration_type: 'shorts' as const,
+        enable_research: false,
       };
 
       const result = await youtubeApi.createPlan(request);
       expect(longRunningApiClient.post).toHaveBeenCalledWith('/api/youtube/plan', request);
+      expect(request.enable_research).toBe(false);
       expect(result).toEqual(mockResponse.data);
     });
 

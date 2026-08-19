@@ -39,7 +39,8 @@ async def create_video_plan(
         logger.info(
             f"[YouTubeAPI] Creating plan: idea={request.user_idea[:50]}..., "
             f"duration={request.duration_type}, user={user_id}, "
-            f"has_source_article={has_source_article}, article_host={article_host}"
+            f"has_source_article={has_source_article}, article_host={article_host}, "
+            f"enable_research={request.enable_research}"
         )
 
         target_audience = request.target_audience

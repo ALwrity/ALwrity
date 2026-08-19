@@ -21,6 +21,7 @@ import { SEOKeywordsCard } from './SEOKeywordsCard';
 import { PlanTitleOptimizer } from './PlanTitleOptimizer';
 import { PlanOutlineEditor } from './PlanOutlineEditor';
 import { PlanMetaFieldsEditor } from './PlanMetaFieldsEditor';
+import { PlanGenerationMeta } from './PlanGenerationMeta';
 import {
   fromOutlineItems,
   normalizeKeywordList,
@@ -196,6 +197,8 @@ export const PlanDetails: React.FC<PlanDetailsProps> = React.memo(({
       )}
 
       <Stack spacing={3}>
+        <PlanGenerationMeta plan={plan} />
+
         {(isEditing || hasTitles) && (
           <PlanTitleOptimizer
             titleSuggestions={displayPlan.title_suggestions || []}

@@ -59,6 +59,7 @@ export interface YouTubeVideoCreatorStepsProps {
   setChannelBible: (bible: YouTubeChannelBible | null) => void;
   saveChannelBible: () => void;
   applyBibleToThisVideo: () => void;
+  enableResearch: boolean;
   handleBuildScenes: () => void;
   handleEditScene: (scene: Scene) => void;
   handleSaveScene: () => void;
@@ -114,6 +115,8 @@ export const YouTubeVideoCreatorSteps: React.FC<YouTubeVideoCreatorStepsProps> =
         onBibleChange={props.setChannelBible}
         onSaveBible={props.saveChannelBible}
         onApplyBible={props.applyBibleToThisVideo}
+        enableResearch={props.enableResearch}
+        onEnableResearchChange={(value) => props.updateState({ enableResearch: value })}
       />
     );
   }

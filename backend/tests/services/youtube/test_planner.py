@@ -160,6 +160,10 @@ class TestGeneratePlan:
 
         assert result["video_summary"]
         assert result["duration_type"] == "shorts" or "video_summary" in result
+        assert result["generation"]["text_gateway"] == "llm_text_gen"
+        assert result["generation"]["research_injected"] is False
+        assert "Cheap travel tips" in result["generation"]["user_prompt"]
+        assert result["generation"]["system_prompt"]
 
     def test_copies_source_article_url_onto_plan(self):
         from services.youtube.planner import YouTubePlannerService
@@ -182,6 +186,34 @@ class TestGeneratePlan:
             )
 
         assert result["source_article_url"] == "https://example.com/bali-guide"
+
+    def test_exa_research_is_injected_into_returned_user_prompt(self):
+        from services.youtube.planner import YouTubePlannerService
+
+        svc = YouTubePlannerService()
+        llm_payload = _minimal_plan()
+        research_block = "**Research & Current Information:**\nTrend about budget travel"
+
+        with patch("services.youtube.planner.llm_text_gen", return_value=llm_payload), \
+             patch.object(
+                 svc,
+                 "_perform_exa_research",
+                 new=AsyncMock(return_value=(research_block, [{"title": "T", "url": "https://ex.com"}])),
+             ):
+            result = asyncio.run(
+                svc.generate_plan(
+                    user_idea="Cheap travel tips",
+                    duration_type="shorts",
+                    video_type="tutorial",
+                    user_id="user_planner",
+                    enable_research=True,
+                )
+            )
+
+        assert result["research_enabled"] is True
+        assert result["research_sources_count"] == 1
+        assert result["generation"]["research_injected"] is True
+        assert "Trend about budget travel" in result["generation"]["user_prompt"]
 
     def test_http_exception_propagates(self):
         from services.youtube.planner import YouTubePlannerService
