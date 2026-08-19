@@ -7,8 +7,6 @@ export const RemarketWedgeModal: React.FC<RemarketWedgeProps> = ({
   open,
   onClose,
   goCreate,
-  connected,
-  onRequestConnect,
   creatorState,
   onOpenStale,
   onNavigateBlog,
@@ -81,7 +79,7 @@ export const RemarketWedgeModal: React.FC<RemarketWedgeProps> = ({
           title="Stale Video Refresh"
           description="New title/thumb/desc for buried winners — HITL apply."
           hitl
-          onClick={() => (connected ? onOpenStale() : onRequestConnect())}
+          onClick={onOpenStale}
         />
         <YouTubeToolTile
           icon="📺"

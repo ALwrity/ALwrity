@@ -9,9 +9,7 @@ export interface WedgeModalBaseProps {
   goCreate: GoCreateFn;
 }
 
-export interface NotifyWedgeProps extends WedgeModalBaseProps {
-  markNotify: (key: string) => void;
-  notifyKeys: Record<string, boolean>;
+export interface PlanWedgeProps extends WedgeModalBaseProps {
   channelBibleNiche?: string | null;
   onOpenBible: () => void;
 }
@@ -23,8 +21,6 @@ export interface CreateWedgeProps extends WedgeModalBaseProps {
 }
 
 export interface PublishWedgeProps extends WedgeModalBaseProps {
-  connected: boolean;
-  onRequestConnect: () => void;
   creatorState: YouTubeCreatorState;
   onOpenDrafts: () => void;
   onOpenCoach: () => void;
@@ -33,12 +29,7 @@ export interface PublishWedgeProps extends WedgeModalBaseProps {
   onOpenPlaylist: () => void;
 }
 
-export interface GatedWedgeProps extends WedgeModalBaseProps {
-  connected: boolean;
-  onRequestConnect: () => void;
-}
-
-export interface AnalysisWedgeProps extends GatedWedgeProps {
+export interface AnalysisWedgeProps extends WedgeModalBaseProps {
   onOpenPulse: () => void;
   onOpenStale: () => void;
   onOpenSeo: () => void;
@@ -46,13 +37,13 @@ export interface AnalysisWedgeProps extends GatedWedgeProps {
   onOpenRetention: () => void;
 }
 
-export interface EngagementWedgeProps extends GatedWedgeProps {
+export interface EngagementWedgeProps extends WedgeModalBaseProps {
   creatorState: YouTubeCreatorState;
   onOpenComments: () => void;
   onOpenCommunity: () => void;
 }
 
-export interface RemarketWedgeProps extends GatedWedgeProps {
+export interface RemarketWedgeProps extends WedgeModalBaseProps {
   creatorState: YouTubeCreatorState;
   onOpenStale: () => void;
   onNavigateBlog: () => void;

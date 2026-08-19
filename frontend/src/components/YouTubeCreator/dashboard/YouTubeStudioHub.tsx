@@ -189,8 +189,6 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
         <YouTubeWorkflowModals
           activeModal={workflowModal}
           onClose={() => setWorkflowModal(null)}
-          connected={connected}
-          onRequestConnect={onConnect}
           creatorState={creatorState}
           onClearDraft={onClearDraft}
           channelBibleNiche={channelBible?.niche || null}
