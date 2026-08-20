@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { VideoPlan, Scene } from '../services/youtubeApi';
+import { VideoPlan, Scene, SceneBuildGeneration } from '../services/youtubeApi';
 import { Resolution, DurationType, VideoType, YouTubeContentLanguage } from '../components/YouTubeCreator/constants';
 
 export interface YouTubeCreatorState {
@@ -25,6 +25,7 @@ export interface YouTubeCreatorState {
   
   // Step 2: Scenes
   scenes: Scene[];
+  sceneBuildGeneration: SceneBuildGeneration | null;
   editingSceneId: number | null;
   editedScene: Partial<Scene> | null;
   
@@ -57,6 +58,7 @@ const DEFAULT_STATE: YouTubeCreatorState = {
   videoPlan: null,
   enableResearch: true,
   scenes: [],
+  sceneBuildGeneration: null,
   editingSceneId: null,
   editedScene: null,
   renderTaskId: null,

@@ -100,11 +100,20 @@ class TestBuildScenes:
         scenes = [_sample_scene(1), _sample_scene(2)]
 
         with patch("api.youtube.handlers.plan.YouTubeSceneBuilderService") as mock_cls:
-            mock_cls.return_value.build_scenes_from_plan.return_value = scenes
+            mock_cls.return_value.build_scenes_from_plan.return_value = {
+                "scenes": scenes,
+                "generation": {
+                    "system_prompt": "System",
+                    "user_prompt": "User",
+                    "llm_called": True,
+                },
+            }
             result = asyncio.run(build_scenes(request=request, current_user=_user()))
 
         assert result.success is True
         assert len(result.scenes) == 2
+        assert result.generation is not None
+        assert result.generation["system_prompt"] == "System"
 
     def test_failure_returns_error_response(self):
         from api.youtube.router import SceneBuildRequest, build_scenes

@@ -31,6 +31,7 @@ export interface YouTubeVideoCreatorStepsProps {
   regeneratingAvatar: boolean;
   videoPlan: VideoPlan | null;
   scenes: Scene[];
+  sceneBuildGeneration: YouTubeCreatorState["sceneBuildGeneration"];
   editingSceneId: number | null;
   editedScene: Partial<Scene> | null;
   generatingImageSceneId: number | null;
@@ -126,6 +127,7 @@ export const YouTubeVideoCreatorSteps: React.FC<YouTubeVideoCreatorStepsProps> =
       <ScenesStep
         videoPlan={props.videoPlan}
         scenes={props.scenes}
+        sceneBuildGeneration={props.sceneBuildGeneration}
         editingSceneId={props.editingSceneId}
         editedScene={props.editedScene}
         loading={props.loading}
@@ -155,6 +157,7 @@ export const YouTubeVideoCreatorSteps: React.FC<YouTubeVideoCreatorStepsProps> =
       <SceneGenerationStep
         scenes={props.scenes}
         videoPlan={props.videoPlan}
+        sceneBuildGeneration={props.sceneBuildGeneration}
         editingSceneId={props.editingSceneId}
         editedScene={props.editedScene}
         onEditScene={props.handleEditScene}

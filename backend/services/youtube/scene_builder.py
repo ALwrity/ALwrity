@@ -16,6 +16,8 @@ from services.youtube.scene_builder_enhance import (
     enhance_visual_prompts_batch,
 )
 from services.youtube.scene_builder_generation import generate_scenes_from_plan
+from services.youtube.scene_builder_generation_metadata import attach_scene_generation_metadata
+from services.youtube.scene_builder_prompts import build_scene_generation_prompts
 
 logger = get_service_logger("youtube.scene_builder")
 
@@ -33,7 +35,7 @@ class YouTubeSceneBuilderService:
         video_plan: Dict[str, Any],
         user_id: str,
         custom_script: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         # PHASE-3B (deferred): this builds scene narration + visual_prompt WITHOUT
         # the YouTube persona. Flow the persona in (visual_style, script_structure,
         # prompt_defaults.video_base_prompt) from plan.py /scenes so medium/long
@@ -53,7 +55,7 @@ class YouTubeSceneBuilderService:
             custom_script: Optional custom script to use instead of generating
 
         Returns:
-            List of scene dictionaries with narration, visual prompts, timing, etc.
+            Dict with `scenes` and optional `generation` metadata for UI transparency.
         """
         try:
             duration_type = video_plan.get('duration_type', 'medium')
@@ -66,6 +68,12 @@ class YouTubeSceneBuilderService:
 
             duration_metadata = video_plan.get("duration_metadata", {})
             max_scenes = duration_metadata.get("max_scenes", 10)
+            system_prompt, user_prompt = build_scene_generation_prompts(
+                video_plan, duration_metadata
+            )
+            llm_called = False
+            scenes_reused_from_plan = False
+            custom_script_used = False
 
             # Optimization: Check if scenes already exist in plan (prevents duplicate generation)
             # This can happen if plan was generated with include_scenes=True for shorts
@@ -77,12 +85,14 @@ class YouTubeSceneBuilderService:
                     f"(duration={duration_type}) - skipping generation to save AI calls"
                 )
                 scenes = self._normalize_scenes_from_plan(video_plan, duration_metadata)
+                scenes_reused_from_plan = True
             # If custom script provided, parse it into scenes (0 AI calls for parsing)
             elif custom_script:
                 logger.info(
                     f"[YouTubeSceneBuilder] Parsing custom script for scene generation "
                     f"(0 AI calls required)"
                 )
+                custom_script_used = True
                 scenes = self._parse_custom_script(
                     custom_script, video_plan, duration_metadata, user_id
                 )
@@ -95,6 +105,7 @@ class YouTubeSceneBuilderService:
                         f"({len(prebuilt)} scenes)"
                     )
                     scenes = self._normalize_scenes_from_plan(video_plan, duration_metadata)
+                    scenes_reused_from_plan = True
                 else:
                     logger.warning(
                         "[YouTubeSceneBuilder] Plan marked _scenes_included but no scenes present; "
@@ -103,11 +114,13 @@ class YouTubeSceneBuilderService:
                     scenes = self._generate_scenes_from_plan(
                         video_plan, duration_metadata, user_id
                     )
+                    llm_called = True
             else:
                 # Generate scenes from plan
                 scenes = self._generate_scenes_from_plan(
                     video_plan, duration_metadata, user_id
                 )
+                llm_called = True
 
             # Limit to max scenes
             if len(scenes) > max_scenes:
@@ -123,7 +136,14 @@ class YouTubeSceneBuilderService:
             )
 
             logger.info(f"[YouTubeSceneBuilder] ✅ Built {len(scenes)} scenes")
-            return scenes
+            return attach_scene_generation_metadata(
+                {"scenes": scenes},
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                llm_called=llm_called,
+                scenes_reused_from_plan=scenes_reused_from_plan,
+                custom_script_used=custom_script_used,
+            )
 
         except HTTPException:
             raise

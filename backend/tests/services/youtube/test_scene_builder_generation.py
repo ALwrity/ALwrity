@@ -85,3 +85,32 @@ class TestGenerateScenesFromPlan:
                     user_id="user_bad",
                 )
         assert exc.value.status_code == 500
+
+    def test_passes_built_prompts_to_llm_text_gen(self):
+        from services.youtube.scene_builder_generation import generate_scenes_from_plan
+
+        llm_scenes = [
+            {
+                "scene_number": 1,
+                "title": "Hook",
+                "narration": "Hello",
+                "visual_description": "Wide shot",
+                "duration_estimate": 8,
+                "emphasis": "hook",
+                "visual_cues": [],
+            }
+        ]
+        with patch(
+            "services.youtube.scene_builder_generation.llm_text_gen",
+            return_value=llm_scenes,
+        ) as mock_llm:
+            generate_scenes_from_plan(
+                video_plan=_plan(),
+                duration_metadata={"scene_duration_range": (5, 15), "target_seconds": 60},
+                user_id="user_prompts",
+            )
+
+        mock_llm.assert_called_once()
+        call_kwargs = mock_llm.call_args.kwargs
+        assert "Summary" in call_kwargs["prompt"]
+        assert "master YouTube scriptwriter" in call_kwargs["system_prompt"]

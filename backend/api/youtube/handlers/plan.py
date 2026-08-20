@@ -167,15 +167,18 @@ async def build_scenes(
         # the /plan endpoint above) and pass it into build_scenes_from_plan so
         # scene narration + visual_prompt inherit visual_style + prompt_defaults.
         scene_builder = YouTubeSceneBuilderService()
-        scenes = scene_builder.build_scenes_from_plan(
+        build_result = scene_builder.build_scenes_from_plan(
             video_plan=request.video_plan,
             user_id=user_id,
             custom_script=request.custom_script,
         )
+        scenes = build_result.get("scenes", [])
+        generation = build_result.get("generation")
 
         return SceneBuildResponse(
             success=True,
             scenes=scenes,
+            generation=generation,
             message=f"Built {len(scenes)} scenes successfully"
         )
 

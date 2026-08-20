@@ -34,6 +34,7 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
     videoPlan,
     enableResearch,
     scenes,
+    sceneBuildGeneration,
     editingSceneId,
     editedScene,
     renderTaskId,
@@ -218,6 +219,7 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
         regeneratingAvatar={regeneratingAvatar}
         videoPlan={videoPlan}
         scenes={scenes}
+        sceneBuildGeneration={sceneBuildGeneration}
         editingSceneId={editingSceneId}
         editedScene={editedScene}
         generatingImageSceneId={generatingImageSceneId}

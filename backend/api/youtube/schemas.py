@@ -85,6 +85,7 @@ class SceneBuildResponse(BaseModel):
     """Response model for scene building."""
     success: bool
     scenes: List[Dict[str, Any]] = []
+    generation: Optional[Dict[str, Any]] = None
     message: str
 
 

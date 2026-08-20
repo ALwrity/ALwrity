@@ -50,6 +50,13 @@ export interface VideoPlanGeneration {
   json_schema_applied?: boolean;
 }
 
+/** LLM transparency metadata returned after Build Scenes from Plan. */
+export interface SceneBuildGeneration extends VideoPlanGeneration {
+  llm_called?: boolean;
+  scenes_reused_from_plan?: boolean;
+  custom_script_used?: boolean;
+}
+
 export interface VideoPlan {
   video_summary: string;
   target_audience: string;
@@ -71,6 +78,8 @@ export interface VideoPlan {
   duration_metadata?: {
     target_seconds?: number;
     max_scenes?: number;
+    scene_duration_range?: [number, number];
+    hook_seconds?: number;
   };
   duration_type: string;
   estimated_duration?: string;
@@ -288,7 +297,15 @@ export const youtubeApi = {
   /**
    * Build scenes from a video plan.
    */
-  async buildScenes(videoPlan: VideoPlan, customScript?: string): Promise<{ success: boolean; scenes?: Scene[]; message: string }> {
+  async buildScenes(
+    videoPlan: VideoPlan,
+    customScript?: string,
+  ): Promise<{
+    success: boolean;
+    scenes?: Scene[];
+    generation?: SceneBuildGeneration;
+    message: string;
+  }> {
     const durationType = videoPlan.duration_type || 'medium';
     const outlineCount = videoPlan.content_outline?.length ?? 0;
     try {
@@ -306,6 +323,7 @@ export const youtubeApi = {
         durationType,
         success: Boolean(response.data?.success),
         sceneCount: response.data?.scenes?.length ?? 0,
+        hasGeneration: Boolean(response.data?.generation),
       });
       return response.data;
     } catch (error: any) {

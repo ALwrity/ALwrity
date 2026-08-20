@@ -288,6 +288,8 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
           sceneCount: response.scenes.length,
           durationType: videoPlan.duration_type,
           outlineCount,
+          hasGeneration: Boolean(response.generation),
+          llmCalled: response.generation?.llm_called,
         });
         const updatedScenes = response.scenes.map((s) => ({ ...s, enabled: s.enabled !== false }));
         const enabledScenes = updatedScenes.filter((s) => s.enabled !== false);
@@ -313,7 +315,10 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
           })
           .join(" • ");
 
-        updateState({ scenes: updatedScenes });
+        updateState({
+          scenes: updatedScenes,
+          sceneBuildGeneration: response.generation ?? null,
+        });
         setSuccess(
           `✅ Successfully built ${response.scenes.length} scenes\n⏱️ Total duration: ${formatDuration(totalDuration)}\n📊 Breakdown: ${breakdownText}`,
         );
