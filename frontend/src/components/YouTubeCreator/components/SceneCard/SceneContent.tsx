@@ -1,5 +1,8 @@
 import React from 'react';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Typography,
   Stack,
   Box,
@@ -8,6 +11,7 @@ import {
   IconButton,
   CircularProgress,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import RecordVoiceOver from '@mui/icons-material/RecordVoiceOver';
 import Videocam from '@mui/icons-material/Videocam';
 import AutoAwesome from '@mui/icons-material/AutoAwesome';
@@ -15,6 +19,10 @@ import ImageIcon from '@mui/icons-material/Image';
 import VolumeUp from '@mui/icons-material/VolumeUp';
 import HelpOutline from '@mui/icons-material/HelpOutline';
 import { Scene } from '../../../../services/youtubeApi';
+import { YouTubeSceneAssetPromptMeta } from '../YouTubeSceneAssetPromptMeta';
+import { YouTubeSceneImagePromptPreview } from '../YouTubeSceneImagePromptPreview';
+import { YouTubeSceneAudioPromptPreview } from '../YouTubeSceneAudioPromptPreview';
+import { buildEnrichedSceneText } from '../../panel/buildEnrichedSceneText';
 
 interface SceneContentProps {
   scene: Scene;
@@ -22,6 +30,8 @@ interface SceneContentProps {
   imageLoading?: boolean;
   audioBlobUrl?: string | null;
   audioLoading?: boolean;
+  avatarUrl?: string | null;
+  videoPlanIdea?: string;
 }
 
 const NarrationSection: React.FC<{ narration: string }> = ({ narration }) => (
@@ -252,7 +262,14 @@ export const SceneContent: React.FC<SceneContentProps> = ({
   imageLoading,
   audioBlobUrl,
   audioLoading,
+  avatarUrl,
+  videoPlanIdea,
 }) => {
+  const imagePreviewPrompt =
+    `${scene.visual_prompt || ''}\n${scene.enhanced_visual_prompt || ''}`.trim() ||
+    `Create a YouTube scene image for: ${scene.title}`;
+  const audioPreviewText = buildEnrichedSceneText(scene);
+
   return (
     <Stack spacing={2.5}>
       {/* Narration Section */}
@@ -303,8 +320,40 @@ export const SceneContent: React.FC<SceneContentProps> = ({
               Image not available yet. If this persists, try regenerating or refresh the page.
             </Typography>
           )}
+          <YouTubeSceneAssetPromptMeta
+            kind="image"
+            imageGeneration={scene.image_generation}
+            defaultExpanded
+          />
         </GeneratedMediaSection>
       )}
+
+      {!scene.imageUrl ? (
+        <Accordion
+          disableGutters
+          elevation={0}
+          sx={{
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px !important',
+            '&:before': { display: 'none' },
+          }}
+        >
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
+              Image prompt preview (before generate)
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <YouTubeSceneImagePromptPreview
+              sceneTitle={scene.title}
+              sceneContent={scene.narration}
+              idea={videoPlanIdea}
+              customPrompt={imagePreviewPrompt}
+              hasBaseAvatar={Boolean(avatarUrl)}
+            />
+          </AccordionDetails>
+        </Accordion>
+      ) : null}
 
       {/* Generated Audio Section */}
       {scene.audioUrl && (audioBlobUrl || audioLoading) && (
@@ -331,8 +380,34 @@ export const SceneContent: React.FC<SceneContentProps> = ({
               }}
             />
           ) : null}
+          <YouTubeSceneAssetPromptMeta
+            kind="audio"
+            audioGeneration={scene.audio_generation}
+            defaultExpanded
+          />
         </GeneratedMediaSection>
       )}
+
+      {!scene.audioUrl ? (
+        <Accordion
+          disableGutters
+          elevation={0}
+          sx={{
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px !important',
+            '&:before': { display: 'none' },
+          }}
+        >
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
+              Voice text preview (before generate)
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <YouTubeSceneAudioPromptPreview inputText={audioPreviewText} />
+          </AccordionDetails>
+        </Accordion>
+      ) : null}
     </Stack>
   );
 };

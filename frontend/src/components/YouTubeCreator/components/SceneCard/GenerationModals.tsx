@@ -13,7 +13,7 @@ interface GenerationModalsProps {
   onAudioSettingsApply: (settings: AudioGenerationSettings) => void;
   onImageSettingsApply: (settings: YouTubeImageGenerationSettings) => void;
   generatingAudio?: boolean;
-  language?: string; // Language code for language-aware voice selection
+  language?: string;
 }
 
 export const GenerationModals: React.FC<GenerationModalsProps> = ({
@@ -28,6 +28,10 @@ export const GenerationModals: React.FC<GenerationModalsProps> = ({
   generatingAudio = false,
   language,
 }) => {
+  const imageInitialPrompt =
+    `${scene.visual_prompt || ''}\n${scene.enhanced_visual_prompt || ''}`.trim() ||
+    `Create a YouTube scene image for: ${scene.title}`;
+
   return (
     <>
       <AudioSettingsModal
@@ -43,7 +47,7 @@ export const GenerationModals: React.FC<GenerationModalsProps> = ({
         open={showImageSettingsModal}
         onClose={() => setShowImageSettingsModal(false)}
         onGenerate={onImageSettingsApply}
-        initialPrompt={`${scene.visual_prompt || ''}\n${scene.enhanced_visual_prompt || ''}`.trim() || `Create a YouTube scene image for: ${scene.title}`}
+        initialPrompt={imageInitialPrompt}
         initialStyle="Realistic"
         initialRenderingSpeed="Quality"
         initialAspectRatio="16:9"

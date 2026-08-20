@@ -18,6 +18,7 @@ from services.llm_providers.main_image_generation import generate_image, generat
 from utils.asset_tracker import save_asset_to_library
 from utils.logger_utils import get_service_logger
 from utils.media_utils import load_media_bytes
+from services.youtube.youtube_scene_image_prompts import build_youtube_scene_image_prompt
 from ..task_manager import task_manager
 
 router = APIRouter(tags=["youtube-image"])
@@ -206,32 +207,16 @@ def _execute_image_generation_task(task_id: str, request_data: dict, user_id: st
         # PHASE-3B (deferred): APPEND the YouTube persona's prompt_defaults here —
         # image_base_prompt (brand visual identity) + negative_prompt — to the
         # scene-specific content below. An explicit request.custom_prompt always wins.
-        if base_avatar_bytes:
-            prompt_parts = []
-            if request.scene_title:
-                prompt_parts.append(f"Scene: {request.scene_title}")
-            if request.scene_content:
-                content_preview = request.scene_content[:200].replace("\n", " ").strip()
-                prompt_parts.append(f"Context: {content_preview}")
-            if request.idea:
-                prompt_parts.append(f"Video idea: {request.idea[:80].strip()}")
-            prompt_parts.append("YouTube creator on camera, engaging and dynamic framing")
-            prompt_parts.append("Clean background, good lighting, thumbnail-friendly composition")
-            image_prompt = ", ".join(prompt_parts)
-        else:
-            prompt_parts = [
-                "YouTube creator scene",
-                "clean, modern background",
-                "good lighting, high contrast for thumbnail clarity",
-            ]
-            if request.scene_title:
-                prompt_parts.append(f"Scene theme: {request.scene_title}")
-            if request.scene_content:
-                prompt_parts.append(f"Context: {request.scene_content[:120].replace(chr(10), ' ')}")
-            if request.idea:
-                prompt_parts.append(f"Topic: {request.idea[:80]}")
-            prompt_parts.append("video-optimized composition, 16:9 aspect ratio")
-            image_prompt = ", ".join(prompt_parts)
+        prompt_payload = build_youtube_scene_image_prompt(
+            scene_title=request.scene_title,
+            scene_content=request.scene_content,
+            idea=request.idea,
+            custom_prompt=request.custom_prompt,
+            has_base_avatar=bool(base_avatar_bytes),
+        )
+        image_prompt = prompt_payload["image_prompt"]
+        generation_type = prompt_payload["generation_type"]
+        custom_prompt_used = prompt_payload["custom_prompt_used"]
 
         task_manager.update_task_status(
             task_id, "processing", progress=30.0, message="Generating image..."
@@ -368,6 +353,14 @@ def _execute_image_generation_task(task_id: str, request_data: dict, user_id: st
                 "height": request.height or 576,
                 "file_size": len(image_bytes),
                 "cost": 0.10 if model == "ideogram-v3-turbo" else 0.05,
+                "generation": {
+                    "image_prompt": image_prompt,
+                    "template_prompt": prompt_payload.get("template_prompt", image_prompt),
+                    "provider": provider,
+                    "model": model,
+                    "generation_type": generation_type,
+                    "custom_prompt_used": custom_prompt_used,
+                },
             }
         )
 

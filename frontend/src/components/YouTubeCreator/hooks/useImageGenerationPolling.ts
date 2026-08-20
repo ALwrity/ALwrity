@@ -14,7 +14,7 @@ import { useRef, useCallback, useEffect } from 'react';
 interface PollingOptions {
   taskId: string;
   sceneNumber: number;
-  onComplete: (imageUrl: string) => void;
+  onComplete: (payload: { imageUrl: string; generation?: Record<string, unknown> }) => void;
   onError: (error: string) => void;
   onProgress?: (progress: number, message: string) => void;
   pollInterval?: number;
@@ -82,7 +82,10 @@ export const useImageGenerationPolling = () => {
 
         if (status.status === 'completed' && status.result) {
           cleanup();
-          onComplete(status.result.image_url);
+          onComplete({
+            imageUrl: status.result.image_url,
+            generation: status.result.generation,
+          });
         } else if (status.status === 'failed') {
           cleanup();
           const errorMsg = status.error || status.message || 'Image generation failed';

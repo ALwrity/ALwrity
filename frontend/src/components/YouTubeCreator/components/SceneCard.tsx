@@ -398,6 +398,8 @@ export const SceneCard: React.FC<SceneCardProps> = React.memo(({
                 imageLoading={imageLoading}
                 audioBlobUrl={audioBlobUrl}
                 audioLoading={audioLoading}
+                avatarUrl={avatarUrl}
+                videoPlanIdea={videoPlanIdea}
               />
 
               <GenerationButtons

@@ -97,9 +97,17 @@ export function useYouTubeAssetAndRenderHandlers(args: AssetRenderHandlerArgs) {
           taskId: taskResponse.task_id,
           sceneNumber: scene.scene_number,
           getStatus: youtubeApi.getImageGenerationStatus,
-          onComplete: (imageUrl) => {
+          onComplete: ({ imageUrl, generation }) => {
             updateState({
-              scenes: scenes.map((s) => (s.scene_number === scene.scene_number ? { ...s, imageUrl } : s)),
+              scenes: scenes.map((s) =>
+                s.scene_number === scene.scene_number
+                  ? {
+                      ...s,
+                      imageUrl,
+                      image_generation: generation as Scene["image_generation"],
+                    }
+                  : s,
+              ),
             });
             setSuccess(`Image generated for Scene ${scene.scene_number}!`);
             setTimeout(() => setSuccess(null), 3000);
@@ -193,7 +201,13 @@ export function useYouTubeAssetAndRenderHandlers(args: AssetRenderHandlerArgs) {
 
         updateState({
           scenes: scenes.map((s) =>
-            s.scene_number === scene.scene_number ? { ...s, audioUrl: result.audio_url } : s,
+            s.scene_number === scene.scene_number
+              ? {
+                  ...s,
+                  audioUrl: result.audio_url,
+                  audio_generation: result.generation ?? undefined,
+                }
+              : s,
           ),
         });
         setSuccess(`Audio generated for Scene ${scene.scene_number}!`);
