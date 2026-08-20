@@ -144,7 +144,16 @@ export function useYouTubeRenderQueue({
             });
 
             const updatedScenes = scenes.map((s) =>
-              s.scene_number === sceneNumber ? { ...s, videoUrl } : s
+              s.scene_number === sceneNumber
+                ? {
+                    ...s,
+                    videoUrl,
+                    video_generation:
+                      status.result.generation ||
+                      status.result.scene_results?.[0]?.generation ||
+                      s.video_generation,
+                  }
+                : s
             );
             onScenesUpdate(updatedScenes);
 

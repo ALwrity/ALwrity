@@ -31,6 +31,7 @@ import { RenderSettings } from './RenderSettings';
 import { RenderStatusDisplay } from './RenderStatusDisplay';
 import { ScenePreviewModal } from './ScenePreviewModal';
 import { SceneVideoActions } from './SceneVideoActions';
+import { YouTubeSceneVideoPromptPanel } from './YouTubeSceneVideoPromptPanel';
 import { YouTubeFinalVideoPanel } from './YouTubeFinalVideoPanel';
 import { useYouTubeRenderQueue } from '../hooks/useYouTubeRenderQueue';
 import { YouTubePublishPanel } from './YouTubePublishPanel';
@@ -279,6 +280,8 @@ export const RenderStep: React.FC<RenderStepProps> = React.memo(({
                               onError={(msg) => showSnackbar(msg, 'error')}
                             />
                           </Box>
+
+                          <YouTubeSceneVideoPromptPanel scene={scene} resolution={resolution} />
 
                           {/* Progress/Error Message */}
                           {st.status !== 'idle' && st.status !== 'completed' && (

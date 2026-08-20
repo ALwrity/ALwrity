@@ -18,6 +18,12 @@ from services.youtube.scene_audio import resolve_scene_audio_base64
 from services.youtube.scene_image import resolve_scene_image_base64
 from services.youtube.scene_video_generate import generate_youtube_scene_video
 from services.youtube.video_storage import save_youtube_scene_video
+from services.youtube.youtube_scene_video_prompts import (
+    WAN25_ENABLE_PROMPT_EXPANSION,
+    build_youtube_scene_video_generation_metadata,
+    resolve_youtube_scene_video_duration,
+    resolve_youtube_scene_video_prompt,
+)
 from utils.logger_utils import get_service_logger
 
 logger = get_service_logger("youtube.scene_render")
@@ -42,9 +48,7 @@ def execute_scene_video_render(
     generation_mode = "t2v"
 
     narration = scene.get("narration", "").strip()
-    visual_prompt = (
-        scene.get("enhanced_visual_prompt") or scene.get("visual_prompt", "")
-    ).strip()
+    visual_prompt, prompt_source = resolve_youtube_scene_video_prompt(scene)
     duration_estimate = scene.get("duration_estimate", 5)
 
     logger.debug(
@@ -70,7 +74,7 @@ def execute_scene_video_render(
             f"({len(visual_prompt)} chars), may result in poor quality"
         )
 
-    duration = 5 if duration_estimate <= 7 else 10
+    duration = resolve_youtube_scene_video_duration(duration_estimate)
     has_existing_image = bool(scene.get("imageUrl"))
     has_existing_audio = bool(scene.get("audioUrl"))
 
@@ -166,7 +170,7 @@ def execute_scene_video_render(
             audio_base64=audio_base64,
             image_base64=image_base64,
             wavespeed_client=wavespeed_client,
-            enable_prompt_expansion=True,
+            enable_prompt_expansion=WAN25_ENABLE_PROMPT_EXPANSION,
             timeout=600,
         )
     except HTTPException as e:
@@ -284,4 +288,19 @@ def execute_scene_video_render(
         "prediction_id": video_result.get("prediction_id"),
         "usage_info": usage_info,
         "generation_mode": generation_mode,
+        "generation": build_youtube_scene_video_generation_metadata(
+            visual_prompt=visual_prompt,
+            prompt_source=prompt_source,
+            generation_mode=generation_mode,
+            duration=duration,
+            resolution=resolution,
+            enable_prompt_expansion=WAN25_ENABLE_PROMPT_EXPANSION,
+            provider=video_result.get("provider", "wavespeed"),
+            model=video_result.get("model_name", "wan-2.5"),
+            image_attached=bool(image_base64),
+            audio_attached=bool(audio_base64),
+            image_url=str(scene_image_url or ""),
+            audio_url=str(scene.get("audioUrl") or ""),
+            duration_estimate=duration_estimate,
+        ),
     }
