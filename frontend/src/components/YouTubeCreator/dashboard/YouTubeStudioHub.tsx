@@ -4,7 +4,13 @@ import "./youtube-rail-controls.css";
 import { YouTubeRadialWorkflow } from "./YouTubeRadialWorkflow";
 import { YouTubeMobileWorkflowGrid } from "./YouTubeMobileWorkflowGrid";
 import { YouTubeChannelHub } from "./YouTubeChannelHub";
-import { computeYouTubeRadialLayout } from "./youtubeRadialLayout";
+import { YouTubeHubConnectButton } from "./YouTubeHubConnectButton";
+import { YouTubeChannelBibleChip } from "./YouTubeChannelBibleChip";
+import {
+  computeYouTubeRadialLayout,
+  youtubeHubCenterLeftCss,
+  youtubeHubCenterYPx,
+} from "./youtubeRadialLayout";
 import type { YouTubeWorkflowCardId } from "./youtubeWorkflowConfig";
 import { resolveWedgeNavigation } from "./studioHubWedgeNavigation";
 import { YouTubeWorkflowModals } from "./YouTubeWorkflowModals";
@@ -113,6 +119,10 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
     [containerWidth, containerHeight],
   );
 
+  const hubCenterLeft = youtubeHubCenterLeftCss(layout);
+  const hubCenterY = youtubeHubCenterYPx(layout);
+  const hubDiameter = layout.hubVisualR * 2;
+
   const hasDraft = hasYouTubeCreatorDraft(creatorState);
 
   const draftPreview =
@@ -133,11 +143,20 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
     [connected],
   );
 
+  const hubCta = (
+    <YouTubeHubConnectButton
+      connected={connected}
+      onConnect={onConnect}
+      onCreateVideo={() => openYouTubeCreator({ step: 0 })}
+    />
+  );
+
   return (
     <div className="yt-studio-hub" data-tour="yt-studio-hub">
       <div className="yt-studio-hub-main">
         <div className="yt-studio-hub-toolbar">
           <YouTubeTodayGrowth />
+          <YouTubeChannelBibleChip niche={channelBible?.niche || null} />
           {hasDraft ? (
             <StartNewVideoButton
               variant="hub"
@@ -154,8 +173,15 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
           />
         </div>
 
-        <div className="yt-studio-hub-hero">
-          <div className="yt-studio-hub-canvas" ref={canvasRef}>
+        <div
+          className="yt-studio-hub-hero"
+          style={{ ["--yt-hub-center-left" as string]: hubCenterLeft }}
+        >
+          <div
+            className="yt-studio-hub-canvas"
+            ref={canvasRef}
+            style={isDesktop ? { height: layout.viewH } : undefined}
+          >
             {isDesktop ? (
               <>
                 <YouTubeRadialWorkflow
@@ -165,37 +191,31 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
                 />
                 <div
                   className="yt-studio-hub-hub"
-                  style={{ width: layout.hubVisualR * 2 }}
+                  style={{
+                    width: hubDiameter,
+                    left: hubCenterLeft,
+                    top: hubCenterY,
+                  }}
                 >
                   <YouTubeChannelHub
-                    hubSize={layout.hubVisualR * 2}
+                    hubSize={hubDiameter}
                     connected={connected}
                     channelName={channelName}
                     niche={channelBible?.niche || null}
                     isLoading={oauthLoading}
-                    onConnect={onConnect}
-                    onCreateVideo={() => openYouTubeCreator({ step: 0 })}
                   />
                 </div>
               </>
             ) : (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 20,
-                }}
-              >
+              <div className="yt-studio-hub-mobile">
                 <YouTubeChannelHub
                   hubSize={180}
                   connected={connected}
                   channelName={channelName}
                   niche={channelBible?.niche || null}
                   isLoading={oauthLoading}
-                  onConnect={onConnect}
-                  onCreateVideo={() => openYouTubeCreator({ step: 0 })}
                 />
+                {hubCta}
                 <YouTubeMobileWorkflowGrid
                   onCardAction={handleCardAction}
                   connected={connected}
@@ -203,6 +223,7 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
               </div>
             )}
           </div>
+          {isDesktop ? <div className="yt-studio-hub-connect">{hubCta}</div> : null}
         </div>
 
         <YouTubeWorkflowModals
@@ -213,6 +234,7 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
           creatorState={creatorState}
           onClearDraft={onClearDraft}
           channelBibleNiche={channelBible?.niche || null}
+          channelBible={channelBible}
         />
 
         {connectGateOpen && (

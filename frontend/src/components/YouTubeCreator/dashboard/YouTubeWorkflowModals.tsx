@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { YouTubeWorkflowCardId } from "./youtubeWorkflowConfig";
 import { openYouTubeCreator } from "./youtubeStudioEvents";
 import type { YouTubeCreatorState } from "../../../hooks/useYouTubeCreatorState";
-import { youtubeApi } from "../../../services/youtubeApi";
+import { youtubeApi, type YouTubeChannelBible } from "../../../services/youtubeApi";
 import {
   AnalysisWedgeModal,
   ChannelPulseModal,
@@ -30,6 +30,7 @@ interface YouTubeWorkflowModalsProps {
   creatorState: YouTubeCreatorState;
   onClearDraft: () => void;
   channelBibleNiche?: string | null;
+  channelBible?: YouTubeChannelBible | null;
 }
 
 export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
@@ -40,6 +41,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
   creatorState,
   onClearDraft,
   channelBibleNiche,
+  channelBible = null,
 }) => {
   const navigate = useNavigate();
   const [notifyKeys, setNotifyKeys] = useState<Record<string, boolean>>({});
@@ -50,7 +52,6 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
   const [costText, setCostText] = useState("");
   const [videosOpen, setVideosOpen] = useState(false);
   const [videos, setVideos] = useState<string[]>([]);
-  const [bibleOpen, setBibleOpen] = useState(false);
   const [pulseOpen, setPulseOpen] = useState(false);
   const [retentionOpen, setRetentionOpen] = useState(false);
   const [gapsOpen, setGapsOpen] = useState(false);
@@ -67,7 +68,6 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
       setThumbOpen(false);
       setCostOpen(false);
       setVideosOpen(false);
-      setBibleOpen(false);
       setPulseOpen(false);
       setRetentionOpen(false);
       setGapsOpen(false);
@@ -135,10 +135,9 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         open={activeModal === "plan"}
         onClose={onClose}
         goCreate={goCreate}
-        channelBibleNiche={channelBibleNiche}
-        onOpenBible={() => setBibleOpen(true)}
         markNotify={markNotify}
         notifyKeys={notifyKeys}
+        channelBible={channelBible}
       />
       <CreateWedgeModal
         open={activeModal === "create"}
@@ -211,7 +210,6 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         creatorState={creatorState}
         goCreate={goCreate}
         onClearDraft={onClearDraft}
-        bibleOpen={bibleOpen}
         coachOpen={coachOpen}
         seoOpen={seoOpen}
         thumbOpen={thumbOpen}
@@ -219,7 +217,6 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         videosOpen={videosOpen}
         costText={costText}
         videos={videos}
-        onCloseBible={() => setBibleOpen(false)}
         onCloseCoach={() => setCoachOpen(false)}
         onCloseSeo={() => setSeoOpen(false)}
         onCloseThumb={() => setThumbOpen(false)}

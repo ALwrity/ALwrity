@@ -53,38 +53,50 @@ body.youtube-studio-view {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
   position: relative;
 }
 
 .yt-studio-hub-toolbar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 25;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: flex-start;
   gap: 8px;
+  pointer-events: none;
+}
+
+.yt-studio-hub-toolbar > * {
+  pointer-events: auto;
 }
 
 .yt-studio-hub-hero {
   position: relative;
   width: 100%;
   flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding-bottom: 12px;
+  box-sizing: border-box;
 }
 
 .yt-studio-hub-canvas {
   position: relative;
   width: 100%;
-  max-width: 680px;
+  max-width: 720px;
   margin: 0 auto;
 }
 
 .yt-studio-hub-hub {
   position: absolute;
-  left: 50%;
-  top: 50%;
+  left: var(--yt-hub-center-left, 50%);
   transform: translate(-50%, -50%);
   z-index: 10;
   pointer-events: none;
@@ -94,6 +106,26 @@ body.youtube-studio-view {
   pointer-events: auto;
 }
 
+.yt-studio-hub-connect {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+  pointer-events: auto;
+}
+
+.yt-studio-hub-mobile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 48px 8px 12px;
+}
+
 .yt-studio-right-rail {
   flex: 0 0 300px;
   width: 300px;
@@ -101,6 +133,30 @@ body.youtube-studio-view {
   flex-direction: column;
   gap: 12px;
   min-height: 0;
+}
+
+@media (min-width: 961px) {
+  .yt-studio-hub {
+    display: block;
+  }
+
+  .yt-studio-hub-main {
+    width: 100%;
+    min-height: calc(100dvh - 140px);
+  }
+
+  .yt-studio-hub-hero {
+    min-height: calc(100dvh - 160px);
+  }
+
+  .yt-studio-right-rail {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 24;
+    pointer-events: auto;
+  }
 }
 
 .yt-studio-rail-actions {
@@ -343,11 +399,13 @@ body.youtube-studio-view {
 
 @media (max-width: 960px) {
   .yt-studio-hub {
+    display: flex;
     flex-direction: column;
     min-height: 0;
   }
 
   .yt-studio-right-rail {
+    position: static;
     flex: 1 1 auto;
     width: 100%;
   }

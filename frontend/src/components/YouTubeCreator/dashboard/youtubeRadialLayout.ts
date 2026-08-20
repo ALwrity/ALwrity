@@ -21,8 +21,11 @@ export interface YouTubeRadialLayout {
 const OUTER_BULGE_FACTOR = 0.14;
 const HUB_RADIUS = 82;
 const MIN_WEDGE_DEPTH = 92;
+const MAX_OUTER_R = 268;
 const SIDE_MARGIN = 8;
 const RING_EDGE_PAD = 10;
+/** Space reserved under the ring for the hub-aligned Connect / Create control. */
+export const YT_CONNECT_SLOT_PX = 56;
 
 function outerVisualRadius(outerR: number): number {
   return outerR * (1 + OUTER_BULGE_FACTOR);
@@ -42,12 +45,13 @@ export function computeYouTubeRadialLayout(
 
   let outerR = widthCap;
   if (maxHeight && maxHeight > 0) {
+    const usableH = Math.max(280, maxHeight - YT_CONNECT_SLOT_PX);
     const heightCap = Math.floor(
-      (maxHeight / 2 - RING_EDGE_PAD) / (1 + OUTER_BULGE_FACTOR),
+      (usableH / 2 - RING_EDGE_PAD) / (1 + OUTER_BULGE_FACTOR),
     );
     outerR = Math.min(outerR, heightCap);
   }
-  outerR = Math.max(hubVisualR + MIN_WEDGE_DEPTH, outerR);
+  outerR = Math.min(MAX_OUTER_R, Math.max(hubVisualR + MIN_WEDGE_DEPTH, outerR));
   const innerR = hubVisualR;
 
   const iconFontSize = Math.round(Math.min(32, Math.max(16, viewW * 0.026)));
@@ -81,4 +85,15 @@ export function computeYouTubeRadialLayout(
     iconFontSize,
     labelBoxWidth,
   };
+}
+
+/** CSS `left` for overlays that share the radial hub axis (hub + connect). */
+export function youtubeHubCenterLeftCss(layout: YouTubeRadialLayout): string {
+  if (layout.viewW <= 0) return "50%";
+  return `${(layout.centerX / layout.viewW) * 100}%`;
+}
+
+/** Pixel Y of the hub center inside the canvas (viewBox-aware). */
+export function youtubeHubCenterYPx(layout: YouTubeRadialLayout): number {
+  return layout.centerY - layout.viewBoxY;
 }

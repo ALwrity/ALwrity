@@ -25,6 +25,7 @@ import { useYouTubePlanBrainstorm } from "../hooks/useYouTubePlanBrainstorm";
 import { PlanBrainstormLoadingPanel } from "./PlanBrainstormLoadingPanel";
 import { PlanBrainstormSourceChips } from "./PlanBrainstormSourceChips";
 import { helperSx, inputSx, labelSx } from "../styles";
+import { consumeYouTubePlanFocus } from "../panel/youtubePlanFocus";
 
 export interface PlanBrainstormPanelProps {
   userIdea: string;
@@ -84,6 +85,18 @@ export const PlanBrainstormPanel: React.FC<PlanBrainstormPanelProps> = ({
     }
   }, [channelBible]);
 
+  useEffect(() => {
+    const focus = consumeYouTubePlanFocus();
+    if (!focus) return undefined;
+    if (focus.brainstorm) setExpanded(true);
+    if (focus.savedIdeas) {
+      setIncludeRepurpose(true);
+      setShowSaved(true);
+      void loadSaved();
+    }
+    return undefined;
+  }, [loadSaved]);
+
   const loading = phase === "loading";
   const canGenerate = !disabled && !loading && Boolean((seed.trim() || niche));
 
@@ -110,6 +123,7 @@ export const PlanBrainstormPanel: React.FC<PlanBrainstormPanelProps> = ({
       expanded={expanded}
       onChange={(_, next) => setExpanded(next)}
       disableGutters
+      data-tour="yt-plan-brainstorm"
       sx={{
         mt: 1.5,
         border: "1px solid #e5e7eb",

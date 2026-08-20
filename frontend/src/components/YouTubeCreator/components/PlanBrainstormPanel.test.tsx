@@ -2,6 +2,7 @@ import React from "react";
 import "@testing-library/jest-dom";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { PlanBrainstormPanel } from "./PlanBrainstormPanel";
+import { consumeYouTubePlanFocus } from "../panel/youtubePlanFocus";
 
 const mockRun = jest.fn();
 const mockSave = jest.fn();
@@ -46,6 +47,7 @@ describe("PlanBrainstormPanel", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockHookState = {};
+    consumeYouTubePlanFocus();
   });
 
   it("does not call generate when seed and niche are empty", async () => {
