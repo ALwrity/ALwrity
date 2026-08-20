@@ -2,12 +2,15 @@
  * YouTube Studio Hub ↔ Video Creator deep-link event bus.
  */
 import type { DurationType } from "../constants";
+import type { YouTubeChannelBible } from "../../../services/youtubeApi";
 import type { YouTubeWorkflowCardId } from "./youtubeWorkflowConfig";
 
 export const YT_OPEN_CREATOR_EVENT = "youtube:openCreator";
 export const YT_OPEN_WEDGE_EVENT = "youtube:openWorkflowWedge";
 export const YT_RESUME_DRAFT_EVENT = "youtube:resumeDraft";
 export const YT_SWITCH_TAB_EVENT = "youtube:switchTab";
+export const YT_OPEN_CHANNEL_BIBLE_EVENT = "youtube:openChannelBible";
+export const YT_CHANNEL_BIBLE_UPDATED_EVENT = "youtube:channelBibleUpdated";
 
 export type YouTubeStudioTab = "hub" | "creator";
 
@@ -112,6 +115,25 @@ export function switchYouTubeStudioTab(tab: YouTubeStudioTab): void {
   window.dispatchEvent(
     new CustomEvent<{ tab: YouTubeStudioTab }>(YT_SWITCH_TAB_EVENT, {
       detail: { tab },
+    }),
+  );
+}
+
+/** Open Channel Bible editor on Studio Hub (does not switch to Video Creator). */
+export function openYouTubeChannelBible(): void {
+  window.dispatchEvent(new CustomEvent(YT_OPEN_CHANNEL_BIBLE_EVENT));
+  window.dispatchEvent(
+    new CustomEvent<{ tab: YouTubeStudioTab }>(YT_SWITCH_TAB_EVENT, {
+      detail: { tab: "hub" },
+    }),
+  );
+}
+
+/** Notify Hub shell + other surfaces after a successful bible save. */
+export function notifyYouTubeChannelBibleUpdated(bible: YouTubeChannelBible): void {
+  window.dispatchEvent(
+    new CustomEvent<YouTubeChannelBible>(YT_CHANNEL_BIBLE_UPDATED_EVENT, {
+      detail: bible,
     }),
   );
 }

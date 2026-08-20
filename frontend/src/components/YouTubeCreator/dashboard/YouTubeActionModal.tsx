@@ -1,10 +1,14 @@
 import React from "react";
+import { YouTubeModalBackButton } from "./YouTubeModalBackButton";
 
 interface YouTubeActionModalProps {
   open: boolean;
   title: string;
   intro?: string;
   onClose: () => void;
+  /** When set, shows ← back next to the title (Hub / parent wedge). */
+  onBack?: () => void;
+  backLabel?: string;
   children: React.ReactNode;
   maxWidth?: number;
 }
@@ -14,10 +18,14 @@ export const YouTubeActionModal: React.FC<YouTubeActionModalProps> = ({
   title,
   intro,
   onClose,
+  onBack,
+  backLabel = "Back",
   children,
   maxWidth = 720,
 }) => {
   if (!open) return null;
+
+  const isWedgeSized = Boolean(onBack) && maxWidth >= 1100;
 
   return (
     <div
@@ -25,11 +33,14 @@ export const YouTubeActionModal: React.FC<YouTubeActionModalProps> = ({
       role="presentation"
       onClick={onClose}
       onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
+        if (e.key === "Escape") {
+          if (onBack) onBack();
+          else onClose();
+        }
       }}
     >
       <div
-        className="yt-modal-card"
+        className={`yt-modal-card${isWedgeSized ? " yt-modal-card--wedge" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -37,7 +48,12 @@ export const YouTubeActionModal: React.FC<YouTubeActionModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="yt-modal-header">
-          <h2>{title}</h2>
+          <div className="yt-modal-header-main">
+            {onBack ? (
+              <YouTubeModalBackButton label={backLabel} onClick={onBack} />
+            ) : null}
+            <h2>{title}</h2>
+          </div>
           <button
             type="button"
             className="yt-modal-close"

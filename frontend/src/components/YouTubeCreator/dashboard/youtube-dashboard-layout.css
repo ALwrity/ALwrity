@@ -365,6 +365,10 @@ body.youtube-studio-view {
   padding: 20px;
 }
 
+.yt-modal-card--wedge {
+  max-height: min(85dvh, 900px);
+}
+
 .yt-modal-header {
   display: flex;
   align-items: flex-start;
@@ -373,10 +377,35 @@ body.youtube-studio-view {
   margin-bottom: 12px;
 }
 
+.yt-modal-header-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
 .yt-modal-header h2 {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 800;
+}
+
+.yt-modal-back {
+  background: transparent;
+  border: none;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  cursor: pointer;
+  color: #64748b;
+  padding: 2px 0;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.yt-modal-back:hover {
+  color: #ff0000;
 }
 
 .yt-modal-intro {
@@ -395,6 +424,7 @@ body.youtube-studio-view {
   cursor: pointer;
   font-size: 1.1rem;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 @media (max-width: 960px) {

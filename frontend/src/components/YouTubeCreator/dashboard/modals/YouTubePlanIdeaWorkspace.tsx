@@ -11,12 +11,14 @@ import type { GoCreateFn } from "./wedgeModalTypes";
 interface YouTubePlanIdeaWorkspaceProps {
   channelBible?: YouTubeChannelBible | null;
   goCreate: GoCreateFn;
+  onOpenChannelBible: () => void;
 }
 
 /** Combined Topic Discovery + Blog/URL + Brainstorm/Saved Ideas (LinkedIn Plan primary panel). */
 export const YouTubePlanIdeaWorkspace: React.FC<YouTubePlanIdeaWorkspaceProps> = ({
   channelBible = null,
   goCreate,
+  onOpenChannelBible,
 }) => {
   const niche = (channelBible?.niche || "").trim();
   const [seed, setSeed] = useState(niche);
@@ -103,6 +105,7 @@ export const YouTubePlanIdeaWorkspace: React.FC<YouTubePlanIdeaWorkspaceProps> =
           includeRepurpose={includeRepurpose}
           hasChannelBible={hasChannelBibleIdentity(channelBible)}
           loading={loading}
+          onOpenChannelBible={onOpenChannelBible}
           onToggleChannelBible={() => setUseChannelBible((v) => !v)}
           onToggleTrending={() => setIncludeTrending((v) => !v)}
           onToggleRepurpose={handleToggleRepurpose}

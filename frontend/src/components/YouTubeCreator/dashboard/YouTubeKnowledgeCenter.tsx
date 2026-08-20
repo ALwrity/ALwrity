@@ -7,7 +7,7 @@ import {
   YOUTUBE_KNOWLEDGE_CENTER_FEATURES,
   type YouTubeKnowledgeFeature,
 } from "./knowledgeCenterFeatures";
-import { openYouTubeCreator, openYouTubeWorkflowWedge } from "./youtubeStudioEvents";
+import { openYouTubeCreator, openYouTubeWorkflowWedge, openYouTubeChannelBible } from "./youtubeStudioEvents";
 
 interface YouTubeKnowledgeCenterProps {
   compact?: boolean;
@@ -75,6 +75,8 @@ export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
         openYouTubeWorkflowWedge({ wedge: "plan" });
         break;
       case "channelBible":
+        openYouTubeChannelBible();
+        break;
       case "multimodal":
         openYouTubeCreator({ step: 0 });
         break;

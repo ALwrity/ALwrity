@@ -98,6 +98,31 @@ export function clearYouTubeCreatorStateStorage(): void {
   }
 }
 
+/** Merge Plan-field updates into persisted draft (Studio Hub Apply to this video). */
+export function patchYouTubeCreatorStateStorage(
+  updates: Partial<YouTubeCreatorState>,
+): YouTubeCreatorState {
+  try {
+    const next: YouTubeCreatorState = {
+      ...getYouTubeCreatorStateSnapshot(),
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    console.info('[patchYouTubeCreatorStateStorage] Draft plan fields updated', {
+      fields: Object.keys(updates),
+    });
+    return next;
+  } catch (error) {
+    console.error('[patchYouTubeCreatorStateStorage] Failed', error);
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : 'Could not apply channel defaults to this video draft.',
+    );
+  }
+}
+
 export const useYouTubeCreatorState = () => {
   const [state, setState] = useState<YouTubeCreatorState>(() => {
     // Initialize from localStorage if available

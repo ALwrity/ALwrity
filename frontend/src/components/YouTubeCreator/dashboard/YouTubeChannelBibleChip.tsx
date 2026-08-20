@@ -1,18 +1,33 @@
-import React, { useState } from "react";
-import { YouTubeActionModal } from "./YouTubeActionModal";
-import { openYouTubeCreator } from "./youtubeStudioEvents";
+import React, { useEffect, useState } from "react";
+import { YouTubeChannelBibleEditorModal } from "./YouTubeChannelBibleEditorModal";
+import { YT_OPEN_CHANNEL_BIBLE_EVENT } from "./youtubeStudioEvents";
+import type { YouTubeChannelBible } from "../../../services/youtubeApi";
 
 interface YouTubeChannelBibleChipProps {
   niche?: string | null;
+  planAvatarUrl?: string | null;
+  onBibleSaved?: (bible: YouTubeChannelBible) => void;
 }
 
 /**
- * Dashboard shortcut for Channel Bible — sits under Today's Growth, not in Plan wedge.
+ * Studio Hub toolbar shortcut — opens Channel Bible editor in-place (not Video Creator).
+ * Also listens for openYouTubeChannelBible() (Knowledge Centre).
  */
 export const YouTubeChannelBibleChip: React.FC<YouTubeChannelBibleChipProps> = ({
   niche,
+  planAvatarUrl = null,
+  onBibleSaved,
 }) => {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const onOpen = () => {
+      console.info("[YouTubeChannelBibleChip] Open via event");
+      setOpen(true);
+    };
+    window.addEventListener(YT_OPEN_CHANNEL_BIBLE_EVENT, onOpen);
+    return () => window.removeEventListener(YT_OPEN_CHANNEL_BIBLE_EVENT, onOpen);
+  }, []);
 
   return (
     <>
@@ -20,33 +35,27 @@ export const YouTubeChannelBibleChip: React.FC<YouTubeChannelBibleChipProps> = (
         type="button"
         className="yt-rail-btn"
         data-tour="yt-channel-bible"
-        onClick={() => setOpen(true)}
+        aria-label={
+          niche ? `Channel Bible — niche ${niche}` : "Open Channel Bible"
+        }
+        onClick={() => {
+          console.info("[YouTubeChannelBibleChip] Open editor", {
+            hasNiche: Boolean(niche?.trim()),
+          });
+          setOpen(true);
+        }}
       >
         Channel Bible
       </button>
 
-      <YouTubeActionModal
+      <YouTubeChannelBibleEditorModal
         open={open}
-        title="Channel Bible"
-        intro={
-          niche
-            ? `Niche: ${niche} — keep voice and CTA consistent across videos.`
-            : "Set niche, audience, CTA, and tone once — apply to every video."
-        }
         onClose={() => setOpen(false)}
-        maxWidth={480}
-      >
-        <button
-          type="button"
-          className="yt-rail-btn yt-rail-btn--primary"
-          onClick={() => {
-            setOpen(false);
-            openYouTubeCreator({ step: 0 });
-          }}
-        >
-          Open Channel Bible in Plan
-        </button>
-      </YouTubeActionModal>
+        planAvatarUrl={planAvatarUrl}
+        onSaved={(bible) => {
+          onBibleSaved?.(bible);
+        }}
+      />
     </>
   );
 };

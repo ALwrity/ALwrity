@@ -1,6 +1,6 @@
 /**
- * Channel Bible accordion for YouTube Plan Your Video.
- * Edits a flat per-user profile; parent owns fetch/save/apply.
+ * Channel Bible editor — shared by Video Creator Plan and Studio Hub modal.
+ * Parent owns fetch/save/apply; this file is the single UI surface for fields.
  */
 
 import React, { useCallback } from 'react';
@@ -20,6 +20,8 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 import type { YouTubeChannelBible } from '../../../services/youtubeApi';
 import { helperSx, inputSx, labelSx } from '../styles';
 
+export type ChannelBiblePanelVariant = 'accordion' | 'standalone';
+
 export interface ChannelBiblePanelProps {
   bible: YouTubeChannelBible | null;
   loading?: boolean;
@@ -27,9 +29,13 @@ export interface ChannelBiblePanelProps {
   error?: string | null;
   disabled?: boolean;
   planAvatarUrl?: string | null;
+  /** accordion = Plan step; standalone = Studio Hub modal (always expanded). */
+  variant?: ChannelBiblePanelVariant;
+  /** When false, hides Apply (Hub has no live Plan draft to apply). Default true. */
+  showApplyToVideo?: boolean;
   onChange: (bible: YouTubeChannelBible) => void;
   onSave: () => void;
-  onApplyToThisVideo: () => void;
+  onApplyToThisVideo?: () => void;
 }
 
 const EMPTY_HINT = 'Save your channel defaults so the next video starts with your niche, audience, style, and CTA.';
@@ -105,10 +111,14 @@ export const ChannelBiblePanel: React.FC<ChannelBiblePanelProps> = ({
   error = null,
   disabled = false,
   planAvatarUrl,
+  variant = 'accordion',
+  showApplyToVideo = true,
   onChange,
   onSave,
   onApplyToThisVideo,
 }) => {
+  const standalone = variant === 'standalone';
+
   const handleField = useCallback(
     (key: keyof YouTubeChannelBible, value: string) => {
       if (!bible) return;
@@ -123,6 +133,7 @@ export const ChannelBiblePanel: React.FC<ChannelBiblePanelProps> = ({
 
   const handleSave = useCallback(() => {
     console.info('[ChannelBiblePanel] Save channel defaults', {
+      variant,
       hasNiche: Boolean(bible?.niche?.trim()),
       hasAudience: Boolean(bible?.target_audience?.trim()),
       hasStyle: Boolean(bible?.brand_style?.trim()),
@@ -130,9 +141,13 @@ export const ChannelBiblePanel: React.FC<ChannelBiblePanelProps> = ({
       hasAvatar: Boolean(bible?.default_avatar_url?.trim()),
     });
     onSave();
-  }, [bible, onSave]);
+  }, [bible, onSave, variant]);
 
   const handleApply = useCallback(() => {
+    if (!onApplyToThisVideo) {
+      console.warn('[ChannelBiblePanel] Apply requested but no handler provided');
+      return;
+    }
     console.info('[ChannelBiblePanel] Apply to this video', {
       hasNiche: Boolean(bible?.niche?.trim()),
       hasAudience: Boolean(bible?.target_audience?.trim()),
@@ -151,8 +166,114 @@ export const ChannelBiblePanel: React.FC<ChannelBiblePanelProps> = ({
   if (!bible && !loading) {
     return (
       <Alert severity="warning" sx={{ mb: 1 }}>
-        {error || 'Could not load channel bible. You can still plan this video.'}
+        {error ||
+          (standalone
+            ? 'Could not load channel bible. Fix the error and try again.'
+            : 'Could not load channel bible. You can still plan this video.')}
       </Alert>
+    );
+  }
+
+  const formBody = (
+    <>
+      {loading && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Loading channel defaults…
+        </Typography>
+      )}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      {bible && isEmptyIdentity(bible) && !loading && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          {EMPTY_HINT}
+        </Alert>
+      )}
+      {bible && (
+        <Stack spacing={1.5}>
+          {TEXT_FIELDS.map((field) => (
+            <Box key={String(field.key)}>
+              <InputLabel sx={{ ...labelSx, mb: 0.5 }}>{field.label}</InputLabel>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder={field.placeholder}
+                value={String(bible[field.key] ?? '')}
+                onChange={(event) => handleField(field.key, event.target.value)}
+                disabled={disabled || saving}
+                multiline={field.multiline}
+                rows={field.multiline ? 2 : 1}
+                helperText={field.helperText}
+                sx={inputSx}
+                FormHelperTextProps={{ sx: helperSx }}
+              />
+            </Box>
+          ))}
+          <Box>
+            <InputLabel sx={{ ...labelSx, mb: 0.5 }}>Default avatar URL</InputLabel>
+            <TextField
+              fullWidth
+              size="small"
+              value={bible.default_avatar_url || ''}
+              InputProps={{ readOnly: true }}
+              placeholder={
+                standalone
+                  ? 'Set default avatar from Video Creator Plan, or paste after uploading there'
+                  : 'Upload an avatar on Plan Step, then click Use current Plan avatar below'
+              }
+              helperText="URL only — reuse your brand avatar or the avatar from this video."
+              sx={inputSx}
+              FormHelperTextProps={{ sx: helperSx }}
+            />
+            <Button
+              size="small"
+              sx={{ mt: 0.75, textTransform: 'none' }}
+              disabled={disabled || saving || !planAvatarUrl}
+              onClick={handleUsePlanAvatar}
+            >
+              Use current Plan avatar
+            </Button>
+          </Box>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+            <Button
+              variant="contained"
+              onClick={handleSave}
+              disabled={disabled || saving || loading}
+              sx={{ textTransform: 'none' }}
+            >
+              {saving ? 'Saving…' : 'Save channel defaults'}
+            </Button>
+            {showApplyToVideo ? (
+              <Button
+                variant="outlined"
+                onClick={handleApply}
+                disabled={disabled || loading || !bible || !onApplyToThisVideo}
+                sx={{ textTransform: 'none' }}
+              >
+                Apply to this video
+              </Button>
+            ) : null}
+          </Stack>
+        </Stack>
+      )}
+    </>
+  );
+
+  if (standalone) {
+    return (
+      <Box
+        sx={{
+          borderRadius: 2,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+          p: 2,
+          bgcolor: '#fff',
+        }}
+        data-testid="channel-bible-standalone"
+      >
+        {formBody}
+      </Box>
     );
   }
 
@@ -177,84 +298,7 @@ export const ChannelBiblePanel: React.FC<ChannelBiblePanelProps> = ({
           </Typography>
         </Stack>
       </AccordionSummary>
-      <AccordionDetails>
-        {loading && (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Loading channel defaults…
-          </Typography>
-        )}
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-        {bible && isEmptyIdentity(bible) && !loading && (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            {EMPTY_HINT}
-          </Alert>
-        )}
-        {bible && (
-          <Stack spacing={1.5}>
-            {TEXT_FIELDS.map((field) => (
-              <Box key={String(field.key)}>
-                <InputLabel sx={{ ...labelSx, mb: 0.5 }}>{field.label}</InputLabel>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder={field.placeholder}
-                  value={String(bible[field.key] ?? '')}
-                  onChange={(event) => handleField(field.key, event.target.value)}
-                  disabled={disabled || saving}
-                  multiline={field.multiline}
-                  rows={field.multiline ? 2 : 1}
-                  helperText={field.helperText}
-                  sx={inputSx}
-                  FormHelperTextProps={{ sx: helperSx }}
-                />
-              </Box>
-            ))}
-            <Box>
-              <InputLabel sx={{ ...labelSx, mb: 0.5 }}>Default avatar URL</InputLabel>
-              <TextField
-                fullWidth
-                size="small"
-                value={bible.default_avatar_url || ''}
-                InputProps={{ readOnly: true }}
-                placeholder="Upload an avatar on Plan Step, then click Use current Plan avatar below"
-                helperText="URL only — reuse your brand avatar or the avatar from this video."
-                sx={inputSx}
-                FormHelperTextProps={{ sx: helperSx }}
-              />
-              <Button
-                size="small"
-                sx={{ mt: 0.75, textTransform: 'none' }}
-                disabled={disabled || saving || !planAvatarUrl}
-                onClick={handleUsePlanAvatar}
-              >
-                Use current Plan avatar
-              </Button>
-            </Box>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-              <Button
-                variant="contained"
-                onClick={handleSave}
-                disabled={disabled || saving || loading}
-                sx={{ textTransform: 'none' }}
-              >
-                {saving ? 'Saving…' : 'Save channel defaults'}
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={handleApply}
-                disabled={disabled || loading || !bible}
-                sx={{ textTransform: 'none' }}
-              >
-                Apply to this video
-              </Button>
-            </Stack>
-          </Stack>
-        )}
-      </AccordionDetails>
+      <AccordionDetails>{formBody}</AccordionDetails>
     </Accordion>
   );
 };

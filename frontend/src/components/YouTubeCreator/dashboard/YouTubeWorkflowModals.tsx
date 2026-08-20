@@ -31,6 +31,8 @@ interface YouTubeWorkflowModalsProps {
   onClearDraft: () => void;
   channelBibleNiche?: string | null;
   channelBible?: YouTubeChannelBible | null;
+  onChannelBibleSaved?: (bible: YouTubeChannelBible) => void;
+  onCreatorDraftPatched?: (state: YouTubeCreatorState) => void;
 }
 
 export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
@@ -42,6 +44,8 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
   onClearDraft,
   channelBibleNiche,
   channelBible = null,
+  onChannelBibleSaved,
+  onCreatorDraftPatched,
 }) => {
   const navigate = useNavigate();
   const [notifyKeys, setNotifyKeys] = useState<Record<string, boolean>>({});
@@ -138,6 +142,9 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         markNotify={markNotify}
         notifyKeys={notifyKeys}
         channelBible={channelBible}
+        planAvatarUrl={creatorState.avatarUrl || null}
+        onChannelBibleSaved={onChannelBibleSaved}
+        onCreatorDraftPatched={onCreatorDraftPatched}
       />
       <CreateWedgeModal
         open={activeModal === "create"}

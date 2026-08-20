@@ -55,6 +55,8 @@ export interface YouTubeStudioHubProps {
   creatorState: YouTubeCreatorState;
   onClearDraft: () => void;
   needsAnalyticsReconnect?: boolean;
+  onChannelBibleSaved?: (bible: YouTubeChannelBible) => void;
+  onCreatorDraftPatched?: (state: YouTubeCreatorState) => void;
 }
 
 export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
@@ -66,6 +68,8 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
   creatorState,
   onClearDraft,
   needsAnalyticsReconnect = false,
+  onChannelBibleSaved,
+  onCreatorDraftPatched,
 }) => {
   const isDesktop = useIsDesktop();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -156,7 +160,11 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
       <div className="yt-studio-hub-main">
         <div className="yt-studio-hub-toolbar">
           <YouTubeTodayGrowth />
-          <YouTubeChannelBibleChip niche={channelBible?.niche || null} />
+          <YouTubeChannelBibleChip
+            niche={channelBible?.niche || null}
+            planAvatarUrl={creatorState.avatarUrl || null}
+            onBibleSaved={onChannelBibleSaved}
+          />
           {hasDraft ? (
             <StartNewVideoButton
               variant="hub"
@@ -235,6 +243,8 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
           onClearDraft={onClearDraft}
           channelBibleNiche={channelBible?.niche || null}
           channelBible={channelBible}
+          onChannelBibleSaved={onChannelBibleSaved}
+          onCreatorDraftPatched={onCreatorDraftPatched}
         />
 
         {connectGateOpen && (
