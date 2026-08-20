@@ -97,6 +97,27 @@ export interface VideoPlan {
   generation?: VideoPlanGeneration;
 }
 
+export interface YouTubeSceneImageGeneration {
+  image_prompt?: string;
+  template_prompt?: string;
+  provider?: string;
+  model?: string;
+  generation_type?: "character" | "scene";
+  custom_prompt_used?: boolean;
+}
+
+export interface YouTubeSceneAudioGeneration {
+  gateway?: string;
+  provider?: string;
+  model?: string;
+  input_text?: string;
+  speech_text?: string;
+  voice_id?: string;
+  emotion?: string;
+  language_boost?: string;
+  instructions_stripped?: boolean;
+}
+
 export interface Scene {
   scene_number: number;
   title: string;
@@ -110,6 +131,8 @@ export interface Scene {
   imageUrl?: string; // Per-scene generated image URL
   audioUrl?: string; // Per-scene generated audio URL
   videoUrl?: string; // Per-scene generated video URL
+  image_generation?: YouTubeSceneImageGeneration;
+  audio_generation?: YouTubeSceneAudioGeneration;
 }
 
 export interface VideoRenderRequest {
@@ -274,6 +297,7 @@ export interface SceneAudioResponse {
   text_length: number;
   file_size: number;
   cost: number;
+  generation?: YouTubeSceneAudioGeneration;
 }
 
 export const youtubeApi = {

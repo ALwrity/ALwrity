@@ -12,6 +12,10 @@ from api.story_writer.utils.auth import require_authenticated_user
 from utils.asset_tracker import save_asset_to_library
 from models.story_models import StoryAudioResult
 from services.story_writer.audio_generation_service import StoryAudioGenerationService
+from services.youtube.youtube_scene_audio_prompts import (
+    build_youtube_scene_audio_generation_metadata,
+    preprocess_youtube_narration_text,
+)
 from utils.logger_utils import get_service_logger
 
 router = APIRouter(tags=["youtube-audio"])
@@ -249,6 +253,7 @@ class YouTubeAudioResponse(BaseModel):
     text_length: int
     file_size: int
     cost: float
+    generation: Optional[Dict[str, Any]] = None
 
 
 @router.post("/audio", response_model=YouTubeAudioResponse)
@@ -268,25 +273,7 @@ async def generate_youtube_scene_audio(
         raise HTTPException(status_code=400, detail="Text is required")
 
     try:
-        # Preprocess text to remove instructional markers that shouldn't be spoken
-        # Remove patterns like [Pacing: slow], [Instructions: ...], etc.
-        import re
-        processed_text = request.text.strip()
-
-        # Remove instructional markers that contain pacing, timing, or other non-spoken content
-        instructional_patterns = [
-            r'\[Pacing:\s*[^\]]+\]',  # [Pacing: slow]
-            r'\[Instructions?:\s*[^\]]+\]',  # [Instructions: ...]
-            r'\[Timing:\s*[^\]]+\]',  # [Timing: ...]
-            r'\[Note:\s*[^\]]+\]',  # [Note: ...]
-            r'\[Internal:\s*[^\]]+\]',  # [Internal: ...]
-        ]
-
-        for pattern in instructional_patterns:
-            processed_text = re.sub(pattern, '', processed_text, flags=re.IGNORECASE)
-
-        # Clean up extra whitespace and normalize
-        processed_text = re.sub(r'\s+', ' ', processed_text).strip()
+        processed_text = preprocess_youtube_narration_text(request.text)
 
         if not processed_text:
             raise HTTPException(status_code=400, detail="Text became empty after removing instructions. Please provide clean narration text.")
@@ -431,6 +418,15 @@ async def generate_youtube_scene_audio(
         text_length=result.get("text_length", len(request.text)),
         file_size=result.get("file_size", 0),
         cost=result.get("cost", 0.0),
+        generation=build_youtube_scene_audio_generation_metadata(
+            input_text=request.text,
+            speech_text=processed_text,
+            voice_id=result.get("voice_id", selected_voice),
+            emotion=selected_emotion,
+            language_boost=effective_language_boost,
+            provider=result.get("provider", "wavespeed"),
+            model=result.get("model", "minimax/speech-02-hd"),
+        ),
     )
 
 

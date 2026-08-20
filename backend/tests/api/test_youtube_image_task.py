@@ -85,6 +85,7 @@ class TestExecuteImageGenerationTask:
             )
             assert status["progress"] == 100.0
             assert status["result"]["image_filename"] == "yt_scene_1_12345678.png"
+            assert status["result"]["generation"]["image_prompt"]
             assert "Depends" not in str(status.get("error") or "")
 
     def test_task_handles_missing_db_session_gracefully(self):
