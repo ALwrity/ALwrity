@@ -22,12 +22,15 @@ import { Scene, VideoPlan } from '../../../services/youtubeApi';
 import { YT_BG, YT_BORDER, YT_TEXT } from '../constants';
 import { SceneCard } from './SceneCard';
 import { AssetGenerationCostCard } from './AssetGenerationCostCard';
+import { SceneGenerationMeta } from './SceneGenerationMeta';
+import type { SceneBuildGeneration } from '../../../services/youtubeApi';
 import type { AudioGenerationSettings } from '../../shared/AudioSettingsModal';
 import type { YouTubeImageGenerationSettings } from '../shared';
 
 interface SceneGenerationStepProps {
   scenes: Scene[];
   videoPlan: VideoPlan | null;
+  sceneBuildGeneration?: SceneBuildGeneration | null;
   editingSceneId: number | null;
   editedScene: Partial<Scene> | null;
   onEditScene: (scene: Scene) => void;
@@ -50,6 +53,7 @@ interface SceneGenerationStepProps {
 export const SceneGenerationStep: React.FC<SceneGenerationStepProps> = React.memo(({
   scenes,
   videoPlan,
+  sceneBuildGeneration,
   editingSceneId,
   editedScene,
   onEditScene,
@@ -107,6 +111,10 @@ export const SceneGenerationStep: React.FC<SceneGenerationStepProps> = React.mem
         <Typography variant="body2" sx={{ mb: 3, color: '#64748b' }}>
           Generate custom images and audio narration for each scene. All scenes must have both an image and audio before you can render the final video.
         </Typography>
+
+        {sceneBuildGeneration ? (
+          <SceneGenerationMeta generation={sceneBuildGeneration} />
+        ) : null}
 
         {/* Cost Estimate */}
         <AssetGenerationCostCard scenes={scenes} />

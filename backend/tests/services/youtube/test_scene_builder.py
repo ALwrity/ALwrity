@@ -66,8 +66,11 @@ class TestBuildScenesFromPlan:
                     user_id="user_scenes",
                 )
 
-        assert len(scenes) == 2
-        assert scenes[0]["narration"] == "Start here"
+        assert len(scenes["scenes"]) == 2
+        assert scenes["scenes"][0]["narration"] == "Start here"
+        assert scenes["generation"]["system_prompt"]
+        assert scenes["generation"]["llm_called"] is False
+        assert scenes["generation"]["scenes_reused_from_plan"] is True
         mock_generate.assert_not_called()
 
     def test_parses_custom_script_paragraphs(self):
@@ -97,8 +100,10 @@ class TestBuildScenesFromPlan:
                     custom_script=script,
                 )
 
-        assert len(scenes) == 3
-        assert "Intro tip one" in scenes[0]["narration"]
+        assert len(scenes["scenes"]) == 3
+        assert "Intro tip one" in scenes["scenes"][0]["narration"]
+        assert scenes["generation"]["custom_script_used"] is True
+        assert scenes["generation"]["llm_called"] is False
 
     def test_shorts_skip_prompt_enhancement(self):
         from services.youtube.scene_builder import YouTubeSceneBuilderService

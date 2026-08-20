@@ -19,10 +19,14 @@ import { OperationButton } from '../../shared/OperationButton';
 import { buildSceneBuildingOperation } from '../utils/operationHelpers';
 import { DurationType } from '../constants';
 import { SceneBuildLoadingPanel } from './SceneBuildLoadingPanel';
+import { ScenePromptPreview } from './ScenePromptPreview';
+import { SceneGenerationMeta } from './SceneGenerationMeta';
+import type { SceneBuildGeneration } from '../../../services/youtubeApi';
 
 interface ScenesStepProps {
   videoPlan: VideoPlan;
   scenes: Scene[];
+  sceneBuildGeneration?: SceneBuildGeneration | null;
   editingSceneId: number | null;
   editedScene: Partial<Scene> | null;
   loading: boolean;
@@ -42,6 +46,7 @@ interface ScenesStepProps {
 export const ScenesStep: React.FC<ScenesStepProps> = React.memo(({
   videoPlan,
   scenes,
+  sceneBuildGeneration,
   editingSceneId,
   editedScene,
   loading,
@@ -108,6 +113,11 @@ export const ScenesStep: React.FC<ScenesStepProps> = React.memo(({
           regeneratingAvatar={regeneratingAvatar}
           onPlanChange={onPlanChange}
         />
+
+        {scenes.length === 0 ? <ScenePromptPreview plan={videoPlan} /> : null}
+        {sceneBuildGeneration ? (
+          <SceneGenerationMeta generation={sceneBuildGeneration} defaultExpanded />
+        ) : null}
 
         {scenes.length === 0 && loading && (
           <Box sx={{ py: 2 }}>
