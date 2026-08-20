@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { YouTubeActionModal } from "../YouTubeActionModal";
 import { youtubeStudioApi } from "../../../../services/youtubeStudioApi";
+import {
+  YOUTUBE_WEDGE_MODAL_MAX_WIDTH,
+  type YouTubeModalShellProps,
+} from "../youtubeWedgeModalUi";
 
 export const PlaylistAttachModal: React.FC<{
   open: boolean;
   onClose: () => void;
-}> = ({ open, onClose }) => {
+  shell?: YouTubeModalShellProps;
+}> = ({ open, onClose, shell }) => {
   const [playlists, setPlaylists] = useState<any[]>([]);
   const [videos, setVideos] = useState<any[]>([]);
   const [playlistId, setPlaylistId] = useState("");
@@ -47,7 +52,9 @@ export const PlaylistAttachModal: React.FC<{
       title="Playlist / Series Attach"
       intro="Attach a published video to a playlist for retention packaging."
       onClose={onClose}
-      maxWidth={520}
+      maxWidth={shell?.maxWidth ?? YOUTUBE_WEDGE_MODAL_MAX_WIDTH}
+      onBack={shell?.onBack}
+      backLabel={shell?.backLabel}
     >
       {status && <p className="yt-modal-intro">{status}</p>}
       <label style={{ fontSize: 12, fontWeight: 700 }}>Playlist</label>

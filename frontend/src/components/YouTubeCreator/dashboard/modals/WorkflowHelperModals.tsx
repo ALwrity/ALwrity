@@ -1,6 +1,16 @@
+/**
+ * Studio Hub helper modals from Create / Publish (and SEO from Analysis).
+ * Drill-downs use Plan-sized chrome + Back to the parent wedge.
+ */
+
 import React from "react";
 import { YouTubeActionModal } from "../YouTubeActionModal";
 import type { YouTubeCreatorState } from "../../../../hooks/useYouTubeCreatorState";
+import type { YouTubeWorkflowCardId } from "../youtubeWorkflowConfig";
+import {
+  YOUTUBE_WEDGE_MODAL_MAX_WIDTH,
+  youtubeSubModalShellProps,
+} from "../youtubeWedgeModalUi";
 import type { GoCreateFn } from "./wedgeModalTypes";
 
 function scorePrePublish(state: YouTubeCreatorState): { score: number; tips: string[] } {
@@ -27,6 +37,7 @@ function scorePrePublish(state: YouTubeCreatorState): { score: number; tips: str
 }
 
 interface WorkflowHelperModalsProps {
+  activeModal: YouTubeWorkflowCardId | null;
   creatorState: YouTubeCreatorState;
   goCreate: GoCreateFn;
   onClearDraft: () => void;
@@ -45,6 +56,7 @@ interface WorkflowHelperModalsProps {
 }
 
 export const WorkflowHelperModals: React.FC<WorkflowHelperModalsProps> = ({
+  activeModal,
   creatorState,
   goCreate,
   onClearDraft,
@@ -62,6 +74,14 @@ export const WorkflowHelperModals: React.FC<WorkflowHelperModalsProps> = ({
   onCloseVideos,
 }) => {
   const coach = scorePrePublish(creatorState);
+  const shell = (onBack: () => void) =>
+    activeModal
+      ? youtubeSubModalShellProps(activeModal, onBack)
+      : {
+          maxWidth: YOUTUBE_WEDGE_MODAL_MAX_WIDTH,
+          onBack,
+          backLabel: "Studio Hub",
+        };
 
   return (
     <>
@@ -70,7 +90,7 @@ export const WorkflowHelperModals: React.FC<WorkflowHelperModalsProps> = ({
         title="Pre-Publish Coach"
         intro="HITL score — fix tips before you publish."
         onClose={onCloseCoach}
-        maxWidth={480}
+        {...shell(onCloseCoach)}
       >
         <p style={{ fontSize: "1.5rem", fontWeight: 800, margin: "0 0 8px" }}>
           Score: {coach.score}/100
@@ -108,7 +128,7 @@ export const WorkflowHelperModals: React.FC<WorkflowHelperModalsProps> = ({
         title="SEO Pack"
         intro="Keywords and titles from your current plan — edit in Creator for HITL approval."
         onClose={onCloseSeo}
-        maxWidth={520}
+        {...shell(onCloseSeo)}
       >
         {creatorState.videoPlan ? (
           <>
@@ -152,7 +172,7 @@ export const WorkflowHelperModals: React.FC<WorkflowHelperModalsProps> = ({
         title="Thumbnail Studio"
         intro="Generate scene images in Creator, then pick your strongest frame as the thumbnail (HITL)."
         onClose={onCloseThumb}
-        maxWidth={480}
+        {...shell(onCloseThumb)}
       >
         <button
           type="button"
@@ -166,7 +186,12 @@ export const WorkflowHelperModals: React.FC<WorkflowHelperModalsProps> = ({
         </button>
       </YouTubeActionModal>
 
-      <YouTubeActionModal open={costOpen} title="Cost Preflight" onClose={onCloseCost} maxWidth={480}>
+      <YouTubeActionModal
+        open={costOpen}
+        title="Cost Preflight"
+        onClose={onCloseCost}
+        {...shell(onCloseCost)}
+      >
         <p className="yt-modal-intro">{costText || "Estimating…"}</p>
       </YouTubeActionModal>
 
@@ -175,7 +200,7 @@ export const WorkflowHelperModals: React.FC<WorkflowHelperModalsProps> = ({
         title="Rendered videos"
         intro="Local rendered files from YouTube Creator."
         onClose={onCloseVideos}
-        maxWidth={480}
+        {...shell(onCloseVideos)}
       >
         {videos.length === 0 ? (
           <p className="yt-modal-intro">No rendered videos yet — create one in Video Creator.</p>

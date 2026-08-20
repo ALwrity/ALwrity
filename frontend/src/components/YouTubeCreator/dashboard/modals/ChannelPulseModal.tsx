@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { YouTubeActionModal } from "../YouTubeActionModal";
 import { youtubeStudioApi } from "../../../../services/youtubeStudioApi";
+import {
+  YOUTUBE_WEDGE_MODAL_MAX_WIDTH,
+  type YouTubeModalShellProps,
+} from "../youtubeWedgeModalUi";
 
 export const ChannelPulseModal: React.FC<{
   open: boolean;
   onClose: () => void;
-}> = ({ open, onClose }) => {
+  shell?: YouTubeModalShellProps;
+}> = ({ open, onClose, shell }) => {
   const [data, setData] = useState<any>(null);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -29,7 +34,9 @@ export const ChannelPulseModal: React.FC<{
       title="Channel Pulse"
       intro="Live channel health from YouTube Data + Analytics APIs."
       onClose={onClose}
-      maxWidth={520}
+      maxWidth={shell?.maxWidth ?? YOUTUBE_WEDGE_MODAL_MAX_WIDTH}
+      onBack={shell?.onBack}
+      backLabel={shell?.backLabel}
     >
       {status && <p className="yt-modal-intro">{status}</p>}
       {data?.success && (

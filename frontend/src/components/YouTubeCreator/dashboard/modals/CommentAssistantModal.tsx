@@ -2,10 +2,18 @@ import React, { useCallback, useEffect, useState } from "react";
 import { YouTubeActionModal } from "../YouTubeActionModal";
 import { youtubeStudioApi } from "../../../../services/youtubeStudioApi";
 import type { PhaseModalSharedProps } from "./phaseModalTypes";
+import {
+  YOUTUBE_WEDGE_MODAL_MAX_WIDTH,
+  type YouTubeModalShellProps,
+} from "../youtubeWedgeModalUi";
 
 export const CommentAssistantModal: React.FC<
-  PhaseModalSharedProps & { open: boolean; onClose: () => void }
-> = ({ open, onClose, niche }) => {
+  PhaseModalSharedProps & {
+    open: boolean;
+    onClose: () => void;
+    shell?: YouTubeModalShellProps;
+  }
+> = ({ open, onClose, niche, shell }) => {
   const [loading, setLoading] = useState(false);
   const [comments, setComments] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +89,9 @@ export const CommentAssistantModal: React.FC<
       title="Comment Reply Assistant"
       intro="ALwrity drafts replies in your voice — you edit and send (HITL)."
       onClose={onClose}
-      maxWidth={640}
+      maxWidth={shell?.maxWidth ?? YOUTUBE_WEDGE_MODAL_MAX_WIDTH}
+      onBack={shell?.onBack}
+      backLabel={shell?.backLabel}
     >
       {loading && <p className="yt-modal-intro">Loading inbox…</p>}
       {error && <p className="yt-modal-intro">{error}</p>}
