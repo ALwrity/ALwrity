@@ -289,14 +289,34 @@ export const youtubeApi = {
    * Build scenes from a video plan.
    */
   async buildScenes(videoPlan: VideoPlan, customScript?: string): Promise<{ success: boolean; scenes?: Scene[]; message: string }> {
+    const durationType = videoPlan.duration_type || 'medium';
+    const outlineCount = videoPlan.content_outline?.length ?? 0;
     try {
+      console.info('[youtubeApi] buildScenes request started', {
+        durationType,
+        outlineCount,
+        hasCustomScript: Boolean(customScript?.trim()),
+      });
       // Use longRunningApiClient with 180s-300s timeout for scene building
       const response = await longRunningApiClient.post(`${API_BASE}/scenes`, {
         video_plan: videoPlan,
         custom_script: customScript || undefined,
       });
+      console.info('[youtubeApi] buildScenes response received', {
+        durationType,
+        success: Boolean(response.data?.success),
+        sceneCount: response.data?.scenes?.length ?? 0,
+      });
       return response.data;
     } catch (error: any) {
+      const status = error.response?.status;
+      console.error('[youtubeApi] buildScenes failed', {
+        durationType,
+        outlineCount,
+        status,
+        isTimeout: error.name === 'RequestTimeoutError' || Boolean(error.message?.includes('timeout')),
+        message: error.response?.data?.message || error.response?.data?.detail || error.message,
+      });
       if (error.name === 'RequestTimeoutError' || error.message?.includes('timeout')) {
         throw new Error('Scene generation is taking longer than expected. Please check your internet connection and try again.');
       }

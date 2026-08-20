@@ -3,10 +3,28 @@
 from typing import Dict, Any, List
 import json
 
+from fastapi import HTTPException
+
 from services.llm_providers.main_text_generation import llm_text_gen
 from utils.logger_utils import get_service_logger
 
 logger = get_service_logger("youtube.scene_builder_generation")
+
+
+def _parse_scenes_response(response: Any) -> List[Any]:
+    """Normalize llm_text_gen output into a list of scene payloads."""
+    if isinstance(response, list):
+        return response
+    if isinstance(response, dict) and isinstance(response.get("scenes"), list):
+        return response["scenes"]
+    if isinstance(response, str):
+        parsed = json.loads(response)
+        if isinstance(parsed, list):
+            return parsed
+        if isinstance(parsed, dict) and isinstance(parsed.get("scenes"), list):
+            return parsed["scenes"]
+        raise ValueError("LLM string response did not contain a scenes array")
+    raise ValueError(f"Unexpected LLM response type: {type(response).__name__}")
 
 
 def generate_scenes_from_plan(
@@ -15,7 +33,7 @@ def generate_scenes_from_plan(
     user_id: str,
 ) -> List[Dict[str, Any]]:
     """Generate scenes from video plan using AI."""
-    
+    duration_type = video_plan.get("duration_type", "medium")
     raw_content_outline = video_plan.get("content_outline", [])
     content_outline: List[Dict[str, Any]] = []
     for item in raw_content_outline:
@@ -29,13 +47,33 @@ def generate_scenes_from_plan(
                     "duration_estimate": 0,
                 }
             )
+
+    if not content_outline:
+        logger.error(
+            "[YouTubeSceneBuilder] Refusing scene generation with empty outline "
+            "duration=%s user=%s",
+            duration_type,
+            user_id,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="Video plan has no content outline. Regenerate the plan before building scenes.",
+        )
+
     hook_strategy = video_plan.get("hook_strategy", "")
     call_to_action = video_plan.get("call_to_action", "")
     visual_style = video_plan.get("visual_style", "cinematic")
     tone = video_plan.get("tone", "professional")
-    
+
     scene_duration_range = duration_metadata.get("scene_duration_range", (5, 15))
-    
+    logger.info(
+        "[YouTubeSceneBuilder] Generating scenes via llm_text_gen "
+        "duration=%s outline_sections=%s user=%s",
+        duration_type,
+        len(content_outline),
+        user_id,
+    )
+
     scene_generation_prompt = f"""You are a top YouTube scriptwriter specializing in engaging, viral content. Create compelling scenes that captivate viewers and maximize watch time.
 
 **VIDEO PLAN:**
@@ -119,43 +157,77 @@ Write narration that:
         "Your scripts are conversational, valuable, and conversion-focused."
     )
     
-    response = llm_text_gen(
-        prompt=scene_generation_prompt,
-        system_prompt=system_prompt,
-        user_id=user_id,
-        json_struct={
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "scene_number": {"type": "number"},
-                    "title": {"type": "string"},
-                    "narration": {"type": "string"},
-                    "visual_description": {"type": "string"},
-                    "duration_estimate": {"type": "number"},
-                    "emphasis": {"type": "string"},
-                    "visual_cues": {
-                        "type": "array",
-                        "items": {"type": "string"}
-                    }
-                },
-                "required": [
-                    "scene_number", "title", "narration", "visual_description",
-                    "duration_estimate", "emphasis"
-                ]
+    try:
+        response = llm_text_gen(
+            prompt=scene_generation_prompt,
+            system_prompt=system_prompt,
+            user_id=user_id,
+            json_struct={
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "scene_number": {"type": "number"},
+                        "title": {"type": "string"},
+                        "narration": {"type": "string"},
+                        "visual_description": {"type": "string"},
+                        "duration_estimate": {"type": "number"},
+                        "emphasis": {"type": "string"},
+                        "visual_cues": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        }
+                    },
+                    "required": [
+                        "scene_number", "title", "narration", "visual_description",
+                        "duration_estimate", "emphasis"
+                    ]
+                }
             }
-        }
-    )
-    
-    # Parse response
-    if isinstance(response, list):
-        scenes = response
-    elif isinstance(response, dict) and "scenes" in response:
-        scenes = response["scenes"]
-    else:
-        import json
-        scenes = json.loads(response) if isinstance(response, str) else response
-    
+        )
+    except Exception as exc:
+        logger.error(
+            "[YouTubeSceneBuilder] llm_text_gen failed during scene generation "
+            "duration=%s outline_sections=%s user=%s error=%s",
+            duration_type,
+            len(content_outline),
+            user_id,
+            str(exc),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate scenes: {str(exc)}",
+        ) from exc
+
+    try:
+        scenes = _parse_scenes_response(response)
+    except Exception as exc:
+        logger.error(
+            "[YouTubeSceneBuilder] Failed to parse scene LLM response "
+            "duration=%s user=%s response_type=%s error=%s",
+            duration_type,
+            user_id,
+            type(response).__name__,
+            str(exc),
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Scene generation returned an invalid response. Please try again.",
+        ) from exc
+
+    if not scenes:
+        logger.error(
+            "[YouTubeSceneBuilder] LLM returned zero scenes duration=%s user=%s",
+            duration_type,
+            user_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Scene generation returned no scenes. Please try again.",
+        )
+
     # Normalize scene data
     normalized_scenes = []
     for idx, scene in enumerate(scenes, 1):
@@ -185,5 +257,12 @@ Write narration that:
                 "visual_prompt": scene_data.get("visual_description", ""),
             }
         )
-    
+
+    logger.info(
+        "[YouTubeSceneBuilder] Scene LLM generation complete "
+        "duration=%s scene_count=%s user=%s",
+        duration_type,
+        len(normalized_scenes),
+        user_id,
+    )
     return normalized_scenes

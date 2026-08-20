@@ -243,11 +243,23 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
 
   const handleBuildScenes = useCallback(async () => {
     if (!videoPlan) {
+      console.warn("[YouTubeCreator] Scene build blocked: missing video plan");
       setError("Please generate a plan first");
       return;
     }
+    const outlineCount = videoPlan.content_outline?.length ?? 0;
+    if (outlineCount === 0) {
+      console.warn("[YouTubeCreator] Scene build blocked: empty content outline", {
+        durationType: videoPlan.duration_type,
+      });
+      setError("Your plan has no content outline. Please regenerate the plan first.");
+      return;
+    }
     if (scenes.length > 0) {
-      console.warn("[YouTubeCreator] Scenes already exist, skipping build to prevent duplicate AI calls");
+      console.warn("[YouTubeCreator] Scenes already exist, skipping build to prevent duplicate AI calls", {
+        existingSceneCount: scenes.length,
+        durationType: videoPlan.duration_type,
+      });
       setError("Scenes have already been generated. Please refresh the page if you want to regenerate.");
       return;
     }
@@ -257,8 +269,26 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
     setSuccess(null);
 
     try {
+      console.info("[YouTubeCreator] Building scenes from plan", {
+        durationType: videoPlan.duration_type,
+        outlineCount,
+        hasSelectedTitle: Boolean(videoPlan.selected_title?.trim()),
+      });
       const response = await youtubeApi.buildScenes(videoPlan);
       if (response.success && response.scenes) {
+        if (response.scenes.length === 0) {
+          console.error("[YouTubeCreator] Scene build returned empty scenes list", {
+            durationType: videoPlan.duration_type,
+            message: response.message,
+          });
+          setError(response.message || "Scene build returned no scenes. Please try again.");
+          return;
+        }
+        console.info("[YouTubeCreator] Scenes built", {
+          sceneCount: response.scenes.length,
+          durationType: videoPlan.duration_type,
+          outlineCount,
+        });
         const updatedScenes = response.scenes.map((s) => ({ ...s, enabled: s.enabled !== false }));
         const enabledScenes = updatedScenes.filter((s) => s.enabled !== false);
         const totalDuration = enabledScenes.reduce((sum, scene) => sum + scene.duration_estimate, 0);
@@ -290,10 +320,22 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
         setActiveStep(2);
         setTimeout(() => setSuccess(null), 3000);
       } else {
+        console.warn("[YouTubeCreator] Scene build returned unsuccessful response", {
+          message: response.message,
+          durationType: videoPlan.duration_type,
+          outlineCount,
+        });
         setError(response.message || "Failed to build scenes");
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to build scenes");
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : typeof err === "string" ? err : "Failed to build scenes";
+      console.error("[YouTubeCreator] Scene build failed", {
+        durationType: videoPlan.duration_type,
+        outlineCount,
+        error: errorMessage,
+      });
+      setError(errorMessage || "Failed to build scenes");
     } finally {
       setLoading(false);
     }

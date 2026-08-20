@@ -18,6 +18,7 @@ import { YT_BORDER } from '../constants';
 import { OperationButton } from '../../shared/OperationButton';
 import { buildSceneBuildingOperation } from '../utils/operationHelpers';
 import { DurationType } from '../constants';
+import { SceneBuildLoadingPanel } from './SceneBuildLoadingPanel';
 
 interface ScenesStepProps {
   videoPlan: VideoPlan;
@@ -108,7 +109,13 @@ export const ScenesStep: React.FC<ScenesStepProps> = React.memo(({
           onPlanChange={onPlanChange}
         />
 
-        {scenes.length === 0 && (
+        {scenes.length === 0 && loading && (
+          <Box sx={{ py: 2 }}>
+            <SceneBuildLoadingPanel />
+          </Box>
+        )}
+
+        {scenes.length === 0 && !loading && (
           <Box sx={{ textAlign: 'center', py: 4 }}>
             <VideoLibrary sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
             <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
