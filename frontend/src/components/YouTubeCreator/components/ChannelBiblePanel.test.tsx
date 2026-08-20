@@ -62,6 +62,37 @@ describe("ChannelBiblePanel", () => {
     expect(onApplyToThisVideo).toHaveBeenCalledTimes(1);
   });
 
+  it("hides Apply in standalone Hub variant", () => {
+    render(
+      <ChannelBiblePanel
+        bible={bible}
+        variant="standalone"
+        showApplyToVideo={false}
+        onChange={onChange}
+        onSave={onSave}
+      />,
+    );
+    expect(screen.getByTestId("channel-bible-standalone")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Apply to this video" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save channel defaults" }));
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows Apply in Plan wedge standalone when enabled", () => {
+    render(
+      <ChannelBiblePanel
+        bible={bible}
+        variant="standalone"
+        showApplyToVideo
+        onChange={onChange}
+        onSave={onSave}
+        onApplyToThisVideo={onApplyToThisVideo}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply to this video" }));
+    expect(onApplyToThisVideo).toHaveBeenCalledTimes(1);
+  });
+
   it("calls onChange with updated niche", () => {
     renderPanel(bible, { onChange, onSave, onApplyToThisVideo });
     fireEvent.change(

@@ -47,4 +47,44 @@ describe("PlanBrainstormSourceChips", () => {
     fireEvent.click(screen.getByRole("button", { name: "Trending" }));
     expect(onToggleTrending).toHaveBeenCalledTimes(1);
   });
+
+  it("opens Channel Bible editor when empty and onOpenChannelBible is provided", () => {
+    const onOpenChannelBible = jest.fn();
+    render(
+      <PlanBrainstormSourceChips
+        useChannelBible={false}
+        includeTrending={false}
+        includeRepurpose={false}
+        hasChannelBible={false}
+        onOpenChannelBible={onOpenChannelBible}
+        onToggleChannelBible={onToggleChannelBible}
+        onToggleTrending={onToggleTrending}
+        onToggleRepurpose={onToggleRepurpose}
+      />,
+    );
+
+    const chip = screen.getByRole("button", { name: "Channel Bible" });
+    expect(chip).not.toBeDisabled();
+    fireEvent.click(chip);
+    expect(onOpenChannelBible).toHaveBeenCalledTimes(1);
+    expect(onToggleChannelBible).not.toHaveBeenCalled();
+  });
+
+  it("toggles Channel Bible when identity exists", () => {
+    render(
+      <PlanBrainstormSourceChips
+        useChannelBible
+        includeTrending={false}
+        includeRepurpose={false}
+        hasChannelBible
+        onOpenChannelBible={jest.fn()}
+        onToggleChannelBible={onToggleChannelBible}
+        onToggleTrending={onToggleTrending}
+        onToggleRepurpose={onToggleRepurpose}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Channel Bible" }));
+    expect(onToggleChannelBible).toHaveBeenCalledTimes(1);
+  });
 });

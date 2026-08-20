@@ -18,6 +18,9 @@ import {
 } from "../../hooks/useYouTubeCreatorState";
 import { useYouTubePublish } from "../../hooks/useYouTubePublish";
 import { youtubeApi, type YouTubeChannelBible } from "../../services/youtubeApi";
+import {
+  YT_CHANNEL_BIBLE_UPDATED_EVENT,
+} from "./dashboard/youtubeStudioEvents";
 import "./dashboard/youtube-dashboard-layout.css";
 import "./dashboard/youtube-rail-controls.css";
 
@@ -57,6 +60,19 @@ const YouTubeCreator: React.FC = () => {
       cancelled = true;
     };
   }, [tab]);
+
+  useEffect(() => {
+    const onUpdated = (event: Event) => {
+      const bible = (event as CustomEvent<YouTubeChannelBible>).detail;
+      if (!bible) return;
+      setChannelBible(bible);
+      console.info("[YouTubeCreator] Hub Channel Bible synced", {
+        hasNiche: Boolean(bible.niche?.trim()),
+      });
+    };
+    window.addEventListener(YT_CHANNEL_BIBLE_UPDATED_EVENT, onUpdated);
+    return () => window.removeEventListener(YT_CHANNEL_BIBLE_UPDATED_EVENT, onUpdated);
+  }, []);
 
   const needsAnalyticsReconnect = useMemo(
     () =>
@@ -101,6 +117,8 @@ const YouTubeCreator: React.FC = () => {
             creatorState={hubDraft}
             onClearDraft={onClearDraft}
             needsAnalyticsReconnect={needsAnalyticsReconnect}
+            onChannelBibleSaved={setChannelBible}
+            onCreatorDraftPatched={setHubDraft}
           />
         ) : (
           <YouTubeVideoCreatorPanel />

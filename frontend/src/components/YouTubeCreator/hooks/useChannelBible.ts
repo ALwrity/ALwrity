@@ -1,26 +1,20 @@
 /**
- * Load, prefill, save, and apply the YouTube Channel Bible.
- * Database is the source of truth; localStorage session fields are not overwritten when nonempty.
+ * Load, prefill, save, and apply the YouTube Channel Bible for Video Creator.
+ * Persistence is shared via useChannelBibleStore (same GET/PUT as Studio Hub).
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { getLatestBrandAvatar } from '../../../api/brandAssets';
-import { youtubeApi, type YouTubeChannelBible } from '../../../services/youtubeApi';
-import type { YouTubeContentLanguage } from '../constants';
-import type { YouTubeCreatorState } from '../../../hooks/useYouTubeCreatorState';
+import { useCallback, useEffect, useRef } from "react";
+import { getLatestBrandAvatar } from "../../../api/brandAssets";
+import type { YouTubeChannelBible } from "../../../services/youtubeApi";
+import type { YouTubeContentLanguage } from "../constants";
+import type { YouTubeCreatorState } from "../../../hooks/useYouTubeCreatorState";
+import { buildPlanFieldUpdatesFromChannelBible } from "../utils/channelBibleContext";
+import {
+  EMPTY_CHANNEL_BIBLE,
+  useChannelBibleStore,
+} from "./useChannelBibleStore";
 
-export const EMPTY_CHANNEL_BIBLE: YouTubeChannelBible = {
-  channel_name: '',
-  niche: '',
-  target_audience: '',
-  default_video_goal: '',
-  default_cta: '',
-  brand_style: '',
-  visual_style_guide: '',
-  tone: '',
-  default_avatar_url: null,
-  default_language: '',
-};
+export { EMPTY_CHANNEL_BIBLE };
 
 interface UseChannelBibleArgs {
   targetAudience: string;
@@ -36,7 +30,7 @@ function applyBibleToEmptyFields(
   bible: YouTubeChannelBible,
   current: Pick<
     UseChannelBibleArgs,
-    'targetAudience' | 'videoGoal' | 'brandStyle' | 'referenceImage' | 'avatarUrl' | 'language'
+    "targetAudience" | "videoGoal" | "brandStyle" | "referenceImage" | "avatarUrl" | "language"
   >,
 ): Partial<YouTubeCreatorState> {
   const updates: Partial<YouTubeCreatorState> = {};
@@ -70,10 +64,16 @@ export function useChannelBible({
   language,
   updateState,
 }: UseChannelBibleArgs) {
-  const [channelBible, setChannelBible] = useState<YouTubeChannelBible | null>(null);
-  const [bibleLoading, setBibleLoading] = useState(true);
-  const [bibleSaving, setBibleSaving] = useState(false);
-  const [bibleError, setBibleError] = useState<string | null>(null);
+  const {
+    channelBible,
+    bibleLoading,
+    bibleSaving,
+    bibleError,
+    setChannelBible,
+    setBibleError,
+    saveChannelBible: persistBible,
+  } = useChannelBibleStore();
+
   const fieldsRef = useRef({
     targetAudience,
     videoGoal,
@@ -92,96 +92,52 @@ export function useChannelBible({
   };
   const updateStateRef = useRef(updateState);
   updateStateRef.current = updateState;
+  const prefilledRef = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
+    if (bibleLoading || !channelBible || prefilledRef.current) return;
+    prefilledRef.current = true;
+    const emptyUpdates = applyBibleToEmptyFields(channelBible, fieldsRef.current);
+    if (Object.keys(emptyUpdates).length > 0) {
+      updateStateRef.current(emptyUpdates);
+    }
 
-    const load = async () => {
-      setBibleLoading(true);
-      setBibleError(null);
-      try {
-        const response = await youtubeApi.getChannelBible();
-        if (cancelled) return;
-        const bible = response.bible || { ...EMPTY_CHANNEL_BIBLE };
-        setChannelBible(bible);
-        const emptyUpdates = applyBibleToEmptyFields(bible, fieldsRef.current);
-        if (Object.keys(emptyUpdates).length > 0) {
-          updateStateRef.current(emptyUpdates);
-        }
-
-        const currentAvatar = emptyUpdates.avatarUrl || fieldsRef.current.avatarUrl;
-        if (!bible.default_avatar_url?.trim() && !currentAvatar) {
-          try {
-            const avatarResp = await getLatestBrandAvatar();
-            if (!cancelled && avatarResp.success && avatarResp.image_url) {
-              updateStateRef.current({ avatarUrl: avatarResp.image_url });
-            }
-          } catch (avatarErr) {
-            console.warn('[useChannelBible] Latest brand avatar unavailable', avatarErr);
+    const currentAvatar = emptyUpdates.avatarUrl || fieldsRef.current.avatarUrl;
+    if (!channelBible.default_avatar_url?.trim() && !currentAvatar) {
+      void (async () => {
+        try {
+          const avatarResp = await getLatestBrandAvatar();
+          if (avatarResp.success && avatarResp.image_url) {
+            updateStateRef.current({ avatarUrl: avatarResp.image_url });
           }
+        } catch (avatarErr) {
+          console.warn("[useChannelBible] Latest brand avatar unavailable", avatarErr);
         }
-        console.info('[useChannelBible] Loaded', {
-          source: response.source,
-          hasNiche: Boolean(bible.niche?.trim()),
-        });
-      } catch (err: any) {
-        if (cancelled) return;
-        const message = err?.message || 'Failed to load channel bible';
-        console.error('[useChannelBible] GET failed', message);
-        setBibleError(message);
-        setChannelBible(null);
-      } finally {
-        if (!cancelled) setBibleLoading(false);
-      }
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      })();
+    }
+  }, [bibleLoading, channelBible]);
 
   const saveChannelBible = useCallback(async () => {
-    if (!channelBible) return;
-    setBibleSaving(true);
-    setBibleError(null);
     try {
-      const response = await youtubeApi.saveChannelBible(channelBible);
-      setChannelBible(response.bible);
-      console.info('[useChannelBible] Saved channel defaults');
-    } catch (err: any) {
-      const message = err?.message || 'Failed to save channel bible';
-      console.error('[useChannelBible] PUT failed', message);
-      setBibleError(message);
-    } finally {
-      setBibleSaving(false);
+      await persistBible();
+    } catch {
+      /* bibleError already set on store */
     }
-  }, [channelBible]);
+  }, [persistBible]);
 
   const applyBibleToThisVideo = useCallback(() => {
     if (!channelBible) return;
     try {
-      const updates: Partial<YouTubeCreatorState> = {
-        targetAudience: channelBible.target_audience || '',
-        videoGoal: channelBible.default_video_goal || '',
-        brandStyle: channelBible.brand_style || '',
-        referenceImage: channelBible.visual_style_guide || '',
-      };
-      if (channelBible.default_language) {
-        updates.language = channelBible.default_language as YouTubeContentLanguage;
-      }
-      if (channelBible.default_avatar_url) {
-        updates.avatarUrl = channelBible.default_avatar_url;
-      }
+      const updates = buildPlanFieldUpdatesFromChannelBible(channelBible);
       updateState(updates);
-      console.info('[useChannelBible] Applied bible to this video', {
+      console.info("[useChannelBible] Applied bible to this video", {
         fields: Object.keys(updates),
       });
     } catch (err) {
-      console.error('[useChannelBible] Apply failed', err);
-      setBibleError('Could not apply channel defaults to this video.');
+      console.error("[useChannelBible] Apply failed", err);
+      setBibleError("Could not apply channel defaults to this video.");
     }
-  }, [channelBible, updateState]);
+  }, [channelBible, setBibleError, updateState]);
 
   return {
     channelBible,

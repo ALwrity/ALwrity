@@ -20,6 +20,9 @@ export interface PlanWedgeProps extends WedgeModalBaseProps {
   markNotify?: (key: string) => void;
   notifyKeys?: Record<string, boolean>;
   channelBible?: YouTubeChannelBible | null;
+  planAvatarUrl?: string | null;
+  onChannelBibleSaved?: (bible: YouTubeChannelBible) => void;
+  onCreatorDraftPatched?: (state: YouTubeCreatorState) => void;
 }
 
 export interface CreateWedgeProps extends WedgeModalBaseProps {

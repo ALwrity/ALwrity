@@ -16,6 +16,8 @@ export interface PlanBrainstormSourceChipsProps {
   hasChannelBible: boolean;
   disabled?: boolean;
   loading?: boolean;
+  /** Studio Hub Plan: open editor when bible is empty (chip stays clickable). */
+  onOpenChannelBible?: () => void;
   onToggleChannelBible: () => void;
   onToggleTrending: () => void;
   onToggleRepurpose: () => void;
@@ -46,27 +48,44 @@ export const PlanBrainstormSourceChips: React.FC<PlanBrainstormSourceChipsProps>
   hasChannelBible,
   disabled = false,
   loading = false,
+  onOpenChannelBible,
   onToggleChannelBible,
   onToggleTrending,
   onToggleRepurpose,
 }) => {
   const controlsDisabled = disabled || loading;
-  const bibleDisabled = controlsDisabled || !hasChannelBible;
+  const canOpenBible = Boolean(onOpenChannelBible);
+  const bibleDisabled = controlsDisabled || (!hasChannelBible && !canOpenBible);
+
+  const handleChannelBibleClick = () => {
+    if (!hasChannelBible && onOpenChannelBible) {
+      console.info("[PlanBrainstormSourceChips] Open Channel Bible editor");
+      onOpenChannelBible();
+      return;
+    }
+    onToggleChannelBible();
+  };
 
   return (
     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
       <Chip
         icon={<MenuBookOutlinedIcon sx={{ fontSize: "0.875rem !important" }} />}
         label="Channel Bible"
-        onClick={onToggleChannelBible}
+        onClick={handleChannelBibleClick}
         disabled={bibleDisabled}
         size="small"
-        aria-pressed={useChannelBible}
-        sx={sourceChipSx("#2563eb", useChannelBible, bibleDisabled)}
+        aria-pressed={hasChannelBible ? useChannelBible : false}
+        sx={sourceChipSx(
+          "#2563eb",
+          hasChannelBible && useChannelBible,
+          bibleDisabled,
+        )}
         title={
           hasChannelBible
             ? "Include your Channel Bible niche, audience, and tone when generating ideas"
-            : "Save a Channel Bible to enable this source"
+            : canOpenBible
+              ? "Open Channel Bible to set niche, audience, and tone"
+              : "Save a Channel Bible to enable this source"
         }
       />
       <Chip

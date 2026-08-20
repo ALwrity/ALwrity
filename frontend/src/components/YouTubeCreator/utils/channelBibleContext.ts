@@ -4,6 +4,8 @@
  */
 
 import type { YouTubeChannelBible } from "../../../services/youtubeApi";
+import type { YouTubeContentLanguage } from "../constants";
+import type { YouTubeCreatorState } from "../../../hooks/useYouTubeCreatorState";
 
 export function buildChannelBibleContext(
   bible: YouTubeChannelBible | null | undefined,
@@ -49,4 +51,26 @@ export function hasChannelBibleIdentity(
   bible: YouTubeChannelBible | null | undefined,
 ): boolean {
   return Boolean(buildChannelBibleContext(bible));
+}
+
+/**
+ * Map Channel Bible defaults onto Video Creator Plan fields.
+ * Shared by Video Creator Apply and Studio Hub Plan wedge Apply.
+ */
+export function buildPlanFieldUpdatesFromChannelBible(
+  bible: YouTubeChannelBible,
+): Partial<YouTubeCreatorState> {
+  const updates: Partial<YouTubeCreatorState> = {
+    targetAudience: bible.target_audience || "",
+    videoGoal: bible.default_video_goal || "",
+    brandStyle: bible.brand_style || "",
+    referenceImage: bible.visual_style_guide || "",
+  };
+  if (bible.default_language?.trim()) {
+    updates.language = bible.default_language as YouTubeContentLanguage;
+  }
+  if (bible.default_avatar_url?.trim()) {
+    updates.avatarUrl = bible.default_avatar_url;
+  }
+  return updates;
 }
