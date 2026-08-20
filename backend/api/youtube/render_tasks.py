@@ -422,6 +422,7 @@ def _execute_scene_video_render_task(
             "scene_number": scene_num,
             "video_url": scene_result.get("video_url"),
             "video_filename": scene_result.get("video_filename"),
+            "generation": scene_result.get("generation"),
         }
 
         task_manager.update_task_status(

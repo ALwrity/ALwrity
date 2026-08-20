@@ -118,6 +118,27 @@ export interface YouTubeSceneAudioGeneration {
   instructions_stripped?: boolean;
 }
 
+export interface YouTubeSceneVideoGeneration {
+  gateway?: string;
+  provider?: string;
+  model?: string;
+  visual_prompt?: string;
+  prompt_source?: "enhanced_visual_prompt" | "visual_prompt" | string;
+  generation_mode?: "i2v" | "t2v" | string;
+  duration?: number;
+  duration_estimate?: number | null;
+  resolution?: string;
+  enable_prompt_expansion?: boolean;
+  has_system_prompt?: boolean;
+  image_attached?: boolean;
+  audio_attached?: boolean;
+  image_url?: string;
+  audio_url?: string;
+  audio_note?: string;
+  negative_prompt_sent?: boolean;
+  seed_sent?: boolean;
+}
+
 export interface Scene {
   scene_number: number;
   title: string;
@@ -133,6 +154,7 @@ export interface Scene {
   videoUrl?: string; // Per-scene generated video URL
   image_generation?: YouTubeSceneImageGeneration;
   audio_generation?: YouTubeSceneAudioGeneration;
+  video_generation?: YouTubeSceneVideoGeneration;
 }
 
 export interface VideoRenderRequest {
