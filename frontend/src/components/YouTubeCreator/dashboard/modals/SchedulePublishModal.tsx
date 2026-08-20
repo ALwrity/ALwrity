@@ -1,18 +1,25 @@
 import React from "react";
 import { YouTubeActionModal } from "../YouTubeActionModal";
 import { openYouTubeCreator } from "../youtubeStudioEvents";
+import {
+  YOUTUBE_WEDGE_MODAL_MAX_WIDTH,
+  type YouTubeModalShellProps,
+} from "../youtubeWedgeModalUi";
 
 export const SchedulePublishModal: React.FC<{
   open: boolean;
   onClose: () => void;
-}> = ({ open, onClose }) => {
+  shell?: YouTubeModalShellProps;
+}> = ({ open, onClose, shell }) => {
   return (
     <YouTubeActionModal
       open={open}
       title="Schedule Publish"
       intro="Open Video Creator → Render, then set a schedule time before upload. Videos schedule as private until go-live."
       onClose={onClose}
-      maxWidth={480}
+      maxWidth={shell?.maxWidth ?? YOUTUBE_WEDGE_MODAL_MAX_WIDTH}
+      onBack={shell?.onBack}
+      backLabel={shell?.backLabel}
     >
       <button
         type="button"

@@ -3,10 +3,18 @@ import { YouTubeActionModal } from "../YouTubeActionModal";
 import { youtubeStudioApi } from "../../../../services/youtubeStudioApi";
 import { openYouTubeCreator } from "../youtubeStudioEvents";
 import type { PhaseModalSharedProps } from "./phaseModalTypes";
+import {
+  YOUTUBE_WEDGE_MODAL_MAX_WIDTH,
+  type YouTubeModalShellProps,
+} from "../youtubeWedgeModalUi";
 
 export const ContentGapsModal: React.FC<
-  PhaseModalSharedProps & { open: boolean; onClose: () => void }
-> = ({ open, onClose, niche }) => {
+  PhaseModalSharedProps & {
+    open: boolean;
+    onClose: () => void;
+    shell?: YouTubeModalShellProps;
+  }
+> = ({ open, onClose, niche, shell }) => {
   const [gaps, setGaps] = useState<any[]>([]);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -39,7 +47,9 @@ export const ContentGapsModal: React.FC<
       title="Content Gaps"
       intro="Fill niche holes — pick a gap and open Create (HITL)."
       onClose={onClose}
-      maxWidth={560}
+      maxWidth={shell?.maxWidth ?? YOUTUBE_WEDGE_MODAL_MAX_WIDTH}
+      onBack={shell?.onBack}
+      backLabel={shell?.backLabel}
     >
       {status && <p className="yt-modal-intro">{status}</p>}
       {gaps.map((g, idx) => (

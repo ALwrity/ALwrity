@@ -2,10 +2,18 @@ import React, { useEffect, useState } from "react";
 import { YouTubeActionModal } from "../YouTubeActionModal";
 import { youtubeStudioApi } from "../../../../services/youtubeStudioApi";
 import type { PhaseModalSharedProps } from "./phaseModalTypes";
+import {
+  YOUTUBE_WEDGE_MODAL_MAX_WIDTH,
+  type YouTubeModalShellProps,
+} from "../youtubeWedgeModalUi";
 
 export const StaleRefreshModal: React.FC<
-  PhaseModalSharedProps & { open: boolean; onClose: () => void }
-> = ({ open, onClose, niche }) => {
+  PhaseModalSharedProps & {
+    open: boolean;
+    onClose: () => void;
+    shell?: YouTubeModalShellProps;
+  }
+> = ({ open, onClose, niche, shell }) => {
   const [videos, setVideos] = useState<any[]>([]);
   const [selected, setSelected] = useState<any | null>(null);
   const [suggestion, setSuggestion] = useState<any | null>(null);
@@ -72,7 +80,9 @@ export const StaleRefreshModal: React.FC<
       title="Stale Video Refresh"
       intro="Pick a published video — AI proposes title/desc/tags; you approve before update."
       onClose={onClose}
-      maxWidth={640}
+      maxWidth={shell?.maxWidth ?? YOUTUBE_WEDGE_MODAL_MAX_WIDTH}
+      onBack={shell?.onBack}
+      backLabel={shell?.backLabel}
     >
       {loading && <p className="yt-modal-intro">Working…</p>}
       {status && <p className="yt-modal-intro">{status}</p>}

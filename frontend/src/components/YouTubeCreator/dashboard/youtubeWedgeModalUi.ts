@@ -1,10 +1,11 @@
 /**
- * Shared Channel Bible modal chrome (size + back labels for Hub / Plan drill-down).
+ * Shared Studio Hub modal chrome for Channel Bible + wedge drill-downs.
+ * Root wedges keep their own size and do not use Back-to-Hub from this helper.
  */
 
 import type { YouTubeWorkflowCardId } from "./youtubeWorkflowConfig";
 
-/** Same footprint as Plan wedge for every Hub workflow modal. */
+/** Plan-sized footprint for Channel Bible and wedge sub-modals. */
 export const YOUTUBE_WEDGE_MODAL_MAX_WIDTH = 1100;
 
 export const YOUTUBE_BACK_TO_HUB_LABEL = "Studio Hub";
@@ -24,6 +25,7 @@ export const YOUTUBE_WEDGE_BACK_LABELS: Record<YouTubeWorkflowCardId, string> = 
   remarket: "Remarket",
 };
 
+/** Hub-level Channel Bible (Back closes to Studio Hub). */
 export function youtubeWedgeShellProps(onClose: () => void): YouTubeModalShellProps {
   return {
     maxWidth: YOUTUBE_WEDGE_MODAL_MAX_WIDTH,
@@ -32,6 +34,7 @@ export function youtubeWedgeShellProps(onClose: () => void): YouTubeModalShellPr
   };
 }
 
+/** Sub-tool opened from a wedge (Back returns to that wedge). */
 export function youtubeSubModalShellProps(
   parent: YouTubeWorkflowCardId,
   onBackToWedge: () => void,

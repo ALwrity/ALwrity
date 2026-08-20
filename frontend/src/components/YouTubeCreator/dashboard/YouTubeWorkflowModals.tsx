@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { YouTubeWorkflowCardId } from "./youtubeWorkflowConfig";
 import { openYouTubeCreator } from "./youtubeStudioEvents";
+import { youtubeSubModalShellProps } from "./youtubeWedgeModalUi";
 import type { YouTubeCreatorState } from "../../../hooks/useYouTubeCreatorState";
 import { youtubeApi, type YouTubeChannelBible } from "../../../services/youtubeApi";
 import {
@@ -66,22 +67,29 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
   const [scheduleOpen, setScheduleOpen] = useState(false);
 
   useEffect(() => {
-    if (!activeModal) {
-      setCoachOpen(false);
-      setSeoOpen(false);
-      setThumbOpen(false);
-      setCostOpen(false);
-      setVideosOpen(false);
-      setPulseOpen(false);
-      setRetentionOpen(false);
-      setGapsOpen(false);
-      setCommentsOpen(false);
-      setCommunityOpen(false);
-      setStaleOpen(false);
-      setPlaylistOpen(false);
-      setScheduleOpen(false);
-    }
+    // Clear drill-downs whenever the active wedge changes (including close).
+    setCoachOpen(false);
+    setSeoOpen(false);
+    setThumbOpen(false);
+    setCostOpen(false);
+    setVideosOpen(false);
+    setPulseOpen(false);
+    setRetentionOpen(false);
+    setGapsOpen(false);
+    setCommentsOpen(false);
+    setCommunityOpen(false);
+    setStaleOpen(false);
+    setPlaylistOpen(false);
+    setScheduleOpen(false);
   }, [activeModal]);
+
+  const createDrillOpen = seoOpen || thumbOpen;
+  const publishDrillOpen =
+    coachOpen || costOpen || videosOpen || scheduleOpen || playlistOpen;
+  const analysisDrillOpen =
+    pulseOpen || retentionOpen || gapsOpen || seoOpen || staleOpen;
+  const engagementDrillOpen = commentsOpen || communityOpen;
+  const remarketDrillOpen = staleOpen;
 
   const markNotify = useCallback((key: string) => {
     setNotifyKeys((prev) => ({ ...prev, [key]: true }));
@@ -133,6 +141,17 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
     openYouTubeCreator(detail);
   };
 
+  const subShell = (onBack: () => void) => {
+    if (!activeModal) {
+      return {
+        maxWidth: 1100,
+        onBack,
+        backLabel: "Studio Hub",
+      };
+    }
+    return youtubeSubModalShellProps(activeModal, onBack);
+  };
+
   return (
     <>
       <PlanWedgeModal
@@ -147,7 +166,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         onCreatorDraftPatched={onCreatorDraftPatched}
       />
       <CreateWedgeModal
-        open={activeModal === "create"}
+        open={activeModal === "create" && !createDrillOpen}
         onClose={onClose}
         goCreate={goCreate}
         creatorState={creatorState}
@@ -155,7 +174,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         onOpenThumb={() => setThumbOpen(true)}
       />
       <PublishWedgeModal
-        open={activeModal === "publish"}
+        open={activeModal === "publish" && !publishDrillOpen}
         onClose={onClose}
         goCreate={goCreate}
         connected={connected}
@@ -174,7 +193,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         onOpenPlaylist={() => setPlaylistOpen(true)}
       />
       <AnalysisWedgeModal
-        open={activeModal === "analysis"}
+        open={activeModal === "analysis" && !analysisDrillOpen}
         onClose={onClose}
         goCreate={goCreate}
         connected={connected}
@@ -186,7 +205,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         onOpenRetention={() => setRetentionOpen(true)}
       />
       <EngagementWedgeModal
-        open={activeModal === "engagement"}
+        open={activeModal === "engagement" && !engagementDrillOpen}
         onClose={onClose}
         goCreate={goCreate}
         connected={connected}
@@ -196,7 +215,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         onOpenCommunity={() => setCommunityOpen(true)}
       />
       <RemarketWedgeModal
-        open={activeModal === "remarket"}
+        open={activeModal === "remarket" && !remarketDrillOpen}
         onClose={onClose}
         goCreate={goCreate}
         connected={connected}
@@ -214,6 +233,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
       />
 
       <WorkflowHelperModals
+        activeModal={activeModal}
         creatorState={creatorState}
         goCreate={goCreate}
         onClearDraft={onClearDraft}
@@ -231,17 +251,27 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         onCloseVideos={() => setVideosOpen(false)}
       />
 
-      <ChannelPulseModal open={pulseOpen} onClose={() => setPulseOpen(false)} />
-      <RetentionModal open={retentionOpen} onClose={() => setRetentionOpen(false)} />
+      <ChannelPulseModal
+        open={pulseOpen}
+        onClose={() => setPulseOpen(false)}
+        shell={subShell(() => setPulseOpen(false))}
+      />
+      <RetentionModal
+        open={retentionOpen}
+        onClose={() => setRetentionOpen(false)}
+        shell={subShell(() => setRetentionOpen(false))}
+      />
       <ContentGapsModal
         open={gapsOpen}
         onClose={() => setGapsOpen(false)}
         niche={channelBibleNiche}
+        shell={subShell(() => setGapsOpen(false))}
       />
       <CommentAssistantModal
         open={commentsOpen}
         onClose={() => setCommentsOpen(false)}
         niche={channelBibleNiche}
+        shell={subShell(() => setCommentsOpen(false))}
       />
       <CommunityIdeasModal
         open={communityOpen}
@@ -250,14 +280,24 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         recentTitle={
           creatorState.videoPlan?.selected_title || creatorState.videoPlan?.title_suggestions?.[0]
         }
+        shell={subShell(() => setCommunityOpen(false))}
       />
       <StaleRefreshModal
         open={staleOpen}
         onClose={() => setStaleOpen(false)}
         niche={channelBibleNiche}
+        shell={subShell(() => setStaleOpen(false))}
       />
-      <PlaylistAttachModal open={playlistOpen} onClose={() => setPlaylistOpen(false)} />
-      <SchedulePublishModal open={scheduleOpen} onClose={() => setScheduleOpen(false)} />
+      <PlaylistAttachModal
+        open={playlistOpen}
+        onClose={() => setPlaylistOpen(false)}
+        shell={subShell(() => setPlaylistOpen(false))}
+      />
+      <SchedulePublishModal
+        open={scheduleOpen}
+        onClose={() => setScheduleOpen(false)}
+        shell={subShell(() => setScheduleOpen(false))}
+      />
     </>
   );
 };
