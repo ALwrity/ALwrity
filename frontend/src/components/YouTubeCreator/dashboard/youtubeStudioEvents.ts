@@ -89,7 +89,7 @@ export function openYouTubeCreator(detail: YouTubeOpenCreatorDetail = {}): void 
       detail,
     }),
   );
-  // Do not switch to Video Creator tab — Studio Hub opens Full Creator modal.
+  // Hub Full Creator modal host listens — do not switch tabs.
   console.info("[youtubeStudioEvents] openYouTubeCreator", detail);
 }
 
