@@ -10,6 +10,7 @@ export const CreateWedgeModal: React.FC<CreateWedgeProps> = ({
   creatorState,
   onOpenSeo,
   onOpenThumb,
+  onOpenFullCreator,
 }) => (
   <YouTubeActionModal open={open} title="Create" intro={WEDGE_MODAL_INTROS.create} onClose={onClose}>
     <div className="yt-tool-tile-grid">
@@ -19,7 +20,7 @@ export const CreateWedgeModal: React.FC<CreateWedgeProps> = ({
         title="New Video (Full)"
         description="Plan → scenes → assets → render — the core money path."
         hitl
-        onClick={() => goCreate({ step: 0, durationType: "medium" })}
+        onClick={onOpenFullCreator}
       />
       <YouTubeToolTile
         icon="⚡"

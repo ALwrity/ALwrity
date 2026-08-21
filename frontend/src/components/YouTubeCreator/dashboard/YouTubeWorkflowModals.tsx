@@ -1,9 +1,16 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { YouTubeWorkflowCardId } from "./youtubeWorkflowConfig";
-import { openYouTubeCreator } from "./youtubeStudioEvents";
+import {
+  openYouTubeCreator,
+  queueYouTubeCreatorOpen,
+  type YouTubeOpenCreatorDetail,
+} from "./youtubeStudioEvents";
 import { youtubeSubModalShellProps } from "./youtubeWedgeModalUi";
-import type { YouTubeCreatorState } from "../../../hooks/useYouTubeCreatorState";
+import {
+  getYouTubeCreatorStateSnapshot,
+  type YouTubeCreatorState,
+} from "../../../hooks/useYouTubeCreatorState";
 import { youtubeApi, type YouTubeChannelBible } from "../../../services/youtubeApi";
 import {
   AnalysisWedgeModal,
@@ -21,6 +28,7 @@ import {
   SchedulePublishModal,
   StaleRefreshModal,
   WorkflowHelperModals,
+  YouTubeVideoCreatorModal,
 } from "./modals";
 
 interface YouTubeWorkflowModalsProps {
@@ -65,9 +73,12 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
   const [staleOpen, setStaleOpen] = useState(false);
   const [playlistOpen, setPlaylistOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  /** Full Creator modal from New Video (Full) — independent of wedge activeModal. */
+  const [fullCreatorOpen, setFullCreatorOpen] = useState(false);
 
   useEffect(() => {
     // Clear drill-downs whenever the active wedge changes (including close).
+    // Do not clear fullCreatorOpen — it replaces the Create wedge intentionally.
     setCoachOpen(false);
     setSeoOpen(false);
     setThumbOpen(false);
@@ -141,6 +152,37 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
     openYouTubeCreator(detail);
   };
 
+  /**
+   * Open Full Creator on Hub without switching to Video Creator tab
+   * (avoids dual-mounting YouTubeVideoCreatorPanel).
+   */
+  const openFullCreatorModal = useCallback(
+    (detail: YouTubeOpenCreatorDetail = { step: 0, durationType: "medium" }) => {
+      onClose();
+      queueYouTubeCreatorOpen(detail);
+      setFullCreatorOpen(true);
+      console.info("[YouTubeWorkflowModals] Opening Full Creator modal", detail);
+    },
+    [onClose],
+  );
+
+  const closeFullCreatorModal = useCallback(() => {
+    setFullCreatorOpen(false);
+    try {
+      const snapshot = getYouTubeCreatorStateSnapshot();
+      onCreatorDraftPatched?.(snapshot);
+      console.info("[YouTubeWorkflowModals] Full Creator closed — returned to Hub", {
+        activeStep: snapshot.activeStep,
+        hasPlan: Boolean(snapshot.videoPlan),
+      });
+    } catch (err) {
+      console.error(
+        "[YouTubeWorkflowModals] Failed to refresh Hub draft after Full Creator close",
+        err,
+      );
+    }
+  }, [onCreatorDraftPatched]);
+
   const subShell = (onBack: () => void) => {
     if (!activeModal) {
       return {
@@ -166,12 +208,15 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         onCreatorDraftPatched={onCreatorDraftPatched}
       />
       <CreateWedgeModal
-        open={activeModal === "create" && !createDrillOpen}
+        open={activeModal === "create" && !createDrillOpen && !fullCreatorOpen}
         onClose={onClose}
         goCreate={goCreate}
         creatorState={creatorState}
         onOpenSeo={() => setSeoOpen(true)}
         onOpenThumb={() => setThumbOpen(true)}
+        onOpenFullCreator={() =>
+          openFullCreatorModal({ step: 0, durationType: "medium" })
+        }
       />
       <PublishWedgeModal
         open={activeModal === "publish" && !publishDrillOpen}
@@ -298,6 +343,8 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         onClose={() => setScheduleOpen(false)}
         shell={subShell(() => setScheduleOpen(false))}
       />
+
+      <YouTubeVideoCreatorModal open={fullCreatorOpen} onClose={closeFullCreatorModal} />
     </>
   );
 };
