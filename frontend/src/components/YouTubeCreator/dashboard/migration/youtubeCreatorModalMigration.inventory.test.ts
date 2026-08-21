@@ -1,23 +1,23 @@
-import {
+﻿import {
   YOUTUBE_CREATOR_AVOID_INFLATING,
   YOUTUBE_CREATOR_ENTRY_POINTS,
   YOUTUBE_CREATOR_MIGRATION_GUARDRAILS,
-  YOUTUBE_CREATOR_MIGRATION_PLANNED_FILES,
+  YOUTUBE_CREATOR_MIGRATION_LANDED_FILES,
   YOUTUBE_CREATOR_MIGRATION_TESTS,
   YOUTUBE_CREATOR_MODAL_MIGRATION_PHASE,
   YOUTUBE_CREATOR_MUST_REUSE,
   getYouTubeCreatorEntriesForPhase,
   getYouTubeCreatorPrimaryCreateEntry,
-  isYouTubeCreatorMigrationPhase0Complete,
+  isYouTubeCreatorMigrationComplete,
 } from "./youtubeCreatorModalMigration.inventory";
 
-describe("YouTube Creator modal migration — Phase 0 inventory", () => {
-  it("marks Phase 0 as the active migration phase (no UX change yet)", () => {
-    expect(YOUTUBE_CREATOR_MODAL_MIGRATION_PHASE).toBe(0);
-    expect(isYouTubeCreatorMigrationPhase0Complete()).toBe(true);
+describe("YouTube Creator modal migration — complete inventory", () => {
+  it("marks migration complete at phase 7 (harden)", () => {
+    expect(YOUTUBE_CREATOR_MODAL_MIGRATION_PHASE).toBe(7);
+    expect(isYouTubeCreatorMigrationComplete()).toBe(true);
   });
 
-  it("locks product guardrails for Full Creator modal cutover", () => {
+  it("locks product guardrails for Hub-only + Full Creator modal", () => {
     expect(YOUTUBE_CREATOR_MIGRATION_GUARDRAILS).toEqual({
       singlePanelMount: true,
       noBackendChanges: true,
@@ -25,6 +25,7 @@ describe("YouTube Creator modal migration — Phase 0 inventory", () => {
       primaryCreateTile: "New Video (Full)",
       closeReturnsToHub: true,
       directRouteAlwaysHub: true,
+      panelMountHost: "YouTubeVideoCreatorModal",
     });
   });
 
@@ -37,7 +38,7 @@ describe("YouTube Creator modal migration — Phase 0 inventory", () => {
         "YouTubeActionModal",
       ]),
     );
-    expect(YOUTUBE_CREATOR_MIGRATION_PLANNED_FILES.neverDuplicate).toEqual(
+    expect(YOUTUBE_CREATOR_MIGRATION_LANDED_FILES.neverDuplicate).toEqual(
       expect.arrayContaining([
         "YouTubeVideoCreatorPanel.tsx",
         "services/youtubeApi.ts",
@@ -47,12 +48,13 @@ describe("YouTube Creator modal migration — Phase 0 inventory", () => {
     expect(YOUTUBE_CREATOR_AVOID_INFLATING.length).toBeGreaterThan(0);
   });
 
-  it("documents New Video (Full) as the Phase 1 primary Create-wedge entry", () => {
+  it("documents New Video (Full) as the primary Create-wedge entry", () => {
     const primary = getYouTubeCreatorPrimaryCreateEntry();
     expect(primary.label).toBe("New Video (Full)");
     expect(primary.retargetInPhase).toBe(1);
     expect(primary.mechanism).toBe("goCreate");
     expect(primary.detailSummary).toContain("medium");
+    expect(primary.detailSummary).toMatch(/Full Creator modal/i);
   });
 
   it("has unique entry point ids and covers migration phases 1–4", () => {
@@ -68,7 +70,13 @@ describe("YouTube Creator modal migration — Phase 0 inventory", () => {
     );
   });
 
-  it("lists Shorts, Title Lab, Script Coach, and Resume Draft for same-modal retarget (Phase 2)", () => {
+  it("records shell tab as removed (Hub-only)", () => {
+    const shell = YOUTUBE_CREATOR_ENTRY_POINTS.find((e) => e.id === "shell-video-creator-tab");
+    expect(shell?.detailSummary).toMatch(/Removed/i);
+    expect(shell?.detailSummary).toMatch(/YouTubeVideoCreatorModal/);
+  });
+
+  it("lists Shorts, Title Lab, Script Coach, and Resume Draft on the same modal path", () => {
     const phase2Labels = getYouTubeCreatorEntriesForPhase(2).map((e) => e.label);
     expect(phase2Labels).toEqual(
       expect.arrayContaining([
@@ -80,23 +88,29 @@ describe("YouTube Creator modal migration — Phase 0 inventory", () => {
     );
   });
 
-  it("plans a thin modal host in Phase 1 and no backend file creates", () => {
-    expect(YOUTUBE_CREATOR_MIGRATION_PLANNED_FILES.create).toEqual([
-      expect.objectContaining({
-        path: "dashboard/modals/YouTubeVideoCreatorModal.tsx",
-        phase: 1,
-      }),
-    ]);
-    const backendCreates = YOUTUBE_CREATOR_MIGRATION_PLANNED_FILES.create.filter((f) =>
+  it("lands a thin modal host and no backend file creates", () => {
+    expect(YOUTUBE_CREATOR_MIGRATION_LANDED_FILES.create).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: "dashboard/modals/YouTubeVideoCreatorModal.tsx",
+          phase: 1,
+        }),
+      ]),
+    );
+    const backendCreates = YOUTUBE_CREATOR_MIGRATION_LANDED_FILES.create.filter((f) =>
       f.path.includes("backend"),
     );
     expect(backendCreates).toHaveLength(0);
   });
 
-  it("tracks existing tests that later phases must update", () => {
-    expect(YOUTUBE_CREATOR_MIGRATION_TESTS.length).toBeGreaterThanOrEqual(3);
+  it("tracks regression tests for Hub-only + modal behavior", () => {
+    expect(YOUTUBE_CREATOR_MIGRATION_TESTS.length).toBeGreaterThanOrEqual(5);
     expect(YOUTUBE_CREATOR_MIGRATION_TESTS.map((t) => t.file)).toEqual(
-      expect.arrayContaining(["dashboard/youtubeStudioEvents.test.ts"]),
+      expect.arrayContaining([
+        "dashboard/youtubeStudioEvents.test.ts",
+        "dashboard/__tests__/useYouTubeStudioTab.test.tsx",
+        "dashboard/__tests__/YouTubeVideoCreatorModal.test.tsx",
+      ]),
     );
   });
 });

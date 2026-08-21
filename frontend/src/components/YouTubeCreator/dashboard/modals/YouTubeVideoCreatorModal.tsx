@@ -1,7 +1,7 @@
 /**
  * Full Video Creator pipeline hosted in a Hub modal shell.
  * Reuses YouTubeVideoCreatorPanel unchanged — Plan → Scenes → Assets → Render.
- * Additive: exported for later Create-wedge wiring; not mounted from Hub yet.
+ * Sole mount host for the panel (Hub-only shell has no Video Creator tab).
  */
 import React, { useEffect } from "react";
 import { YouTubeActionModal } from "../YouTubeActionModal";
