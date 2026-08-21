@@ -1,123 +1,85 @@
-import React from "react";
-import { YT_RED } from "../constants";
+import React, { useMemo } from "react";
+import "./youtubeChannelHub.css";
 
 interface YouTubeChannelHubProps {
   hubSize: number;
+  avatarSize?: number;
   connected: boolean;
   channelName?: string | null;
   niche?: string | null;
   isLoading?: boolean;
 }
 
-/** Profile hub in the radial center — Connect CTA lives on the hub axis below the ring. */
+function channelInitials(channelName?: string | null): string {
+  const trimmed = channelName?.trim();
+  if (!trimmed) return "YT";
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return trimmed.slice(0, 2).toUpperCase();
+}
+
+/** Profile hub in the radial center — LinkedIn-style avatar + connection status dot. */
 export const YouTubeChannelHub: React.FC<YouTubeChannelHubProps> = ({
   hubSize,
+  avatarSize,
   connected,
   channelName,
-  niche,
   isLoading = false,
 }) => {
-  return (
-    <div
-      style={{
-        width: hubSize,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-        textAlign: "center",
-      }}
-    >
-      <div
-        style={{
-          width: Math.round(hubSize * 0.42),
-          height: Math.round(hubSize * 0.42),
-          borderRadius: "50%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: Math.round(hubSize * 0.18),
-          background: `linear-gradient(135deg, ${YT_RED} 0%, #b91c1c 100%)`,
-          boxShadow: "0 8px 20px rgba(255,0,0,0.28)",
-          color: "#fff",
-        }}
-        aria-hidden
-      >
-        ▶
-      </div>
+  const avatarPx = avatarSize ?? Math.min(120, Math.round(hubSize * 0.69));
+  const initials = useMemo(() => channelInitials(channelName), [channelName]);
+  const statusLabel = isLoading
+    ? "Checking YouTube connection"
+    : connected
+      ? `YouTube connected${channelName ? `: ${channelName}` : ""}`
+      : "YouTube not connected";
 
-      {!isLoading && (
+  return (
+    <div className="yt-profile-hub-cluster" style={{ width: hubSize }}>
+      <div className="yt-profile-hub-avatar-row">
         <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 2,
-            minHeight: 32,
-          }}
+          className={[
+            "yt-profile-hub-avatar",
+            connected ? "yt-profile-hub-avatar--connected" : "yt-profile-hub-avatar--disconnected",
+          ].join(" ")}
+          style={{ width: avatarPx, height: avatarPx }}
+          aria-label={statusLabel}
         >
-          {connected ? (
-            <>
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 5,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "#166534",
-                  background: "#dcfce7",
-                  border: "1px solid #86efac",
-                  borderRadius: 999,
-                  padding: "2px 10px",
-                }}
-              >
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: "#22c55e",
-                  }}
-                />
-                Connected · YouTube
-              </span>
-              {channelName && (
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: "#606060",
-                    maxWidth: hubSize,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {channelName}
-                </span>
-              )}
-              {niche && (
-                <span style={{ fontSize: 10, color: "#94a3b8" }}>{niche}</span>
-              )}
-            </>
+          {isLoading ? (
+            <span className="yt-profile-hub-avatar-icon" aria-hidden>
+              …
+            </span>
+          ) : connected ? (
+            <span
+              className="yt-profile-hub-avatar-initials"
+              style={{ fontSize: Math.round(avatarPx * 0.34) }}
+              aria-hidden
+            >
+              {initials}
+            </span>
           ) : (
             <span
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: "#94a3b8",
-                background: "#f1f5f9",
-                border: "1px solid #e2e8f0",
-                borderRadius: 999,
-                padding: "2px 10px",
-              }}
+              className="yt-profile-hub-avatar-icon"
+              style={{ fontSize: Math.round(avatarPx * 0.46) }}
+              aria-hidden
             >
-              Channel not connected
+              ▶
             </span>
           )}
+          {!isLoading && (
+            <span
+              className={[
+                "yt-profile-status-dot",
+                connected ? "yt-profile-status-dot--connected" : "yt-profile-status-dot--disconnected",
+              ].join(" ")}
+              aria-hidden
+            />
+          )}
         </div>
-      )}
+        <span className="yt-profile-hub-sr-status">{statusLabel}</span>
+      </div>
     </div>
   );
 };

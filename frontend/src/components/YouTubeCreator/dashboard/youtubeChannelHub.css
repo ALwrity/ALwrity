@@ -1,0 +1,83 @@
+/* YouTube radial hub avatar — mirrors LinkedIn profile hub status treatment */
+
+.yt-profile-hub-cluster {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.yt-profile-hub-avatar-row {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.yt-profile-hub-avatar {
+  position: relative;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid #ffffff;
+  box-shadow: 0 4px 20px rgba(255, 0, 0, 0.22);
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+.yt-profile-hub-avatar--connected,
+.yt-profile-hub-avatar--disconnected {
+  background: linear-gradient(135deg, #ff0000 0%, #b91c1c 100%);
+  color: #ffffff;
+}
+
+.yt-profile-hub-avatar-initials {
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.yt-profile-hub-avatar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.yt-profile-status-dot {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08);
+  z-index: 25;
+  pointer-events: none;
+}
+
+.yt-profile-status-dot--connected {
+  background-color: #10b981;
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.45);
+}
+
+.yt-profile-status-dot--disconnected {
+  background-color: #ef4444;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.35);
+}
+
+.yt-profile-hub-sr-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
