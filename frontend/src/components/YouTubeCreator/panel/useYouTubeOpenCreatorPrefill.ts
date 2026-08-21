@@ -58,6 +58,8 @@ export function useYouTubeOpenCreatorPrefill(
     if (pending) applyDetail(pending);
 
     const onOpenCreator = (event: Event) => {
+      // Event carries the detail; clear queued pending so a later remount does not re-apply stale data.
+      consumePendingOpenCreator();
       const detail = (event as CustomEvent<YouTubeOpenCreatorDetail>).detail || {};
       applyDetail(detail);
     };

@@ -70,11 +70,8 @@ export function openYouTubeCreator(detail: YouTubeOpenCreatorDetail = {}): void 
       detail,
     }),
   );
-  window.dispatchEvent(
-    new CustomEvent<{ tab: YouTubeStudioTab }>(YT_SWITCH_TAB_EVENT, {
-      detail: { tab: "creator" },
-    }),
-  );
+  // Do not switch to Video Creator tab — Studio Hub opens Full Creator modal.
+  console.info("[youtubeStudioEvents] openYouTubeCreator", detail);
 }
 
 export function openYouTubeWorkflowWedge(
@@ -91,13 +88,10 @@ export function openYouTubeWorkflowWedge(
 }
 
 export function resumeYouTubeDraft(): void {
-  queueYouTubeCreatorOpen({ step: getYouTubeCreatorActiveStep() });
+  const step = getYouTubeCreatorActiveStep();
+  openYouTubeCreator({ step });
   window.dispatchEvent(new CustomEvent(YT_RESUME_DRAFT_EVENT));
-  window.dispatchEvent(
-    new CustomEvent<{ tab: YouTubeStudioTab }>(YT_SWITCH_TAB_EVENT, {
-      detail: { tab: "creator" },
-    }),
-  );
+  console.info("[youtubeStudioEvents] resumeYouTubeDraft", { step });
 }
 
 function getYouTubeCreatorActiveStep(): number {

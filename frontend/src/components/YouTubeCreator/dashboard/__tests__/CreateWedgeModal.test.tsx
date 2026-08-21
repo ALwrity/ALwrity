@@ -9,10 +9,9 @@ const emptyCreatorState = {
   scenes: [],
 } as unknown as YouTubeCreatorState;
 
-describe("CreateWedgeModal — New Video (Full) opens Full Creator modal", () => {
-  it("calls onOpenFullCreator instead of goCreate", () => {
+describe("CreateWedgeModal — shared goCreate → Full Creator modal", () => {
+  it("New Video (Full) calls goCreate with medium duration", () => {
     const goCreate = jest.fn();
-    const onOpenFullCreator = jest.fn();
 
     render(
       <CreateWedgeModal
@@ -22,16 +21,14 @@ describe("CreateWedgeModal — New Video (Full) opens Full Creator modal", () =>
         creatorState={emptyCreatorState}
         onOpenSeo={jest.fn()}
         onOpenThumb={jest.fn()}
-        onOpenFullCreator={onOpenFullCreator}
       />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: /New Video \(Full\)/i }));
-    expect(onOpenFullCreator).toHaveBeenCalledTimes(1);
-    expect(goCreate).not.toHaveBeenCalled();
+    expect(goCreate).toHaveBeenCalledWith({ step: 0, durationType: "medium" });
   });
 
-  it("keeps Shorts on goCreate (tab path until later PR)", () => {
+  it("Shorts Fast Path calls goCreate with shorts duration", () => {
     const goCreate = jest.fn();
 
     render(
@@ -42,7 +39,6 @@ describe("CreateWedgeModal — New Video (Full) opens Full Creator modal", () =>
         creatorState={emptyCreatorState}
         onOpenSeo={jest.fn()}
         onOpenThumb={jest.fn()}
-        onOpenFullCreator={jest.fn()}
       />,
     );
 
