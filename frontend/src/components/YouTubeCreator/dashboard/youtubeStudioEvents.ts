@@ -14,9 +14,12 @@ export const YT_CHANNEL_BIBLE_UPDATED_EVENT = "youtube:channelBibleUpdated";
 
 export type YouTubeStudioTab = "hub" | "creator";
 
-/** Missing or unknown query values default to Video Creator — never Hub. */
+/**
+ * Default Studio Hub. Explicit `?tab=creator` still parses for deep-link rewrite
+ * and in-app Video Creator tab clicks (tab removed in a later PR).
+ */
 export function parseYouTubeStudioTab(raw: string | null | undefined): YouTubeStudioTab {
-  return raw === "hub" ? "hub" : "creator";
+  return raw === "creator" ? "creator" : "hub";
 }
 
 export interface YouTubeOpenCreatorDetail {
@@ -35,9 +38,25 @@ export interface YouTubeOpenWedgeDetail {
   sub?: string;
 }
 
-/** Pending open detail for Tab 1 when it mounts after a hub deep-link. */
+/** Pending open detail when Full Creator modal mounts after a deep-link. */
 let pendingOpenCreator: YouTubeOpenCreatorDetail | null = null;
 const PENDING_STORAGE_KEY = "yt_pending_open_creator";
+
+export function peekPendingOpenCreator(): YouTubeOpenCreatorDetail | null {
+  if (pendingOpenCreator) return pendingOpenCreator;
+  try {
+    const raw = sessionStorage.getItem(PENDING_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as YouTubeOpenCreatorDetail;
+  } catch (err) {
+    console.warn("[youtubeStudioEvents] peekPendingOpenCreator failed", err);
+    return null;
+  }
+}
+
+export function hasPendingOpenCreator(): boolean {
+  return peekPendingOpenCreator() != null;
+}
 
 export function consumePendingOpenCreator(): YouTubeOpenCreatorDetail | null {
   let next = pendingOpenCreator;

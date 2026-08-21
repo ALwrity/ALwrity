@@ -8,16 +8,16 @@ import {
   YT_SWITCH_TAB_EVENT,
 } from "./youtubeStudioEvents";
 
-describe("parseYouTubeStudioTab", () => {
-  it("defaults to creator when tab is missing or unknown", () => {
-    expect(parseYouTubeStudioTab(null)).toBe("creator");
-    expect(parseYouTubeStudioTab(undefined)).toBe("creator");
-    expect(parseYouTubeStudioTab("")).toBe("creator");
-    expect(parseYouTubeStudioTab("studio")).toBe("creator");
+describe("parseYouTubeStudioTab — Hub default", () => {
+  it("defaults to hub when tab is missing or unknown", () => {
+    expect(parseYouTubeStudioTab(null)).toBe("hub");
+    expect(parseYouTubeStudioTab(undefined)).toBe("hub");
+    expect(parseYouTubeStudioTab("")).toBe("hub");
+    expect(parseYouTubeStudioTab("studio")).toBe("hub");
+    expect(parseYouTubeStudioTab("hub")).toBe("hub");
   });
 
-  it("only treats hub as Studio Hub", () => {
-    expect(parseYouTubeStudioTab("hub")).toBe("hub");
+  it("still recognizes explicit creator for tab / deep-link", () => {
     expect(parseYouTubeStudioTab("creator")).toBe("creator");
   });
 });

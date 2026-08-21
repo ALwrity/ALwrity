@@ -570,7 +570,8 @@ export const PublishContent: React.FC<PublishContentProps> = ({
                   userIdea: idea,
                   focusUrlImport: true,
                 });
-                navigate('/youtube-creator?tab=creator');
+                // Hub landing opens Full Creator modal from pending queue.
+                navigate('/youtube-creator');
               }}
               style={{ ...btnStyle, background: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' }}
               title="Open YouTube Video Creator with this post as the starting idea"

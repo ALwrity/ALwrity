@@ -3,6 +3,7 @@ import { useYouTubeFullCreatorModalHost } from "../useYouTubeFullCreatorModalHos
 import {
   consumePendingOpenCreator,
   openYouTubeCreator,
+  queueYouTubeCreatorOpen,
   YT_OPEN_CREATOR_EVENT,
 } from "../youtubeStudioEvents";
 
@@ -38,5 +39,14 @@ describe("useYouTubeFullCreatorModalHost", () => {
       result.current.closeFullCreatorModal();
     });
     expect(result.current.fullCreatorOpen).toBe(false);
+  });
+
+  it("opens Full Creator modal when pending deep-link exists on mount", () => {
+    queueYouTubeCreatorOpen({ step: 0, userIdea: "From blog" });
+    const onCloseWedges = jest.fn();
+    const { result } = renderHook(() => useYouTubeFullCreatorModalHost(onCloseWedges));
+
+    expect(onCloseWedges).toHaveBeenCalled();
+    expect(result.current.fullCreatorOpen).toBe(true);
   });
 });
