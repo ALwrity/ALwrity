@@ -15,11 +15,11 @@ export const YT_CHANNEL_BIBLE_UPDATED_EVENT = "youtube:channelBibleUpdated";
 export type YouTubeStudioTab = "hub" | "creator";
 
 /**
- * Default Studio Hub. Explicit `?tab=creator` still parses for deep-link rewrite
- * and in-app Video Creator tab clicks (tab removed in a later PR).
+ * Hub-only shell: any query (including legacy `?tab=creator`) resolves to Hub.
+ * Legacy creator deep-links are rewritten by `useYouTubeCreatorLandingDeepLink`.
  */
-export function parseYouTubeStudioTab(raw: string | null | undefined): YouTubeStudioTab {
-  return raw === "creator" ? "creator" : "hub";
+export function parseYouTubeStudioTab(_raw?: string | null): YouTubeStudioTab {
+  return "hub";
 }
 
 export interface YouTubeOpenCreatorDetail {

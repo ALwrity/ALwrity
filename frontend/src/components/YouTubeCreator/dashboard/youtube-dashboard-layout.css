@@ -369,7 +369,7 @@ body.youtube-studio-view {
   max-height: min(85dvh, 900px);
 }
 
-/* Full Video Creator pipeline modal (Create → New Video (Full) — wired in a later PR) */
+/* Full Video Creator pipeline modal (Create → New Video (Full)) */
 .yt-modal-card--pipeline {
   max-height: min(92dvh, 980px);
   display: flex;
