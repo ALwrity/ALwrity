@@ -1,7 +1,8 @@
 /* @refresh reset */
 /**
  * YouTube Creator Studio shell.
- * Default tab is Video Creator. Studio Hub is Tab 2 (`?tab=hub`).
+ * Default landing is Studio Hub. Legacy `?tab=creator` opens Full Creator modal.
+ * Video Creator tab remains available via in-app click until a later PR.
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Tab, Tabs } from "@mui/material";
@@ -10,6 +11,7 @@ import { YouTubeVideoCreatorHeader } from "./panel/YouTubeVideoCreatorHeader";
 import { YouTubeVideoCreatorPanel } from "./YouTubeVideoCreatorPanel";
 import { YouTubeStudioHub } from "./dashboard/YouTubeStudioHub";
 import { useYouTubeStudioTab } from "./dashboard/useYouTubeStudioTab";
+import { useYouTubeCreatorLandingDeepLink } from "./dashboard/useYouTubeCreatorLandingDeepLink";
 import type { YouTubeStudioTab } from "./dashboard/youtubeStudioEvents";
 import {
   getYouTubeCreatorStateSnapshot,
@@ -18,15 +20,17 @@ import {
 } from "../../hooks/useYouTubeCreatorState";
 import { useYouTubePublish } from "../../hooks/useYouTubePublish";
 import { youtubeApi, type YouTubeChannelBible } from "../../services/youtubeApi";
-import {
-  YT_CHANNEL_BIBLE_UPDATED_EVENT,
-} from "./dashboard/youtubeStudioEvents";
+import { YT_CHANNEL_BIBLE_UPDATED_EVENT } from "./dashboard/youtubeStudioEvents";
 import "./dashboard/youtube-dashboard-layout.css";
 import "./dashboard/youtube-rail-controls.css";
 
 const YouTubeCreator: React.FC = () => {
   const navigate = useNavigate();
   const { tab, setTab } = useYouTubeStudioTab();
+  const { suppressCreatorTabForDeepLink } = useYouTubeCreatorLandingDeepLink(setTab);
+  const effectiveTab: YouTubeStudioTab =
+    suppressCreatorTabForDeepLink && tab === "creator" ? "hub" : tab;
+
   const { connected, channels, loading: oauthLoading, connect, activeChannel } =
     useYouTubePublish();
   const [channelBible, setChannelBible] = useState<YouTubeChannelBible | null>(null);
@@ -36,8 +40,8 @@ const YouTubeCreator: React.FC = () => {
 
   useEffect(() => {
     document.title =
-      tab === "hub" ? "YouTube Studio Hub | ALwrity" : "YouTube Creator Studio | ALwrity";
-  }, [tab]);
+      effectiveTab === "hub" ? "YouTube Studio Hub | ALwrity" : "YouTube Creator Studio | ALwrity";
+  }, [effectiveTab]);
 
   useEffect(() => {
     document.body.classList.add("youtube-studio-view");
@@ -45,7 +49,7 @@ const YouTubeCreator: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (tab !== "hub") return undefined;
+    if (effectiveTab !== "hub") return undefined;
     setHubDraft(getYouTubeCreatorStateSnapshot());
     let cancelled = false;
     youtubeApi
@@ -59,7 +63,7 @@ const YouTubeCreator: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [tab]);
+  }, [effectiveTab]);
 
   useEffect(() => {
     const onUpdated = (event: Event) => {
@@ -91,11 +95,11 @@ const YouTubeCreator: React.FC = () => {
   const onTabChange = (_e: React.SyntheticEvent, value: YouTubeStudioTab) => setTab(value);
 
   return (
-    <Box className="yt-studio-page" data-tab={tab}>
+    <Box className="yt-studio-page" data-tab={effectiveTab}>
       <Box className="yt-studio-page-header">
         <YouTubeVideoCreatorHeader onBack={() => navigate("/dashboard")} />
         <Tabs
-          value={tab}
+          value={effectiveTab}
           onChange={onTabChange}
           textColor="inherit"
           indicatorColor="secondary"
@@ -106,8 +110,14 @@ const YouTubeCreator: React.FC = () => {
         </Tabs>
       </Box>
 
-      <Box className={tab === "hub" ? "yt-studio-page-body" : "yt-studio-page-body yt-studio-page-body--creator"}>
-        {tab === "hub" ? (
+      <Box
+        className={
+          effectiveTab === "hub"
+            ? "yt-studio-page-body"
+            : "yt-studio-page-body yt-studio-page-body--creator"
+        }
+      >
+        {effectiveTab === "hub" ? (
           <YouTubeStudioHub
             connected={connected}
             channelName={activeChannel?.channel_name}

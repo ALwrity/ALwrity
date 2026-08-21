@@ -5,6 +5,8 @@ export {
   resumeYouTubeDraft,
   queueYouTubeCreatorOpen,
   parseYouTubeStudioTab,
+  hasPendingOpenCreator,
+  peekPendingOpenCreator,
 } from "./youtubeStudioEvents";
 export { useYouTubeStudioTab } from "./useYouTubeStudioTab";
 export type { YouTubeWorkflowCardId } from "./youtubeWorkflowConfig";
