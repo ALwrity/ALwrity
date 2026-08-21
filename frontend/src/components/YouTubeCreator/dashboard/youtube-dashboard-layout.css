@@ -369,6 +369,28 @@ body.youtube-studio-view {
   max-height: min(85dvh, 900px);
 }
 
+/* Full Video Creator pipeline modal (Create → New Video (Full) — wired in a later PR) */
+.yt-modal-card--pipeline {
+  max-height: min(92dvh, 980px);
+  display: flex;
+  flex-direction: column;
+}
+
+.yt-modal-card--pipeline .yt-modal-header {
+  flex-shrink: 0;
+}
+
+.yt-modal-card--pipeline .yt-modal-intro {
+  flex-shrink: 0;
+}
+
+.yt-video-creator-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding-top: 4px;
+}
+
 .yt-modal-header {
   display: flex;
   align-items: flex-start;

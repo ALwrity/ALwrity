@@ -11,6 +11,8 @@ interface YouTubeActionModalProps {
   backLabel?: string;
   children: React.ReactNode;
   maxWidth?: number;
+  /** Extra card class (e.g. yt-modal-card--pipeline for Full Creator). */
+  cardClassName?: string;
 }
 
 export const YouTubeActionModal: React.FC<YouTubeActionModalProps> = ({
@@ -22,10 +24,18 @@ export const YouTubeActionModal: React.FC<YouTubeActionModalProps> = ({
   backLabel = "Back",
   children,
   maxWidth = 720,
+  cardClassName,
 }) => {
   if (!open) return null;
 
   const isWedgeSized = Boolean(onBack) && maxWidth >= 1100;
+  const cardClasses = [
+    "yt-modal-card",
+    isWedgeSized ? "yt-modal-card--wedge" : "",
+    cardClassName || "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div
@@ -40,7 +50,7 @@ export const YouTubeActionModal: React.FC<YouTubeActionModalProps> = ({
       }}
     >
       <div
-        className={`yt-modal-card${isWedgeSized ? " yt-modal-card--wedge" : ""}`}
+        className={cardClasses}
         role="dialog"
         aria-modal="true"
         aria-label={title}

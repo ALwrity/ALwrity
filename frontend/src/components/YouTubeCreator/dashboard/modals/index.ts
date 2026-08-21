@@ -13,3 +13,4 @@ export { AnalysisWedgeModal } from "./AnalysisWedgeModal";
 export { EngagementWedgeModal } from "./EngagementWedgeModal";
 export { RemarketWedgeModal } from "./RemarketWedgeModal";
 export { WorkflowHelperModals } from "./WorkflowHelperModals";
+export { YouTubeVideoCreatorModal } from "./YouTubeVideoCreatorModal";
