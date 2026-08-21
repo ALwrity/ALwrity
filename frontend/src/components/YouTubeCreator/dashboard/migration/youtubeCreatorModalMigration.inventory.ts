@@ -421,8 +421,3 @@ export function getYouTubeCreatorPrimaryCreateEntry(): YouTubeCreatorEntryPoint 
 export function isYouTubeCreatorMigrationComplete(): boolean {
   return YOUTUBE_CREATOR_MODAL_MIGRATION_PHASE === 7;
 }
-
-/** @deprecated Use isYouTubeCreatorMigrationComplete — Phase 0 inventory only. */
-export function isYouTubeCreatorMigrationPhase0Complete(): boolean {
-  return YOUTUBE_CREATOR_MODAL_MIGRATION_PHASE === 0;
-}
