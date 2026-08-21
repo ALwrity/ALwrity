@@ -2,6 +2,7 @@ import React from "react";
 import { YouTubeAnalyticsSidebar } from "./YouTubeAnalyticsSidebar";
 import { YouTubeKnowledgeCenter } from "./YouTubeKnowledgeCenter";
 import { YouTubeLibraryButton } from "./YouTubeLibraryButton";
+import { DASHBOARD_ANALYTICS_RAIL_WIDTH_PX } from "./youtubeLayoutConstants";
 
 interface YouTubeRightRailProps {
   connected: boolean;
@@ -22,7 +23,11 @@ export const YouTubeRightRail: React.FC<YouTubeRightRailProps> = ({
     <aside
       className="yt-studio-right-rail"
       aria-label="Studio tools"
-      style={isDesktop ? undefined : { width: "100%" }}
+      style={
+        isDesktop
+          ? { width: DASHBOARD_ANALYTICS_RAIL_WIDTH_PX, flexShrink: 0 }
+          : { width: "100%" }
+      }
     >
       <YouTubeAnalyticsSidebar
         connected={connected}

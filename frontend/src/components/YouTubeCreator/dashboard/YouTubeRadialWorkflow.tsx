@@ -9,6 +9,13 @@ import {
 } from "./youtubeWorkflowConfig";
 import { isWedgeConnectGated } from "./studioHubAccessConfig";
 import type { YouTubeRadialLayout } from "./youtubeRadialLayout";
+import { PlanStartHereBadge } from "../../LinkedInWriter/components/dashboard/PlanStartHereBadge";
+import { ConnectLockBadge } from "../../LinkedInWriter/components/dashboard/ConnectLockIcon";
+import {
+  youtubeWedgeHeaderTextGap,
+  youtubeWedgeIconHeaderGap,
+  youtubeWedgeLabelBoxWidth,
+} from "./youtubeRadialWedgeUi";
 
 interface YouTubeRadialWorkflowProps {
   layout: YouTubeRadialLayout;
@@ -18,8 +25,8 @@ interface YouTubeRadialWorkflowProps {
 
 const PANEL_GAP_DEGREES = WEDGE_PANEL_GAP_DEG;
 const OUTER_BULGE_FACTOR = 0.14;
-const HOVER_POP_PX = 12;
-const HOVER_SCALE = 1.08;
+const HOVER_POP_PX = 10;
+const HOVER_SCALE = 1.06;
 
 function usePrefersReducedMotion(): boolean {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
@@ -166,8 +173,8 @@ export const YouTubeRadialWorkflow: React.FC<YouTubeRadialWorkflowProps> = ({
     const isConnectLocked = isWedgeConnectGated(card.id, connected);
     const panelStartDeg = card.startAngle - PANEL_GAP_DEGREES;
     const panelEndDeg = card.endAngle + PANEL_GAP_DEGREES;
-    const iconHeaderGap = Math.max(5, Math.round(iconFontSize * 0.22));
-    const headerTextGap = Math.max(4, Math.round(descFontSize * 0.45));
+    const iconHeaderGap = youtubeWedgeIconHeaderGap(iconFontSize);
+    const headerTextGap = youtubeWedgeHeaderTextGap(descFontSize);
     const box = wedgeLabelBox(
       centerX,
       centerY,
@@ -175,7 +182,7 @@ export const YouTubeRadialWorkflow: React.FC<YouTubeRadialWorkflowProps> = ({
       outerR,
       card.startAngle,
       card.endAngle,
-      labelBoxWidth,
+      youtubeWedgeLabelBoxWidth(card.id, labelBoxWidth),
     );
     const wedgePath = describeWedge(
       centerX,
@@ -189,6 +196,13 @@ export const YouTubeRadialWorkflow: React.FC<YouTubeRadialWorkflowProps> = ({
     return (
       <g
         key={card.id}
+        className={[
+          "workflow-wedge",
+          isRecommended && "workflow-wedge--recommended",
+          isConnectLocked && "workflow-wedge--connect-locked",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         data-tour={`yt-wedge-${card.id}`}
         transform={wedgeTransform(
           centerX,
@@ -225,6 +239,7 @@ export const YouTubeRadialWorkflow: React.FC<YouTubeRadialWorkflowProps> = ({
           <title>Connect YouTube to unlock {card.title}</title>
         )}
         <path
+          className="workflow-wedge-base"
           d={wedgePath}
           fill={
             isConnectLocked
@@ -245,85 +260,110 @@ export const YouTubeRadialWorkflow: React.FC<YouTubeRadialWorkflowProps> = ({
           strokeWidth={isActive ? 3 : isRecommended ? 2.4 : 1.2}
           strokeLinejoin="round"
           style={{
+            transition: "fill 180ms ease, stroke 180ms ease, filter 180ms ease",
             filter: isConnectLocked
               ? "saturate(0.68) brightness(1.02)"
               : isActive
-                ? `drop-shadow(0 18px 34px ${accentFill(card.accent, 0.65)})`
-                : "drop-shadow(0 2px 8px rgba(255,0,0,0.12))",
+                ? `drop-shadow(0 18px 34px ${accentFill(card.accent, 0.65)}) drop-shadow(0 8px 12px rgba(0,0,0,0.1))`
+                : isRecommended
+                  ? undefined
+                  : "drop-shadow(0 2px 8px rgba(255,0,0,0.12)) drop-shadow(0 4px 6px rgba(0,0,0,0.05))",
           }}
         />
+        {isConnectLocked && (
+          <path
+            d={wedgePath}
+            fill="rgba(255, 255, 255, 0.22)"
+            stroke="none"
+            pointerEvents="none"
+            aria-hidden
+          />
+        )}
         <foreignObject
           x={box.x}
           y={box.y}
           width={box.width}
           height={box.height}
-          style={{ pointerEvents: "none", userSelect: "none", overflow: "visible" }}
+          style={{
+            pointerEvents: "none",
+            userSelect: "none",
+            overflow: "visible",
+          }}
         >
           <div
             style={{
+              position: "relative",
               width: "100%",
               height: "100%",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              justifyContent: "center",
+              justifyContent: isRecommended ? "flex-start" : "center",
               textAlign: "center",
-              padding: "4px 6px",
+              padding: isRecommended ? "29px 6px 4px" : "4px 6px",
               boxSizing: "border-box",
             }}
           >
+            {isRecommended && <PlanStartHereBadge />}
             <div
               style={{
-                width: iconFontSize,
-                height: iconFontSize,
-                marginBottom: iconHeaderGap,
-                color: isActive ? card.accent : accentFill(card.accent, 0.75),
-                display: "inline-flex",
+                display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
+                flex: isRecommended ? "1 1 auto" : undefined,
+                minHeight: 0,
+                width: "100%",
               }}
             >
-              {React.createElement(card.icon, {
-                sx: { color: "currentColor", fontSize: iconFontSize, display: "block" },
-                "aria-hidden": true,
-                focusable: false,
-              })}
-            </div>
-            <div
-              style={{
-                fontSize: labelFontSize,
-                fontWeight: 800,
-                color: isActive ? card.accent : "#0f0f0f",
-                lineHeight: 1.12,
-                marginBottom: headerTextGap,
-              }}
-            >
-              {card.title}
-            </div>
-            <div
-              style={{
-                fontSize: descFontSize,
-                fontWeight: 500,
-                color: "#475569",
-                lineHeight: 1.28,
-                maxWidth: "100%",
-                overflowWrap: "break-word",
-              }}
-            >
-              {card.description}
-            </div>
-            {isRecommended && (
               <div
                 style={{
-                  marginTop: 4,
-                  fontSize: Math.max(8, descFontSize - 1),
-                  fontWeight: 700,
-                  color: card.accent,
+                  width: iconFontSize,
+                  height: iconFontSize,
+                  marginBottom: iconHeaderGap,
+                  color: isActive ? card.accent : accentFill(card.accent, 0.75),
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "color 180ms ease",
                 }}
               >
-                START HERE
+                {React.createElement(card.icon, {
+                  sx: { color: "currentColor", fontSize: iconFontSize, display: "block" },
+                  "aria-hidden": true,
+                  focusable: false,
+                })}
               </div>
-            )}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: Math.max(3, Math.round(labelFontSize * 0.28)),
+                  fontSize: labelFontSize,
+                  fontWeight: 800,
+                  color: isActive ? card.accent : "#0f172a",
+                  lineHeight: 1.12,
+                  marginBottom: headerTextGap,
+                  transition: "color 180ms ease",
+                }}
+              >
+                <span>{card.title}</span>
+                {isConnectLocked && <ConnectLockBadge size={8} />}
+              </div>
+              <div
+                style={{
+                  fontSize: descFontSize,
+                  fontWeight: 500,
+                  color: isActive ? "#334155" : "#475569",
+                  lineHeight: 1.28,
+                  maxWidth: "100%",
+                  overflowWrap: "break-word",
+                }}
+              >
+                {card.description}
+              </div>
+            </div>
           </div>
         </foreignObject>
       </g>

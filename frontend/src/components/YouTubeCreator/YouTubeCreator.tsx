@@ -4,9 +4,7 @@
  * Full Video Creator pipeline opens in modal (Create wedge / deep-links / Blog).
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Box } from "@mui/material";
-import { useNavigate } from "react-router-dom";
-import { YouTubeVideoCreatorHeader } from "./panel/YouTubeVideoCreatorHeader";
+import { YouTubeStudioLandingHeader } from "./dashboard/YouTubeStudioLandingHeader";
 import { YouTubeStudioHub } from "./dashboard/YouTubeStudioHub";
 import { useYouTubeStudioTab } from "./dashboard/useYouTubeStudioTab";
 import { useYouTubeCreatorLandingDeepLink } from "./dashboard/useYouTubeCreatorLandingDeepLink";
@@ -20,9 +18,9 @@ import { youtubeApi, type YouTubeChannelBible } from "../../services/youtubeApi"
 import { YT_CHANNEL_BIBLE_UPDATED_EVENT } from "./dashboard/youtubeStudioEvents";
 import "./dashboard/youtube-dashboard-layout.css";
 import "./dashboard/youtube-rail-controls.css";
+import "./dashboard/youtube-studio-header.css";
 
 const YouTubeCreator: React.FC = () => {
-  const navigate = useNavigate();
   const { setTab } = useYouTubeStudioTab();
   useYouTubeCreatorLandingDeepLink(setTab);
 
@@ -86,12 +84,12 @@ const YouTubeCreator: React.FC = () => {
   }, []);
 
   return (
-    <Box className="yt-studio-page" data-tab="hub">
-      <Box className="yt-studio-page-header">
-        <YouTubeVideoCreatorHeader onBack={() => navigate("/dashboard")} />
-      </Box>
+    <div className="yt-studio-page" data-tab="hub">
+      <div className="yt-studio-page-header">
+        <YouTubeStudioLandingHeader />
+      </div>
 
-      <Box className="yt-studio-page-body">
+      <div className="yt-studio-page-body">
         <YouTubeStudioHub
           connected={connected}
           channelName={activeChannel?.channel_name}
@@ -104,8 +102,8 @@ const YouTubeCreator: React.FC = () => {
           onChannelBibleSaved={setChannelBible}
           onCreatorDraftPatched={setHubDraft}
         />
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 };
 

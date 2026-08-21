@@ -1,11 +1,18 @@
 import React, { useState } from "react";
 import { YouTubeActionModal } from "./YouTubeActionModal";
 
-export const YouTubeCopilotFab: React.FC = () => {
-  const [open, setOpen] = useState(false);
+interface YouTubeCopilotFabProps {
+  variant?: "corner" | "fixed";
+}
 
-  return (
-    <div className="yt-studio-copilot-fab">
+export const YouTubeCopilotFab: React.FC<YouTubeCopilotFabProps> = ({
+  variant = "corner",
+}) => {
+  const [open, setOpen] = useState(false);
+  const isFixed = variant === "fixed";
+
+  const inner = (
+    <>
       <button
         type="button"
         className="yt-copilot-fab-btn"
@@ -31,6 +38,12 @@ export const YouTubeCopilotFab: React.FC = () => {
           you render.
         </p>
       </YouTubeActionModal>
-    </div>
+    </>
   );
+
+  if (isFixed) {
+    return <div className="yt-copilot-fab-fixed-inner">{inner}</div>;
+  }
+
+  return <div className="yt-copilot-fab-corner-inner">{inner}</div>;
 };
