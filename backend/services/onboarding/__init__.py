@@ -19,13 +19,9 @@ Architecture:
 
 # Import all public classes for easy access
 from .progress_service import OnboardingProgressService
-from .api_key_manager import OnboardingProgress, APIKeyManager, get_onboarding_progress, get_user_onboarding_progress, get_onboarding_progress_for_user
+from .api_key_manager import APIKeyManager
 
 __all__ = [
     'OnboardingProgressService', 
-    'OnboardingProgress',
-    'APIKeyManager',
-    'get_onboarding_progress',
-    'get_user_onboarding_progress',
-    'get_onboarding_progress_for_user'
+    'APIKeyManager'
 ]

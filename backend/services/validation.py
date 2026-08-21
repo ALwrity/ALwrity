@@ -287,16 +287,18 @@ def validate_website_url(url: str) -> bool:
         return False
 
 def validate_step_data(step_number: int, data: Dict[str, Any]) -> List[str]:
-    """Validate step-specific data with enhanced logic."""
+    """Validate step-specific data with enhanced logic.
+
+    Canonical 4-step onboarding: 1=Connect Platforms, 2=Research,
+    3=Personalization. "Finish" (4) is handled by complete_onboarding, not
+    this validator. The retired API-keys step and the Integrations step no
+    longer have branches here.
+    """
     errors = []
     
     logger.info(f"[validate_step_data] Validating step {step_number} with data: {data}")
     
-    if step_number == 1:  # API keys — platform-managed, skip end-user validation
-        logger.info("[validate_step_data] Step 1 skipped — API keys are platform-managed")
-        return errors
-    
-    elif step_number == 2:  # Website Analysis
+    if step_number == 1:  # Connect Platforms (website)
         # Accept both 'website' and 'website_url' for backwards compatibility
         website_url = data.get('website') or data.get('website_url') if data else None
         if not website_url:
@@ -304,10 +306,10 @@ def validate_step_data(step_number: int, data: Dict[str, Any]) -> List[str]:
         elif not validate_website_url(website_url):
             errors.append("Invalid website URL format")
     
-    elif step_number == 3:  # AI Research
+    elif step_number == 2:  # Research
         # Validate that research data is present (competitors, research summary, or sitemap analysis)
         if not data:
-            errors.append("Research data is required for step 3 completion")
+            errors.append("Research data is required for step 2 completion")
         else:
             # Check for required research fields
             has_competitors = 'competitors' in data and data['competitors']
@@ -317,10 +319,10 @@ def validate_step_data(step_number: int, data: Dict[str, Any]) -> List[str]:
             if not (has_competitors or has_research_summary or has_sitemap_analysis):
                 errors.append("At least one research data field (competitors, researchSummary, or sitemapAnalysis) must be present")
     
-    elif step_number == 4:  # Personalization
+    elif step_number == 3:  # Personalization (persona)
         # Validate that persona data is present
         if not data:
-            errors.append("Persona data is required for step 4 completion")
+            errors.append("Persona data is required for step 3 completion")
         else:
             # Check for required persona fields
             required_persona_fields = ['corePersona', 'platformPersonas']
@@ -348,15 +350,6 @@ def validate_step_data(step_number: int, data: Dict[str, Any]) -> List[str]:
                     errors.append("platformPersonas must be a valid object")
                 elif len(platform_personas) == 0:
                     errors.append("At least one platform persona must be configured")
-    
-    elif step_number == 5:  # Integrations
-        # Optional step, no validation required
-        pass
-    
-    elif step_number == 6:  # Complete Setup
-        # This step requires all previous steps to be completed
-        # Validation is handled by the progress tracking system
-        pass
     
     return errors
 

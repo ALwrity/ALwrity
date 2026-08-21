@@ -32,14 +32,6 @@ const websiteSteps = [
   { label: 'Finish', description: 'Complete setup', icon: '✅' }
 ];
 
-const linkedinSteps = [
-  { label: 'Connect', description: 'Connect your LinkedIn account', icon: '🔗' },
-  { label: 'Research', description: 'Discover creators and content gaps', icon: '🔍' },
-  { label: 'Persona', description: 'Generate your LinkedIn persona', icon: '⚙️' },
-  { label: 'Preferences', description: 'Set content preferences', icon: '📝' },
-  { label: 'Finish', description: 'Complete setup', icon: '✅' }
-];
-
 interface WizardProps {
   onComplete?: () => void;
 }
@@ -89,7 +81,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   }, []);
 
   const onboardingType = data?.onboarding?.onboarding_type || defaultOnboardingType;
-  const steps = useMemo(() => onboardingType === 'linkedin' ? linkedinSteps : websiteSteps, [onboardingType]);
+  const steps = useMemo(() => websiteSteps, []);
 
   useEffect(() => {
     if (activeStep < 1) return;

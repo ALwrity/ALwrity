@@ -113,57 +113,12 @@ class APIKeyInjectionMiddleware:
             # No authenticated user, proceed without injection
             return await call_next(request)
         
-        # Check if we're in production mode
-        is_production = os.getenv('DEPLOY_ENV', 'local') == 'production'
-        
-        if not is_production:
-            # Local mode - keys already in .env, no injection needed
-            return await call_next(request)
-        
-        # Get user-specific API keys from database
-        with user_api_keys(user_id) as user_keys:
-            if not user_keys:
-                self._log_missing_keys_non_blocking(request, user_id)
-                return await call_next(request)
-            
-            # Save original environment values
-            original_keys = {}
-            keys_to_inject = {
-                'gemini': 'GEMINI_API_KEY',
-                'exa': 'EXA_API_KEY',
-                'copilotkit': 'COPILOTKIT_API_KEY',
-                'openai': 'OPENAI_API_KEY',
-                'anthropic': 'ANTHROPIC_API_KEY',
-                'tavily': 'TAVILY_API_KEY',
-                'serper': 'SERPER_API_KEY',
-                'firecrawl': 'FIRECRAWL_API_KEY',
-            }
-            
-            # Inject user-specific keys into environment
-            for provider, env_var in keys_to_inject.items():
-                if provider in user_keys and user_keys[provider]:
-                    # Save original value (if any)
-                    original_keys[env_var] = os.environ.get(env_var)
-                    # Inject user-specific key
-                    os.environ[env_var] = user_keys[provider]
-                    logger.debug(f"[PRODUCTION] Injected {env_var} for user {user_id}")
-            
-            try:
-                # Process request with user-specific keys in environment
-                response = await call_next(request)
-                return response
-                
-            finally:
-                # CRITICAL: Restore original environment values
-                for env_var, original_value in original_keys.items():
-                    if original_value is None:
-                        # Key didn't exist before, remove it
-                        os.environ.pop(env_var, None)
-                    else:
-                        # Restore original value
-                        os.environ[env_var] = original_value
-                
-                logger.debug(f"[PRODUCTION] Cleaned up environment for user {user_id}")
+        # D1 (retire BYOK): per-user key injection is disabled. The platform now
+        # supplies all provider keys via environment variables, so os.getenv()
+        # already resolves to the correct platform key for every request.
+        # The user_id extraction above is retained for request.state consumers
+        # (monitoring middleware). _log_missing_keys_non_blocking is dead in D2.
+        return await call_next(request)
 
 
 async def api_key_injection_middleware(request: Request, call_next: Callable):

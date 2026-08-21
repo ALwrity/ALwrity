@@ -10,7 +10,7 @@ logging.getLogger("py.warnings").setLevel(logging.CRITICAL)
 
 # Import onboarding models VERY early to ensure they're available before any services
 import typing
-from models.onboarding import APIKey, WebsiteAnalysis, ResearchPreferences, PersonaData, CompetitorAnalysis
+from models.onboarding import WebsiteAnalysis, ResearchPreferences, PersonaData, CompetitorAnalysis
 
 from fastapi import FastAPI, HTTPException, Depends, Request, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,7 +30,7 @@ from models.onboarding import OnboardingSession
 from services.subscription import monitoring_middleware
 
 # Import remaining onboarding models
-from models import APIKey, WebsiteAnalysis, ResearchPreferences, PersonaData, CompetitorAnalysis
+from models import WebsiteAnalysis, ResearchPreferences, PersonaData, CompetitorAnalysis
 
 # Import modular utilities
 from alwrity_utils import HealthChecker, RateLimiter, FrontendServing, RouterManager

@@ -16,7 +16,6 @@ class OnboardingSession(Base):
     # Platform onboarding framework: "website" (default), "linkedin", "instagram", "youtube", etc.
     # Existing rows default to "website" so the current flow is unchanged.
     onboarding_type = Column(String(32), nullable=False, default="website")
-    api_keys = relationship('APIKey', back_populates='session', cascade="all, delete-orphan")
     website_analyses = relationship('WebsiteAnalysis', back_populates='session', cascade="all, delete-orphan")
     research_preferences = relationship('ResearchPreferences', back_populates='session', cascade="all, delete-orphan", uselist=False)
     persona_data = relationship('PersonaData', back_populates='session', cascade="all, delete-orphan", uselist=False)
@@ -25,30 +24,6 @@ class OnboardingSession(Base):
 
     def __repr__(self):
         return f"<OnboardingSession(id={self.id}, user_id={self.user_id}, type={self.onboarding_type}, step={self.current_step}, progress={self.progress})>"
-
-class APIKey(Base):
-    __tablename__ = 'api_keys'
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    session_id = Column(Integer, ForeignKey('onboarding_sessions.id'))
-    provider = Column(String(64), nullable=False)
-    key = Column(String(256), nullable=False)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    session = relationship('OnboardingSession', back_populates='api_keys')
-
-    def __repr__(self):
-        return f"<APIKey(id={self.id}, provider={self.provider}, session_id={self.session_id})>"
-    
-    def to_dict(self):
-        """Convert to dictionary for API responses."""
-        return {
-            'id': self.id,
-            'session_id': self.session_id,
-            'provider': self.provider,
-            'key': self.key,  # Note: In production, you might want to mask this
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
 
 class WebsiteAnalysis(Base):
     """Stores website analysis results from onboarding step 2."""

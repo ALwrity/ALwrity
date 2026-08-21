@@ -1,19 +1,18 @@
 """
 LinkedIn Onboarding Strategy
-=============================
+============================
 
-Implements the LinkedIn-specific path through onboarding, reusing existing
-LinkedIn Studio services:
+Provides the LinkedIn-specific logic for the unified 4-step onboarding flow
+(single step tree: Connect Platforms → Research → Personalization → Finish).
+The ``WebsiteOnboardingStrategy`` is the single dispatched strategy; it
+delegates to this class's platform methods by name:
 
-    - Step 1: Connect LinkedIn (OAuth) + Profile pipeline (Phases 1-5)
-              + post sync + writing style analysis
-    - Step 2: Research via consolidated growth engine + competitor/creator discovery
-    - Step 3: Persona generation (core + LinkedIn platform persona) — Phase 3
-    - Step 4: Integrations / content preferences — Phase 4
-    - Step 5: Finish / completion — Phase 4
+    - ``connect_linkedin``  — OAuth + profile pipeline (Phases 1-5) + post sync + writing style
+    - ``research_linkedin`` — consolidated growth engine + competitor/creator discovery
+    - ``persona_linkedin``  — core persona + LinkedIn platform persona
 
-This strategy does NOT write any new endpoints or services.  It
-orchestrates the existing service calls inside the step dispatch.
+This class is NOT registered as a strategy (no ``complete_step`` dispatch);
+it is a reusable helper for the website strategy's platform-aware steps.
 """
 
 from __future__ import annotations
@@ -27,7 +26,7 @@ from .base import LINKEDIN_TYPE
 
 
 class LinkedInOnboardingStrategy:
-    """Strategy for the ``linkedin`` onboarding type."""
+    """Helper providing LinkedIn connect/research/persona logic for the unified flow."""
 
     @property
     def onboarding_type(self) -> str:
@@ -37,41 +36,13 @@ class LinkedInOnboardingStrategy:
     def context_file_prefix(self) -> str:
         return "linkedin"
 
-    async def complete_step(
-        self,
-        svc,
-        step_number: int,
-        user_id: str,
-        request_data: Dict[str, Any],
-        db: Session,
-    ) -> Dict[str, Any]:
-        """Execute LinkedIn-specific step logic.
-
-        Returns ``{"warnings": [...]}`` if any non-blocking warnings
-        occurred.  Raises ``HTTPException`` for blocking errors.
-        """
-        warnings: List[str] = []
-
-        if step_number == 1:
-            await self._complete_linkedin_step1(svc, user_id, request_data, db)
-        elif step_number == 2:
-            await self._complete_linkedin_step2(svc, user_id, request_data, db)
-        elif step_number == 3:
-            await self._complete_linkedin_step3(svc, user_id, request_data, db)
-        elif step_number == 4:
-            await self._complete_linkedin_step4(svc, user_id, request_data, db)
-        elif step_number == 5:
-            await self._complete_linkedin_step5(svc, user_id, request_data, db)
-
-        return {"warnings": warnings if warnings else None}
-
     # ------------------------------------------------------------------
     # Step 1 -- Connect + Profile pipeline + Post sync + Writing style
     # (Merged: verifies OAuth connection, runs Phases 1-5, syncs posts,
     #  analyzes writing style, persists combined snapshot to flat-file)
     # ------------------------------------------------------------------
 
-    async def _complete_linkedin_step1(self, svc, user_id, request_data, db):
+    async def connect_linkedin(self, svc, user_id, request_data, db):
         """Single user-facing step: Connect + Profile + Posts + Writing Style.
 
         The frontend ``LinkedInConnectStep`` handles the OAuth popup and
@@ -114,21 +85,17 @@ class LinkedInOnboardingStrategy:
         try:
             from models.onboarding import PlatformIntegration
             from datetime import datetime
+            # Record the connection (single source of truth for "which platforms").
+            svc.record_connected_platform(user_id, "linkedin", db)
+            # Also mark LinkedIn in social_platforms for legacy flat-context consumers.
             session = svc._get_or_create_session(user_id, db)
             if session.platform_integrations:
                 pi = session.platform_integrations
-            else:
-                pi = PlatformIntegration(session_id=session.id)
-                db.add(pi)
-            social_platforms = pi.social_platforms or {}
-            social_platforms.setdefault("linkedin", True)
-            pi.social_platforms = social_platforms
-            connected = pi.connected_platforms or []
-            if "linkedin" not in connected:
-                connected.append("linkedin")
-            pi.connected_platforms = connected
-            pi.updated_at = datetime.utcnow()
-            db.commit()
+                social_platforms = pi.social_platforms or {}
+                social_platforms.setdefault("linkedin", True)
+                pi.social_platforms = social_platforms
+                pi.updated_at = datetime.utcnow()
+                db.commit()
         except Exception as e:
             logger.warning(f"[linkedin_step1] Failed to save platform integration: {e}")
             db.rollback()
@@ -369,7 +336,7 @@ class LinkedInOnboardingStrategy:
     # Step 2 -- Research via growth engine + competitor/creator discovery
     # ------------------------------------------------------------------
 
-    async def _complete_linkedin_step2(self, svc, user_id, request_data, db):
+    async def research_linkedin(self, svc, user_id, request_data, db):
         """Step 2: LinkedIn research via consolidated growth engine.
 
         Calls ``ConsolidatedGrowthService.analyze_all(user_id)`` (single LLM
@@ -568,7 +535,7 @@ class LinkedInOnboardingStrategy:
         except Exception as e:
             logger.warning(f"[linkedin_step2] Failed to persist flat context: {e}")
 
-    async def _complete_linkedin_step3(self, svc, user_id, request_data, db):
+    async def persona_linkedin(self, svc, user_id, request_data, db):
         """Step 3: Generate core persona + LinkedIn platform persona.
 
         Loads the profile snapshot (step 1) and research data (step 2) from
@@ -1017,368 +984,6 @@ class LinkedInOnboardingStrategy:
             "formality_level": "Semi-formal" if (bm.get("average_word_length", 0) or 0) > 5 else "Conversational",
             "emotional_appeal": f"Intensity {ea.get('emotional_intensity', '?')}%",
         }
-
-    async def _complete_linkedin_step4(self, svc, user_id, request_data, db):
-        """Step 4: Content preferences + optional integrations metadata.
-
-        LinkedIn is already connected from step 1.  This step records any
-        user-provided content preferences (posting cadence, preferred formats)
-        into the session payload and ensures the integration entry is complete.
-        """
-        from datetime import datetime
-        from models.onboarding import PlatformIntegration
-
-        # ----------------------------------------------------------
-        # 1. Ensure LinkedIn integration is recorded
-        # ----------------------------------------------------------
-        try:
-            session = svc._get_or_create_session(user_id, db)
-            if session.platform_integrations:
-                pi = session.platform_integrations
-            else:
-                pi = PlatformIntegration(session_id=session.id)
-                db.add(pi)
-            social_platforms = pi.social_platforms or {}
-            social_platforms.setdefault("linkedin", True)
-            pi.social_platforms = social_platforms
-            connected = pi.connected_platforms or []
-            if "linkedin" not in connected:
-                connected.append("linkedin")
-            pi.connected_platforms = connected
-            pi.updated_at = datetime.utcnow()
-            db.commit()
-            logger.info(f"[linkedin_step4] LinkedIn integration confirmed for {user_id}")
-        except Exception as e:
-            logger.warning(f"[linkedin_step4] Failed to confirm integration: {e}")
-            db.rollback()
-
-        # ----------------------------------------------------------
-        # 2. Save content preferences from request_data if provided
-        # ----------------------------------------------------------
-        preferences = request_data.get("data") or request_data or {}
-        if preferences and isinstance(preferences, dict):
-            try:
-                session = svc._get_or_create_session(user_id, db)
-                payload = dict(session.payload) if session.payload else {}
-                payload["linkedin_content_preferences"] = {
-                    "posting_cadence": preferences.get("postingCadence", preferences.get("posting_cadence")),
-                    "preferred_formats": preferences.get("preferredFormats", preferences.get("preferred_formats", ["posts", "articles", "carousels"])),
-                    "content_topics": preferences.get("contentTopics", preferences.get("content_topics", [])),
-                    "engagement_goals": preferences.get("engagementGoals", preferences.get("engagement_goals")),
-                    "saved_at": datetime.utcnow().isoformat(),
-                }
-                session.payload = payload
-                db.add(session)
-                db.commit()
-                logger.info(f"[linkedin_step4] Content preferences saved for {user_id}")
-            except Exception as e:
-                logger.warning(f"[linkedin_step4] Failed to save preferences: {e}")
-                db.rollback()
-
-    async def _complete_linkedin_step5(self, svc, user_id, request_data, db):
-        """Step 5: Finish — validate, progressive setup, summary, mark complete.
-
-        Validates that all prerequisites (connection, profile, persona) are
-        in place, initializes the user environment via
-        ``ProgressiveSetupService``, records completion metadata, and
-        schedules LinkedIn-specific background tasks.
-        """
-        from datetime import datetime
-        from services.intelligence.agent_flat_context import AgentFlatContextStore
-
-        # ----------------------------------------------------------
-        # 1. Validate prerequisites
-        # ----------------------------------------------------------
-        validation_errors = []
-
-        # Check connection
-        try:
-            from services.integrations.linkedin_oauth import LinkedInOAuthService
-            from services.integrations.linkedin.types import LinkedInNotConnectedError
-
-            oauth = LinkedInOAuthService()
-            oauth.resolve_credentials(user_id)
-        except LinkedInNotConnectedError:
-            validation_errors.append("LinkedIn account not connected")
-
-        # Check profile context exists (from flat file or DB)
-        try:
-            from services.integrations.linkedin.profile_repository import ProfileRepository
-
-            repo = ProfileRepository(oauth=oauth)
-            profile_context = repo.get_profile_context(user_id)
-            if not profile_context:
-                validation_errors.append("LinkedIn profile context not found")
-        except Exception as e:
-            logger.warning(f"[linkedin_step5] Could not validate profile context: {e}")
-
-        # Check persona exists
-        try:
-            flat_store = AgentFlatContextStore(user_id)
-            persona_doc = flat_store.load_step4_context_document()
-            if not persona_doc:
-                # Fallback: check DB
-                from models.onboarding import PersonaData
-                session = svc._get_or_create_session(user_id, db)
-                existing_persona = db.query(PersonaData).filter(
-                    PersonaData.session_id == session.id
-                ).first()
-                if not existing_persona or not existing_persona.platform_personas:
-                    validation_errors.append("LinkedIn persona not generated")
-        except Exception as e:
-            logger.warning(f"[linkedin_step5] Could not validate persona: {e}")
-
-        if validation_errors:
-            logger.error(f"[linkedin_step5] Validation failed for {user_id}: {validation_errors}")
-            from fastapi import HTTPException
-            raise HTTPException(
-                status_code=400,
-                detail=f"Cannot complete onboarding: {'; '.join(validation_errors)}",
-            )
-
-        logger.info(f"[linkedin_step5] All prerequisites validated for {user_id}")
-
-        # ----------------------------------------------------------
-        # 2. Progressive setup — initialize user environment
-        # ----------------------------------------------------------
-        try:
-            from services.progressive_setup_service import ProgressiveSetupService
-
-            setup_service = ProgressiveSetupService(db)
-            setup_result = setup_service.initialize_user_environment(user_id)
-            logger.info(
-                f"[linkedin_step5] Progressive setup complete for {user_id}: "
-                f"workspace={setup_result.get('workspace', {}).get('workspace_path', 'n/a')}"
-            )
-        except Exception as e:
-            logger.error(f"[linkedin_step5] Progressive setup failed: {e}")
-            # Non-blocking: don't fail completion if setup errors
-
-        # ----------------------------------------------------------
-        # 3. Build and persist completion summary
-        # ----------------------------------------------------------
-        try:
-            flat_store = AgentFlatContextStore(user_id)
-            step1_doc = flat_store.load_step2_context_document() or {}
-            step1_data = step1_doc.get("data", {}) if isinstance(step1_doc, dict) else {}
-            step2_doc = flat_store.load_step3_context_document() or {}
-            step2_data = step2_doc.get("data", {}) if isinstance(step2_doc, dict) else {}
-            step3_doc = flat_store.load_step4_context_document() or {}
-            step3_data = step3_doc.get("data", {}) if isinstance(step3_doc, dict) else {}
-
-            profile_snapshot = step1_data.get("profile_snapshot", {})
-            growth_data = step2_data.get("growth_analysis", {})
-            linkedin_persona = (
-                step3_data.get("platform_personas", {}).get("linkedin", {})
-                if isinstance(step3_data, dict)
-                else {}
-            )
-            quality_metrics = step3_data.get("quality_metrics", {}) if isinstance(step3_data, dict) else {}
-
-            summary = {
-                "onboarding_type": "linkedin",
-                "completed_at": datetime.utcnow().isoformat(),
-                "profile": {
-                    "name": profile_snapshot.get("name"),
-                    "headline": profile_snapshot.get("headline"),
-                    "industry": profile_snapshot.get("industry"),
-                    "completeness_score": profile_snapshot.get("completeness_score"),
-                },
-                "research": {
-                    "trending_industry": (
-                        growth_data.get("trending", {}).get("trending_industry")
-                        if isinstance(growth_data, dict)
-                        else None
-                    ),
-                    "brand_scorecard": (
-                        growth_data.get("brand_scorecard")
-                        if isinstance(growth_data, dict)
-                        else None
-                    ),
-                },
-                "persona": {
-                    "quality_score": quality_metrics.get("linkedin_quality_score"),
-                    "valid": quality_metrics.get("linkedin_valid"),
-                },
-                "connected_platforms": ["linkedin"],
-            }
-
-            # Save to flat file
-            flat_payload = {
-                "onboarding_type": "linkedin",
-                "completion_date": datetime.utcnow().isoformat(),
-                "summary": summary,
-                "saved_at": datetime.utcnow().isoformat(),
-            }
-            flat_store.save_step5_integrations(flat_payload, source="onboarding_linkedin_finish")
-
-            # Save to session payload
-            session = svc._get_or_create_session(user_id, db)
-            payload = dict(session.payload) if session.payload else {}
-            payload["linkedin_onboarding_summary"] = summary
-            session.payload = payload
-            db.add(session)
-            db.commit()
-
-            logger.info(f"[linkedin_step5] Completion summary saved for {user_id}")
-        except Exception as e:
-            logger.warning(f"[linkedin_step5] Failed to save completion summary: {e}")
-
-        # ----------------------------------------------------------
-        # 4. Mark onboarding as complete (current_step=6, progress=100%)
-        # ----------------------------------------------------------
-        try:
-            session = svc._get_or_create_session(user_id, db)
-            session.current_step = 6
-            session.progress = 100.0
-            session.updated_at = datetime.utcnow()
-            db.add(session)
-            db.commit()
-            logger.info(f"[linkedin_step5] Marked onboarding complete for {user_id} (step=6, progress=100%)")
-        except Exception as e:
-            db.rollback()
-            logger.warning(f"[linkedin_step5] Failed to mark onboarding complete in session: {e}")
-
-        # ----------------------------------------------------------
-        # 5. Optionally call the existing completion service
-        # ----------------------------------------------------------
-        try:
-            from services.onboarding.progress_service import OnboardingProgressService
-            completion_result = OnboardingProgressService().complete_onboarding(user_id)
-            if completion_result:
-                logger.info(f"[linkedin_step5] Completion service confirmed onboarding complete for {user_id}")
-            else:
-                logger.warning(f"[linkedin_step5] Completion service returned False for {user_id}")
-        except Exception as e:
-            logger.warning(f"[linkedin_step5] Non-blocking: completion service call failed: {e}")
-
-        # ----------------------------------------------------------
-        # 6. Schedule LinkedIn background tasks (non-blocking)
-        # ----------------------------------------------------------
-        await self._schedule_linkedin_tasks(user_id, db)
-
-        logger.info(f"[linkedin_step5] Onboarding complete for {user_id}")
-
-    async def _schedule_linkedin_tasks(self, user_id: str, db) -> None:
-        """Schedule recurring LinkedIn background tasks.
-
-        Creates persistent DB-backed scheduler tasks via ``_upsert_task`` and
-        records them in the session payload manifest.  All errors are
-        non-blocking.
-        """
-        from datetime import datetime, timezone, timedelta
-        from api.onboarding_utils.onboarding_task_scheduler import (
-            _record_task_in_session,
-            _upsert_task,
-        )
-        from models.linkedin_monitoring_models import (
-            LinkedInProfileSyncTask,
-            LinkedInPostAnalyticsSyncTask,
-            LinkedInGrowthReanalysisTask,
-        )
-
-        now = datetime.now(timezone.utc)
-
-        # 1. LinkedIn profile sync (every 7 days)
-        try:
-            _upsert_task(
-                db, LinkedInProfileSyncTask,
-                user_id=user_id,
-                filters={"user_id": user_id},
-                defaults={
-                    "status": "active",
-                    "next_execution": now + timedelta(days=7),
-                    "frequency_days": 7,
-                    "payload": {
-                        "created_from": "onboarding_linkedin_step5",
-                        "description": "Re-run LinkedIn profile pipeline (Phases 1-5) to catch external profile changes",
-                    },
-                },
-            )
-            db.commit()
-            logger.info(f"[linkedin_step5] Scheduled linkedin_profile_sync for {user_id}")
-            _record_task_in_session(
-                db, user_id, "linkedin_profile_sync", step=5,
-                details={
-                    "frequency": 7,
-                    "frequency_unit": "days",
-                    "description": "Re-run LinkedIn profile pipeline (Phases 1-5) to catch external profile changes",
-                }
-            )
-        except Exception as e:
-            db.rollback()
-            logger.warning(f"[linkedin_step5] Non-blocking: failed to schedule linkedin_profile_sync: {e}")
-
-        # 2. LinkedIn post analytics sync (every 24 hours)
-        try:
-            _upsert_task(
-                db, LinkedInPostAnalyticsSyncTask,
-                user_id=user_id,
-                filters={"user_id": user_id},
-                defaults={
-                    "status": "active",
-                    "next_execution": now + timedelta(hours=24),
-                    "frequency_hours": 24,
-                    "payload": {
-                        "created_from": "onboarding_linkedin_step5",
-                        "post_limit": 50,
-                        "description": "Sync last 50 posts + engagement metrics from Unipile",
-                    },
-                },
-            )
-            db.commit()
-            logger.info(f"[linkedin_step5] Scheduled linkedin_post_analytics_sync for {user_id}")
-            _record_task_in_session(
-                db, user_id, "linkedin_post_analytics_sync", step=5,
-                details={
-                    "frequency": 24,
-                    "frequency_unit": "hours",
-                    "description": "Sync last 50 posts + engagement metrics from Unipile",
-                }
-            )
-        except Exception as e:
-            db.rollback()
-            logger.warning(f"[linkedin_step5] Non-blocking: failed to schedule linkedin_post_analytics_sync: {e}")
-
-        # 3. LinkedIn growth reanalysis (every 72 hours)
-        try:
-            _upsert_task(
-                db, LinkedInGrowthReanalysisTask,
-                user_id=user_id,
-                filters={"user_id": user_id},
-                defaults={
-                    "status": "active",
-                    "next_execution": now + timedelta(hours=72),
-                    "frequency_hours": 72,
-                    "payload": {
-                        "created_from": "onboarding_linkedin_step5",
-                        "description": "Re-run ConsolidatedGrowthService.analyze_all() to capture trending topic drift",
-                    },
-                },
-            )
-            db.commit()
-            logger.info(f"[linkedin_step5] Scheduled linkedin_growth_reanalysis for {user_id}")
-            _record_task_in_session(
-                db, user_id, "linkedin_growth_reanalysis", step=5,
-                details={
-                    "frequency": 72,
-                    "frequency_unit": "hours",
-                    "description": "Re-run ConsolidatedGrowthService.analyze_all() to capture trending topic drift",
-                }
-            )
-        except Exception as e:
-            db.rollback()
-            logger.warning(f"[linkedin_step5] Non-blocking: failed to schedule linkedin_growth_reanalysis: {e}")
-
-        # 4. Create OAuth token monitoring task for LinkedIn
-        try:
-            from services.oauth_token_monitoring_service import create_oauth_monitoring_tasks
-            create_oauth_monitoring_tasks(user_id, db, ['linkedin'])
-            db.commit()
-            logger.info(f"[linkedin_step5] Created OAuth monitoring task for {user_id}")
-        except Exception as e:
-            db.rollback()
-            logger.warning(f"[linkedin_step5] Non-blocking: failed to create OAuth monitoring task: {e}")
 
     # ------------------------------------------------------------------
     # SIF Sync -- LinkedIn uses structured tables, not vector index

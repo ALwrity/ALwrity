@@ -34,20 +34,6 @@ def test_executor_content_guardian_imported_at_module_top():
     assert "if not _CONTENT_GUARDIAN_AVAILABLE" in src
 
 
-# Issue #620 #6
-def test_onboarding_progress_logs_critical_on_db_failure():
-    src = _read("services/onboarding/api_key_manager.py")
-    # The fix is in the constructor's except block (surrounded by
-    # the OnboardingDataIntegrationService import). The except block
-    # must contain "logger.critical" and "Issue #620 #6".
-    # Use the FIRST except block in the file (which is the one for
-    # the integration service import).
-    match = re.search(r"except Exception as e:(.*?)(?=\n    def |\Z)", src, re.DOTALL)
-    assert match is not None
-    assert "logger.critical" in match.group(1)
-    assert "Issue #620 #6" in match.group(1)
-
-
 # Issue #620 #9
 def test_workspace_dir_uses_get_workspace_root():
     src = _read("services/intelligence/agent_flat_context.py")

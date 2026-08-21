@@ -1,13 +1,6 @@
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
-from services.onboarding.api_key_manager import (
-    OnboardingProgress,
-    get_onboarding_progress,
-    get_onboarding_progress_for_user,
-    StepStatus,
-    StepData,
-    APIKeyManager,
-)
+from services.onboarding.api_key_manager import APIKeyManager
 
 
 class StepDataModel(BaseModel):
@@ -54,10 +47,6 @@ class StepValidationResponse(BaseModel):
     can_proceed: bool
     validation_errors: List[str]
     step_status: str
-
-
-def get_progress() -> OnboardingProgress:
-    return get_onboarding_progress()
 
 
 def get_api_key_manager() -> APIKeyManager:

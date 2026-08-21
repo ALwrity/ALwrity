@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from services.user_workspace_manager import UserWorkspaceManager
-from services.onboarding.api_key_manager import get_onboarding_progress_for_user
 
 class ProgressiveSetupService:
     """Manages progressive backend setup based on user progress."""
@@ -196,11 +195,12 @@ class ProgressiveSetupService:
             if not workspace:
                 return {"error": "User workspace not found"}
             
-            progress = get_onboarding_progress_for_user(user_id)
+            from services.onboarding.progress_service import OnboardingProgressService
+            progress = OnboardingProgressService().get_onboarding_status(user_id)
             
             return {
                 "user_id": user_id,
-                "onboarding_step": progress.current_step,
+                "onboarding_step": progress.get('current_step'),
                 "workspace_exists": True,
                 "workspace_path": workspace["workspace_path"],
                 "config": workspace["config"],

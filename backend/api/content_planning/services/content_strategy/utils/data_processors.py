@@ -9,7 +9,7 @@ from typing import Dict, List, Any, Optional, Union
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from models.onboarding import OnboardingSession, WebsiteAnalysis, ResearchPreferences, APIKey
+from models.onboarding import OnboardingSession, WebsiteAnalysis, ResearchPreferences
 
 logger = logging.getLogger(__name__)
 

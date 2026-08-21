@@ -48,11 +48,7 @@ class OnboardingSummaryService:
             research_preferences = integrated_data.get('research_preferences', {})
             persona_data = integrated_data.get('persona_data', {})
             canonical_profile = integrated_data.get('canonical_profile', {})
-            api_keys_data = integrated_data.get('api_keys_data', {})
             is_linkedin = onboarding_type == 'linkedin'
-            
-            # Get API keys
-            api_keys = self._get_api_keys(api_keys_data)
             
             # Get personalization settings
             personalization_settings = self._get_personalization_settings(research_preferences, persona_data)
@@ -64,10 +60,9 @@ class OnboardingSummaryService:
             integrations = self._get_integrations(payload, is_linkedin)
             
             # Determine capabilities
-            capabilities = self._determine_capabilities(api_keys, website_analysis, research_preferences, personalization_settings, persona_readiness, integrations, is_linkedin)
+            capabilities = self._determine_capabilities(website_analysis, research_preferences, personalization_settings, persona_readiness, integrations, is_linkedin)
             
             return {
-                "api_keys": api_keys,
                 "website_url": website_analysis.get('website_url') if website_analysis else None,
                 "style_analysis": website_analysis.get('style_analysis') if website_analysis else None,
                 "research_preferences": research_preferences,
@@ -82,38 +77,6 @@ class OnboardingSummaryService:
         except Exception as e:
             logger.error(f"Error getting onboarding summary: {str(e)}")
             raise HTTPException(status_code=500, detail="Internal server error")
-    
-    def _get_api_keys(self, api_keys_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Get configured API keys from integrated data."""
-        try:
-            if not api_keys_data:
-                return {
-                    "openai": {"configured": False, "value": None},
-                    "anthropic": {"configured": False, "value": None},
-                    "google": {"configured": False, "value": None}
-                }
-            
-            return {
-                "openai": {
-                    "configured": bool(api_keys_data.get('openai_api_key')),
-                    "value": api_keys_data.get('openai_api_key')[:8] + "..." if api_keys_data.get('openai_api_key') else None
-                },
-                "anthropic": {
-                    "configured": bool(api_keys_data.get('anthropic_api_key')),
-                    "value": api_keys_data.get('anthropic_api_key')[:8] + "..." if api_keys_data.get('anthropic_api_key') else None
-                },
-                "google": {
-                    "configured": bool(api_keys_data.get('google_api_key')),
-                    "value": api_keys_data.get('google_api_key')[:8] + "..." if api_keys_data.get('google_api_key') else None
-                }
-            }
-        except Exception as e:
-            logger.error(f"Error getting API keys: {str(e)}")
-            return {
-                "openai": {"configured": False, "value": None},
-                "anthropic": {"configured": False, "value": None},
-                "google": {"configured": False, "value": None}
-            }
     
     def _get_personalization_settings(self, research_preferences: Optional[Dict[str, Any]], persona_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Get personalization settings based on research preferences and persona data.
@@ -197,7 +160,7 @@ class OnboardingSummaryService:
             "missing_data": missing_fields
         }
     
-    def _determine_capabilities(self, api_keys: Dict[str, Any], website_analysis: Optional[Dict[str, Any]], 
+    def _determine_capabilities(self, website_analysis: Optional[Dict[str, Any]], 
                               research_preferences: Optional[Dict[str, Any]], 
                               personalization_settings: Dict[str, Any], 
                               persona_readiness: Dict[str, Any],
@@ -206,7 +169,7 @@ class OnboardingSummaryService:
         """Determine available capabilities based on configured data."""
         if is_linkedin:
             return {
-                "ai_content_generation": any(key.get("configured") for key in api_keys.values()) or bool(integrations),
+                "ai_content_generation": bool(integrations),
                 "linkedin_research": research_preferences is not None,
                 "linkedin_persona": persona_readiness.get("ready", False),
                 "linkedin_content_preferences": bool(integrations.get("postingCadence") or integrations.get("preferredFormats")),
@@ -214,7 +177,7 @@ class OnboardingSummaryService:
             }
         
         capabilities = {
-            "ai_content_generation": any(key.get("configured") for key in api_keys.values()),
+            "ai_content_generation": True,  # platform keys (env-only, BYOK retired — D1)
             "website_analysis": website_analysis is not None,
             "research_capabilities": research_preferences is not None,
             "persona_generation": persona_readiness.get("ready", False),

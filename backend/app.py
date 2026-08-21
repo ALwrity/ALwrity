@@ -54,7 +54,7 @@ print(f"[app.py] ALWRITY_ENABLED_FEATURES at start: {os.getenv('ALWRITY_ENABLED_
 
 
 # Import onboarding models (after env is loaded, before heavy imports)
-from models.onboarding import APIKey, WebsiteAnalysis, ResearchPreferences, PersonaData, CompetitorAnalysis
+from models.onboarding import WebsiteAnalysis, ResearchPreferences, PersonaData, CompetitorAnalysis
 
 
 # Import FastAPI and related
