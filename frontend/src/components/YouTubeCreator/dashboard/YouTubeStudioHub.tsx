@@ -15,6 +15,7 @@ import { YouTubeResumeDraftChip } from "./YouTubeResumeDraftChip";
 import { StartNewVideoButton } from "../components/StartNewVideoButton";
 import { hasYouTubeCreatorDraft } from "../utils/youtubeCreatorDraftUtils";
 import { YouTubeCopilotFab } from "./YouTubeCopilotFab";
+import { YouTubeActionModal } from "./YouTubeActionModal";
 import {
   openYouTubeCreator,
   YT_OPEN_WEDGE_EVENT,
@@ -247,47 +248,24 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
           onCreatorDraftPatched={onCreatorDraftPatched}
         />
 
-        {connectGateOpen && (
-          <div
-            className="yt-modal-backdrop"
-            role="presentation"
-            onClick={() => setConnectGateOpen(false)}
+        <YouTubeActionModal
+          open={connectGateOpen}
+          title="Connect YouTube"
+          intro="Analysis, Engagement, and Remarket unlock after you connect your channel. Plan and Create stay available offline."
+          onClose={() => setConnectGateOpen(false)}
+          maxWidth={420}
+        >
+          <button
+            type="button"
+            className="yt-rail-btn yt-rail-btn--primary"
+            onClick={() => {
+              setConnectGateOpen(false);
+              onConnect();
+            }}
           >
-            <div
-              className="yt-modal-card"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Connect YouTube"
-              style={{ width: "min(420px, 100%)" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="yt-modal-header">
-                <h2>Connect YouTube</h2>
-                <button
-                  type="button"
-                  className="yt-modal-close"
-                  onClick={() => setConnectGateOpen(false)}
-                >
-                  ×
-                </button>
-              </div>
-              <p className="yt-modal-intro">
-                Analysis, Engagement, and Remarket unlock after you connect your channel. Plan and
-                Create stay available offline.
-              </p>
-              <button
-                type="button"
-                className="yt-rail-btn yt-rail-btn--primary"
-                onClick={() => {
-                  setConnectGateOpen(false);
-                  onConnect();
-                }}
-              >
-                Connect YouTube
-              </button>
-            </div>
-          </div>
-        )}
+            Connect YouTube
+          </button>
+        </YouTubeActionModal>
 
         <div className="yt-studio-bottom-dock" aria-label="Studio actions">
           <div className="yt-studio-copilot-fab">

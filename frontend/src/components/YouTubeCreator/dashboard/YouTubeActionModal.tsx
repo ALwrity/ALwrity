@@ -1,5 +1,7 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { YouTubeModalBackButton } from "./YouTubeModalBackButton";
+import { YT_Z_MODAL } from "./youtubeStudioZIndex";
 
 interface YouTubeActionModalProps {
   open: boolean;
@@ -28,6 +30,11 @@ export const YouTubeActionModal: React.FC<YouTubeActionModalProps> = ({
 }) => {
   if (!open) return null;
 
+  if (typeof document === "undefined") {
+    console.error("[YouTubeActionModal] Cannot render — document is unavailable");
+    return null;
+  }
+
   const isWedgeSized = Boolean(onBack) && maxWidth >= 1100;
   const cardClasses = [
     "yt-modal-card",
@@ -37,10 +44,11 @@ export const YouTubeActionModal: React.FC<YouTubeActionModalProps> = ({
     .filter(Boolean)
     .join(" ");
 
-  return (
+  return createPortal(
     <div
       className="yt-modal-backdrop"
       role="presentation"
+      style={{ zIndex: YT_Z_MODAL }}
       onClick={onClose}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
@@ -76,7 +84,8 @@ export const YouTubeActionModal: React.FC<YouTubeActionModalProps> = ({
         {intro && <p className="yt-modal-intro">{intro}</p>}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
