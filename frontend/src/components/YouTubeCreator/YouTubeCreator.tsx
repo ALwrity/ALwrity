@@ -1,18 +1,15 @@
 /* @refresh reset */
 /**
- * YouTube Creator Studio shell.
- * Default landing is Studio Hub. Legacy `?tab=creator` opens Full Creator modal.
- * Video Creator tab remains available via in-app click until a later PR.
+ * YouTube Creator Studio — Hub-only shell.
+ * Full Video Creator pipeline opens in modal (Create wedge / deep-links / Blog).
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Box, Tab, Tabs } from "@mui/material";
+import { Box } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { YouTubeVideoCreatorHeader } from "./panel/YouTubeVideoCreatorHeader";
-import { YouTubeVideoCreatorPanel } from "./YouTubeVideoCreatorPanel";
 import { YouTubeStudioHub } from "./dashboard/YouTubeStudioHub";
 import { useYouTubeStudioTab } from "./dashboard/useYouTubeStudioTab";
 import { useYouTubeCreatorLandingDeepLink } from "./dashboard/useYouTubeCreatorLandingDeepLink";
-import type { YouTubeStudioTab } from "./dashboard/youtubeStudioEvents";
 import {
   getYouTubeCreatorStateSnapshot,
   clearYouTubeCreatorStateStorage,
@@ -26,10 +23,8 @@ import "./dashboard/youtube-rail-controls.css";
 
 const YouTubeCreator: React.FC = () => {
   const navigate = useNavigate();
-  const { tab, setTab } = useYouTubeStudioTab();
-  const { suppressCreatorTabForDeepLink } = useYouTubeCreatorLandingDeepLink(setTab);
-  const effectiveTab: YouTubeStudioTab =
-    suppressCreatorTabForDeepLink && tab === "creator" ? "hub" : tab;
+  const { setTab } = useYouTubeStudioTab();
+  useYouTubeCreatorLandingDeepLink(setTab);
 
   const { connected, channels, loading: oauthLoading, connect, activeChannel } =
     useYouTubePublish();
@@ -39,9 +34,8 @@ const YouTubeCreator: React.FC = () => {
   );
 
   useEffect(() => {
-    document.title =
-      effectiveTab === "hub" ? "YouTube Studio Hub | ALwrity" : "YouTube Creator Studio | ALwrity";
-  }, [effectiveTab]);
+    document.title = "YouTube Studio Hub | ALwrity";
+  }, []);
 
   useEffect(() => {
     document.body.classList.add("youtube-studio-view");
@@ -49,7 +43,6 @@ const YouTubeCreator: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (effectiveTab !== "hub") return undefined;
     setHubDraft(getYouTubeCreatorStateSnapshot());
     let cancelled = false;
     youtubeApi
@@ -63,7 +56,7 @@ const YouTubeCreator: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [effectiveTab]);
+  }, []);
 
   useEffect(() => {
     const onUpdated = (event: Event) => {
@@ -92,47 +85,25 @@ const YouTubeCreator: React.FC = () => {
     setHubDraft(getYouTubeCreatorStateSnapshot());
   }, []);
 
-  const onTabChange = (_e: React.SyntheticEvent, value: YouTubeStudioTab) => setTab(value);
-
   return (
-    <Box className="yt-studio-page" data-tab={effectiveTab}>
+    <Box className="yt-studio-page" data-tab="hub">
       <Box className="yt-studio-page-header">
         <YouTubeVideoCreatorHeader onBack={() => navigate("/dashboard")} />
-        <Tabs
-          value={effectiveTab}
-          onChange={onTabChange}
-          textColor="inherit"
-          indicatorColor="secondary"
-          sx={{ minHeight: 44, color: "#0f0f0f" }}
-        >
-          <Tab value="creator" label="Video Creator" sx={{ color: "#0f0f0f" }} />
-          <Tab value="hub" label="Studio Hub" sx={{ color: "#0f0f0f" }} />
-        </Tabs>
       </Box>
 
-      <Box
-        className={
-          effectiveTab === "hub"
-            ? "yt-studio-page-body"
-            : "yt-studio-page-body yt-studio-page-body--creator"
-        }
-      >
-        {effectiveTab === "hub" ? (
-          <YouTubeStudioHub
-            connected={connected}
-            channelName={activeChannel?.channel_name}
-            channelBible={channelBible}
-            oauthLoading={oauthLoading}
-            onConnect={() => void connect()}
-            creatorState={hubDraft}
-            onClearDraft={onClearDraft}
-            needsAnalyticsReconnect={needsAnalyticsReconnect}
-            onChannelBibleSaved={setChannelBible}
-            onCreatorDraftPatched={setHubDraft}
-          />
-        ) : (
-          <YouTubeVideoCreatorPanel />
-        )}
+      <Box className="yt-studio-page-body">
+        <YouTubeStudioHub
+          connected={connected}
+          channelName={activeChannel?.channel_name}
+          channelBible={channelBible}
+          oauthLoading={oauthLoading}
+          onConnect={() => void connect()}
+          creatorState={hubDraft}
+          onClearDraft={onClearDraft}
+          needsAnalyticsReconnect={needsAnalyticsReconnect}
+          onChannelBibleSaved={setChannelBible}
+          onCreatorDraftPatched={setHubDraft}
+        />
       </Box>
     </Box>
   );
