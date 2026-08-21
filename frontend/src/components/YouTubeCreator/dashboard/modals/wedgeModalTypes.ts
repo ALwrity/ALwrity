@@ -29,6 +29,8 @@ export interface CreateWedgeProps extends WedgeModalBaseProps {
   creatorState: YouTubeCreatorState;
   onOpenSeo: () => void;
   onOpenThumb: () => void;
+  /** Opens Full Creator modal on Hub (no Video Creator tab switch). */
+  onOpenFullCreator: () => void;
 }
 
 export interface PublishWedgeProps extends GatedWedgeProps {
