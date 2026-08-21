@@ -93,6 +93,35 @@ class TestTitleSuggestionsPrompt:
         assert "selected_title" not in schema["required"]
 
 
+class TestPlannerSystemPrompt:
+    def test_binds_to_user_message_form_fields(self):
+        from services.youtube.planner_prompts import PLANNER_SYSTEM_PROMPT
+
+        assert "source of truth" in PLANNER_SYSTEM_PROMPT.lower()
+        assert "user message" in PLANNER_SYSTEM_PROMPT.lower()
+        for required in (
+            "video idea",
+            "audience",
+            "goal",
+            "style",
+            "duration",
+            "research",
+        ):
+            assert required in PLANNER_SYSTEM_PROMPT.lower()
+        assert "do not invent a different audience" in PLANNER_SYSTEM_PROMPT.lower()
+        assert "±20%" in PLANNER_SYSTEM_PROMPT
+        assert "TASK:" in PLANNER_SYSTEM_PROMPT
+        assert "CRITICAL RULES:" in PLANNER_SYSTEM_PROMPT
+
+    def test_user_prompt_builder_is_unchanged_for_idea_and_json(self):
+        from services.youtube.planner_prompts import build_planning_prompt
+
+        prompt = build_planning_prompt(**_base_kwargs(user_idea="Budget travel to Darjeeling targeting young professionals"))
+        assert "Budget travel to Darjeeling targeting young professionals" in prompt
+        assert '"video_summary"' in prompt
+        assert "Content outline durations must sum" in prompt
+
+
 class TestChannelBiblePrompt:
     def test_empty_context_omits_bible_block(self):
         from services.youtube.planner_prompts import build_planning_prompt
