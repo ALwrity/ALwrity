@@ -1,0 +1,110 @@
+/* YouTube Studio landing header — aligned with LinkedIn writer-header layout */
+
+.yt-studio-landing-header {
+  background: #fecaca;
+  color: #0f0f0f;
+  min-height: 80px;
+  max-height: 80px;
+  overflow: visible;
+  padding: 0 36px 0 12px;
+  border-bottom: 1px solid rgba(220, 38, 38, 0.12);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.yt-studio-landing-header-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  min-height: 80px;
+}
+
+.yt-studio-landing-header-brand {
+  grid-column: 1;
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.yt-studio-landing-header-brand-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: #ffffff;
+  border: 1px solid rgba(220, 38, 38, 0.15);
+  border-radius: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.yt-studio-landing-header-brand-logo img {
+  height: 36px;
+  width: 36px;
+  object-fit: contain;
+}
+
+.yt-studio-landing-header-title {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1;
+}
+
+.yt-studio-landing-header-brand-line {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #cc0000;
+  line-height: 1;
+}
+
+.yt-studio-landing-header-brand-subline {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #7f1d1d;
+  opacity: 0.9;
+  line-height: 1;
+}
+
+.yt-studio-landing-header-right {
+  grid-column: 2;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .yt-studio-landing-header {
+    padding: 0 12px;
+    min-height: 72px;
+    max-height: 72px;
+  }
+
+  .yt-studio-landing-header-row {
+    min-height: 72px;
+  }
+
+  .yt-studio-landing-header-brand-line {
+    font-size: 22px;
+  }
+
+  .yt-studio-landing-header-brand-subline {
+    font-size: 11px;
+  }
+}

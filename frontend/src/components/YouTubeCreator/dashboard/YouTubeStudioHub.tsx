@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import "./youtube-dashboard-layout.css";
 import "./youtube-rail-controls.css";
 import { YouTubeRadialWorkflow } from "./YouTubeRadialWorkflow";
@@ -6,11 +6,6 @@ import { YouTubeMobileWorkflowGrid } from "./YouTubeMobileWorkflowGrid";
 import { YouTubeChannelHub } from "./YouTubeChannelHub";
 import { YouTubeHubConnectButton } from "./YouTubeHubConnectButton";
 import { YouTubeChannelBibleChip } from "./YouTubeChannelBibleChip";
-import {
-  computeYouTubeRadialLayout,
-  youtubeHubCenterLeftCss,
-  youtubeHubCenterYPx,
-} from "./youtubeRadialLayout";
 import type { YouTubeWorkflowCardId } from "./youtubeWorkflowConfig";
 import { resolveWedgeNavigation } from "./studioHubWedgeNavigation";
 import { YouTubeWorkflowModals } from "./YouTubeWorkflowModals";
@@ -27,24 +22,9 @@ import {
 } from "./youtubeStudioEvents";
 import type { YouTubeCreatorState } from "../../../hooks/useYouTubeCreatorState";
 import type { YouTubeChannelBible } from "../../../services/youtubeApi";
-
-const DESKTOP_MIN_WIDTH_PX = 961;
-
-function useIsDesktop(): boolean {
-  const [desktop, setDesktop] = useState(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return true;
-    return window.matchMedia(`(min-width: ${DESKTOP_MIN_WIDTH_PX}px)`).matches;
-  });
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return undefined;
-    const mq = window.matchMedia(`(min-width: ${DESKTOP_MIN_WIDTH_PX}px)`);
-    const onChange = () => setDesktop(mq.matches);
-    onChange();
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-  return desktop;
-}
+import { useYouTubeDesktopViewport } from "./useYouTubeDesktopViewport";
+import { useYouTubeHeroLayoutMetrics } from "./useYouTubeHeroLayoutMetrics";
+import { HUB_CENTER_LEFT_CSS_VAR } from "./youtubeLayoutConstants";
 
 export interface YouTubeStudioHubProps {
   connected: boolean;
@@ -71,37 +51,21 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
   onChannelBibleSaved,
   onCreatorDraftPatched,
 }) => {
-  const isDesktop = useIsDesktop();
+  const isDesktop = useYouTubeDesktopViewport();
+  const heroStageRef = useRef<HTMLDivElement>(null);
+  const heroContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(640);
-  const [containerHeight, setContainerHeight] = useState(0);
-  const [workflowModal, setWorkflowModal] = useState<YouTubeWorkflowCardId | null>(
-    null,
-  );
+  const [workflowModal, setWorkflowModal] = useState<YouTubeWorkflowCardId | null>(null);
   const [connectGateOpen, setConnectGateOpen] = useState(false);
 
-  useEffect(() => {
-    const el = canvasRef.current;
-    if (!el) return undefined;
-    const readDimensions = () => {
-      if (el.clientWidth > 0) setContainerWidth(el.clientWidth);
-      if (el.parentElement && el.parentElement.clientHeight > 0) {
-        setContainerHeight(el.parentElement.clientHeight);
-      }
-    };
-    readDimensions();
-    const ro = new ResizeObserver(readDimensions);
-    ro.observe(el);
-    if (el.parentElement) {
-      const parentRo = new ResizeObserver(readDimensions);
-      parentRo.observe(el.parentElement);
-      return () => {
-        ro.disconnect();
-        parentRo.disconnect();
-      };
-    }
-    return () => ro.disconnect();
-  }, []);
+  const { layout, hubCenterLeft, hubCenterY, hubDiameter, hubAvatarSize } =
+    useYouTubeHeroLayoutMetrics({
+      isDesktop,
+      heroStageRef,
+      heroContainerRef,
+      canvasRef,
+    });
+  const hubAxisLeft = isDesktop ? `var(${HUB_CENTER_LEFT_CSS_VAR})` : hubCenterLeft;
 
   useEffect(() => {
     const onOpenWedge = (event: Event) => {
@@ -118,14 +82,15 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
     return () => window.removeEventListener(YT_OPEN_WEDGE_EVENT, onOpenWedge);
   }, [connected]);
 
-  const layout = useMemo(
-    () => computeYouTubeRadialLayout(containerWidth, containerHeight || undefined),
-    [containerWidth, containerHeight],
-  );
-
-  const hubCenterLeft = youtubeHubCenterLeftCss(layout);
-  const hubCenterY = youtubeHubCenterYPx(layout);
-  const hubDiameter = layout.hubVisualR * 2;
+  useEffect(() => {
+    const stage = heroStageRef.current;
+    if (!stage) return;
+    if (isDesktop) {
+      stage.style.setProperty(HUB_CENTER_LEFT_CSS_VAR, hubCenterLeft);
+    } else {
+      stage.style.removeProperty(HUB_CENTER_LEFT_CSS_VAR);
+    }
+  }, [isDesktop, hubCenterLeft]);
 
   const hasDraft = hasYouTubeCreatorDraft(creatorState);
 
@@ -182,56 +147,91 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
         </div>
 
         <div
-          className="yt-studio-hub-hero"
-          style={{ ["--yt-hub-center-left" as string]: hubCenterLeft }}
+          ref={heroStageRef}
+          className="yt-studio-hub-hero-stage"
+          style={{
+            [HUB_CENTER_LEFT_CSS_VAR as string]: isDesktop ? hubCenterLeft : undefined,
+          }}
         >
           <div
-            className="yt-studio-hub-canvas"
-            ref={canvasRef}
-            style={isDesktop ? { height: layout.viewH } : undefined}
+            className="yt-studio-hub-hero"
+            ref={heroContainerRef}
+            style={
+              isDesktop
+                ? {
+                    width: "100%",
+                    flex: "0 1 auto",
+                    minHeight: 0,
+                    height: "auto",
+                    flexShrink: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "flex-start",
+                    alignItems: "center",
+                    overflow: "hidden",
+                    position: "static",
+                    paddingTop: 0,
+                  }
+                : undefined
+            }
           >
-            {isDesktop ? (
-              <>
-                <YouTubeRadialWorkflow
-                  layout={layout}
-                  onCardAction={handleCardAction}
-                  connected={connected}
-                />
-                <div
-                  className="yt-studio-hub-hub"
-                  style={{
-                    width: hubDiameter,
-                    left: hubCenterLeft,
-                    top: hubCenterY,
-                  }}
-                >
+            <div
+              className="yt-studio-hub-canvas"
+              ref={canvasRef}
+              style={isDesktop ? { height: layout.viewH, flexShrink: 0, zIndex: 1 } : undefined}
+            >
+              {isDesktop ? (
+                <>
+                  <YouTubeRadialWorkflow
+                    layout={layout}
+                    onCardAction={handleCardAction}
+                    connected={connected}
+                  />
+                  <div
+                    className="yt-studio-hub-hub"
+                    style={{
+                      width: hubDiameter,
+                      maxWidth: hubDiameter,
+                      left: hubAxisLeft,
+                      top: hubCenterY,
+                      ["--hub-inner-diameter" as string]: `${hubDiameter}px`,
+                      ["--hub-avatar-size" as string]: `${hubAvatarSize}px`,
+                    }}
+                  >
+                    <YouTubeChannelHub
+                      hubSize={hubDiameter}
+                      avatarSize={hubAvatarSize}
+                      connected={connected}
+                      channelName={channelName}
+                      niche={channelBible?.niche || null}
+                      isLoading={oauthLoading}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="yt-studio-hub-mobile">
                   <YouTubeChannelHub
-                    hubSize={hubDiameter}
+                    hubSize={180}
                     connected={connected}
                     channelName={channelName}
                     niche={channelBible?.niche || null}
                     isLoading={oauthLoading}
                   />
+                  {hubCta}
+                  <YouTubeMobileWorkflowGrid
+                    onCardAction={handleCardAction}
+                    connected={connected}
+                  />
                 </div>
-              </>
-            ) : (
-              <div className="yt-studio-hub-mobile">
-                <YouTubeChannelHub
-                  hubSize={180}
-                  connected={connected}
-                  channelName={channelName}
-                  niche={channelBible?.niche || null}
-                  isLoading={oauthLoading}
-                />
-                {hubCta}
-                <YouTubeMobileWorkflowGrid
-                  onCardAction={handleCardAction}
-                  connected={connected}
-                />
-              </div>
-            )}
+              )}
+            </div>
           </div>
-          {isDesktop ? <div className="yt-studio-hub-connect">{hubCta}</div> : null}
+
+          {isDesktop ? (
+            <div className="yt-studio-hub-connect-anchor yt-studio-hub-connect-anchor--hub-bottom">
+              {hubCta}
+            </div>
+          ) : null}
         </div>
 
         <YouTubeWorkflowModals
@@ -248,7 +248,11 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
         />
 
         {connectGateOpen && (
-          <div className="yt-modal-backdrop" role="presentation" onClick={() => setConnectGateOpen(false)}>
+          <div
+            className="yt-modal-backdrop"
+            role="presentation"
+            onClick={() => setConnectGateOpen(false)}
+          >
             <div
               className="yt-modal-card"
               role="dialog"
@@ -285,7 +289,15 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
           </div>
         )}
 
-        <YouTubeCopilotFab />
+        <div className="yt-studio-bottom-dock" aria-label="Studio actions">
+          <div className="yt-studio-copilot-fab">
+            <YouTubeCopilotFab variant="corner" />
+          </div>
+        </div>
+
+        <div className="yt-studio-mobile-copilot-fab" data-tour="yt-mobile-copilot-fab">
+          <YouTubeCopilotFab variant="fixed" />
+        </div>
       </div>
 
       <YouTubeRightRail

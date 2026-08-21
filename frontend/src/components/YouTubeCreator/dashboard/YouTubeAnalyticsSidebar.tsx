@@ -16,12 +16,13 @@ function fmt(n: number | null | undefined): string {
   return String(Math.round(n));
 }
 
-export const YouTubeAnalyticsSidebar: React.FC<YouTubeAnalyticsSidebarProps> = ({
-  connected,
-  channelName,
-  onConnect,
-  needsAnalyticsReconnect = false,
-}) => {
+export const YouTubeAnalyticsSidebar = React.forwardRef<
+  HTMLDivElement,
+  YouTubeAnalyticsSidebarProps
+>(function YouTubeAnalyticsSidebar(
+  { connected, channelName, onConnect, needsAnalyticsReconnect = false },
+  ref,
+) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pulse, setPulse] = useState<any>(null);
@@ -65,7 +66,7 @@ export const YouTubeAnalyticsSidebar: React.FC<YouTubeAnalyticsSidebarProps> = (
   const windowMetrics = pulse?.window || {};
 
   return (
-    <div className="yt-rail-panel" data-tour="yt-analytics-sidebar">
+    <div className="yt-rail-panel" data-tour="yt-analytics-sidebar" ref={ref}>
       <h3>Channel Pulse</h3>
       {!connected ? (
         <>
@@ -147,4 +148,4 @@ export const YouTubeAnalyticsSidebar: React.FC<YouTubeAnalyticsSidebarProps> = (
       )}
     </div>
   );
-};
+});

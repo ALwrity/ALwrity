@@ -4,31 +4,70 @@
 
 body.youtube-studio-view {
   background: #ffffff !important;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+body.youtube-studio-view #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+@keyframes workflowWedgeRecommendedPulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 2px 8px rgba(255, 0, 0, 0.2))
+      drop-shadow(0 4px 6px rgba(0, 0, 0, 0.05));
+    stroke-opacity: 1;
+  }
+  50% {
+    filter: drop-shadow(0 4px 14px rgba(255, 0, 0, 0.45))
+      drop-shadow(0 6px 10px rgba(0, 0, 0, 0.08));
+    stroke-opacity: 0.92;
+  }
+}
+
+.workflow-wedge--recommended .workflow-wedge-base {
+  animation: workflowWedgeRecommendedPulse 2.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workflow-wedge--recommended .workflow-wedge-base {
+    animation: none !important;
+  }
 }
 
 .yt-studio-page {
+  height: 100vh;
+  height: 100dvh;
   min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
   display: flex;
   flex-direction: column;
   background: linear-gradient(180deg, #ffffff 0%, #fff5f5 100%);
   color: #0f0f0f;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .yt-studio-page-header {
   flex: 0 0 auto;
-  padding: 12px 20px 0;
-  border-bottom: 1px solid #f1f1f1;
-  background: #ffffff;
+  padding: 0;
+  border-bottom: none;
+  background: transparent;
 }
 
 .yt-studio-page-body {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
   width: 100%;
-  padding: 12px 16px 20px;
+  padding: 0;
   box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .yt-studio-hub {
@@ -38,7 +77,8 @@ body.youtube-studio-view {
   gap: 16px;
   align-items: stretch;
   box-sizing: border-box;
-  min-height: calc(100dvh - 140px);
+  flex: 1 1 auto;
+  min-height: 0;
   position: relative;
 }
 
@@ -49,6 +89,10 @@ body.youtube-studio-view {
   flex-direction: column;
   gap: 0;
   position: relative;
+  isolation: isolate;
+  padding: 0 8px;
+  padding-bottom: 90px;
+  box-sizing: border-box;
 }
 
 .yt-studio-hub-toolbar {
@@ -68,24 +112,42 @@ body.youtube-studio-view {
   pointer-events: auto;
 }
 
+.yt-studio-hub-hero-stage {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  position: relative;
+  z-index: 2;
+  padding: 2px clamp(8px, 1.5vw, 16px) clamp(12px, 3vh, 28px)
+    clamp(4px, 1vw, 12px);
+  box-sizing: border-box;
+}
+
 .yt-studio-hub-hero {
   position: relative;
   width: 100%;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding-bottom: 12px;
-  box-sizing: border-box;
+  justify-content: flex-start;
+  overflow: hidden;
+  z-index: 1;
+  margin-top: -10px;
 }
 
 .yt-studio-hub-canvas {
   position: relative;
   width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
+  max-width: 100%;
+  margin: -4px 0 0;
 }
 
 .yt-studio-hub-hub {
@@ -100,16 +162,13 @@ body.youtube-studio-view {
   pointer-events: auto;
 }
 
-.yt-studio-hub-connect {
-  position: relative;
-  left: auto;
-  bottom: auto;
-  transform: none;
-  z-index: 20;
-  display: flex;
-  justify-content: center;
-  margin-top: 8px;
-  pointer-events: auto;
+.yt-studio-hub-connect-anchor {
+  filter: drop-shadow(0 4px 12px rgba(255, 0, 0, 0.12));
+}
+
+.yt-studio-bottom-dock {
+  display: none;
+  overflow: visible;
 }
 
 .yt-studio-hub-mobile {
@@ -121,29 +180,98 @@ body.youtube-studio-view {
 }
 
 .yt-studio-right-rail {
-  flex: 0 0 300px;
-  width: 300px;
+  flex: 0 0 340px;
+  width: 340px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   min-height: 0;
+  padding: 10px 10px 12px;
+  box-sizing: border-box;
 }
 
-@media (min-width: 961px) {
-  .yt-studio-hub {
+@media (min-width: 601px) {
+  body.youtube-studio-view .yt-studio-hub {
     display: block;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
   }
 
-  .yt-studio-hub-main {
+  body.youtube-studio-view .yt-studio-hub-main {
     width: 100%;
-    min-height: calc(100dvh - 140px);
+    min-height: 0;
+    height: 100%;
+    padding-bottom: 0;
+    display: flex;
+    flex-direction: column;
   }
 
-  .yt-studio-hub-hero {
-    min-height: calc(100dvh - 160px);
+  body.youtube-studio-view .yt-studio-hub-hero-stage {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end !important;
+    align-items: stretch;
+    padding-top: clamp(8px, 2vh, 24px);
+    padding-left: clamp(4px, 1vw, 12px);
+    padding-bottom: 30px;
+    position: relative;
   }
 
-  .yt-studio-right-rail {
+  body.youtube-studio-view .yt-studio-hub-hero {
+    margin-top: 0 !important;
+    margin-bottom: 4px !important;
+    flex: 0 0 auto;
+    position: static !important;
+  }
+
+  body.youtube-studio-view .yt-studio-hub-hub {
+    left: var(--yt-hub-center-left, 50%) !important;
+  }
+
+  body.youtube-studio-view .yt-studio-hub-connect-anchor--hub-bottom {
+    position: absolute !important;
+    left: var(--yt-hub-center-left, 50%) !important;
+    bottom: 12px !important;
+    top: auto !important;
+    transform: translateX(-50%) !important;
+    z-index: 25;
+    pointer-events: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 0;
+  }
+
+  body.youtube-studio-view .yt-studio-bottom-dock {
+    display: flex;
+    align-items: flex-start;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 12px;
+    padding: 0 12px;
+    z-index: 24;
+    pointer-events: none;
+    min-height: 72px;
+  }
+
+  body.youtube-studio-view .yt-studio-bottom-dock > * {
+    pointer-events: auto;
+  }
+
+  body.youtube-studio-view .yt-studio-bottom-dock .yt-studio-copilot-fab {
+    position: static;
+    left: auto;
+    bottom: auto;
+    flex: 0 0 auto;
+  }
+
+  body.youtube-studio-view .yt-studio-right-rail {
     position: absolute;
     top: 0;
     right: 0;
@@ -154,6 +282,7 @@ body.youtube-studio-view {
 }
 
 .yt-studio-rail-actions {
+  flex-shrink: 0;
   margin-top: auto;
   width: 100%;
   display: flex;
@@ -315,8 +444,9 @@ body.youtube-studio-view {
 
 .yt-kc-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
   gap: 8px;
+  padding: 10px;
 }
 
 .yt-kc-item {
@@ -443,22 +573,183 @@ body.youtube-studio-view {
   flex-shrink: 0;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 600px) {
+  .yt-studio-page {
+    overflow: visible;
+  }
+
+  .yt-studio-page-body {
+    overflow: visible;
+  }
+
   .yt-studio-hub {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    height: auto;
+    overflow: visible;
+  }
+
+  .yt-studio-hub-main {
+    flex: 0 0 auto;
+    width: 100%;
+    overflow: visible;
+    padding: 0 clamp(12px, 4vw, 16px);
+    padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .yt-studio-hub-hero-stage {
+    flex: 0 0 auto;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible;
+    padding: 0;
+  }
+
+  .yt-studio-hub-hero {
+    align-items: center !important;
+    gap: 12px;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    overflow: visible !important;
   }
 
   .yt-studio-right-rail {
     position: static;
     flex: 1 1 auto;
     width: 100%;
+    padding: 0;
   }
 
   .yt-studio-rail-actions {
     flex-direction: row;
+    align-items: stretch;
     justify-content: flex-end;
-    margin-top: 8px;
+    margin-top: 4px;
+    gap: 10px;
+  }
+
+  .yt-studio-rail-actions > * {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .yt-knowledge-center-rail {
+    width: 100%;
+  }
+
+  .yt-rail-icon-trigger,
+  .yt-rail-icon-trigger:hover,
+  .yt-rail-icon-trigger--open {
+    min-width: 0;
+    width: 100%;
+    min-height: 44px;
+    padding: 0 40px 0 12px;
+  }
+
+  .yt-studio-copilot-fab {
+    display: none;
+  }
+
+  .yt-studio-bottom-dock {
+    display: none !important;
+  }
+
+  .yt-studio-mobile-copilot-fab {
+    display: block;
+    position: fixed;
+    left: auto;
+    right: clamp(12px, 4vw, 16px);
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    z-index: 1200;
+    pointer-events: none;
+  }
+
+  .yt-studio-mobile-copilot-fab .yt-copilot-fab-fixed-inner {
+    pointer-events: auto;
+  }
+}
+
+/* Plan wedge START HERE bookmark — matches LinkedIn radial hero (desktop only) */
+@media (min-width: 601px) {
+  .workflow-wedge-bookmark-badge {
+    --bookmark-accent: var(--bookmark-ribbon-color, #b9faf8);
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 37px;
+    height: 46px;
+    transform: translateX(-50%);
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    user-select: none;
+    z-index: 2;
+    filter: drop-shadow(
+      0 3px 10px color-mix(in srgb, var(--bookmark-accent) 55%, transparent)
+    );
+    animation: workflowBookmarkBadgeFloat 2.8s ease-in-out infinite;
+  }
+
+  .workflow-wedge-bookmark-badge__svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .workflow-wedge-bookmark-badge__path {
+    stroke: rgba(255, 255, 255, 0.85);
+    stroke-width: 1.2;
+    stroke-linejoin: round;
+    paint-order: stroke fill;
+  }
+
+  .workflow-wedge-bookmark-badge__text {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    text-align: center;
+    line-height: 1;
+    padding-bottom: 6px;
+  }
+
+  .workflow-wedge-bookmark-badge__line {
+    display: block;
+    font-size: 7px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #0f4c47;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+  }
+
+  .workflow-wedge-bookmark-badge__line--bold {
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+  }
+
+  @keyframes workflowBookmarkBadgeFloat {
+    0%,
+    100% {
+      transform: translateX(-50%) translateY(0);
+    }
+    50% {
+      transform: translateX(-50%) translateY(-2px);
+    }
+  }
+}
+
+@media (min-width: 601px) and (prefers-reduced-motion: reduce) {
+  .workflow-wedge-bookmark-badge {
+    animation: none;
+    transform: translateX(-50%);
   }
 }
