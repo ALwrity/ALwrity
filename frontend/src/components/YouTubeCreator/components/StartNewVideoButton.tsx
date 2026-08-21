@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@mui/material";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+import { YouTubeStudioTabButton } from "./YouTubeStudioTabButton";
 import { YT_BORDER, YT_RED, YT_TEXT } from "../constants";
 
 interface StartNewVideoButtonProps {
@@ -20,7 +21,7 @@ interface StartNewVideoButtonProps {
   disabled?: boolean;
   size?: "small" | "medium";
   /** Hub toolbar uses rail button classes instead of MUI contained. */
-  variant?: "mui" | "hub";
+  variant?: "mui" | "hub" | "hubTab";
 }
 
 export const StartNewVideoButton: React.FC<StartNewVideoButtonProps> = ({
@@ -37,7 +38,17 @@ export const StartNewVideoButton: React.FC<StartNewVideoButtonProps> = ({
   };
 
   const trigger =
-    variant === "hub" ? (
+    variant === "hubTab" ? (
+      <YouTubeStudioTabButton
+        label="Start New Video"
+        stackedLabel={["Start", "New"]}
+        icon="✨"
+        open={open}
+        disabled={disabled}
+        onClick={() => setOpen(true)}
+        dataTour="yt-start-new-video"
+      />
+    ) : variant === "hub" ? (
       <button
         type="button"
         className="yt-rail-btn"

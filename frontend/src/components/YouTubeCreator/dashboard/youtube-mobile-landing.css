@@ -1,0 +1,324 @@
+/**
+ * YouTube Studio mobile landing (≤600px) — mirrors LinkedIn Studio mobile placement.
+ * Desktop radial / rail rules stay in youtube-dashboard-layout.css.
+ */
+
+.yt-studio-hub-mobile {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 0 4px;
+  box-sizing: border-box;
+}
+
+.yt-studio-mobile-dock {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  gap: 8px;
+  margin: 0 0 4px;
+  padding: 0 2px;
+  box-sizing: border-box;
+}
+
+.yt-studio-mobile-dock > * {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+}
+
+.yt-studio-mobile-tab {
+  appearance: none;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  height: 52px;
+  min-height: 52px;
+  max-height: 52px;
+  padding: 4px 3px;
+  margin: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: #475569;
+  font-weight: 700;
+  line-height: 1.1;
+  cursor: pointer;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.yt-studio-mobile-tab--boxed {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.yt-studio-mobile-tab--active {
+  color: #cc0000;
+  background: rgba(204, 0, 0, 0.1);
+}
+
+.yt-studio-mobile-tab:hover:not(:disabled) {
+  color: #cc0000;
+  background: rgba(204, 0, 0, 0.06);
+}
+
+.yt-studio-mobile-tab:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.yt-studio-mobile-tab-label {
+  font-size: clamp(9px, 2.5vw, 11px);
+  font-weight: 700;
+  color: inherit;
+  text-align: center;
+  line-height: 1.1;
+  order: 1;
+}
+
+.yt-studio-mobile-tab-label--stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+
+.yt-studio-mobile-tab-icon {
+  position: relative;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  order: 2;
+}
+
+.yt-studio-mobile-tab-icon--badged::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f97316;
+  border: 1.5px solid #ffffff;
+}
+
+.yt-dashboard-mobile-workflow {
+  width: 100%;
+  padding: 0 2px;
+}
+
+.yt-dashboard-mobile-workflow-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.yt-dashboard-mobile-workflow-title--stacked {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font-size: clamp(18px, 5.3vw, 24px);
+  font-weight: 800;
+  color: #0f0f0f;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+}
+
+.yt-dashboard-mobile-workflow-title-emoji {
+  font-size: 0.9em;
+}
+
+.yt-dashboard-mobile-workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.yt-dashboard-mobile-workflow-card {
+  position: relative;
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 4px;
+  min-height: 88px;
+  padding: 10px 8px 8px 10px;
+  border-radius: 14px;
+  border: 1.5px solid color-mix(in srgb, var(--workflow-card-accent, #64748b) 20%, #e2e8f0);
+  background: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  text-align: left;
+}
+
+.yt-dashboard-mobile-workflow-card--recommended {
+  border-color: color-mix(in srgb, var(--workflow-card-accent, #6366f1) 45%, #e2e8f0);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.16);
+}
+
+.yt-dashboard-mobile-workflow-badge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #6366f1;
+  line-height: 1.1;
+}
+
+.yt-dashboard-mobile-workflow-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+}
+
+.yt-dashboard-mobile-workflow-icon {
+  font-size: 16px;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+.yt-dashboard-mobile-workflow-label {
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #0f0f0f;
+  flex: 1;
+  min-width: 0;
+}
+
+.yt-dashboard-mobile-workflow-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #606060;
+  width: 100%;
+}
+
+.yt-mobile-analytics-section {
+  width: 100%;
+  margin: 0;
+  padding: 0 2px 4px;
+}
+
+.yt-mobile-analytics-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-around;
+  gap: 8px;
+  width: 100%;
+  padding-right: 72px;
+  box-sizing: border-box;
+}
+
+.yt-mobile-analytics-icon-btn {
+  appearance: none;
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.yt-mobile-analytics-icon-btn-circle {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid #cc0000;
+  background: #ffffff;
+  color: #cc0000;
+  box-shadow: 0 4px 16px rgba(204, 0, 0, 0.18);
+}
+
+.yt-mobile-analytics-icon-btn-label {
+  font-size: clamp(10px, 2.8vw, 12px);
+  font-weight: 700;
+  color: #334155;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.yt-mobile-analytics-icon-btn:hover .yt-mobile-analytics-icon-btn-circle,
+.yt-mobile-analytics-icon-btn:active .yt-mobile-analytics-icon-btn-circle {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(204, 0, 0, 0.24);
+}
+
+.yt-mobile-analytics-icon-btn__lock {
+  position: absolute;
+  top: 0;
+  right: 8px;
+}
+
+.yt-mobile-analytics-knowledge-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.yt-mobile-analytics-knowledge-feature {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border-radius: 12px;
+  border: 1px solid #fecaca;
+  background: #fff;
+  cursor: pointer;
+  color: var(--feature-accent, #cc0000);
+}
+
+.yt-mobile-analytics-knowledge-feature-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f0f0f;
+  text-align: center;
+  line-height: 1.2;
+}
+
+@media (max-width: 600px) {
+  .yt-studio-hub-toolbar {
+    display: none;
+  }
+
+  .yt-studio-right-rail {
+    display: none !important;
+  }
+}
