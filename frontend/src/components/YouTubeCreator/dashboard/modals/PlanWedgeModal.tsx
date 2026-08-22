@@ -14,6 +14,7 @@ import { YouTubePlanUrlImportModal } from "./YouTubePlanUrlImportModal";
 import type { GoCreateFn, PlanWedgeProps } from "./wedgeModalTypes";
 import { YouTubePlanIdeaWorkspace } from "./YouTubePlanIdeaWorkspace";
 import { YouTubePlanSidebarTools } from "./YouTubePlanSidebarTools";
+import { consumeYouTubePlanDrillDown } from "../youtubePlanDrillDown";
 import type { YouTubeChannelBible } from "../../../../services/youtubeApi";
 
 export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
@@ -48,6 +49,29 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
       setUrlImportOpen(false);
       return;
     }
+
+    const drill = consumeYouTubePlanDrillDown();
+    if (drill) {
+      const nextSeed = (drill.seed || "").trim();
+      if (nextSeed) {
+        setSeed(nextSeed);
+      }
+      if (drill.sub === "url-import") {
+        setUrlImportOpen(true);
+        setSavedIdeasOpen(false);
+        setBibleEditorOpen(false);
+      } else if (drill.sub === "saved-ideas") {
+        setSavedIdeasOpen(true);
+        setUrlImportOpen(false);
+        setBibleEditorOpen(false);
+      } else {
+        setUrlImportOpen(false);
+        setSavedIdeasOpen(false);
+        setBibleEditorOpen(false);
+      }
+      console.info("[PlanWedgeModal] Applied Plan drill-down", drill);
+    }
+
     let cancelled = false;
     void (async () => {
       try {

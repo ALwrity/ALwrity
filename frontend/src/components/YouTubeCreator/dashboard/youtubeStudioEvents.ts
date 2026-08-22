@@ -3,9 +3,16 @@
  */
 import type { DurationType } from "../constants";
 import type { YouTubeChannelBible } from "../../../services/youtubeApi";
+import type { YouTubeSourceArticle } from "../components/planUrlImportUtils";
 import type { YouTubeWorkflowCardId } from "./youtubeWorkflowConfig";
+import {
+  queueYouTubePlanDrillDown,
+  type YouTubePlanDrillDownDetail,
+  type YouTubePlanDrillDownSub,
+} from "./youtubePlanDrillDown";
 
 export const YT_OPEN_CREATOR_EVENT = "youtube:openCreator";
+export const YT_CLOSE_CREATOR_EVENT = "youtube:closeCreator";
 export const YT_OPEN_WEDGE_EVENT = "youtube:openWorkflowWedge";
 export const YT_RESUME_DRAFT_EVENT = "youtube:resumeDraft";
 export const YT_SWITCH_TAB_EVENT = "youtube:switchTab";
@@ -13,6 +20,8 @@ export const YT_OPEN_CHANNEL_BIBLE_EVENT = "youtube:openChannelBible";
 export const YT_CHANNEL_BIBLE_UPDATED_EVENT = "youtube:channelBibleUpdated";
 
 export type YouTubeStudioTab = "hub" | "creator";
+
+export type { YouTubePlanDrillDownDetail, YouTubePlanDrillDownSub };
 
 /**
  * Hub-only shell: any query (including legacy `?tab=creator`) resolves to Hub.
@@ -26,16 +35,19 @@ export interface YouTubeOpenCreatorDetail {
   step?: number;
   durationType?: DurationType;
   userIdea?: string;
+  /** Article metadata for createPlan (from Plan Blog/URL → Use for video idea). */
+  sourceArticle?: YouTubeSourceArticle;
+  /** @deprecated Retargeted to Plan wedge url-import drill-down. */
   focusUrlImport?: boolean;
-  /** Expand Plan brainstorm (Topic Discovery). */
+  /** @deprecated Retargeted to Plan Topic Discovery. */
   focusBrainstorm?: boolean;
-  /** Expand brainstorm and load saved ideas. */
+  /** @deprecated Retargeted to Plan Saved Ideas drill-down. */
   focusSavedIdeas?: boolean;
 }
 
 export interface YouTubeOpenWedgeDetail {
   wedge: YouTubeWorkflowCardId;
-  sub?: string;
+  sub?: YouTubePlanDrillDownSub;
 }
 
 /** Pending open detail when Full Creator modal mounts after a deep-link. */
@@ -82,7 +94,33 @@ export function queueYouTubeCreatorOpen(detail: YouTubeOpenCreatorDetail = {}): 
   }
 }
 
+export function openYouTubePlanFromCreator(
+  detail: YouTubePlanDrillDownDetail = {},
+): void {
+  queueYouTubePlanDrillDown(detail);
+  window.dispatchEvent(new CustomEvent(YT_CLOSE_CREATOR_EVENT));
+  openYouTubeWorkflowWedge({
+    wedge: "plan",
+    sub: detail.sub,
+  });
+  console.info("[youtubeStudioEvents] openYouTubePlanFromCreator", detail);
+}
+
 export function openYouTubeCreator(detail: YouTubeOpenCreatorDetail = {}): void {
+  // Discovery deep-links land on Plan wedge (single place for brainstorm / Blog/URL).
+  if (detail.focusUrlImport || detail.focusBrainstorm || detail.focusSavedIdeas) {
+    const sub: YouTubePlanDrillDownSub = detail.focusUrlImport
+      ? "url-import"
+      : detail.focusSavedIdeas
+        ? "saved-ideas"
+        : "brainstorm";
+    openYouTubePlanFromCreator({
+      sub,
+      seed: typeof detail.userIdea === "string" ? detail.userIdea : undefined,
+    });
+    return;
+  }
+
   queueYouTubeCreatorOpen(detail);
   window.dispatchEvent(
     new CustomEvent<YouTubeOpenCreatorDetail>(YT_OPEN_CREATOR_EVENT, {

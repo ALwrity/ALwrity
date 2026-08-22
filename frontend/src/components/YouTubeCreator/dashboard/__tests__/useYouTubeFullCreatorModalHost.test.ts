@@ -4,6 +4,7 @@ import {
   consumePendingOpenCreator,
   openYouTubeCreator,
   queueYouTubeCreatorOpen,
+  YT_CLOSE_CREATOR_EVENT,
   YT_OPEN_CREATOR_EVENT,
 } from "../youtubeStudioEvents";
 
@@ -48,5 +49,36 @@ describe("useYouTubeFullCreatorModalHost", () => {
 
     expect(onCloseWedges).toHaveBeenCalled();
     expect(result.current.fullCreatorOpen).toBe(true);
+  });
+
+  it("retargets legacy discovery pending to Plan wedge instead of opening Creator", () => {
+    queueYouTubeCreatorOpen({
+      step: 0,
+      userIdea: "Blog idea",
+      focusUrlImport: true,
+    });
+    const onCloseWedges = jest.fn();
+    const { result } = renderHook(() => useYouTubeFullCreatorModalHost(onCloseWedges));
+
+    expect(onCloseWedges).not.toHaveBeenCalled();
+    expect(result.current.fullCreatorOpen).toBe(false);
+    expect(consumePendingOpenCreator()).toBeNull();
+  });
+
+  it("closes modal and clears pending on YT_CLOSE_CREATOR_EVENT", () => {
+    queueYouTubeCreatorOpen({ step: 0, userIdea: "Queued" });
+    const { result } = renderHook(() => useYouTubeFullCreatorModalHost(jest.fn()));
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(YT_OPEN_CREATOR_EVENT, { detail: {} }));
+    });
+    expect(result.current.fullCreatorOpen).toBe(true);
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(YT_CLOSE_CREATOR_EVENT));
+    });
+
+    expect(result.current.fullCreatorOpen).toBe(false);
+    expect(consumePendingOpenCreator()).toBeNull();
   });
 });

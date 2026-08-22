@@ -1,5 +1,6 @@
 export {
   openYouTubeCreator,
+  openYouTubePlanFromCreator,
   openYouTubeWorkflowWedge,
   resumeYouTubeDraft,
   queueYouTubeCreatorOpen,
@@ -7,6 +8,14 @@ export {
   hasPendingOpenCreator,
   peekPendingOpenCreator,
 } from "./youtubeStudioEvents";
+export {
+  queueYouTubePlanDrillDown,
+  consumeYouTubePlanDrillDown,
+} from "./youtubePlanDrillDown";
+export type {
+  YouTubePlanDrillDownDetail,
+  YouTubePlanDrillDownSub,
+} from "./youtubePlanDrillDown";
 export { useYouTubeStudioTab } from "./useYouTubeStudioTab";
 export type { YouTubeWorkflowCardId } from "./youtubeWorkflowConfig";
 export {

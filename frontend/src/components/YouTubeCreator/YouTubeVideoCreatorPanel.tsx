@@ -84,7 +84,7 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
     updateState({ activeStep });
   }, [activeStep, updateState]);
 
-  useYouTubeOpenCreatorPrefill(updateState, setActiveStep);
+  useYouTubeOpenCreatorPrefill(updateState, setActiveStep, setSourceArticle);
 
   const { renderStatus: polledStatus, renderProgress: polledProgress, error: pollingError } =
     useRenderPolling(

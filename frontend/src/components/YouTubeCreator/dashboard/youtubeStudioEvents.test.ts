@@ -1,10 +1,13 @@
 import {
   consumePendingOpenCreator,
   openYouTubeCreator,
+  openYouTubePlanFromCreator,
   parseYouTubeStudioTab,
   queueYouTubeCreatorOpen,
   resumeYouTubeDraft,
+  YT_CLOSE_CREATOR_EVENT,
   YT_OPEN_CREATOR_EVENT,
+  YT_OPEN_WEDGE_EVENT,
   YT_SWITCH_TAB_EVENT,
 } from "./youtubeStudioEvents";
 
@@ -56,6 +59,57 @@ describe("openYouTubeCreator — Full Creator modal host (no tab switch)", () =>
 
     window.removeEventListener(YT_OPEN_CREATOR_EVENT, onOpen);
     window.removeEventListener(YT_SWITCH_TAB_EVENT, onTab);
+  });
+});
+
+describe("openYouTubePlanFromCreator", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    consumePendingOpenCreator();
+  });
+
+  it("queues Plan drill-down, closes Creator, and opens Plan wedge", () => {
+    const closed: unknown[] = [];
+    const wedges: unknown[] = [];
+    const onClose = () => closed.push(true);
+    const onWedge = (e: Event) => wedges.push((e as CustomEvent).detail);
+
+    window.addEventListener(YT_CLOSE_CREATOR_EVENT, onClose);
+    window.addEventListener(YT_OPEN_WEDGE_EVENT, onWedge);
+
+    openYouTubePlanFromCreator({ sub: "url-import", seed: "From Creator" });
+
+    expect(closed).toEqual([true]);
+    expect(wedges).toEqual([{ wedge: "plan", sub: "url-import" }]);
+
+    window.removeEventListener(YT_CLOSE_CREATOR_EVENT, onClose);
+    window.removeEventListener(YT_OPEN_WEDGE_EVENT, onWedge);
+  });
+});
+
+describe("openYouTubeCreator — discovery retarget to Plan", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    consumePendingOpenCreator();
+  });
+
+  it("retargets focusUrlImport to Plan url-import drill-down", () => {
+    const wedges: unknown[] = [];
+    const onWedge = (e: Event) => wedges.push((e as CustomEvent).detail);
+    const opened: unknown[] = [];
+    const onOpen = (e: Event) => opened.push((e as CustomEvent).detail);
+
+    window.addEventListener(YT_OPEN_WEDGE_EVENT, onWedge);
+    window.addEventListener(YT_OPEN_CREATOR_EVENT, onOpen);
+
+    openYouTubeCreator({ step: 0, userIdea: "Blog post", focusUrlImport: true });
+
+    expect(wedges).toEqual([{ wedge: "plan", sub: "url-import" }]);
+    expect(opened).toEqual([]);
+    expect(consumePendingOpenCreator()).toBeNull();
+
+    window.removeEventListener(YT_OPEN_WEDGE_EVENT, onWedge);
+    window.removeEventListener(YT_OPEN_CREATOR_EVENT, onOpen);
   });
 });
 
