@@ -4,12 +4,13 @@ import { hasChannelBibleIdentity } from "../../utils/channelBibleContext";
 import { useYouTubePlanBrainstorm } from "../../hooks/useYouTubePlanBrainstorm";
 import { PlanBrainstormLoadingPanel } from "../../components/PlanBrainstormLoadingPanel";
 import { PlanBrainstormSourceChips } from "../../components/PlanBrainstormSourceChips";
-import { PlanUrlImportBar } from "../../components/PlanUrlImportBar";
 import { YouTubePlanIdeaList } from "./YouTubePlanIdeaLists";
 import type { GoCreateFn } from "./wedgeModalTypes";
 
 interface YouTubePlanIdeaWorkspaceProps {
   channelBible?: YouTubeChannelBible | null;
+  seed: string;
+  onSeedChange: (seed: string) => void;
   savedCount: number;
   goCreate: GoCreateFn;
   onOpenChannelBible: () => void;
@@ -17,9 +18,11 @@ interface YouTubePlanIdeaWorkspaceProps {
   onIdeaSaved?: () => void;
 }
 
-/** Topic Discovery + Blog/URL + brainstorm; Saved Ideas open in a sibling modal. */
+/** Topic Discovery + brainstorm. Blog/URL is a sidebar drill-down. */
 export const YouTubePlanIdeaWorkspace: React.FC<YouTubePlanIdeaWorkspaceProps> = ({
   channelBible = null,
+  seed,
+  onSeedChange,
   savedCount,
   goCreate,
   onOpenChannelBible,
@@ -27,7 +30,6 @@ export const YouTubePlanIdeaWorkspace: React.FC<YouTubePlanIdeaWorkspaceProps> =
   onIdeaSaved,
 }) => {
   const niche = (channelBible?.niche || "").trim();
-  const [seed, setSeed] = useState(niche);
   const [useChannelBible, setUseChannelBible] = useState(() =>
     hasChannelBibleIdentity(channelBible),
   );
@@ -43,8 +45,8 @@ export const YouTubePlanIdeaWorkspace: React.FC<YouTubePlanIdeaWorkspaceProps> =
 
   useEffect(() => {
     if (hasChannelBibleIdentity(channelBible)) setUseChannelBible(true);
-    if (niche && !seed) setSeed(niche);
-  }, [channelBible, niche, seed]);
+    if (niche && !seed.trim()) onSeedChange(niche);
+  }, [channelBible, niche, onSeedChange, seed]);
 
   const loading = brainstorm.phase === "loading";
   const canGenerate = !loading && Boolean(seed.trim() || niche);
@@ -67,8 +69,8 @@ export const YouTubePlanIdeaWorkspace: React.FC<YouTubePlanIdeaWorkspaceProps> =
         <div className="yt-plan-brainstorm__titles">
           <h3 className="yt-plan-brainstorm__title">Topic Discovery &amp; Ideas</h3>
           <p className="yt-plan-brainstorm__subtitle">
-            Brainstorm niche topics, turn a blog/URL into a video seed, and reuse saved ideas —
-            you pick what sounds like your channel.
+            Brainstorm niche topics and reuse saved ideas — you pick what sounds like your
+            channel.
           </p>
         </div>
         <button
@@ -85,7 +87,7 @@ export const YouTubePlanIdeaWorkspace: React.FC<YouTubePlanIdeaWorkspaceProps> =
         <textarea
           className="yt-plan-brainstorm__input"
           value={seed}
-          onChange={(e) => setSeed(e.target.value)}
+          onChange={(e) => onSeedChange(e.target.value)}
           placeholder={
             niche
               ? `Ex: a video angle for ${niche}`
@@ -106,14 +108,6 @@ export const YouTubePlanIdeaWorkspace: React.FC<YouTubePlanIdeaWorkspaceProps> =
           onToggleChannelBible={() => setUseChannelBible((v) => !v)}
           onToggleTrending={() => setIncludeTrending((v) => !v)}
           onToggleRepurpose={() => setIncludeRepurpose((v) => !v)}
-        />
-
-        <p className="yt-plan-brainstorm__section-label">Blog / URL → Video</p>
-        <PlanUrlImportBar
-          userIdea={seed}
-          onIdeaChange={setSeed}
-          onSourceArticleChange={() => undefined}
-          disabled={loading}
         />
 
         <div className="yt-plan-brainstorm__actions">
