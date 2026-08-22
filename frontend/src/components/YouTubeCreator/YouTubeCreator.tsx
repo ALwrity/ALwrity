@@ -24,12 +24,19 @@ const YouTubeCreator: React.FC = () => {
   const { setTab } = useYouTubeStudioTab();
   useYouTubeCreatorLandingDeepLink(setTab);
 
-  const { connected, channels, loading: oauthLoading, connect, activeChannel } =
-    useYouTubePublish();
+  const {
+    connected,
+    channels,
+    loading: oauthLoading,
+    connect,
+    disconnect,
+    activeChannel,
+  } = useYouTubePublish();
   const [channelBible, setChannelBible] = useState<YouTubeChannelBible | null>(null);
   const [hubDraft, setHubDraft] = useState<YouTubeCreatorState>(() =>
     getYouTubeCreatorStateSnapshot(),
   );
+  const [disconnecting, setDisconnecting] = useState(false);
 
   useEffect(() => {
     document.title = "YouTube Studio Hub | ALwrity";
@@ -78,6 +85,21 @@ const YouTubeCreator: React.FC = () => {
     [connected, channels],
   );
 
+  const onDisconnect = useCallback(async () => {
+    if (!activeChannel) {
+      console.error("[YouTubeCreator] Disconnect requested with no active channel");
+      return;
+    }
+    setDisconnecting(true);
+    try {
+      await disconnect(activeChannel.token_id);
+    } catch (err) {
+      console.error("[YouTubeCreator] Disconnect failed", err);
+    } finally {
+      setDisconnecting(false);
+    }
+  }, [activeChannel, disconnect]);
+
   const onClearDraft = useCallback(() => {
     clearYouTubeCreatorStateStorage();
     setHubDraft(getYouTubeCreatorStateSnapshot());
@@ -96,6 +118,8 @@ const YouTubeCreator: React.FC = () => {
           channelBible={channelBible}
           oauthLoading={oauthLoading}
           onConnect={() => void connect()}
+          onDisconnect={() => void onDisconnect()}
+          isDisconnecting={disconnecting}
           creatorState={hubDraft}
           onClearDraft={onClearDraft}
           needsAnalyticsReconnect={needsAnalyticsReconnect}

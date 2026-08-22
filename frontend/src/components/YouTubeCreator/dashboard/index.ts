@@ -1,4 +1,3 @@
-export { YouTubeStudioHub } from "./YouTubeStudioHub";
 export {
   openYouTubeCreator,
   openYouTubeWorkflowWedge,

@@ -8,15 +8,20 @@ import {
   type YouTubeKnowledgeFeature,
 } from "./knowledgeCenterFeatures";
 import { openYouTubeCreator, openYouTubeWorkflowWedge, openYouTubeChannelBible } from "./youtubeStudioEvents";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
 import { YT_Z_KNOWLEDGE_CENTER } from "./youtubeStudioZIndex";
 
 interface YouTubeKnowledgeCenterProps {
   compact?: boolean;
+  /** rail = desktop dock; mobileCircle = landing icon row */
+  variant?: "rail" | "mobileCircle";
 }
 
 export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
   compact = false,
+  variant = "rail",
 }) => {
+  const isMobileCircle = variant === "mobileCircle";
   const [expanded, setExpanded] = useState(false);
   const [gridPos, setGridPos] = useState<{ bottom: number; right: number; width: number } | null>(
     null,
@@ -30,9 +35,11 @@ export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
   const features = useMemo(
     () =>
       YOUTUBE_KNOWLEDGE_CENTER_FEATURES.filter((f) =>
-        compact ? ["ask-alwrity", "quick-start", "studio-guide"].includes(f.id) : true,
+        compact && !isMobileCircle
+          ? ["ask-alwrity", "quick-start", "studio-guide"].includes(f.id)
+          : true,
       ),
-    [compact],
+    [compact, isMobileCircle],
   );
 
   const updateGridPosition = useCallback(() => {
@@ -49,7 +56,7 @@ export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!expanded) return undefined;
+    if (!expanded || isMobileCircle) return undefined;
     updateGridPosition();
     const onDocClick = (event: MouseEvent) => {
       const target = event.target as Node;
@@ -63,7 +70,7 @@ export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
       window.removeEventListener("resize", updateGridPosition);
       document.removeEventListener("mousedown", onDocClick);
     };
-  }, [expanded, updateGridPosition]);
+  }, [expanded, updateGridPosition, isMobileCircle]);
 
   const handleAction = (feature: YouTubeKnowledgeFeature) => {
     setExpanded(false);
@@ -134,33 +141,80 @@ export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
 
   return (
     <>
-      {expanded &&
-        gridPos &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            className="yt-knowledge-center-portal"
-            style={{
-              position: "fixed",
-              bottom: gridPos.bottom,
-              right: gridPos.right,
-              width: gridPos.width,
-              zIndex: YT_Z_KNOWLEDGE_CENTER,
-            }}
-          >
-            {panel}
-          </div>,
-          document.body,
-        )}
-      <div ref={anchorRef} className="yt-knowledge-center-rail" data-tour="yt-knowledge-center">
-        <YouTubeRailIconButton
-          label="Knowledge Centre"
-          icon="knowledge"
-          onClick={() => setExpanded((open) => !open)}
+      {isMobileCircle ? (
+        <button
+          type="button"
+          className="yt-mobile-analytics-icon-btn"
+          data-tour="yt-mobile-knowledge-icon"
+          onClick={() => {
+            console.info("[YouTubeKnowledgeCenter] Open mobile Knowledge Centre");
+            setExpanded(true);
+          }}
+          aria-label="Knowledge centre"
+          aria-expanded={expanded}
+          title="Knowledge Centre"
+        >
+          <span className="yt-mobile-analytics-icon-btn-circle" aria-hidden>
+            <MenuBookIcon fontSize="medium" />
+          </span>
+          <span className="yt-mobile-analytics-icon-btn-label">Knowledge centre</span>
+        </button>
+      ) : (
+        <>
+          {expanded &&
+            gridPos &&
+            typeof document !== "undefined" &&
+            createPortal(
+              <div
+                className="yt-knowledge-center-portal"
+                style={{
+                  position: "fixed",
+                  bottom: gridPos.bottom,
+                  right: gridPos.right,
+                  width: gridPos.width,
+                  zIndex: YT_Z_KNOWLEDGE_CENTER,
+                }}
+              >
+                {panel}
+              </div>,
+              document.body,
+            )}
+          <div ref={anchorRef} className="yt-knowledge-center-rail" data-tour="yt-knowledge-center">
+            <YouTubeRailIconButton
+              label="Knowledge Centre"
+              icon="knowledge"
+              onClick={() => setExpanded((open) => !open)}
+              open={expanded}
+              ariaExpanded={expanded}
+            />
+          </div>
+        </>
+      )}
+      {isMobileCircle && (
+        <YouTubeActionModal
           open={expanded}
-          ariaExpanded={expanded}
-        />
-      </div>
+          title="Knowledge Centre"
+          onClose={() => setExpanded(false)}
+          maxWidth={440}
+        >
+          <div className="yt-mobile-analytics-knowledge-grid">
+            {features.map((feature) => (
+              <button
+                key={feature.id}
+                type="button"
+                className="yt-mobile-analytics-knowledge-feature"
+                onClick={() => handleAction(feature)}
+                style={{ ["--feature-accent" as string]: feature.accent }}
+              >
+                <span aria-hidden>{feature.icon}</span>
+                <span className="yt-mobile-analytics-knowledge-feature-title">
+                  {feature.title}
+                </span>
+              </button>
+            ))}
+          </div>
+        </YouTubeActionModal>
+      )}
       <YouTubeActionModal
         open={askOpen}
         title="Ask ALwrity"

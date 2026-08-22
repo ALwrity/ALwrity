@@ -174,9 +174,9 @@ body.youtube-studio-view #root {
 .yt-studio-hub-mobile {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 48px 8px 12px;
+  align-items: stretch;
+  gap: 12px;
+  padding: 8px 0 4px;
 }
 
 .yt-studio-right-rail {

@@ -7,7 +7,10 @@ import {
 
 describe("youtubeRadialLayout hub axis", () => {
   it("places hub axis slightly left of column center on desktop", () => {
-    const layout = computeYouTubeRadialLayout(800, 640, true);
+    const layout = computeYouTubeRadialLayout(800, {
+      maxHeight: 640,
+      desktopViewport: true,
+    });
     expect(layout.centerX).toBeLessThan(400);
     expect(layout.centerX).toBeGreaterThan(320);
     expect(layoutHubCenterPercent(layout)).toBeCloseTo(45, 0);
@@ -16,7 +19,10 @@ describe("youtubeRadialLayout hub axis", () => {
   });
 
   it("uses a smaller hub radius aligned with LinkedIn Studio", () => {
-    const layout = computeYouTubeRadialLayout(800, 640, true);
+    const layout = computeYouTubeRadialLayout(800, {
+      maxHeight: 640,
+      desktopViewport: true,
+    });
     expect(layout.hubVisualR).toBe(83);
   });
 });
