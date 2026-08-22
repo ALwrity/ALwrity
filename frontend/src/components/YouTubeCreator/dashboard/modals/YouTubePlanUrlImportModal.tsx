@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { apiClient } from "../../../../api/client";
 import { YouTubeActionModal } from "../YouTubeActionModal";
 import {
   YOUTUBE_WEDGE_BACK_LABELS,
@@ -8,6 +7,7 @@ import {
 import { PlanUrlImportBar } from "../../components/PlanUrlImportBar";
 import {
   extractApiError,
+  saveExtractedIdeaToBrainstorm,
   type YouTubeSourceArticle,
 } from "../../components/planUrlImportUtils";
 import type { GoCreateFn } from "./wedgeModalTypes";
@@ -39,12 +39,7 @@ export const YouTubePlanUrlImportModal: React.FC<YouTubePlanUrlImportModalProps>
     setSaving(true);
     setActionError(null);
     try {
-      await apiClient.post("/api/brainstorm/saved-ideas", {
-        prompt: idea,
-        rationale: article.summary || "",
-        source_seed: article.url,
-        tags: "youtube",
-      });
+      await saveExtractedIdeaToBrainstorm(idea, article);
       onIdeaSaved?.();
       console.info("[YouTubePlanUrlImport] Saved idea from article", {
         host: article.url,
@@ -65,7 +60,9 @@ export const YouTubePlanUrlImportModal: React.FC<YouTubePlanUrlImportModalProps>
   };
 
   const handleUse = (idea: string) => {
-    console.info("[YouTubePlanUrlImport] Use for video idea");
+    console.info("[YouTubePlanUrlImport] Use for video idea", {
+      ideaLength: idea.length,
+    });
     goCreate({ step: 0, userIdea: idea });
   };
 

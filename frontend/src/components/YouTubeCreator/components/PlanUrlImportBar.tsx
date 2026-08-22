@@ -24,25 +24,19 @@ import {
   extractApiError,
   type YouTubeSourceArticle,
 } from "./planUrlImportUtils";
-import YouTubeUrlExtractAnalysis from "./YouTubeUrlExtractAnalysis";
+import YouTubeUrlExtractAnalysis, {
+  type YouTubeExtractedPageView,
+} from "./YouTubeUrlExtractAnalysis";
 import YouTubeUrlPreviewActions from "./YouTubeUrlPreviewActions";
 
-interface ExtractedPage {
-  title: string;
-  text: string;
-  summary: string;
-  highlights: string[];
-  url: string;
-  image?: string;
-  favicon?: string;
-}
+type ExtractedPage = YouTubeExtractedPageView;
 
 interface PlanUrlImportBarProps {
   userIdea: string;
   onIdeaChange: (idea: string) => void;
   onSourceArticleChange: (article: YouTubeSourceArticle | null) => void;
   disabled?: boolean;
-  /** Plan landing: results below the form. Full Creator keeps the overlay. */
+  /** Plan wedge / Video Creator: results below the form. Overlay kept for legacy/tests. */
   resultsPlacement?: "overlay" | "inline";
   actionBusy?: boolean;
   onInlineSave?: (idea: string, article: YouTubeSourceArticle) => void;
@@ -133,6 +127,7 @@ export function PlanUrlImportBar({
         url: result.url || url,
         image: result.image,
         favicon: result.favicon,
+        subpages: result.subpages || [],
       };
       setExtractedData(extraction);
       if (resultsPlacement === "overlay") {
@@ -144,6 +139,7 @@ export function PlanUrlImportBar({
         summaryLength: summary.length,
         textLength: text.length,
         highlightCount: extraction.highlights.length,
+        subpageCount: extraction.subpages?.length ?? 0,
       });
     } catch (error: unknown) {
       const err = error as { response?: { status?: number }; code?: string; message?: string };

@@ -20,13 +20,19 @@ jest.mock("../../hooks/useYouTubePlanBrainstorm", () => ({
     run: jest.fn(),
     save: jest.fn(),
     loadSaved: jest.fn(),
-    hashPrompt: (p) => p,
+    hashPrompt: (p: string) => p,
   }),
 }));
 
 jest.mock("../modals/YouTubePlanSavedIdeasModal", () => ({
   fetchYouTubeSavedIdeasCount: jest.fn().mockResolvedValue(3),
-  YouTubePlanSavedIdeasModal: ({ open, onBack }) =>
+  YouTubePlanSavedIdeasModal: ({
+    open,
+    onBack,
+  }: {
+    open: boolean;
+    onBack: () => void;
+  }) =>
     open ? (
       <div role="dialog" aria-label="Saved Ideas">
         <button type="button" onClick={onBack}>
@@ -37,7 +43,15 @@ jest.mock("../modals/YouTubePlanSavedIdeasModal", () => ({
 }));
 
 jest.mock("../modals/YouTubePlanUrlImportModal", () => ({
-  YouTubePlanUrlImportModal: ({ open, onClose, onBack }) =>
+  YouTubePlanUrlImportModal: ({
+    open,
+    onClose,
+    onBack,
+  }: {
+    open: boolean;
+    onClose: () => void;
+    onBack: () => void;
+  }) =>
     open ? (
       <div role="dialog" aria-label="Blog / URL → Video">
         <div data-tour="yt-url-import">Blog / URL import</div>
@@ -52,7 +66,11 @@ jest.mock("../modals/YouTubePlanUrlImportModal", () => ({
 }));
 
 jest.mock("../../components/PlanBrainstormSourceChips", () => ({
-  PlanBrainstormSourceChips: ({ onOpenChannelBible }) =>
+  PlanBrainstormSourceChips: ({
+    onOpenChannelBible,
+  }: {
+    onOpenChannelBible?: () => void;
+  }) =>
     onOpenChannelBible ? (
       <button type="button" onClick={onOpenChannelBible}>
         Channel Bible
@@ -63,7 +81,15 @@ jest.mock("../../components/PlanBrainstormSourceChips", () => ({
 }));
 
 jest.mock("../YouTubeChannelBibleEditorModal", () => ({
-  YouTubeChannelBibleEditorModal: ({ open, onClose, shell }) =>
+  YouTubeChannelBibleEditorModal: ({
+    open,
+    onClose,
+    shell,
+  }: {
+    open: boolean;
+    onClose: () => void;
+    shell: { onBack: () => void };
+  }) =>
     open ? (
       <div role="dialog" aria-label="Channel Bible">
         <button type="button" onClick={shell.onBack}>

@@ -1,3 +1,5 @@
+import { apiClient } from "../../../api/client";
+
 export interface YouTubeSourceArticle {
   url: string;
   title: string;
@@ -50,4 +52,25 @@ export function buildIdeaFromExtraction(data: {
   if (title) return title;
   if (text) return text.slice(0, 500);
   return "";
+}
+
+/** Persist a URL-extracted idea to the shared brainstorm saved-ideas library (YouTube tag). */
+export async function saveExtractedIdeaToBrainstorm(
+  idea: string,
+  article: YouTubeSourceArticle,
+): Promise<void> {
+  const prompt = idea.trim();
+  if (!prompt) {
+    throw new Error("Idea is empty");
+  }
+
+  const rationale = (article.summary || article.title || "").trim();
+  const sourceSeed = article.url.trim() || undefined;
+
+  await apiClient.post("/api/brainstorm/saved-ideas", {
+    prompt,
+    rationale,
+    source_seed: sourceSeed,
+    tags: "youtube",
+  });
 }
