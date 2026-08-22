@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import "../youtube-plan-wedge.css";
 import { YouTubeActionModal } from "../YouTubeActionModal";
 import { YouTubeChannelBibleEditorModal } from "../YouTubeChannelBibleEditorModal";
 import { patchYouTubeCreatorStateStorage } from "../../../../hooks/useYouTubeCreatorState";
 import { buildPlanFieldUpdatesFromChannelBible } from "../../utils/channelBibleContext";
 import { WEDGE_MODAL_INTROS } from "../youtubeWorkflowConfig";
+import { youtubeSubModalShellProps } from "../youtubeWedgeModalUi";
 import {
-  youtubeSubModalShellProps,
-} from "../youtubeWedgeModalUi";
+  fetchYouTubeSavedIdeasCount,
+  YouTubePlanSavedIdeasModal,
+} from "./YouTubePlanSavedIdeasModal";
 import type { PlanWedgeProps } from "./wedgeModalTypes";
 import { YouTubePlanIdeaWorkspace } from "./YouTubePlanIdeaWorkspace";
 import { YouTubePlanSidebarTools } from "./YouTubePlanSidebarTools";
@@ -23,9 +25,36 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
   onCreatorDraftPatched,
 }) => {
   const [bibleEditorOpen, setBibleEditorOpen] = useState(false);
+  const [savedIdeasOpen, setSavedIdeasOpen] = useState(false);
+  const [savedCount, setSavedCount] = useState(0);
+
+  const refreshSavedCount = useCallback(async () => {
+    try {
+      const count = await fetchYouTubeSavedIdeasCount();
+      setSavedCount(count);
+    } catch (err) {
+      console.warn("[PlanWedgeModal] Saved count refresh failed", err);
+    }
+  }, []);
 
   useEffect(() => {
-    if (!open) setBibleEditorOpen(false);
+    if (!open) {
+      setBibleEditorOpen(false);
+      setSavedIdeasOpen(false);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const count = await fetchYouTubeSavedIdeasCount();
+        if (!cancelled) setSavedCount(count);
+      } catch (err) {
+        console.warn("[PlanWedgeModal] Saved count refresh failed", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   const bibleShell = youtubeSubModalShellProps("plan", () => {
@@ -54,10 +83,22 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
     }
   };
 
+  const closeSavedIdeasToPlan = () => {
+    console.info("[PlanWedgeModal] Back from Saved Ideas to Plan");
+    setSavedIdeasOpen(false);
+  };
+
+  const handleUseIdea = (prompt: string) => {
+    setSavedIdeasOpen(false);
+    goCreate({ step: 0, userIdea: prompt });
+  };
+
+  const planMainOpen = open && !bibleEditorOpen && !savedIdeasOpen;
+
   return (
     <>
       <YouTubeActionModal
-        open={open && !bibleEditorOpen}
+        open={planMainOpen}
         title="Plan"
         intro={WEDGE_MODAL_INTROS.plan}
         onClose={onClose}
@@ -67,16 +108,27 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
           <div className="yt-plan-wedge-main">
             <YouTubePlanIdeaWorkspace
               channelBible={channelBible}
+              savedCount={savedCount}
               goCreate={goCreate}
               onOpenChannelBible={() => {
                 console.info("[PlanWedgeModal] Open Channel Bible drill-down");
                 setBibleEditorOpen(true);
               }}
+              onOpenSavedIdeas={() => setSavedIdeasOpen(true)}
+              onIdeaSaved={() => void refreshSavedCount()}
             />
             <YouTubePlanSidebarTools goCreate={goCreate} />
           </div>
         </div>
       </YouTubeActionModal>
+
+      <YouTubePlanSavedIdeasModal
+        open={Boolean(open && savedIdeasOpen)}
+        onClose={closeSavedIdeasToPlan}
+        onBack={closeSavedIdeasToPlan}
+        onUseIdea={handleUseIdea}
+        onAfterDelete={() => void refreshSavedCount()}
+      />
 
       <YouTubeChannelBibleEditorModal
         open={Boolean(open && bibleEditorOpen)}

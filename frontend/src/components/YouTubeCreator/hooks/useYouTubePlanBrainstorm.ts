@@ -31,6 +31,8 @@ export interface YouTubeSavedBrainstormIdea {
   rationale?: string | null;
   tags?: string;
   source_seed?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type YouTubeBrainstormPhase = "idle" | "loading" | "results";
