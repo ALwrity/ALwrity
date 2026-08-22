@@ -16,7 +16,7 @@ export interface PlanBrainstormSourceChipsProps {
   hasChannelBible: boolean;
   disabled?: boolean;
   loading?: boolean;
-  /** Studio Hub Plan: open editor when bible is empty (chip stays clickable). */
+  /** Studio Hub Plan: always open the editor (empty or filled). Full Creator omits this. */
   onOpenChannelBible?: () => void;
   onToggleChannelBible: () => void;
   onToggleTrending: () => void;
@@ -58,7 +58,7 @@ export const PlanBrainstormSourceChips: React.FC<PlanBrainstormSourceChipsProps>
   const bibleDisabled = controlsDisabled || (!hasChannelBible && !canOpenBible);
 
   const handleChannelBibleClick = () => {
-    if (!hasChannelBible && onOpenChannelBible) {
+    if (onOpenChannelBible) {
       console.info("[PlanBrainstormSourceChips] Open Channel Bible editor");
       onOpenChannelBible();
       return;
@@ -81,10 +81,10 @@ export const PlanBrainstormSourceChips: React.FC<PlanBrainstormSourceChipsProps>
           bibleDisabled,
         )}
         title={
-          hasChannelBible
-            ? "Include your Channel Bible niche, audience, and tone when generating ideas"
-            : canOpenBible
-              ? "Open Channel Bible to set niche, audience, and tone"
+          canOpenBible
+            ? "Open Channel Bible to set niche, audience, and tone"
+            : hasChannelBible
+              ? "Include your Channel Bible niche, audience, and tone when generating ideas"
               : "Save a Channel Bible to enable this source"
         }
       />

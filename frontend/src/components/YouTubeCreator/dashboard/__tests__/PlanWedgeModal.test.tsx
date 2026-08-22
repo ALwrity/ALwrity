@@ -41,7 +41,28 @@ jest.mock("../../components/PlanUrlImportBar", () => ({
 }));
 
 jest.mock("../../components/PlanBrainstormSourceChips", () => ({
-  PlanBrainstormSourceChips: () => <div>Source chips</div>,
+  PlanBrainstormSourceChips: ({ onOpenChannelBible }) =>
+    onOpenChannelBible ? (
+      <button type="button" onClick={onOpenChannelBible}>
+        Channel Bible
+      </button>
+    ) : (
+      <div>Source chips</div>
+    ),
+}));
+
+jest.mock("../YouTubeChannelBibleEditorModal", () => ({
+  YouTubeChannelBibleEditorModal: ({ open, onClose, shell }) =>
+    open ? (
+      <div role="dialog" aria-label="Channel Bible">
+        <button type="button" onClick={shell.onBack}>
+          Back to Plan
+        </button>
+        <button type="button" aria-label="Close" onClick={onClose}>
+          ×
+        </button>
+      </div>
+    ) : null,
 }));
 
 jest.mock("../../components/PlanBrainstormLoadingPanel", () => ({
@@ -87,5 +108,22 @@ describe("PlanWedgeModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Back to Plan" }));
     expect(screen.getByText(WEDGE_MODAL_INTROS.plan)).toBeTruthy();
     expect(screen.queryByRole("dialog", { name: "Saved Ideas" })).toBeNull();
+  });
+
+  it("returns to Plan when Channel Bible close or back is used", () => {
+    render(<PlanWedgeModal {...baseProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Channel Bible" }));
+    expect(screen.getByRole("dialog", { name: "Channel Bible" })).toBeTruthy();
+    expect(screen.queryByText(WEDGE_MODAL_INTROS.plan)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.getByText(WEDGE_MODAL_INTROS.plan)).toBeTruthy();
+    expect(baseProps.onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Channel Bible" }));
+    fireEvent.click(screen.getByRole("button", { name: "Back to Plan" }));
+    expect(screen.getByText(WEDGE_MODAL_INTROS.plan)).toBeTruthy();
+    expect(baseProps.onClose).not.toHaveBeenCalled();
   });
 });
