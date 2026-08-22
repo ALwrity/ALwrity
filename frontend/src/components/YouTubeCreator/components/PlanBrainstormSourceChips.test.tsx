@@ -70,14 +70,33 @@ describe("PlanBrainstormSourceChips", () => {
     expect(onToggleChannelBible).not.toHaveBeenCalled();
   });
 
-  it("toggles Channel Bible when identity exists", () => {
+  it("opens Channel Bible editor when identity exists if onOpenChannelBible is provided", () => {
+    const onOpenChannelBible = jest.fn();
     render(
       <PlanBrainstormSourceChips
         useChannelBible
         includeTrending={false}
         includeRepurpose={false}
         hasChannelBible
-        onOpenChannelBible={jest.fn()}
+        onOpenChannelBible={onOpenChannelBible}
+        onToggleChannelBible={onToggleChannelBible}
+        onToggleTrending={onToggleTrending}
+        onToggleRepurpose={onToggleRepurpose}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Channel Bible" }));
+    expect(onOpenChannelBible).toHaveBeenCalledTimes(1);
+    expect(onToggleChannelBible).not.toHaveBeenCalled();
+  });
+
+  it("toggles Channel Bible include when no opener is provided", () => {
+    render(
+      <PlanBrainstormSourceChips
+        useChannelBible
+        includeTrending={false}
+        includeRepurpose={false}
+        hasChannelBible
         onToggleChannelBible={onToggleChannelBible}
         onToggleTrending={onToggleTrending}
         onToggleRepurpose={onToggleRepurpose}

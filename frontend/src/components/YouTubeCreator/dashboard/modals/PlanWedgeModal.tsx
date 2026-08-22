@@ -62,6 +62,11 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
     };
   }, [open]);
 
+  const closeBibleToPlan = () => {
+    console.info("[PlanWedgeModal] Close Channel Bible — returning to Plan");
+    setBibleEditorOpen(false);
+  };
+
   useEffect(() => {
     if (open && niche) {
       setSeed((prev) => (prev.trim() ? prev : niche));
@@ -174,7 +179,7 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
 
       <YouTubeChannelBibleEditorModal
         open={Boolean(open && bibleEditorOpen)}
-        onClose={onClose}
+        onClose={closeBibleToPlan}
         planAvatarUrl={planAvatarUrl}
         showApplyToVideo
         onApplyToThisVideo={applyBibleToThisVideo}
