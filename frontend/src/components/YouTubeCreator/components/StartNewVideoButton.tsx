@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import { YT_BORDER, YT_RED, YT_TEXT } from "../constants";
+import { YT_Z_MODAL } from "../dashboard/youtubeStudioZIndex";
 
 interface StartNewVideoButtonProps {
   onConfirm: () => void;
@@ -75,7 +76,22 @@ export const StartNewVideoButton: React.FC<StartNewVideoButtonProps> = ({
   return (
     <>
       {trigger}
-      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        sx={{ zIndex: YT_Z_MODAL }}
+        slotProps={{
+          backdrop: {
+            sx: {
+              backgroundColor: "rgba(15, 23, 42, 0.38)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+            },
+          },
+        }}
+      >
         <DialogTitle>Start a new video?</DialogTitle>
         <DialogContent>
           <DialogContentText>
