@@ -22,6 +22,7 @@ import {
 import PlayArrow from '@mui/icons-material/PlayArrow';
 import CloudUpload from '@mui/icons-material/CloudUpload';
 import AutoAwesome from '@mui/icons-material/AutoAwesome';
+import Refresh from '@mui/icons-material/Refresh';
 import Delete from '@mui/icons-material/Delete';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import Collections from '@mui/icons-material/Collections';
@@ -58,7 +59,10 @@ import { ChannelBiblePanel } from './ChannelBiblePanel';
 import { PlanResearchToggle } from './PlanResearchToggle';
 import { PlanPromptPreview } from './PlanPromptPreview';
 import { PlanGenerationLoadingPanel } from './PlanGenerationLoadingPanel';
+import { YouTubeCreativeAngleSelector } from './YouTubeCreativeAngleSelector';
+import { YouTubePitchPreviewCard } from './YouTubePitchPreviewCard';
 import type { YouTubeChannelBible } from '../../../services/youtubeApi';
+import type { YouTubeScriptPhase, YouTubeVideoPitch } from '../../../hooks/useYouTubeCreatorState';
 
 interface PlanStepProps {
   userIdea: string;
@@ -96,6 +100,15 @@ interface PlanStepProps {
   onApplyBible: () => void;
   enableResearch: boolean;
   onEnableResearchChange: (enabled: boolean) => void;
+  creativeAngle: string;
+  currentPitch: YouTubeVideoPitch | null;
+  pitchHistory: YouTubeVideoPitch[];
+  scriptPhase: YouTubeScriptPhase;
+  onCreativeAngleChange: (angle: string) => void;
+  onGeneratePitch: () => void;
+  onRegeneratePitch: () => void;
+  onExpandPitch: () => void;
+  onSelectPitchFromHistory: (pitch: YouTubeVideoPitch) => void;
 }
 
 export const PlanStep: React.FC<PlanStepProps> = React.memo(({
@@ -134,6 +147,15 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
   onApplyBible,
   enableResearch,
   onEnableResearchChange,
+  creativeAngle,
+  currentPitch,
+  pitchHistory,
+  scriptPhase,
+  onCreativeAngleChange,
+  onGeneratePitch,
+  onRegeneratePitch,
+  onExpandPitch,
+  onSelectPitchFromHistory,
 }) => {
   // Memoize operation objects to avoid recreating on every render
   const videoPlanningOperation = useMemo(
@@ -687,6 +709,59 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
             enableResearch={enableResearch}
             channelBible={channelBible}
           />
+
+          <YouTubeCreativeAngleSelector
+            value={creativeAngle}
+            disabled={loading}
+            onChange={onCreativeAngleChange}
+          />
+
+          {currentPitch && scriptPhase !== 'idle' ? (
+            <>
+              <YouTubePitchPreviewCard
+                pitch={currentPitch}
+                history={pitchHistory}
+                disabled={loading}
+                onSelectHistoryPitch={onSelectPitchFromHistory}
+              />
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                <Button
+                  variant="contained"
+                  color="error"
+                  size="large"
+                  startIcon={<AutoAwesome />}
+                  onClick={onExpandPitch}
+                  disabled={loading || scriptPhase === 'expanding'}
+                  sx={{ textTransform: 'none', px: 3 }}
+                >
+                  {scriptPhase === 'expanding' ? 'Expanding to full script…' : 'Expand to Full Script'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  size="large"
+                  startIcon={<Refresh />}
+                  onClick={onRegeneratePitch}
+                  disabled={loading || scriptPhase === 'expanding'}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Try Another Angle / Regenerate
+                </Button>
+              </Stack>
+            </>
+          ) : (
+            <Button
+              variant="contained"
+              color="error"
+              size="large"
+              startIcon={<PlayArrow />}
+              onClick={onGeneratePitch}
+              disabled={loading || !userIdea.trim() || !creativeAngle.trim()}
+              sx={{ alignSelf: 'flex-start', px: 4, textTransform: 'none' }}
+            >
+              Generate Pitch
+            </Button>
+          )}
 
           {loading ? (
             <PlanGenerationLoadingPanel enableResearch={enableResearch} />

@@ -33,6 +33,11 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
     languageBoost,
     videoPlan,
     enableResearch,
+    creativeAngle,
+    currentPitch,
+    pitchHistory,
+    fullScript,
+    scriptPhase,
     scenes,
     sceneBuildGeneration,
     editingSceneId,
@@ -171,6 +176,61 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
   const onClearSuccess = useCallback(() => setSuccess(null), []);
   const onClearError = useCallback(() => setError(null), []);
 
+  const handleCreativeAngleChange = useCallback(
+    (angle: string) => {
+      updateState({ creativeAngle: angle });
+    },
+    [updateState],
+  );
+
+  const handleGeneratePitch = useCallback(() => {
+    if (!userIdea.trim()) {
+      setError("Please enter your video idea");
+      return;
+    }
+    if (!creativeAngle.trim()) {
+      setError("Please select or enter a creative strategy angle");
+      return;
+    }
+    console.info("[YouTubeCreator] Pitch generate requested", {
+      angle: creativeAngle,
+      ideaLen: userIdea.trim().length,
+    });
+    setError(
+      "Pitch generation is not available yet. Use Generate Video Plan, or continue after the backend pitch phase is added.",
+    );
+  }, [creativeAngle, userIdea]);
+
+  const handleExpandPitch = useCallback(() => {
+    if (!currentPitch) {
+      setError("Generate a pitch first");
+      return;
+    }
+    console.info("[YouTubeCreator] Pitch expand requested", { pitchId: currentPitch.id });
+    setError("Expand to full script is not available yet.");
+  }, [currentPitch]);
+
+  const handleSelectPitchFromHistory = useCallback(
+    (pitch: NonNullable<typeof currentPitch>) => {
+      updateState({
+        currentPitch: pitch,
+        scriptPhase: "pitch",
+        approvedPitch: null,
+        fullScript: null,
+      });
+      setSuccess("Loaded pitch from history.");
+      window.setTimeout(() => setSuccess(null), 2000);
+    },
+    [updateState],
+  );
+
+  const handleFullScriptChange = useCallback(
+    (value: string) => {
+      updateState({ fullScript: value });
+    },
+    [updateState],
+  );
+
   const showStartNewVideo = useMemo(() => hasYouTubeCreatorDraft(state), [state]);
 
   const handleStartNewVideo = useCallback(() => {
@@ -241,6 +301,17 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
         setActiveStep={setActiveStep}
         handleLanguageChange={planHandlers.handleLanguageChange}
         handleGeneratePlan={planHandlers.handleGeneratePlan}
+        creativeAngle={creativeAngle}
+        currentPitch={currentPitch}
+        pitchHistory={pitchHistory}
+        scriptPhase={scriptPhase}
+        fullScript={fullScript}
+        onCreativeAngleChange={handleCreativeAngleChange}
+        onGeneratePitch={handleGeneratePitch}
+        onRegeneratePitch={handleGeneratePitch}
+        onExpandPitch={handleExpandPitch}
+        onSelectPitchFromHistory={handleSelectPitchFromHistory}
+        onFullScriptChange={handleFullScriptChange}
         handleAvatarUpload={planHandlers.handleAvatarUpload}
         handleRemoveAvatar={planHandlers.handleRemoveAvatar}
         handleMakePresentable={planHandlers.handleMakePresentable}

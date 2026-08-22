@@ -14,6 +14,7 @@ import VideoLibrary from '@mui/icons-material/VideoLibrary';
 import { motion } from 'framer-motion';
 import { VideoPlan, Scene } from '../../../services/youtubeApi';
 import { PlanDetails } from './PlanDetails';
+import { YouTubeUnifiedPlanScript } from './YouTubeUnifiedPlanScript';
 import { YT_BORDER } from '../constants';
 import { OperationButton } from '../../shared/OperationButton';
 import { buildSceneBuildingOperation } from '../utils/operationHelpers';
@@ -22,6 +23,7 @@ import { SceneBuildLoadingPanel } from './SceneBuildLoadingPanel';
 import { ScenePromptPreview } from './ScenePromptPreview';
 import { SceneGenerationMeta } from './SceneGenerationMeta';
 import type { SceneBuildGeneration } from '../../../services/youtubeApi';
+import type { YouTubeScriptPhase } from '../../../hooks/useYouTubeCreatorState';
 
 interface ScenesStepProps {
   videoPlan: VideoPlan;
@@ -41,6 +43,9 @@ interface ScenesStepProps {
   onAvatarRegenerate?: () => void;
   regeneratingAvatar?: boolean;
   onPlanChange?: (plan: VideoPlan) => void;
+  fullScript?: string | null;
+  scriptPhase?: YouTubeScriptPhase;
+  onFullScriptChange?: (value: string) => void;
 }
 
 export const ScenesStep: React.FC<ScenesStepProps> = React.memo(({
@@ -61,6 +66,9 @@ export const ScenesStep: React.FC<ScenesStepProps> = React.memo(({
   onAvatarRegenerate,
   regeneratingAvatar = false,
   onPlanChange,
+  fullScript,
+  scriptPhase = 'idle',
+  onFullScriptChange,
 }) => {
   const enabledScenesCount = useMemo(
     () => scenes.filter(s => s.enabled !== false).length,
@@ -107,12 +115,20 @@ export const ScenesStep: React.FC<ScenesStepProps> = React.memo(({
           )}
         </Box>
 
-        <PlanDetails
-          plan={videoPlan}
-          onAvatarRegenerate={onAvatarRegenerate}
-          regeneratingAvatar={regeneratingAvatar}
-          onPlanChange={onPlanChange}
-        />
+        {scriptPhase === 'ready' && fullScript ? (
+          <YouTubeUnifiedPlanScript
+            value={fullScript}
+            onChange={onFullScriptChange}
+            disabled={loading}
+          />
+        ) : (
+          <PlanDetails
+            plan={videoPlan}
+            onAvatarRegenerate={onAvatarRegenerate}
+            regeneratingAvatar={regeneratingAvatar}
+            onPlanChange={onPlanChange}
+          />
+        )}
 
         {scenes.length === 0 ? <ScenePromptPreview plan={videoPlan} /> : null}
         {sceneBuildGeneration ? (

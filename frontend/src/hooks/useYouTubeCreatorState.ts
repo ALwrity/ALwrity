@@ -2,6 +2,18 @@ import { useState, useCallback, useEffect } from 'react';
 import { VideoPlan, Scene, SceneBuildGeneration } from '../services/youtubeApi';
 import { Resolution, DurationType, VideoType, YouTubeContentLanguage } from '../components/YouTubeCreator/constants';
 
+export type YouTubeScriptPhase = 'idle' | 'pitch' | 'expanding' | 'ready';
+
+/** Lightweight pitch shown on Plan Step (Phase 1 UI). */
+export interface YouTubeVideoPitch {
+  id: string;
+  creative_angle: string;
+  selected_title: string;
+  video_summary: string;
+  hook_concept: string;
+  main_content_beats: string[];
+}
+
 export interface YouTubeCreatorState {
   // Step 1: Plan inputs
   userIdea: string;
@@ -22,6 +34,14 @@ export interface YouTubeCreatorState {
   videoPlan: VideoPlan | null;
   /** Include Exa web research in the plan prompt (LinkedIn-style). Default true. */
   enableResearch: boolean;
+
+  // Pitch-first flow (Issue #434 Phase 1 UI)
+  creativeAngle: string;
+  currentPitch: YouTubeVideoPitch | null;
+  pitchHistory: YouTubeVideoPitch[];
+  approvedPitch: YouTubeVideoPitch | null;
+  fullScript: string | null;
+  scriptPhase: YouTubeScriptPhase;
   
   // Step 2: Scenes
   scenes: Scene[];
@@ -57,6 +77,12 @@ const DEFAULT_STATE: YouTubeCreatorState = {
   languageBoost: 'English',
   videoPlan: null,
   enableResearch: true,
+  creativeAngle: '',
+  currentPitch: null,
+  pitchHistory: [],
+  approvedPitch: null,
+  fullScript: null,
+  scriptPhase: 'idle',
   scenes: [],
   sceneBuildGeneration: null,
   editingSceneId: null,
@@ -84,6 +110,8 @@ export function getYouTubeCreatorStateSnapshot(): YouTubeCreatorState {
         scenes: Array.isArray(parsed.scenes) ? parsed.scenes : [],
         enableResearch:
           typeof parsed.enableResearch === "boolean" ? parsed.enableResearch : true,
+        pitchHistory: Array.isArray(parsed.pitchHistory) ? parsed.pitchHistory : [],
+        scriptPhase: parsed.scriptPhase || 'idle',
       };
     }
   } catch (error) {
@@ -141,6 +169,8 @@ export const useYouTubeCreatorState = () => {
           scenes: Array.isArray(parsed.scenes) ? parsed.scenes : [],
           enableResearch:
             typeof parsed.enableResearch === "boolean" ? parsed.enableResearch : true,
+          pitchHistory: Array.isArray(parsed.pitchHistory) ? parsed.pitchHistory : [],
+          scriptPhase: parsed.scriptPhase || 'idle',
           // Ensure dates are preserved
           createdAt: parsed.createdAt || new Date().toISOString(),
           updatedAt: parsed.updatedAt || new Date().toISOString(),

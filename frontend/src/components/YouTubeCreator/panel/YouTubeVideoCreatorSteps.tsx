@@ -53,6 +53,17 @@ export interface YouTubeVideoCreatorStepsProps {
   setActiveStep: (step: number) => void;
   handleLanguageChange: (value: YouTubeContentLanguage) => void;
   handleGeneratePlan: () => void;
+  creativeAngle: string;
+  currentPitch: YouTubeCreatorState["currentPitch"];
+  pitchHistory: YouTubeCreatorState["pitchHistory"];
+  scriptPhase: YouTubeCreatorState["scriptPhase"];
+  fullScript: YouTubeCreatorState["fullScript"];
+  onCreativeAngleChange: (angle: string) => void;
+  onGeneratePitch: () => void;
+  onRegeneratePitch: () => void;
+  onExpandPitch: () => void;
+  onSelectPitchFromHistory: (pitch: NonNullable<YouTubeCreatorState["currentPitch"]>) => void;
+  onFullScriptChange: (value: string) => void;
   handleAvatarUpload: (file: File) => void;
   handleRemoveAvatar: () => void;
   handleMakePresentable: () => void;
@@ -117,6 +128,15 @@ export const YouTubeVideoCreatorSteps: React.FC<YouTubeVideoCreatorStepsProps> =
         onApplyBible={props.applyBibleToThisVideo}
         enableResearch={props.enableResearch}
         onEnableResearchChange={(value) => props.updateState({ enableResearch: value })}
+        creativeAngle={props.creativeAngle}
+        currentPitch={props.currentPitch}
+        pitchHistory={props.pitchHistory}
+        scriptPhase={props.scriptPhase}
+        onCreativeAngleChange={props.onCreativeAngleChange}
+        onGeneratePitch={props.onGeneratePitch}
+        onRegeneratePitch={props.onRegeneratePitch}
+        onExpandPitch={props.onExpandPitch}
+        onSelectPitchFromHistory={props.onSelectPitchFromHistory}
       />
     );
   }
@@ -147,6 +167,9 @@ export const YouTubeVideoCreatorSteps: React.FC<YouTubeVideoCreatorStepsProps> =
           });
           props.updateState({ videoPlan: plan });
         }}
+        fullScript={props.fullScript}
+        scriptPhase={props.scriptPhase}
+        onFullScriptChange={props.onFullScriptChange}
       />
     );
   }
