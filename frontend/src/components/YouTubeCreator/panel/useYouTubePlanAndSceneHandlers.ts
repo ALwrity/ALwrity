@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { youtubeApi, type Scene, type VideoPlan } from "../../../services/youtubeApi";
 import { YOUTUBE_CONTENT_LANGUAGE_OPTIONS, type YouTubeContentLanguage } from "../constants";
 import type { YouTubeCreatorState } from "../../../hooks/useYouTubeCreatorState";
-import type { YouTubeSourceArticle } from "../components/PlanUrlImportBar";
+import type { YouTubeSourceArticle } from "../components/planUrlImportUtils";
 import type { ContentAsset } from "../../../hooks/useContentAssets";
 
 interface PlanSceneHandlerArgs {

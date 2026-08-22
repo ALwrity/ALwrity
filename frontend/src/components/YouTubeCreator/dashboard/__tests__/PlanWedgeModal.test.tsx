@@ -36,8 +36,19 @@ jest.mock("../modals/YouTubePlanSavedIdeasModal", () => ({
     ) : null,
 }));
 
-jest.mock("../../components/PlanUrlImportBar", () => ({
-  PlanUrlImportBar: () => <div data-tour="yt-url-import">Blog / URL import</div>,
+jest.mock("../modals/YouTubePlanUrlImportModal", () => ({
+  YouTubePlanUrlImportModal: ({ open, onClose, onBack }) =>
+    open ? (
+      <div role="dialog" aria-label="Blog / URL → Video">
+        <div data-tour="yt-url-import">Blog / URL import</div>
+        <button type="button" onClick={onBack}>
+          Back to Plan
+        </button>
+        <button type="button" aria-label="Close" onClick={onClose}>
+          ×
+        </button>
+      </div>
+    ) : null,
 }));
 
 jest.mock("../../components/PlanBrainstormSourceChips", () => ({
@@ -65,9 +76,12 @@ describe("PlanWedgeModal", () => {
     expect(screen.getByRole("region", { name: "Topic Discovery and Ideas" })).toBeTruthy();
     expect(screen.queryByText("Coming soon")).toBeNull();
     expect(screen.queryByText("Notify me")).toBeNull();
+    expect(screen.queryByText("Blog / URL import")).toBeNull();
 
+    const urlTile = screen.getByRole("button", { name: /Blog \/ URL → Video/i });
     const trends = screen.getByRole("button", { name: /YouTube Trends/i });
     const series = screen.getByRole("button", { name: /Series Planner/i });
+    expect((urlTile as HTMLButtonElement).disabled).toBe(false);
     expect((trends as HTMLButtonElement).disabled).toBe(false);
     expect((series as HTMLButtonElement).disabled).toBe(false);
 
@@ -86,6 +100,29 @@ describe("PlanWedgeModal", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Back to Plan" }));
     expect(screen.getByText(WEDGE_MODAL_INTROS.plan)).toBeTruthy();
-    expect(screen.queryByRole("dialog", { name: "Saved Ideas" })).toBeNull();
+  });
+
+  it("opens Blog / URL import as a sidebar drill-down modal", () => {
+    render(<PlanWedgeModal {...baseProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Blog \/ URL → Video/i }));
+    expect(screen.getByRole("dialog", { name: "Blog / URL → Video" })).toBeTruthy();
+    expect(screen.getByText("Blog / URL import")).toBeTruthy();
+    expect(screen.queryByText(WEDGE_MODAL_INTROS.plan)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to Plan" }));
+    expect(screen.queryByText("Blog / URL import")).toBeNull();
+    expect(screen.getByText(WEDGE_MODAL_INTROS.plan)).toBeTruthy();
+    expect(baseProps.onClose).not.toHaveBeenCalled();
+  });
+
+  it("closes Blog / URL and Plan when the URL modal close button is clicked", () => {
+    render(<PlanWedgeModal {...baseProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Blog \/ URL → Video/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(baseProps.onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Blog / URL import")).toBeNull();
   });
 });

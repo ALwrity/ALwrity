@@ -1,11 +1,8 @@
 import React from "react";
 import "@testing-library/jest-dom";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import {
-  PlanUrlImportBar,
-  buildIdeaFromExtraction,
-  extractApiError,
-} from "./PlanUrlImportBar";
+import { PlanUrlImportBar } from "./PlanUrlImportBar";
+import { buildIdeaFromExtraction, extractApiError } from "./planUrlImportUtils";
 import { podcastApi } from "../../../services/podcastApi";
 
 jest.mock("../../../services/podcastApi", () => ({
@@ -330,5 +327,51 @@ describe("PlanUrlImportBar", () => {
       target: { value: "https://example.com/bali-guide" },
     });
     expect(screen.getByRole("button", { name: "Extract" })).toBeDisabled();
+  });
+
+  it("shows extract results below the form in inline placement", async () => {
+    mockedExtractUrl.mockResolvedValue({
+      success: true,
+      title: "Bali Guide",
+      summary: "Pack light.",
+      text: "Longer article text",
+      url: "https://example.com/bali-guide",
+      highlights: ["Tip one"],
+    });
+    const onInlineSave = jest.fn();
+    const onInlineBrainstorm = jest.fn();
+    const onInlineUse = jest.fn();
+
+    render(
+      <PlanUrlImportBar
+        userIdea=""
+        onIdeaChange={onIdeaChange}
+        onSourceArticleChange={onSourceArticleChange}
+        resultsPlacement="inline"
+        onInlineSave={onInlineSave}
+        onInlineBrainstorm={onInlineBrainstorm}
+        onInlineUse={onInlineUse}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Article URL to import"), {
+      target: { value: "https://example.com/bali-guide" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Extract" }));
+
+    expect(await screen.findByTestId("yt-url-extract-analysis")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Extract" })).toBeInTheDocument();
+    expect(screen.queryByTestId("use-text-label")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save idea" }));
+    fireEvent.click(screen.getByRole("button", { name: "Brainstorm Idea" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use for video idea" }));
+
+    expect(onInlineSave).toHaveBeenCalledWith("Bali Guide: Pack light.", expect.any(Object));
+    expect(onInlineBrainstorm).toHaveBeenCalledWith("Bali Guide: Pack light.");
+    expect(onInlineUse).toHaveBeenCalledWith("Bali Guide: Pack light.", expect.any(Object));
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByTestId("yt-url-extract-analysis")).not.toBeInTheDocument();
   });
 });

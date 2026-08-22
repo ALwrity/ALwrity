@@ -10,7 +10,7 @@ import { useChannelBible } from "./hooks/useChannelBible";
 import { useRenderPolling } from "./hooks/useRenderPolling";
 import { useCostEstimate } from "./hooks/useCostEstimate";
 import { useImageGenerationPolling } from "./hooks/useImageGenerationPolling";
-import type { YouTubeSourceArticle } from "./components/PlanUrlImportBar";
+import type { YouTubeSourceArticle } from "./components/planUrlImportUtils";
 import { useYouTubeOpenCreatorPrefill } from "./panel/useYouTubeOpenCreatorPrefill";
 import { useYouTubePlanAndSceneHandlers } from "./panel/useYouTubePlanAndSceneHandlers";
 import { useYouTubeAssetAndRenderHandlers } from "./panel/useYouTubeAssetAndRenderHandlers";
