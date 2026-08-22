@@ -3,7 +3,6 @@ import { Link } from "@mui/material";
 import type {
   YouTubeBrainstormIdea,
   YouTubeBrainstormSource,
-  YouTubeSavedBrainstormIdea,
 } from "../../hooks/useYouTubePlanBrainstorm";
 
 interface YouTubePlanIdeaListProps {
@@ -66,40 +65,5 @@ export const YouTubePlanIdeaList: React.FC<YouTubePlanIdeaListProps> = ({
         </article>
       );
     })}
-  </div>
-);
-
-interface YouTubePlanSavedListProps {
-  ideas: YouTubeSavedBrainstormIdea[];
-  loading: boolean;
-  error: string | null;
-  onUseIdea: (prompt: string) => void;
-}
-
-export const YouTubePlanSavedList: React.FC<YouTubePlanSavedListProps> = ({
-  ideas,
-  loading,
-  error,
-  onUseIdea,
-}) => (
-  <div className="yt-plan-saved-list" aria-label="Saved video ideas">
-    <p className="yt-plan-brainstorm__section-label">Saved video ideas</p>
-    {loading ? <p className="yt-modal-intro">Loading saved ideas…</p> : null}
-    {error ? <p className="yt-modal-intro">{error}</p> : null}
-    {!loading && !error && ideas.length === 0 ? (
-      <p className="yt-modal-intro">No saved YouTube ideas yet.</p>
-    ) : null}
-    {ideas.map((item) => (
-      <div key={item.id} className="yt-plan-idea-card">
-        <p className="yt-plan-idea-card__prompt">{item.prompt}</p>
-        <button
-          type="button"
-          className="yt-rail-btn yt-rail-btn--primary"
-          onClick={() => onUseIdea(item.prompt)}
-        >
-          Use
-        </button>
-      </div>
-    ))}
   </div>
 );

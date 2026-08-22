@@ -20,8 +20,20 @@ jest.mock("../../hooks/useYouTubePlanBrainstorm", () => ({
     run: jest.fn(),
     save: jest.fn(),
     loadSaved: jest.fn(),
-    hashPrompt: (p: string) => p,
+    hashPrompt: (p) => p,
   }),
+}));
+
+jest.mock("../modals/YouTubePlanSavedIdeasModal", () => ({
+  fetchYouTubeSavedIdeasCount: jest.fn().mockResolvedValue(3),
+  YouTubePlanSavedIdeasModal: ({ open, onBack }) =>
+    open ? (
+      <div role="dialog" aria-label="Saved Ideas">
+        <button type="button" onClick={onBack}>
+          Back to Plan
+        </button>
+      </div>
+    ) : null,
 }));
 
 jest.mock("../../components/PlanUrlImportBar", () => ({
@@ -63,5 +75,17 @@ describe("PlanWedgeModal", () => {
     fireEvent.click(series);
     expect(baseProps.goCreate).toHaveBeenCalledTimes(2);
     expect(baseProps.goCreate).toHaveBeenCalledWith({ step: 0 });
+  });
+
+  it("opens Saved Ideas as a drill-down modal and returns to Plan", () => {
+    render(<PlanWedgeModal {...baseProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Saved Ideas/i }));
+    expect(screen.getByRole("dialog", { name: "Saved Ideas" })).toBeTruthy();
+    expect(screen.queryByText(WEDGE_MODAL_INTROS.plan)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to Plan" }));
+    expect(screen.getByText(WEDGE_MODAL_INTROS.plan)).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Saved Ideas" })).toBeNull();
   });
 });

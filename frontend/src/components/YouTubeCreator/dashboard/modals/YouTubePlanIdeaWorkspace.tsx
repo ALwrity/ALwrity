@@ -5,20 +5,26 @@ import { useYouTubePlanBrainstorm } from "../../hooks/useYouTubePlanBrainstorm";
 import { PlanBrainstormLoadingPanel } from "../../components/PlanBrainstormLoadingPanel";
 import { PlanBrainstormSourceChips } from "../../components/PlanBrainstormSourceChips";
 import { PlanUrlImportBar } from "../../components/PlanUrlImportBar";
-import { YouTubePlanIdeaList, YouTubePlanSavedList } from "./YouTubePlanIdeaLists";
+import { YouTubePlanIdeaList } from "./YouTubePlanIdeaLists";
 import type { GoCreateFn } from "./wedgeModalTypes";
 
 interface YouTubePlanIdeaWorkspaceProps {
   channelBible?: YouTubeChannelBible | null;
+  savedCount: number;
   goCreate: GoCreateFn;
   onOpenChannelBible: () => void;
+  onOpenSavedIdeas: () => void;
+  onIdeaSaved?: () => void;
 }
 
-/** Combined Topic Discovery + Blog/URL + Brainstorm/Saved Ideas (LinkedIn Plan primary panel). */
+/** Topic Discovery + Blog/URL + brainstorm; Saved Ideas open in a sibling modal. */
 export const YouTubePlanIdeaWorkspace: React.FC<YouTubePlanIdeaWorkspaceProps> = ({
   channelBible = null,
+  savedCount,
   goCreate,
   onOpenChannelBible,
+  onOpenSavedIdeas,
+  onIdeaSaved,
 }) => {
   const niche = (channelBible?.niche || "").trim();
   const [seed, setSeed] = useState(niche);
@@ -27,7 +33,6 @@ export const YouTubePlanIdeaWorkspace: React.FC<YouTubePlanIdeaWorkspaceProps> =
   );
   const [includeTrending, setIncludeTrending] = useState(false);
   const [includeRepurpose, setIncludeRepurpose] = useState(false);
-  const [showSaved, setShowSaved] = useState(false);
 
   const brainstorm = useYouTubePlanBrainstorm({
     channelBible,
@@ -48,17 +53,9 @@ export const YouTubePlanIdeaWorkspace: React.FC<YouTubePlanIdeaWorkspaceProps> =
     goCreate({ step: 0, userIdea: prompt });
   };
 
-  const handleToggleRepurpose = () => {
-    const next = !includeRepurpose;
-    setIncludeRepurpose(next);
-    setShowSaved(next);
-    if (next) void brainstorm.loadSaved();
-  };
-
-  const openSaved = () => {
-    setShowSaved(true);
-    setIncludeRepurpose(true);
-    void brainstorm.loadSaved();
+  const handleSave = async (idx: number) => {
+    await brainstorm.save(idx);
+    onIdeaSaved?.();
   };
 
   return (
@@ -77,10 +74,10 @@ export const YouTubePlanIdeaWorkspace: React.FC<YouTubePlanIdeaWorkspaceProps> =
         <button
           type="button"
           className="yt-rail-btn yt-plan-brainstorm__saved-btn"
-          onClick={openSaved}
+          onClick={onOpenSavedIdeas}
         >
           📚 Saved Ideas
-          {brainstorm.savedIdeas.length > 0 ? ` (${brainstorm.savedIdeas.length})` : ""}
+          {savedCount > 0 ? ` (${savedCount})` : ""}
         </button>
       </header>
 
@@ -108,7 +105,7 @@ export const YouTubePlanIdeaWorkspace: React.FC<YouTubePlanIdeaWorkspaceProps> =
           onOpenChannelBible={onOpenChannelBible}
           onToggleChannelBible={() => setUseChannelBible((v) => !v)}
           onToggleTrending={() => setIncludeTrending((v) => !v)}
-          onToggleRepurpose={handleToggleRepurpose}
+          onToggleRepurpose={() => setIncludeRepurpose((v) => !v)}
         />
 
         <p className="yt-plan-brainstorm__section-label">Blog / URL → Video</p>
@@ -156,16 +153,7 @@ export const YouTubePlanIdeaWorkspace: React.FC<YouTubePlanIdeaWorkspaceProps> =
             savingIndex={brainstorm.savingIndex}
             hashPrompt={brainstorm.hashPrompt}
             onUseIdea={useIdea}
-            onSave={(idx) => void brainstorm.save(idx)}
-          />
-        ) : null}
-
-        {showSaved ? (
-          <YouTubePlanSavedList
-            ideas={brainstorm.savedIdeas}
-            loading={brainstorm.savedLoading}
-            error={brainstorm.savedListError}
-            onUseIdea={useIdea}
+            onSave={(idx) => void handleSave(idx)}
           />
         ) : null}
       </div>
