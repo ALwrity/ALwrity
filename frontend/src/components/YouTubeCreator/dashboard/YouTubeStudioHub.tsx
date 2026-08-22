@@ -1,10 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import "./youtube-dashboard-layout.css";
 import "./youtube-rail-controls.css";
+import "./youtube-mobile-landing.css";
 import { YouTubeRadialWorkflow } from "./YouTubeRadialWorkflow";
 import { YouTubeMobileWorkflowGrid } from "./YouTubeMobileWorkflowGrid";
 import { YouTubeChannelHub } from "./YouTubeChannelHub";
+import { YouTubeChannelHubStrip } from "./YouTubeChannelHubStrip";
 import { YouTubeHubConnectButton } from "./YouTubeHubConnectButton";
+import { YouTubeMobileStudioActionsDock } from "./YouTubeMobileStudioActionsDock";
+import { YouTubeMobileAnalyticsSection } from "./YouTubeMobileAnalyticsSection";
 import { YouTubeChannelBibleChip } from "./YouTubeChannelBibleChip";
 import type { YouTubeWorkflowCardId } from "./youtubeWorkflowConfig";
 import { resolveWedgeNavigation } from "./studioHubWedgeNavigation";
@@ -33,6 +37,8 @@ export interface YouTubeStudioHubProps {
   channelBible?: YouTubeChannelBible | null;
   oauthLoading?: boolean;
   onConnect: () => void;
+  onDisconnect?: () => void;
+  isDisconnecting?: boolean;
   creatorState: YouTubeCreatorState;
   onClearDraft: () => void;
   needsAnalyticsReconnect?: boolean;
@@ -40,18 +46,20 @@ export interface YouTubeStudioHubProps {
   onCreatorDraftPatched?: (state: YouTubeCreatorState) => void;
 }
 
-export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
+export function YouTubeStudioHub({
   connected,
   channelName,
   channelBible,
   oauthLoading = false,
   onConnect,
+  onDisconnect,
+  isDisconnecting = false,
   creatorState,
   onClearDraft,
   needsAnalyticsReconnect = false,
   onChannelBibleSaved,
   onCreatorDraftPatched,
-}) => {
+}: YouTubeStudioHubProps) {
   const isDesktop = useYouTubeDesktopViewport();
   const heroStageRef = useRef<HTMLDivElement>(null);
   const heroContainerRef = useRef<HTMLDivElement>(null);
@@ -124,28 +132,30 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
   return (
     <div className="yt-studio-hub" data-tour="yt-studio-hub">
       <div className="yt-studio-hub-main">
-        <div className="yt-studio-hub-toolbar">
-          <YouTubeTodayGrowth />
-          <YouTubeChannelBibleChip
-            niche={channelBible?.niche || null}
-            planAvatarUrl={creatorState.avatarUrl || null}
-            onBibleSaved={onChannelBibleSaved}
-          />
-          {hasDraft ? (
-            <StartNewVideoButton
-              variant="hub"
-              onConfirm={() => {
-                onClearDraft();
-                openYouTubeCreator({ step: 0 });
-              }}
+        {isDesktop ? (
+          <div className="yt-studio-hub-toolbar">
+            <YouTubeTodayGrowth />
+            <YouTubeChannelBibleChip
+              niche={channelBible?.niche || null}
+              planAvatarUrl={creatorState.avatarUrl || null}
+              onBibleSaved={onChannelBibleSaved}
             />
-          ) : null}
-          <YouTubeResumeDraftChip
-            hasDraft={hasDraft}
-            preview={draftPreview}
-            onDiscard={onClearDraft}
-          />
-        </div>
+            {hasDraft ? (
+              <StartNewVideoButton
+                variant="hub"
+                onConfirm={() => {
+                  onClearDraft();
+                  openYouTubeCreator({ step: 0 });
+                }}
+              />
+            ) : null}
+            <YouTubeResumeDraftChip
+              hasDraft={hasDraft}
+              preview={draftPreview}
+              onDiscard={onClearDraft}
+            />
+          </div>
+        ) : null}
 
         <div
           ref={heroStageRef}
@@ -211,17 +221,39 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
                 </>
               ) : (
                 <div className="yt-studio-hub-mobile">
-                  <YouTubeChannelHub
-                    hubSize={180}
-                    connected={connected}
-                    channelName={channelName}
-                    niche={channelBible?.niche || null}
-                    isLoading={oauthLoading}
-                  />
-                  {hubCta}
                   <YouTubeMobileWorkflowGrid
                     onCardAction={handleCardAction}
                     connected={connected}
+                    studioActionsSlot={
+                      <YouTubeMobileStudioActionsDock
+                        hasDraft={hasDraft}
+                        draftPreview={draftPreview}
+                        niche={channelBible?.niche || null}
+                        planAvatarUrl={creatorState.avatarUrl || null}
+                        onBibleSaved={onChannelBibleSaved}
+                        onClearDraft={onClearDraft}
+                        onStartNewVideo={() => {
+                          onClearDraft();
+                          openYouTubeCreator({ step: 0 });
+                        }}
+                      />
+                    }
+                    profileHubSlot={
+                      <YouTubeChannelHubStrip
+                        connected={connected}
+                        channelName={channelName}
+                        isLoading={oauthLoading}
+                        onConnect={onConnect}
+                        onDisconnect={onDisconnect}
+                        isDisconnecting={isDisconnecting}
+                      />
+                    }
+                  />
+                  <YouTubeMobileAnalyticsSection
+                    connected={connected}
+                    channelName={channelName}
+                    onConnect={onConnect}
+                    needsAnalyticsReconnect={needsAnalyticsReconnect}
                   />
                 </div>
               )}
@@ -278,13 +310,15 @@ export const YouTubeStudioHub: React.FC<YouTubeStudioHubProps> = ({
         </div>
       </div>
 
-      <YouTubeRightRail
-        connected={connected}
-        channelName={channelName}
-        onConnect={onConnect}
-        isDesktop={isDesktop}
-        needsAnalyticsReconnect={needsAnalyticsReconnect}
-      />
+      {isDesktop ? (
+        <YouTubeRightRail
+          connected={connected}
+          channelName={channelName}
+          onConnect={onConnect}
+          isDesktop
+          needsAnalyticsReconnect={needsAnalyticsReconnect}
+        />
+      ) : null}
     </div>
   );
-};
+}

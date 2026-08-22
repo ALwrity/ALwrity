@@ -1,3 +1,4 @@
+/* @refresh reset */
 /**
  * Import a blog/article URL into YouTube Plan Your Video.
  * Reuses Podcast extract + WebsitePreviewModal. Does not invent article text.
@@ -18,12 +19,13 @@ import LinkIcon from "@mui/icons-material/Link";
 import { WebsitePreviewModal } from "../../PodcastMaker/CreateStep/WebsitePreviewModal";
 import { podcastApi } from "../../../services/podcastApi";
 import { inputSx } from "../styles";
-
-export interface YouTubeSourceArticle {
-  url: string;
-  title: string;
-  summary: string;
-}
+import {
+  buildIdeaFromExtraction,
+  extractApiError,
+  type YouTubeSourceArticle,
+} from "./planUrlImportUtils";
+import YouTubeUrlExtractAnalysis from "./YouTubeUrlExtractAnalysis";
+import YouTubeUrlPreviewActions from "./YouTubeUrlPreviewActions";
 
 interface ExtractedPage {
   title: string;
@@ -40,6 +42,12 @@ interface PlanUrlImportBarProps {
   onIdeaChange: (idea: string) => void;
   onSourceArticleChange: (article: YouTubeSourceArticle | null) => void;
   disabled?: boolean;
+  /** Plan landing: results below the form. Full Creator keeps the overlay. */
+  resultsPlacement?: "overlay" | "inline";
+  actionBusy?: boolean;
+  onInlineSave?: (idea: string, article: YouTubeSourceArticle) => void;
+  onInlineBrainstorm?: (idea: string) => void;
+  onInlineUse?: (idea: string, article: YouTubeSourceArticle) => void;
 }
 
 function urlHost(url: string): string {
@@ -54,60 +62,17 @@ function looksLikeHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value.trim());
 }
 
-export function extractApiError(error: unknown, fallback: string): string {
-  const err = error as {
-    message?: string;
-    code?: string;
-    response?: { status?: number; data?: { detail?: unknown; message?: string; error?: string } };
-  };
-  const status = err?.response?.status;
-  const data = err?.response?.data;
-  const detail = data?.detail;
-
-  if (status === 401) return "Please sign in again.";
-  if (status === 404) {
-    return "URL extract is unavailable. Restart the backend or enable topic discovery routes.";
-  }
-  if (status === 503) return "Content extraction is temporarily unavailable. Try again shortly.";
-  if (status === 504) return "Extraction timed out. Try a shorter article or try again.";
-  if (!status && err?.code === "ECONNABORTED") {
-    return "Extraction timed out. Try again or use a different URL.";
-  }
-  if (!status && err?.message?.toLowerCase().includes("network")) {
-    return "Network error. Check your connection and try again.";
-  }
-  if (typeof detail === "string" && detail.trim()) return detail.trim();
-  if (detail && typeof detail === "object") {
-    const typed = detail as { message?: string; error?: string };
-    if (typed.message?.trim()) return typed.message.trim();
-    if (typed.error?.trim()) return typed.error.trim();
-  }
-  if (typeof data?.message === "string" && data.message.trim()) return data.message.trim();
-  if (typeof data?.error === "string" && data.error.trim()) return data.error.trim();
-  return typeof err?.message === "string" && err.message.trim() ? err.message.trim() : fallback;
-}
-
-export function buildIdeaFromExtraction(data: {
-  title?: string;
-  summary?: string;
-  text?: string;
-}): string {
-  const summary = (data.summary || "").trim();
-  const title = (data.title || "").trim();
-  const text = (data.text || "").trim();
-  if (title && summary) return `${title}: ${summary}`;
-  if (summary) return summary;
-  if (title) return title;
-  if (text) return text.slice(0, 500);
-  return "";
-}
-
-export const PlanUrlImportBar: React.FC<PlanUrlImportBarProps> = ({
+export function PlanUrlImportBar({
   userIdea,
   onIdeaChange,
   onSourceArticleChange,
   disabled = false,
-}) => {
+  resultsPlacement = "overlay",
+  actionBusy = false,
+  onInlineSave,
+  onInlineBrainstorm,
+  onInlineUse,
+}: PlanUrlImportBarProps) {
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [isExtracting, setIsExtracting] = useState(false);
   const [websiteError, setWebsiteError] = useState<string | null>(null);
@@ -170,7 +135,9 @@ export const PlanUrlImportBar: React.FC<PlanUrlImportBarProps> = ({
         favicon: result.favicon,
       };
       setExtractedData(extraction);
-      setPreviewOpen(true);
+      if (resultsPlacement === "overlay") {
+        setPreviewOpen(true);
+      }
       console.info("[YouTubePlanUrl] Extract succeeded", {
         host: urlHost(extraction.url),
         titleLength: title.length,
@@ -195,27 +162,53 @@ export const PlanUrlImportBar: React.FC<PlanUrlImportBarProps> = ({
     }
   };
 
+  const articleFromPage = (page: ExtractedPage): YouTubeSourceArticle | null => {
+    const idea = buildIdeaFromExtraction(page);
+    if (!idea) return null;
+    const title = page.title.trim();
+    const summary = (page.summary || page.text.slice(0, 4000)).trim();
+    return { url: page.url, title, summary };
+  };
+
   const handleUseForVideoIdea = () => {
     if (!extractedData) return;
     const idea = buildIdeaFromExtraction(extractedData);
-    if (!idea) {
+    const article = articleFromPage(extractedData);
+    if (!idea || !article) {
       console.warn("[YouTubePlanUrl] Use for video idea blocked: empty extraction", {
         host: urlHost(extractedData.url),
       });
       setWebsiteError("No readable content found at this URL.");
       return;
     }
-    const title = extractedData.title.trim();
-    const summary = (extractedData.summary || extractedData.text.slice(0, 4000)).trim();
     onIdeaChange(idea);
-    onSourceArticleChange({ url: extractedData.url, title, summary });
+    onSourceArticleChange(article);
     setImportedHost(urlHost(extractedData.url));
     setPreviewOpen(false);
     console.info("[YouTubePlanUrl] Filled video idea from article", {
       host: urlHost(extractedData.url),
-      usedTitleAndSummary: Boolean(title && extractedData.summary.trim()),
+      usedTitleAndSummary: Boolean(article.title && extractedData.summary.trim()),
       ideaLength: idea.length,
     });
+  };
+
+  const runInline = (kind: "save" | "brainstorm" | "use") => {
+    if (!extractedData) return;
+    const idea = buildIdeaFromExtraction(extractedData);
+    const article = articleFromPage(extractedData);
+    if (!idea || !article) {
+      setWebsiteError("No readable content found at this URL.");
+      return;
+    }
+    if (kind === "save") {
+      onInlineSave?.(idea, article);
+      return;
+    }
+    if (kind === "brainstorm") {
+      onInlineBrainstorm?.(idea);
+      return;
+    }
+    onInlineUse?.(idea, article);
   };
 
   return (
@@ -302,15 +295,30 @@ export const PlanUrlImportBar: React.FC<PlanUrlImportBarProps> = ({
         </Alert>
       )}
 
-      <WebsitePreviewModal
-        open={previewOpen}
-        extractedData={extractedData}
-        onClose={() => setPreviewOpen(false)}
-        showAnalyzeButton={false}
-        useTextLabel="Use for video idea"
-        onAnalyzeContent={() => undefined}
-        onUseTextOnly={handleUseForVideoIdea}
-      />
+      {resultsPlacement === "inline" && extractedData ? (
+        <>
+          <YouTubeUrlExtractAnalysis page={extractedData} />
+          <YouTubeUrlPreviewActions
+            saving={actionBusy}
+            onCancel={() => setExtractedData(null)}
+            onSave={() => runInline("save")}
+            onBrainstorm={() => runInline("brainstorm")}
+            onUse={() => runInline("use")}
+          />
+        </>
+      ) : null}
+
+      {resultsPlacement === "overlay" ? (
+        <WebsitePreviewModal
+          open={previewOpen}
+          extractedData={extractedData}
+          onClose={() => setPreviewOpen(false)}
+          showAnalyzeButton={false}
+          useTextLabel="Use for video idea"
+          onAnalyzeContent={() => undefined}
+          onUseTextOnly={handleUseForVideoIdea}
+        />
+      ) : null}
     </Box>
   );
-};
+}

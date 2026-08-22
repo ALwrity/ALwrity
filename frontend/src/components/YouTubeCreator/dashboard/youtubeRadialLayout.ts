@@ -172,11 +172,16 @@ function scaleWedgePanelRadii(
   };
 }
 
+export interface YouTubeRadialLayoutOptions {
+  maxHeight?: number;
+  desktopViewport?: boolean;
+}
+
 export function computeYouTubeRadialLayout(
   containerWidth: number,
-  maxHeight?: number,
-  desktopViewport = false,
+  options: YouTubeRadialLayoutOptions = {},
 ): YouTubeRadialLayout {
+  const { maxHeight, desktopViewport = false } = options;
   const viewW = Math.max(320, Math.round(containerWidth));
   const centerX = youtubeHubCenterX(viewW, desktopViewport);
   const hubVisualR = computeInnerRadius();

@@ -10,7 +10,8 @@ import {
   fetchYouTubeSavedIdeasCount,
   YouTubePlanSavedIdeasModal,
 } from "./YouTubePlanSavedIdeasModal";
-import type { PlanWedgeProps } from "./wedgeModalTypes";
+import { YouTubePlanUrlImportModal } from "./YouTubePlanUrlImportModal";
+import type { GoCreateFn, PlanWedgeProps } from "./wedgeModalTypes";
 import { YouTubePlanIdeaWorkspace } from "./YouTubePlanIdeaWorkspace";
 import { YouTubePlanSidebarTools } from "./YouTubePlanSidebarTools";
 import type { YouTubeChannelBible } from "../../../../services/youtubeApi";
@@ -24,9 +25,12 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
   onChannelBibleSaved,
   onCreatorDraftPatched,
 }) => {
+  const niche = (channelBible?.niche || "").trim();
   const [bibleEditorOpen, setBibleEditorOpen] = useState(false);
   const [savedIdeasOpen, setSavedIdeasOpen] = useState(false);
+  const [urlImportOpen, setUrlImportOpen] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
+  const [seed, setSeed] = useState(niche);
 
   const refreshSavedCount = useCallback(async () => {
     try {
@@ -41,6 +45,7 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
     if (!open) {
       setBibleEditorOpen(false);
       setSavedIdeasOpen(false);
+      setUrlImportOpen(false);
       return;
     }
     let cancelled = false;
@@ -61,6 +66,12 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
     console.info("[PlanWedgeModal] Close Channel Bible — returning to Plan");
     setBibleEditorOpen(false);
   };
+
+  useEffect(() => {
+    if (open && niche) {
+      setSeed((prev) => (prev.trim() ? prev : niche));
+    }
+  }, [open, niche]);
 
   const bibleShell = youtubeSubModalShellProps("plan", () => {
     console.info("[PlanWedgeModal] Back from Channel Bible to Plan");
@@ -93,12 +104,28 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
     setSavedIdeasOpen(false);
   };
 
+  const closeUrlImportToPlan = () => {
+    console.info("[PlanWedgeModal] Back from Blog/URL to Plan");
+    setUrlImportOpen(false);
+  };
+
+  const closeUrlImportToHub = () => {
+    console.info("[PlanWedgeModal] Close Blog/URL — returning to Studio Hub");
+    setUrlImportOpen(false);
+    onClose();
+  };
+
   const handleUseIdea = (prompt: string) => {
     setSavedIdeasOpen(false);
     goCreate({ step: 0, userIdea: prompt });
   };
 
-  const planMainOpen = open && !bibleEditorOpen && !savedIdeasOpen;
+  const handleUseUrlIdea: GoCreateFn = (detail) => {
+    setUrlImportOpen(false);
+    goCreate(detail);
+  };
+
+  const planMainOpen = open && !bibleEditorOpen && !savedIdeasOpen && !urlImportOpen;
 
   return (
     <>
@@ -113,6 +140,8 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
           <div className="yt-plan-wedge-main">
             <YouTubePlanIdeaWorkspace
               channelBible={channelBible}
+              seed={seed}
+              onSeedChange={setSeed}
               savedCount={savedCount}
               goCreate={goCreate}
               onOpenChannelBible={() => {
@@ -122,7 +151,10 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
               onOpenSavedIdeas={() => setSavedIdeasOpen(true)}
               onIdeaSaved={() => void refreshSavedCount()}
             />
-            <YouTubePlanSidebarTools goCreate={goCreate} />
+            <YouTubePlanSidebarTools
+              goCreate={goCreate}
+              onOpenUrlImport={() => setUrlImportOpen(true)}
+            />
           </div>
         </div>
       </YouTubeActionModal>
@@ -133,6 +165,16 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
         onBack={closeSavedIdeasToPlan}
         onUseIdea={handleUseIdea}
         onAfterDelete={() => void refreshSavedCount()}
+      />
+
+      <YouTubePlanUrlImportModal
+        open={Boolean(open && urlImportOpen)}
+        onClose={closeUrlImportToHub}
+        onBack={closeUrlImportToPlan}
+        seed={seed}
+        onSeedChange={setSeed}
+        goCreate={handleUseUrlIdea}
+        onIdeaSaved={() => void refreshSavedCount()}
       />
 
       <YouTubeChannelBibleEditorModal

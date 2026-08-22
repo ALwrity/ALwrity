@@ -79,7 +79,11 @@ export function useYouTubeHeroLayoutMetrics({
   }, [readSize, canvasRef, heroContainerRef, heroStageRef]);
 
   const layout = useMemo(
-    () => computeYouTubeRadialLayout(containerWidth, containerHeight, isDesktop),
+    () =>
+      computeYouTubeRadialLayout(containerWidth, {
+        maxHeight: containerHeight,
+        desktopViewport: isDesktop,
+      }),
     [containerWidth, containerHeight, isDesktop],
   );
   const hubCenterLeft = youtubeHubCenterLeftCss(layout);

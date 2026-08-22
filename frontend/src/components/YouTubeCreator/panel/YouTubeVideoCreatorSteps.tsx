@@ -1,7 +1,7 @@
 import React from "react";
 import type { Scene, VideoPlan, YouTubeChannelBible } from "../../../services/youtubeApi";
 import type { YouTubeCreatorState } from "../../../hooks/useYouTubeCreatorState";
-import type { YouTubeSourceArticle } from "../components/PlanUrlImportBar";
+import type { YouTubeSourceArticle } from "../components/planUrlImportUtils";
 import type { ContentAsset } from "../../../hooks/useContentAssets";
 import type { YouTubeImageGenerationSettings } from "../shared";
 import type { AudioGenerationSettings } from "../../shared/AudioSettingsModal";

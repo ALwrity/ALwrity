@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { YouTubeChannelBibleEditorModal } from "./YouTubeChannelBibleEditorModal";
+import { YouTubeStudioTabButton } from "../components/YouTubeStudioTabButton";
 import { YT_OPEN_CHANNEL_BIBLE_EVENT } from "./youtubeStudioEvents";
 import type { YouTubeChannelBible } from "../../../services/youtubeApi";
 
@@ -7,6 +8,7 @@ interface YouTubeChannelBibleChipProps {
   niche?: string | null;
   planAvatarUrl?: string | null;
   onBibleSaved?: (bible: YouTubeChannelBible) => void;
+  layout?: "pill" | "tab";
 }
 
 /**
@@ -17,6 +19,7 @@ export const YouTubeChannelBibleChip: React.FC<YouTubeChannelBibleChipProps> = (
   niche,
   planAvatarUrl = null,
   onBibleSaved,
+  layout = "pill",
 }) => {
   const [open, setOpen] = useState(false);
 
@@ -31,22 +34,39 @@ export const YouTubeChannelBibleChip: React.FC<YouTubeChannelBibleChipProps> = (
 
   return (
     <>
-      <button
-        type="button"
-        className="yt-rail-btn"
-        data-tour="yt-channel-bible"
-        aria-label={
-          niche ? `Channel Bible — niche ${niche}` : "Open Channel Bible"
-        }
-        onClick={() => {
-          console.info("[YouTubeChannelBibleChip] Open editor", {
-            hasNiche: Boolean(niche?.trim()),
-          });
-          setOpen(true);
-        }}
-      >
-        Channel Bible
-      </button>
+      {layout === "tab" ? (
+        <YouTubeStudioTabButton
+          label={niche ? `Channel Bible — niche ${niche}` : "Open Channel Bible"}
+          stackedLabel={["Channel", "Bible"]}
+          icon="📖"
+          boxed
+          open={open}
+          onClick={() => {
+            console.info("[YouTubeChannelBibleChip] Open editor", {
+              hasNiche: Boolean(niche?.trim()),
+            });
+            setOpen(true);
+          }}
+          dataTour="yt-channel-bible"
+        />
+      ) : (
+        <button
+          type="button"
+          className="yt-rail-btn"
+          data-tour="yt-channel-bible"
+          aria-label={
+            niche ? `Channel Bible — niche ${niche}` : "Open Channel Bible"
+          }
+          onClick={() => {
+            console.info("[YouTubeChannelBibleChip] Open editor", {
+              hasNiche: Boolean(niche?.trim()),
+            });
+            setOpen(true);
+          }}
+        >
+          Channel Bible
+        </button>
+      )}
 
       <YouTubeChannelBibleEditorModal
         open={open}

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { YouTubeActionModal } from "./YouTubeActionModal";
+import { YouTubeStudioTabButton } from "../components/YouTubeStudioTabButton";
 import {
   YOUTUBE_WORKFLOW_CARDS,
   type YouTubeWorkflowCardId,
@@ -36,7 +37,9 @@ function loadTasks(): TodayTask[] {
   }
 }
 
-export const YouTubeTodayGrowth: React.FC = () => {
+export const YouTubeTodayGrowth: React.FC<{
+  layout?: "pill" | "tab";
+}> = ({ layout = "pill" }) => {
   const [open, setOpen] = useState(false);
   const [tasks, setTasks] = useState<TodayTask[]>(() => loadTasks());
 
@@ -60,14 +63,25 @@ export const YouTubeTodayGrowth: React.FC = () => {
 
   return (
     <>
-      <button
-        type="button"
-        className="yt-rail-btn"
-        data-tour="yt-today-growth"
-        onClick={() => setOpen(true)}
-      >
-        Today&apos;s Growth ({doneCount}/6)
-      </button>
+      {layout === "tab" ? (
+        <YouTubeStudioTabButton
+          label="Today's Growth Tasks"
+          stackedLabel={["Today's Grow", "Tasks"]}
+          icon="🚀"
+          open={open}
+          onClick={() => setOpen(true)}
+          dataTour="yt-today-growth"
+        />
+      ) : (
+        <button
+          type="button"
+          className="yt-rail-btn"
+          data-tour="yt-today-growth"
+          onClick={() => setOpen(true)}
+        >
+          Today&apos;s Growth ({doneCount}/6)
+        </button>
+      )}
 
       <YouTubeActionModal
         open={open}

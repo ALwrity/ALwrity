@@ -1,81 +1,122 @@
-import React from "react";
+import React, { useState } from "react";
 import { isWedgeConnectGated } from "./studioHubAccessConfig";
 import {
+  PLAN_PINNED_HINT_KEY,
+  RECOMMENDED_WORKFLOW_CARD_ID,
   YOUTUBE_WORKFLOW_CARDS,
   type YouTubeWorkflowCardId,
 } from "./youtubeWorkflowConfig";
+import { ConnectLockBadge } from "../../LinkedInWriter/components/dashboard/ConnectLockIcon";
 
 interface YouTubeMobileWorkflowGridProps {
   onCardAction: (cardId: YouTubeWorkflowCardId) => void;
+  profileHubSlot?: React.ReactNode;
+  studioActionsSlot?: React.ReactNode;
   connected?: boolean;
 }
 
 export const YouTubeMobileWorkflowGrid: React.FC<
   YouTubeMobileWorkflowGridProps
-> = ({ onCardAction, connected = true }) => {
+> = ({
+  onCardAction,
+  profileHubSlot,
+  studioActionsSlot,
+  connected = true,
+}) => {
+  const [showPlanHint, setShowPlanHint] = useState(
+    () => !sessionStorage.getItem(PLAN_PINNED_HINT_KEY),
+  );
+
+  const handleCardAction = (cardId: YouTubeWorkflowCardId) => {
+    if (cardId === RECOMMENDED_WORKFLOW_CARD_ID && showPlanHint) {
+      sessionStorage.setItem(PLAN_PINNED_HINT_KEY, "1");
+      setShowPlanHint(false);
+    }
+    onCardAction(cardId);
+  };
+
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-        gap: 12,
-        width: "100%",
-        padding: "0 4px",
-        boxSizing: "border-box",
-      }}
+    <section
+      className="yt-dashboard-mobile-workflow"
+      aria-label="Studio actions"
+      data-tour="yt-mobile-workflow"
     >
-      {YOUTUBE_WORKFLOW_CARDS.map((card) => {
-        const isConnectLocked = isWedgeConnectGated(card.id, connected);
-        return (
-          <button
-            key={card.id}
-            type="button"
-            onClick={() => onCardAction(card.id)}
-            aria-label={`${card.title}: ${card.description}`}
-            title={
-              isConnectLocked
-                ? `Connect YouTube to unlock ${card.title}`
-                : undefined
-            }
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              textAlign: "center",
-              gap: 4,
-              padding: "14px 10px",
-              borderRadius: 14,
-              border: `1.5px solid ${
-                isConnectLocked ? "rgba(148,163,184,0.5)" : `${card.accent}33`
-              }`,
-              background: isConnectLocked ? "rgba(226,232,240,0.6)" : "#ffffff",
-              cursor: "pointer",
-              boxShadow: "0 2px 8px rgba(15,23,42,0.06)",
-            }}
-          >
-            <card.icon
-              sx={{
-                color: isConnectLocked ? "#94a3b8" : card.accent,
-                fontSize: 26,
-              }}
-              aria-hidden
-            />
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#0f0f0f" }}>
-              {card.title}
-            </div>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 500,
-                color: "#606060",
-                lineHeight: 1.3,
-              }}
+      {studioActionsSlot}
+
+      <div className="yt-dashboard-mobile-workflow-header">
+        <h2
+          className="yt-dashboard-mobile-workflow-title yt-dashboard-mobile-workflow-title--stacked"
+          aria-label="What are You Creating Today"
+        >
+          <span>What are You</span>
+          <span>
+            Creating Today{" "}
+            <span className="yt-dashboard-mobile-workflow-title-emoji" aria-hidden>
+              🎯
+            </span>
+          </span>
+        </h2>
+        {profileHubSlot}
+      </div>
+
+      <div className="yt-dashboard-mobile-workflow-grid">
+        {YOUTUBE_WORKFLOW_CARDS.map((card) => {
+          const isRecommended =
+            card.id === RECOMMENDED_WORKFLOW_CARD_ID && showPlanHint;
+          const isConnectLocked = isWedgeConnectGated(card.id, connected);
+          const Icon = card.icon;
+
+          return (
+            <button
+              key={card.id}
+              type="button"
+              className={[
+                "yt-dashboard-mobile-workflow-card",
+                isRecommended && "yt-dashboard-mobile-workflow-card--recommended",
+                isConnectLocked && "yt-studio-connect-locked",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              data-tour={`yt-wedge-${card.id}`}
+              onClick={() => handleCardAction(card.id)}
+              aria-label={`${card.title}: ${card.description}`}
+              title={
+                isConnectLocked
+                  ? `Connect YouTube to unlock ${card.title}`
+                  : undefined
+              }
+              style={
+                {
+                  "--workflow-card-accent": card.accent,
+                } as React.CSSProperties
+              }
             >
-              {card.description}
-            </div>
-          </button>
-        );
-      })}
-    </div>
+              {isRecommended && (
+                <span className="yt-dashboard-mobile-workflow-badge">
+                  <span>START</span>
+                  <span>HERE</span>
+                </span>
+              )}
+              <span className="yt-dashboard-mobile-workflow-card-head">
+                <span
+                  className="yt-dashboard-mobile-workflow-icon"
+                  style={{ color: isConnectLocked ? "#94a3b8" : card.accent }}
+                  aria-hidden
+                >
+                  <Icon fontSize="inherit" />
+                </span>
+                <span className="yt-dashboard-mobile-workflow-label">
+                  {card.title}
+                </span>
+                {isConnectLocked && <ConnectLockBadge size={11} />}
+              </span>
+              <span className="yt-dashboard-mobile-workflow-desc">
+                {card.description}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 };
