@@ -337,6 +337,17 @@ describe("PlanUrlImportBar", () => {
       text: "Longer article text",
       url: "https://example.com/bali-guide",
       highlights: ["Tip one"],
+      favicon: "https://example.com/favicon.ico",
+      image: "https://example.com/og.jpg",
+      subpages: [
+        {
+          id: "ubud",
+          title: "Ubud",
+          url: "https://example.com/ubud",
+          summary: "Rice terraces",
+          text: "Rice terraces and temples.",
+        },
+      ],
     });
     const onInlineSave = jest.fn();
     const onInlineBrainstorm = jest.fn();
@@ -360,6 +371,10 @@ describe("PlanUrlImportBar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Extract" }));
 
     expect(await screen.findByTestId("yt-url-extract-analysis")).toBeInTheDocument();
+    expect(screen.getByText("example.com Content Analysis")).toBeInTheDocument();
+    expect(screen.getByText("Company / Organization")).toBeInTheDocument();
+    expect(screen.getByText("Source URL")).toBeInTheDocument();
+    expect(screen.getByText("Subpages (1)")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Extract" })).toBeInTheDocument();
     expect(screen.queryByTestId("use-text-label")).not.toBeInTheDocument();
 
