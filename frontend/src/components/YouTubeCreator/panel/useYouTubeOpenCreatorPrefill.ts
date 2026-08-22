@@ -1,17 +1,11 @@
 import { useEffect } from "react";
 import type { YouTubeCreatorState } from "../../../hooks/useYouTubeCreatorState";
+import type { YouTubeSourceArticle } from "../components/planUrlImportUtils";
 import {
   YT_OPEN_CREATOR_EVENT,
   consumePendingOpenCreator,
   type YouTubeOpenCreatorDetail,
 } from "./youtubeOpenCreatorEvents";
-import { queueYouTubePlanFocus } from "./youtubePlanFocus";
-
-function scrollToTourTarget(selector: string): void {
-  window.setTimeout(() => {
-    document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, 250);
-}
 
 /**
  * Applies Blog/Studio deep-link prefill into the Video Creator pipeline.
@@ -20,6 +14,7 @@ function scrollToTourTarget(selector: string): void {
 export function useYouTubeOpenCreatorPrefill(
   updateState: (updates: Partial<YouTubeCreatorState>) => void,
   setActiveStep: (step: number) => void,
+  setSourceArticle?: (article: YouTubeSourceArticle | null) => void,
 ): void {
   useEffect(() => {
     const applyDetail = (detail: YouTubeOpenCreatorDetail) => {
@@ -40,16 +35,11 @@ export function useYouTubeOpenCreatorPrefill(
       const nextStep = typeof detail.step === "number" ? detail.step : 0;
       setActiveStep(nextStep);
       updateState({ activeStep: nextStep });
-      if (detail.focusBrainstorm || detail.focusSavedIdeas) {
-        queueYouTubePlanFocus({
-          brainstorm: Boolean(detail.focusBrainstorm || detail.focusSavedIdeas),
-          savedIdeas: Boolean(detail.focusSavedIdeas),
+      if (detail.sourceArticle && setSourceArticle) {
+        setSourceArticle(detail.sourceArticle);
+        console.info("[YouTubeVideoCreatorPanel] Applied source article from Plan", {
+          url: detail.sourceArticle.url,
         });
-      }
-      if (detail.focusUrlImport) {
-        scrollToTourTarget('[data-tour="yt-url-import"]');
-      } else if (detail.focusBrainstorm || detail.focusSavedIdeas) {
-        scrollToTourTarget('[data-tour="yt-plan-brainstorm"]');
       }
       console.info("[YouTubeVideoCreatorPanel] Applied open-creator prefill", detail);
     };
@@ -65,5 +55,5 @@ export function useYouTubeOpenCreatorPrefill(
     };
     window.addEventListener(YT_OPEN_CREATOR_EVENT, onOpenCreator);
     return () => window.removeEventListener(YT_OPEN_CREATOR_EVENT, onOpenCreator);
-  }, [updateState, setActiveStep]);
+  }, [updateState, setActiveStep, setSourceArticle]);
 }

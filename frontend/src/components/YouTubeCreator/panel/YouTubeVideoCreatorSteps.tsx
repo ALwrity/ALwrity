@@ -96,7 +96,6 @@ export const YouTubeVideoCreatorSteps: React.FC<YouTubeVideoCreatorStepsProps> =
         makingPresentable={props.makingPresentable}
         language={props.language}
         onIdeaChange={(value) => props.updateState({ userIdea: value })}
-        onSourceArticleChange={props.setSourceArticle}
         onDurationChange={(value) => props.updateState({ durationType: value })}
         onVideoTypeChange={(value) => props.updateState({ videoType: value })}
         onTargetAudienceChange={(value) => props.updateState({ targetAudience: value })}

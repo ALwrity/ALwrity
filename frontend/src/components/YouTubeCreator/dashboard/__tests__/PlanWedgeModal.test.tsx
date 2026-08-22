@@ -2,6 +2,7 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { PlanWedgeModal } from "../modals/PlanWedgeModal";
 import { WEDGE_MODAL_INTROS } from "../youtubeWorkflowConfig";
+import { queueYouTubePlanDrillDown } from "../youtubePlanDrillDown";
 
 jest.mock("../../hooks/useYouTubePlanBrainstorm", () => ({
   useYouTubePlanBrainstorm: () => ({
@@ -171,6 +172,15 @@ describe("PlanWedgeModal", () => {
 
     expect(baseProps.onClose).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("Blog / URL import")).toBeNull();
+  });
+
+  it("opens Blog / URL drill-down when Plan drill-down queue has url-import", () => {
+    queueYouTubePlanDrillDown({ sub: "url-import", seed: "From Creator" });
+
+    render(<PlanWedgeModal {...baseProps} />);
+
+    expect(screen.getByRole("dialog", { name: "Blog / URL → Video" })).toBeTruthy();
+    expect(screen.queryByText(WEDGE_MODAL_INTROS.plan)).toBeNull();
   });
 
   it("returns to Plan when Channel Bible close or back is used", () => {

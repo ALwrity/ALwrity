@@ -53,10 +53,8 @@ import { ContentAsset } from '../../../hooks/useContentAssets';
 import { buildVideoPlanningOperation, buildImageEditingOperation } from '../utils/operationHelpers';
 import { useAvatarBlobUrl } from '../hooks/useAvatarBlobUrl';
 import { SelectWithCustom } from './SelectWithCustom';
-import { PlanUrlImportBar } from './PlanUrlImportBar';
-import type { YouTubeSourceArticle } from './planUrlImportUtils';
+import { PlanDiscoveryShortcuts } from './PlanDiscoveryShortcuts';
 import { ChannelBiblePanel } from './ChannelBiblePanel';
-import { PlanBrainstormPanel } from './PlanBrainstormPanel';
 import { PlanResearchToggle } from './PlanResearchToggle';
 import { PlanPromptPreview } from './PlanPromptPreview';
 import { PlanGenerationLoadingPanel } from './PlanGenerationLoadingPanel';
@@ -77,7 +75,6 @@ interface PlanStepProps {
   makingPresentable?: boolean;
   language: YouTubeContentLanguage;
   onIdeaChange: (idea: string) => void;
-  onSourceArticleChange: (article: YouTubeSourceArticle | null) => void;
   onDurationChange: (duration: DurationType) => void;
   onVideoTypeChange: (type: VideoType | '') => void;
   onTargetAudienceChange: (audience: string) => void;
@@ -116,7 +113,6 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
   makingPresentable = false,
   language,
   onIdeaChange,
-  onSourceArticleChange,
   onDurationChange,
   onVideoTypeChange,
   onTargetAudienceChange,
@@ -244,18 +240,7 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
               sx={inputSx}
               FormHelperTextProps={{ sx: helperSx }}
             />
-            <PlanBrainstormPanel
-              userIdea={userIdea}
-              channelBible={channelBible}
-              onUseIdea={onIdeaChange}
-              disabled={loading}
-            />
-            <PlanUrlImportBar
-              userIdea={userIdea}
-              onIdeaChange={onIdeaChange}
-              onSourceArticleChange={onSourceArticleChange}
-              disabled={loading}
-            />
+            <PlanDiscoveryShortcuts userIdea={userIdea} disabled={loading} />
           </Box>
 
           {/* Video Type */}

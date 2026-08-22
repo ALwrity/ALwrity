@@ -59,11 +59,12 @@ export const YouTubePlanUrlImportModal: React.FC<YouTubePlanUrlImportModalProps>
     onBack();
   };
 
-  const handleUse = (idea: string) => {
+  const handleUse = (idea: string, article: YouTubeSourceArticle) => {
     console.info("[YouTubePlanUrlImport] Use for video idea", {
+      url: article.url,
       ideaLength: idea.length,
     });
-    goCreate({ step: 0, userIdea: idea });
+    goCreate({ step: 0, userIdea: idea, sourceArticle: article });
   };
 
   return (

@@ -568,7 +568,6 @@ export const PublishContent: React.FC<PublishContentProps> = ({
                 queueYouTubeCreatorOpen({
                   step: 0,
                   userIdea: idea,
-                  focusUrlImport: true,
                 });
                 // Hub landing opens Full Creator modal from pending queue.
                 navigate('/youtube-creator');
