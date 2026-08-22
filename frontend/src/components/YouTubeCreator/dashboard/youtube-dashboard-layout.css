@@ -470,12 +470,15 @@ body.youtube-studio-view #root {
 .yt-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 15, 15, 0.45);
-  z-index: 1300;
+  background: rgba(15, 23, 42, 0.38);
+  z-index: 13000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
+  isolation: isolate;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .yt-modal-card {

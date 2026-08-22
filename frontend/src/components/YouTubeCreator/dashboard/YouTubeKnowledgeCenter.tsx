@@ -9,6 +9,7 @@ import {
 } from "./knowledgeCenterFeatures";
 import { openYouTubeCreator, openYouTubeWorkflowWedge, openYouTubeChannelBible } from "./youtubeStudioEvents";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
+import { YT_Z_KNOWLEDGE_CENTER } from "./youtubeStudioZIndex";
 
 interface YouTubeKnowledgeCenterProps {
   compact?: boolean;
@@ -171,7 +172,7 @@ export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
                   bottom: gridPos.bottom,
                   right: gridPos.right,
                   width: gridPos.width,
-                  zIndex: 12000,
+                  zIndex: YT_Z_KNOWLEDGE_CENTER,
                 }}
               >
                 {panel}
