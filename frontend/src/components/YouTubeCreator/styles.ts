@@ -4,6 +4,7 @@
  */
 
 import { YT_RED, YT_TEXT } from './constants';
+import { YT_Z_MODAL_POPOVER } from './dashboard/youtubeStudioZIndex';
 
 // Enhanced color palette for better contrast
 const BORDER_COLOR = '#d1d5db'; // Lighter gray for better contrast
@@ -88,10 +89,13 @@ export const selectSx = {
   },
 };
 
-// Menu props for Select dropdown - ensures light theme
+// Menu props for Select dropdown — light theme, above Full Creator modal (z 13000)
 export const selectMenuProps = {
+  style: { zIndex: YT_Z_MODAL_POPOVER },
+  sx: { zIndex: YT_Z_MODAL_POPOVER },
   PaperProps: {
     sx: {
+      zIndex: YT_Z_MODAL_POPOVER,
       backgroundColor: BACKGROUND,
       color: TEXT_PRIMARY,
       borderRadius: 2,
@@ -185,6 +189,11 @@ export const sectionTitleSx = {
   color: TEXT_PRIMARY,
   marginBottom: 2,
   lineHeight: 1.4,
+};
+
+export const tooltipPopperProps = {
+  sx: { zIndex: YT_Z_MODAL_POPOVER },
+  style: { zIndex: YT_Z_MODAL_POPOVER },
 };
 
 export const tooltipSx = {

@@ -13,6 +13,7 @@ import { useImageGenerationPolling } from "./hooks/useImageGenerationPolling";
 import type { YouTubeSourceArticle } from "./components/planUrlImportUtils";
 import { useYouTubeOpenCreatorPrefill } from "./panel/useYouTubeOpenCreatorPrefill";
 import { useYouTubePlanAndSceneHandlers } from "./panel/useYouTubePlanAndSceneHandlers";
+import { useYouTubePitchHandlers } from "./panel/useYouTubePitchHandlers";
 import { useYouTubeAssetAndRenderHandlers } from "./panel/useYouTubeAssetAndRenderHandlers";
 import { YouTubeVideoCreatorStepper } from "./panel/YouTubeVideoCreatorStepper";
 import { YouTubeVideoCreatorSteps } from "./panel/YouTubeVideoCreatorSteps";
@@ -33,6 +34,11 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
     languageBoost,
     videoPlan,
     enableResearch,
+    creativeAngle,
+    currentPitch,
+    pitchHistory,
+    fullScript,
+    scriptPhase,
     scenes,
     sceneBuildGeneration,
     editingSceneId,
@@ -132,6 +138,7 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
     makingPresentable,
     sourceArticle,
     enableResearch,
+    fullScript,
     updateState,
     setLoading,
     setError,
@@ -140,6 +147,27 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
     setUploadingAvatar,
     setMakingPresentable,
     setRegeneratingAvatar,
+  });
+
+  const pitchHandlers = useYouTubePitchHandlers({
+    userIdea,
+    durationType,
+    videoType,
+    targetAudience,
+    videoGoal,
+    brandStyle,
+    referenceImage,
+    avatarUrl,
+    enableResearch,
+    sourceArticle,
+    creativeAngle,
+    currentPitch,
+    pitchHistory,
+    updateState,
+    setLoading,
+    setError,
+    setSuccess,
+    setActiveStep,
   });
 
   const assetHandlers = useYouTubeAssetAndRenderHandlers({
@@ -170,6 +198,37 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
 
   const onClearSuccess = useCallback(() => setSuccess(null), []);
   const onClearError = useCallback(() => setError(null), []);
+
+  const handleCreativeAngleChange = useCallback(
+    (angle: string) => {
+      updateState({ creativeAngle: angle });
+    },
+    [updateState],
+  );
+
+  const handleGeneratePitch = pitchHandlers.handleGeneratePitch;
+  const handleExpandPitch = pitchHandlers.handleExpandPitch;
+
+  const handleSelectPitchFromHistory = useCallback(
+    (pitch: NonNullable<typeof currentPitch>) => {
+      updateState({
+        currentPitch: pitch,
+        scriptPhase: "pitch",
+        approvedPitch: null,
+        fullScript: null,
+      });
+      setSuccess("Loaded pitch from history.");
+      window.setTimeout(() => setSuccess(null), 2000);
+    },
+    [updateState],
+  );
+
+  const handleFullScriptChange = useCallback(
+    (value: string) => {
+      updateState({ fullScript: value });
+    },
+    [updateState],
+  );
 
   const showStartNewVideo = useMemo(() => hasYouTubeCreatorDraft(state), [state]);
 
@@ -241,6 +300,17 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
         setActiveStep={setActiveStep}
         handleLanguageChange={planHandlers.handleLanguageChange}
         handleGeneratePlan={planHandlers.handleGeneratePlan}
+        creativeAngle={creativeAngle}
+        currentPitch={currentPitch}
+        pitchHistory={pitchHistory}
+        scriptPhase={scriptPhase}
+        fullScript={fullScript}
+        onCreativeAngleChange={handleCreativeAngleChange}
+        onGeneratePitch={handleGeneratePitch}
+        onRegeneratePitch={handleGeneratePitch}
+        onExpandPitch={handleExpandPitch}
+        onSelectPitchFromHistory={handleSelectPitchFromHistory}
+        onFullScriptChange={handleFullScriptChange}
         handleAvatarUpload={planHandlers.handleAvatarUpload}
         handleRemoveAvatar={planHandlers.handleRemoveAvatar}
         handleMakePresentable={planHandlers.handleMakePresentable}

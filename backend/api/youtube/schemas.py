@@ -72,6 +72,38 @@ class VideoPlanResponse(BaseModel):
     message: str
 
 
+class PitchRequest(VideoPlanRequest):
+    """Phase 1: idea + creative angle → one lightweight pitch."""
+    creative_angle: str = Field(
+        ...,
+        min_length=1,
+        description="User-selected strategy angle (preset or custom)",
+    )
+
+
+class PitchResponse(BaseModel):
+    """Response model for pitch generation."""
+    success: bool
+    pitch: Optional[Dict[str, Any]] = None
+    message: str
+
+
+class ExpandRequest(VideoPlanRequest):
+    """Phase 2: approved pitch → full production script."""
+    approved_pitch: Dict[str, Any] = Field(
+        ...,
+        description="Approved pitch payload (title, summary, hook, beats, angle)",
+    )
+
+
+class ExpandResponse(BaseModel):
+    """Response model for pitch expansion."""
+    success: bool
+    expansion: Optional[Dict[str, Any]] = None
+    full_script: Optional[str] = None
+    message: str
+
+
 class SceneBuildRequest(BaseModel):
     """Request model for scene building."""
     video_plan: Dict[str, Any] = Field(..., description="Video plan from planning endpoint")

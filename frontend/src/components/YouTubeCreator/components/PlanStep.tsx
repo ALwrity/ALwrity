@@ -22,6 +22,7 @@ import {
 import PlayArrow from '@mui/icons-material/PlayArrow';
 import CloudUpload from '@mui/icons-material/CloudUpload';
 import AutoAwesome from '@mui/icons-material/AutoAwesome';
+import Refresh from '@mui/icons-material/Refresh';
 import Delete from '@mui/icons-material/Delete';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import Collections from '@mui/icons-material/Collections';
@@ -35,6 +36,7 @@ import {
   paperSx,
   sectionTitleSx,
   tooltipSx,
+  tooltipPopperProps,
 } from '../styles';
 import {
   DurationType,
@@ -58,7 +60,10 @@ import { ChannelBiblePanel } from './ChannelBiblePanel';
 import { PlanResearchToggle } from './PlanResearchToggle';
 import { PlanPromptPreview } from './PlanPromptPreview';
 import { PlanGenerationLoadingPanel } from './PlanGenerationLoadingPanel';
+import { YouTubeCreativeAngleSelector } from './YouTubeCreativeAngleSelector';
+import { YouTubePitchPreviewCard } from './YouTubePitchPreviewCard';
 import type { YouTubeChannelBible } from '../../../services/youtubeApi';
+import type { YouTubeScriptPhase, YouTubeVideoPitch } from '../../../hooks/useYouTubeCreatorState';
 
 interface PlanStepProps {
   userIdea: string;
@@ -96,6 +101,15 @@ interface PlanStepProps {
   onApplyBible: () => void;
   enableResearch: boolean;
   onEnableResearchChange: (enabled: boolean) => void;
+  creativeAngle: string;
+  currentPitch: YouTubeVideoPitch | null;
+  pitchHistory: YouTubeVideoPitch[];
+  scriptPhase: YouTubeScriptPhase;
+  onCreativeAngleChange: (angle: string) => void;
+  onGeneratePitch: () => void;
+  onRegeneratePitch: () => void;
+  onExpandPitch: () => void;
+  onSelectPitchFromHistory: (pitch: YouTubeVideoPitch) => void;
 }
 
 export const PlanStep: React.FC<PlanStepProps> = React.memo(({
@@ -134,6 +148,15 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
   onApplyBible,
   enableResearch,
   onEnableResearchChange,
+  creativeAngle,
+  currentPitch,
+  pitchHistory,
+  scriptPhase,
+  onCreativeAngleChange,
+  onGeneratePitch,
+  onRegeneratePitch,
+  onExpandPitch,
+  onSelectPitchFromHistory,
 }) => {
   // Memoize operation objects to avoid recreating on every render
   const videoPlanningOperation = useMemo(
@@ -222,6 +245,7 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
                 title="Be specific! Include: 1) Your topic, 2) Target audience, 3) What viewers will learn/do, 4) Your goal (views, subscribers, sales). Example: 'Explain quantum computing to tech beginners, aiming for 10K views and 500 subscribers.'"
                 arrow
                 sx={tooltipSx}
+                PopperProps={tooltipPopperProps}
               >
                 <IconButton size="small" sx={{ ml: 0.5, p: 0.25, color: '#64748b' }}>
                   <InfoOutlined fontSize="small" />
@@ -251,6 +275,7 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
                 title="Selecting a video type helps AI optimize the script structure, pacing, visuals, and avatar style. Each type has different best practices for engagement."
                 arrow
                 sx={tooltipSx}
+                PopperProps={tooltipPopperProps}
               >
                 <IconButton size="small" sx={{ ml: 0.5, p: 0.25, color: '#64748b' }}>
                   <InfoOutlined fontSize="small" />
@@ -391,6 +416,7 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
                 title="Shorts (≤60s): Vertical format, quick hooks, high energy. Best for viral content. Medium (1-4min): Balanced explainers, tutorials. Long (4-10min): Deep dives, comprehensive guides. Choose based on your content complexity and audience attention span."
                 arrow
                 sx={tooltipSx}
+                PopperProps={tooltipPopperProps}
               >
                 <IconButton size="small" sx={{ ml: 0.5, p: 0.25, color: '#64748b' }}>
                   <InfoOutlined fontSize="small" />
@@ -422,6 +448,7 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
                 title="This controls narration pronunciation and the default voice selection for audio generation. You can still override per-scene in Audio Settings."
                 arrow
                 sx={tooltipSx}
+                PopperProps={tooltipPopperProps}
               >
                 <IconButton size="small" sx={{ ml: 0.5, p: 0.25, color: '#64748b' }}>
                   <InfoOutlined fontSize="small" />
@@ -464,6 +491,7 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
                     title="Describe the visual style, mood, or specific scenes you want for your video. Use descriptive keywords like colors, lighting, composition, atmosphere. This helps AI generate consistent visuals that match your vision. Examples: 'neon-lit Tokyo alley, rainy night, cinematic bokeh' or 'bright, clean, modern office space'"
                     arrow
                     sx={tooltipSx}
+                    PopperProps={tooltipPopperProps}
                   >
                     <IconButton size="small" sx={{ ml: 0.5, p: 0.25, color: '#64748b' }}>
                       <InfoOutlined fontSize="small" />
@@ -687,6 +715,59 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
             enableResearch={enableResearch}
             channelBible={channelBible}
           />
+
+          <YouTubeCreativeAngleSelector
+            value={creativeAngle}
+            disabled={loading}
+            onChange={onCreativeAngleChange}
+          />
+
+          {currentPitch && scriptPhase !== 'idle' ? (
+            <>
+              <YouTubePitchPreviewCard
+                pitch={currentPitch}
+                history={pitchHistory}
+                disabled={loading}
+                onSelectHistoryPitch={onSelectPitchFromHistory}
+              />
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                <Button
+                  variant="contained"
+                  color="error"
+                  size="large"
+                  startIcon={<AutoAwesome />}
+                  onClick={onExpandPitch}
+                  disabled={loading || scriptPhase === 'expanding'}
+                  sx={{ textTransform: 'none', px: 3 }}
+                >
+                  {scriptPhase === 'expanding' ? 'Expanding to full script…' : 'Expand to Full Script'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  size="large"
+                  startIcon={<Refresh />}
+                  onClick={onRegeneratePitch}
+                  disabled={loading || scriptPhase === 'expanding'}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Try Another Angle / Regenerate
+                </Button>
+              </Stack>
+            </>
+          ) : (
+            <Button
+              variant="contained"
+              color="error"
+              size="large"
+              startIcon={<PlayArrow />}
+              onClick={onGeneratePitch}
+              disabled={loading || !userIdea.trim() || !creativeAngle.trim()}
+              sx={{ alignSelf: 'flex-start', px: 4, textTransform: 'none' }}
+            >
+              Generate Pitch
+            </Button>
+          )}
 
           {loading ? (
             <PlanGenerationLoadingPanel enableResearch={enableResearch} />

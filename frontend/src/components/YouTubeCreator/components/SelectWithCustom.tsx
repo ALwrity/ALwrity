@@ -19,7 +19,7 @@ import {
   IconButton,
 } from '@mui/material';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
-import { selectSx, labelSx, helperSx, inputSx, selectMenuProps } from '../styles';
+import { selectSx, labelSx, helperSx, inputSx, selectMenuProps, tooltipPopperProps } from '../styles';
 
 export interface SelectOption {
   value: string;
@@ -102,7 +102,7 @@ export const SelectWithCustom: React.FC<SelectWithCustomProps> = ({
           {label}
         </InputLabel>
         {tooltipText && (
-          <Tooltip title={tooltipText} arrow placement="top">
+          <Tooltip title={tooltipText} arrow placement="top" PopperProps={tooltipPopperProps}>
             <IconButton size="small" sx={{ ml: 0.5, p: 0.25, color: '#64748b' }}>
               <InfoOutlined fontSize="small" />
             </IconButton>
