@@ -21,6 +21,7 @@ const LinkedInPricingPage = React.lazy(() => import('./components/Pricing/Linked
 // Default exports
 const Wizard = React.lazy(() => import('./components/OnboardingWizard/Wizard'));
 const MainDashboard = React.lazy(() => import('./components/MainDashboard/MainDashboard'));
+const MarketingOutcomesDashboard = React.lazy(() => import('./components/MarketingOutcomes/MarketingOutcomesDashboard'));
 const SEODashboard = React.lazy(() => import('./components/SEODashboard/SEODashboard'));
 const ContentPlanningDashboard = React.lazy(() => import('./components/ContentPlanningDashboard/ContentPlanningDashboard'));
 const FacebookWriter = React.lazy(() => import('./components/FacebookWriter/FacebookWriter'));
@@ -233,6 +234,7 @@ const App: React.FC = () => {
                       <Route path="/error-test" element={<ErrorBoundaryTest />} />
                     )}
                     <Route path="/dashboard" element={<ProtectedRoute><MainDashboard /></ProtectedRoute>} />
+                    <Route path="/marketing-outcomes" element={<ProtectedRoute><MarketingOutcomesDashboard /></ProtectedRoute>} />
                     <Route path="/seo" element={<ProtectedRoute><FeatureRoute feature="seo"><SEODashboard /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/seo-dashboard" element={<ProtectedRoute><FeatureRoute feature="seo"><SEODashboard /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/backlink-outreach" element={<ProtectedRoute><FeatureRoute feature="backlinking"><BacklinkOutreachDashboard /></FeatureRoute></ProtectedRoute>} />

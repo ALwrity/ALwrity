@@ -530,3 +530,108 @@ class DataQualityService:
                 'warnings': [],
                 'confidence': 0.0
             } 
+
+def assess_data_quality(website_analysis: Dict, research_preferences: Dict, persona_data: Dict = None, competitor_analysis: List = None, gsc_analytics: Dict = None, bing_analytics: Dict = None) -> Dict[str, Any]:
+    """Assess the quality and completeness of onboarding data."""
+    try:
+        quality_metrics = {
+            'overall_score': 0.0,
+            'completeness': 0.0,
+            'freshness': 0.0,
+            'relevance': 0.0,
+            'confidence': 0.0
+        }
+
+        # Calculate completeness
+        total_fields = 0
+        filled_fields = 0
+
+        # Website analysis completeness
+        website_fields = ['domain', 'industry', 'business_type', 'target_audience', 'content_goals']
+        for field in website_fields:
+            total_fields += 1
+            if website_analysis.get(field):
+                filled_fields += 1
+
+        # Research preferences completeness
+        research_fields = ['research_topics', 'content_types', 'target_audience', 'industry_focus']
+        for field in research_fields:
+            total_fields += 1
+            if research_preferences.get(field):
+                filled_fields += 1
+
+        # Persona data completeness
+        total_fields += 1
+        if persona_data and persona_data.get('core_persona'):
+            filled_fields += 1
+
+        # Competitor analysis completeness
+        total_fields += 1
+        if competitor_analysis and len(competitor_analysis) > 0:
+            filled_fields += 1
+
+        # GSC analytics completeness
+        total_fields += 1
+        if gsc_analytics and (gsc_analytics.get('data') or gsc_analytics.get('metrics')):
+            filled_fields += 1
+
+        # Bing analytics completeness
+        total_fields += 1
+        if bing_analytics and (bing_analytics.get('data') or bing_analytics.get('summary')):
+            filled_fields += 1
+
+        quality_metrics['completeness'] = filled_fields / total_fields if total_fields > 0 else 0.0
+
+        # Calculate freshness
+        freshness_scores = []
+        for data_source in [website_analysis, research_preferences]:
+            if data_source.get('data_freshness'):
+                freshness_scores.append(data_source['data_freshness'])
+        if persona_data and persona_data.get('data_freshness'):
+            freshness_scores.append(persona_data['data_freshness'])
+        if competitor_analysis:
+            for competitor in competitor_analysis:
+                if competitor.get('data_freshness'):
+                    freshness_scores.append(competitor['data_freshness'])
+                    break  # Just use first competitor's freshness
+        if gsc_analytics and gsc_analytics.get('data_freshness'):
+            freshness_scores.append(gsc_analytics['data_freshness'])
+        if bing_analytics and bing_analytics.get('data_freshness'):
+            freshness_scores.append(bing_analytics['data_freshness'])
+        
+        quality_metrics['freshness'] = sum(freshness_scores) / len(freshness_scores) if freshness_scores else 0.0
+
+        # Calculate relevance (based on data presence and quality)
+        relevance_score = 0.0
+        if website_analysis.get('domain'):
+            relevance_score += 0.20
+        if research_preferences.get('research_topics'):
+            relevance_score += 0.15
+        if persona_data and persona_data.get('core_persona'):
+            relevance_score += 0.15
+        if competitor_analysis and len(competitor_analysis) > 0:
+            relevance_score += 0.15
+        if gsc_analytics and (gsc_analytics.get('data') or gsc_analytics.get('metrics')):
+            relevance_score += 0.15  # Real analytics data is highly relevant
+        if bing_analytics and (bing_analytics.get('data') or bing_analytics.get('summary')):
+            relevance_score += 0.10  # Real analytics data is highly relevant
+        
+        quality_metrics['relevance'] = relevance_score
+
+        # Calculate confidence
+        quality_metrics['confidence'] = (quality_metrics['completeness'] + quality_metrics['freshness'] + quality_metrics['relevance']) / 3
+
+        # Calculate overall score
+        quality_metrics['overall_score'] = quality_metrics['confidence']
+
+        return quality_metrics
+
+    except Exception as e:
+        logger.error(f"Error assessing data quality: {str(e)}")
+        return {
+            'overall_score': 0.0,
+            'completeness': 0.0,
+            'freshness': 0.0,
+            'relevance': 0.0,
+            'confidence': 0.0
+        }

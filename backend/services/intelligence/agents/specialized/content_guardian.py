@@ -12,6 +12,7 @@ from loguru import logger
 from .base import SIFBaseAgent, TXTAI_AVAILABLE, Agent
 from services.intelligence.agents.core_agent_framework import TaskProposal
 from services.intelligence.txtai_service import TxtaiIntelligenceService
+from services.intelligence.agents.quality_gates import validate_content_quality
 
 # ── known committee agents for critique ──────────────────────────
 KNOWN_AGENTS = {
@@ -44,11 +45,19 @@ class ContentGuardianAgent(SIFBaseAgent):
         # to avoid task-compatibility issues across txtai versions.
         return None
 
-    def _check_brand_voice(self, content: str) -> Dict[str, Any]:
-        return {"consistent": True, "score": 0.95, "notes": "Content aligns with professional/authoritative tone."}
-
     async def propose_daily_tasks(self, context: Dict[str, Any]) -> List[TaskProposal]:
-        return [TaskProposal(title="Audit Old Content", description="Review top performing posts from >6 months ago for updates.", pillar_id="create", priority="low", estimated_time=30, source_agent="ContentGuardianAgent", reasoning="Maintains content relevance and authority.", action_type="navigate", action_url="/content-planning-dashboard")]
+        default_proposals = [TaskProposal(title="Audit Old Content", description="Review top performing posts from >6 months ago for updates.", pillar_id="analyze", priority="low", estimated_time=30, source_agent="ContentGuardianAgent", reasoning="Maintains content relevance and authority.", action_type="navigate", action_url="/content-planning-dashboard")]
+
+        return await self._synthesize_task_proposals(
+            context,
+            default_proposals,
+            instructions=(
+                "Propose content-audit actions for this brand. The guardian audits existing content "
+                "for quality and brand alignment rather than proposing net-new tasks. Each task must "
+                "have a pillar_id from [plan, generate, publish, analyze, engage, remarket] and an "
+                "action_url pointing to /content-planning-dashboard."
+            ),
+        )
 
     async def perform_site_audit(self, website_url: str) -> Dict[str, Any]:
         self._log_agent_operation("Performing site audit", website_url=website_url)
@@ -132,13 +141,19 @@ class ContentGuardianAgent(SIFBaseAgent):
                             rep=m.get('full_report',{}); style_guidelines={"tone":rep.get('brand_analysis',{}).get('brand_voice','neutral'),"style_patterns":rep.get('style_patterns',{}),"writing_style":rep.get('writing_style',{})}
                 except Exception: pass
             issues=[]; score=1.0
+            quality = validate_content_quality(text, self._load_prompt_context())
+            issues.extend(
+                f"{item['type']}: {item.get('value', '')}" 
+                for item in quality.get("violations", [])
+            )
+            score -= min(0.8, 0.2 * len(quality.get("violations", [])))
             tone=(style_guidelines or {}).get('tone','').lower()
             if 'formal' in tone or 'professional' in tone:
                 found=[c for c in ["can't","won't","don't","it's"] if c in text.lower()]
                 if found: issues.append(f"Found contractions in formal text: {', '.join(found[:3])}..."); score-=0.1
             sentences=text.split('.'); avg=sum(len(s.split()) for s in sentences if s)/max(1,len(sentences))
             if avg>25: issues.append("Average sentence length is too high (>25 words). Consider shortening."); score-=0.1
-            return {"compliance_score":max(0.0,score),"issues":issues,"is_compliant":score>0.8,"guidelines_source":"sif_index" if not style_guidelines and self.sif_service else "provided"}
+            return {"compliance_score":max(0.0,score),"issues":issues,"is_compliant":score>0.8 and quality["is_compliant"],"guidelines_source":"sif_index" if not style_guidelines and self.sif_service else "provided","quality_gate":quality}
         except Exception as e: return {"error":str(e)}
 
     async def safety_filter(self, text: str) -> Dict[str, Any]:
@@ -201,6 +216,60 @@ class ContentGuardianAgent(SIFBaseAgent):
             "overlaps": overlaps,
             "alerts": alerts,
             "audit_timestamp": datetime.utcnow().isoformat(),
+        }
+
+    async def review_normalized_proposals(self, proposals: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Review normalized proposals and return an execution gate decision."""
+        decisions = []
+        for proposal in proposals or []:
+            decision = dict(proposal)
+            reasons = []
+            outcome = "approved"
+            title = str(proposal.get("title") or "").strip()
+            description = str(proposal.get("description") or "").strip()
+            if not title or not description:
+                outcome = "rejected"
+                reasons.append("title and description are required")
+            elif proposal.get("pillar") not in PILLAR_IDS:
+                outcome = "rejected"
+                reasons.append("proposal uses an unsupported pillar")
+            else:
+                quality = validate_content_quality(
+                    f"{title}. {description}",
+                    {"evidence": proposal.get("evidence")},
+                )
+                if quality.get("violations"):
+                    outcome = "quarantined"
+                    reasons.extend(
+                        f"{item.get('type')}: {item.get('value', '')}" for item in quality["violations"]
+                    )
+                if not proposal.get("evidence"):
+                    outcome = "quarantined"
+                    reasons.append("no evidence was supplied")
+                if not proposal.get("reasoning"):
+                    reasons.append("no reasoning was supplied")
+                try:
+                    low_confidence = float(proposal.get("confidence") or 0.0) < 0.5
+                except (TypeError, ValueError):
+                    low_confidence = True
+                if low_confidence:
+                    reasons.append("confidence is below 0.5")
+                action_type = str(proposal.get("action_type") or "navigate").lower()
+                if action_type in {"publish", "external", "create_content", "social_draft", "linkedin_draft"} and not proposal.get("action_parameters"):
+                    outcome = "quarantined"
+                    reasons.append("required action parameters are missing")
+                elif outcome == "approved" and reasons:
+                    outcome = "approved_with_warning"
+            decision["guardian_outcome"] = outcome
+            decision["guardian_reasons"] = reasons
+            decisions.append(decision)
+        return {
+            "decisions": decisions,
+            "summary": {
+                outcome: sum(1 for decision in decisions if decision["guardian_outcome"] == outcome)
+                for outcome in ("approved", "approved_with_warning", "quarantined", "rejected")
+            },
+            "reviewed_at": datetime.utcnow().isoformat(),
         }
 
     # ── agent critique ────────────────────────────────────────────

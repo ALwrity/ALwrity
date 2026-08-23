@@ -60,7 +60,7 @@ const AGENT_DESCRIPTIONS: Record<string, { short: string; long: string }> = {
 
 const SIF_DESCRIPTION = {
   short: 'Semantic Intelligence Framework — the orchestration layer',
-  long: 'The SIF (Semantic Intelligence Framework) is ALwrity\'s orchestration layer for autonomous marketing agents. It coordinates the 6-member committee (StrategyOrchestrator, ContentStrategist, CompetitorAnalyst, SEOSpecialist, SocialMediaManager, ContentGuardian). ContentGuardian is the quality watchdog that audits the committee\'s output rather than proposing tasks. The SIF handles prompt sequencing, context card assembly, and committee voting.',
+  long: 'The SIF (Semantic Intelligence Framework) is ALwrity\'s orchestration layer for autonomous marketing agents. It coordinates the 6-member committee (StrategyArchitect, ContentStrategist, CompetitorAnalyst, SEOSpecialist, SocialMediaManager, ContentGuardian). ContentGuardian is the quality watchdog that audits the committee\'s output rather than proposing tasks. The SIF handles prompt sequencing, context card assembly, and committee voting.',
 };
 
 const AgentHelpModal: React.FC = () => {
@@ -72,7 +72,7 @@ const AgentHelpModal: React.FC = () => {
     if (open) {
       setLoading(true);
       getAgentTeam()
-        .then(setAgents)
+        .then(({ agents }) => setAgents(agents))
         .catch(() => setAgents([]))
         .finally(() => setLoading(false));
     }

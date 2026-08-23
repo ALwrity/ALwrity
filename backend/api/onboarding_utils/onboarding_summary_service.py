@@ -56,20 +56,32 @@ class OnboardingSummaryService:
             # Check persona generation readiness
             persona_readiness = self._check_persona_readiness(website_analysis, persona_data, is_linkedin)
             
-            # Determine integrations / content preferences
+            # Get integrations (Configuration Details)
             integrations = self._get_integrations(payload, is_linkedin)
             
             # Determine capabilities
             capabilities = self._determine_capabilities(website_analysis, research_preferences, personalization_settings, persona_readiness, integrations, is_linkedin)
             
+            # Combine Configuration Details and Capabilities Overview
+            # into one unified section for the FinalStep summary.
+            combined_config_and_capabilities = {
+                "configuration_details": integrations,
+                "capabilities_overview": capabilities,
+                "unified_summary": {
+                    "platform_config": integrations,
+                    "available_features": capabilities,
+                    "platform_connected": bool(integrations) if not is_linkedin else bool(integrations.get("postingCadence") or integrations.get("preferredFormats")),
+                    "feature_readiness": {k: v for k, v in capabilities.items() if v},
+                }
+            }
+
             return {
                 "website_url": website_analysis.get('website_url') if website_analysis else None,
                 "style_analysis": website_analysis.get('style_analysis') if website_analysis else None,
                 "research_preferences": research_preferences,
                 "personalization_settings": personalization_settings,
                 "persona_readiness": persona_readiness,
-                "integrations": integrations,
-                "capabilities": capabilities,
+                "configuration_and_capabilities": combined_config_and_capabilities,
                 "canonical_profile": canonical_profile,
                 "onboarding_type": onboarding_type
             }
@@ -99,11 +111,33 @@ class OnboardingSummaryService:
             core = persona_data.get('core_persona') or {}
             identity = core.get('identity') or {}
             tonal_range = core.get('tonal_range') or {}
+            linguistic = core.get('linguistic_fingerprint') or {}
+            lexical = linguistic.get('lexical_features') or {}
+
             brand_voice = identity.get('brand_voice_description', '')
             tone = tonal_range.get('default_tone', '')
             if brand_voice or tone:
                 settings["brand_voice"] = brand_voice
                 settings["tone"] = tone
+
+            # Structured persona block — preserves the rich SSOT PersonaData instead
+            # of flattening it to two strings. The agent team (Preview / AI-Optimize)
+            # consumes this directly so personalization is not lost at the summary boundary.
+            persona_block = {
+                "persona_name": identity.get('persona_name', ''),
+                "archetype": identity.get('archetype', ''),
+                "core_belief": identity.get('core_belief', ''),
+                "brand_voice_description": brand_voice,
+                "default_tone": tone,
+                "permissible_tones": tonal_range.get('permissible_tones') or [],
+                "forbidden_tones": tonal_range.get('forbidden_tones') or [],
+                "emotional_range": tonal_range.get('emotional_range'),
+                "go_to_phrases": lexical.get('go_to_phrases') or [],
+                "go_to_words": lexical.get('go_to_words') or [],
+                "avoid_words": lexical.get('avoid_words') or [],
+            }
+            if any(persona_block.values()):
+                settings["persona"] = persona_block
 
         return settings
 

@@ -12,6 +12,7 @@ import {
 } from '../types/workflow';
 import { taskWorkflowOrchestrator } from '../services/TaskWorkflowOrchestrator';
 import { aiApiClient as apiClient } from '../api/client';
+import { executeWorkflowTask, ExecuteWorkflowTaskResult } from '../api/onboarding';
 
 const isServerWorkflowId = (workflowId: string) => workflowId.startsWith('daily-');
 const DAILY_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
@@ -130,6 +131,7 @@ interface WorkflowState {
   pauseWorkflow: (workflowId: string) => Promise<void>;
   stopWorkflow: (workflowId: string) => Promise<void>;
   completeTask: (taskId: string, completionData?: any) => Promise<void>;
+  executeTask: (taskId: string, payload?: Record<string, any>) => Promise<ExecuteWorkflowTaskResult | undefined>;
   skipTask: (taskId: string) => Promise<void>;
   moveToNextTask: () => Promise<void>;
   moveToPreviousTask: () => Promise<void>;
@@ -459,6 +461,48 @@ export const useWorkflowStore = create<WorkflowState>()(
             error: workflowError, 
             isLoading: false 
           });
+        }
+      },
+
+      executeTask: async (taskId: string, payload?: Record<string, any>) => {
+        const { currentWorkflow } = get();
+        if (!currentWorkflow || !isServerWorkflowId(currentWorkflow.id)) return undefined;
+
+        set({ isLoading: true, error: null });
+        try {
+          const execution = await executeWorkflowTask(taskId, payload);
+          const tasks = currentWorkflow.tasks.map(task => {
+            if (task.id !== taskId) return task;
+            const executionData = execution?.execution || {};
+            return {
+              ...task,
+              status: execution.status as TodayTask['status'],
+              metadata: {
+                ...(task.metadata || {}),
+                execution: executionData,
+                ...(executionData.artifact_type ? { artifact: executionData } : {}),
+              },
+            };
+          });
+          const completedTasks = tasks.filter(task => task.status === 'completed' || task.status === 'skipped').length;
+          const updated: DailyWorkflow = {
+            ...currentWorkflow,
+            tasks,
+            completedTasks,
+            workflowStatus: completedTasks === tasks.length ? 'completed' : 'in_progress',
+          };
+          const derived = computeProgressAndNavigation(updated);
+          set({
+            currentWorkflow: updated,
+            workflowProgress: derived.progress,
+            navigationState: derived.navigation,
+            isLoading: false,
+          });
+          return execution;
+        } catch (error) {
+          const workflowError = error as WorkflowError;
+          set({ error: workflowError, isLoading: false });
+          throw error;
         }
       },
 

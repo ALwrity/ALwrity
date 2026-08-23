@@ -1,18 +1,7 @@
 // Make sure to install axios: npm install axios
 import { AxiosResponse } from 'axios';
 import { apiClient } from './client';
-
-export interface APIKeyRequest {
-  provider: string;
-  api_key: string;
-  description?: string;
-}
-
-export interface APIKeyResponse {
-  provider: string;
-  api_key: string;
-  description?: string;
-}
+import type { WorkflowOptimizationSignals, WorkflowOutcomes } from '../types/workflow';
 
 export interface OnboardingStepResponse {
   step: number;
@@ -73,89 +62,6 @@ export async function setCurrentStep(step: number, stepData?: any) {
   }
 }
 
-export async function getApiKeys() {
-  const maxRetries = 3;
-  let lastError: any;
-  
-  console.log('getApiKeys: Starting API call to /api/onboarding/api-keys');
-  
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      console.log(`getApiKeys: Attempt ${attempt + 1}/${maxRetries}`);
-      const res: AxiosResponse<Record<string, string>> = await apiClient.get('/api/onboarding/api-keys');
-      console.log('getApiKeys: API call successful');
-      return res.data;
-    } catch (error: any) {
-      lastError = error;
-      console.log(`getApiKeys: Attempt ${attempt + 1} failed:`, error.response?.status, error.message);
-      
-      // If it's a rate limit error (429), wait and retry
-      if (error.response?.status === 429) {
-        const retryAfter = error.response?.data?.retry_after || 60;
-        const delay = Math.min(retryAfter * 1000, 5000); // Max 5 seconds
-        
-        console.log(`getApiKeys: Rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
-      }
-      
-      // For other errors, don't retry
-      console.log('getApiKeys: Non-rate-limit error, not retrying');
-      throw error;
-    }
-  }
-  
-  // If we've exhausted all retries, throw the last error
-  console.log('getApiKeys: All retries exhausted');
-  throw lastError;
-}
-
-export async function getApiKeysForOnboarding() {
-  const maxRetries = 3;
-  let lastError: any;
-  
-  console.log('getApiKeysForOnboarding: Starting API call to /api/onboarding/api-keys/onboarding');
-  
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      console.log(`getApiKeysForOnboarding: Attempt ${attempt + 1}/${maxRetries}`);
-      const res: AxiosResponse<any> = await apiClient.get('/api/onboarding/api-keys/onboarding');
-      console.log('getApiKeysForOnboarding: API call successful');
-      return res.data.api_keys || {};
-    } catch (error: any) {
-      lastError = error;
-      console.log(`getApiKeysForOnboarding: Attempt ${attempt + 1} failed:`, error.response?.status, error.message);
-      
-      // If it's a rate limit error (429), wait and retry
-      if (error.response?.status === 429) {
-        const retryAfter = error.response?.data?.retry_after || 60;
-        const delay = Math.min(retryAfter * 1000, 5000); // Max 5 seconds
-        
-        console.log(`getApiKeysForOnboarding: Rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
-      }
-      
-      // For other errors, don't retry
-      console.log('getApiKeysForOnboarding: Non-rate-limit error, not retrying');
-      throw error;
-    }
-  }
-  
-  // If we've exhausted all retries, throw the last error
-  console.log('getApiKeysForOnboarding: All retries exhausted');
-  throw lastError;
-}
-
-export async function saveApiKey(provider: string, api_key: string, description?: string) {
-  const res: AxiosResponse<APIKeyResponse> = await apiClient.post('/api/onboarding/api-keys', { 
-    provider, 
-    api_key,
-    description 
-  });
-  return res.data;
-}
-
 export async function getProgress() {
   const res: AxiosResponse<OnboardingProgressResponse> = await apiClient.get('/api/onboarding/progress');
   return { progress: res.data.completion_percentage || 0 };
@@ -178,27 +84,8 @@ export async function getStepData(stepNumber: number) {
   return res.data;
 }
 
-export async function getStep1ApiKeysFromProgress(): Promise<{ gemini?: string; exa?: string; copilotkit?: string }> {
-  try {
-    const step = await getStepData(1);
-    const keys = step?.data?.api_keys || {};
-    return {
-      gemini: keys.gemini || undefined,
-      exa: keys.exa || undefined,
-      copilotkit: keys.copilotkit || undefined,
-    };
-  } catch (_e) {
-    return {};
-  }
-}
-
 export async function skipStep(stepNumber: number) {
   const res: AxiosResponse<any> = await apiClient.post(`/api/onboarding/step/${stepNumber}/skip`);
-  return res.data;
-}
-
-export async function validateApiKeys() {
-  const res: AxiosResponse<any> = await apiClient.post('/api/onboarding/api-keys/validate');
   return res.data;
 }
 
@@ -231,4 +118,87 @@ export async function getResearchPreferencesData() {
 export async function getCompetitorAnalysis() {
   const res: AxiosResponse<any> = await apiClient.get('/api/onboarding/competitor-analysis');
   return res.data;
+}
+
+export interface TodayPlanPreview {
+  date: string;
+  tasks: any[];
+  committee_agent_count: number;
+  fallback_used: boolean;
+  proposals_by_agent: Record<string, any[]>;
+}
+
+export async function previewTodayPlan(): Promise<TodayPlanPreview> {
+  const res: AxiosResponse<any> = await apiClient.post('/api/today-workflow/preview');
+  return res.data?.data;
+}
+
+export async function generateTodayPlan() {
+  const res: AxiosResponse<any> = await apiClient.post('/api/today-workflow/generate');
+  return res.data?.data;
+}
+
+export async function getWorkflowOutcomes(days = 30): Promise<WorkflowOutcomes> {
+  const res: AxiosResponse<any> = await apiClient.get('/api/today-workflow/outcomes', {
+    params: { days },
+  });
+  return {
+    ...(res.data?.data?.outcomes || {}),
+    real_outcomes: res.data?.data?.real_outcomes,
+  } as WorkflowOutcomes;
+}
+
+export async function recordWorkflowTaskFeedback(
+  taskId: string,
+  score: -1 | 0 | 1,
+  feedbackText?: string,
+): Promise<void> {
+  await apiClient.post(`/api/today-workflow/tasks/${encodeURIComponent(taskId)}/feedback`, {
+    score,
+    feedback_text: feedbackText,
+  });
+}
+
+export async function getWorkflowOptimizationSignals(days = 30): Promise<WorkflowOptimizationSignals> {
+  const res: AxiosResponse<any> = await apiClient.get('/api/today-workflow/optimization-signals', {
+    params: { days },
+  });
+  return res.data?.data?.optimization;
+}
+
+export async function recordConversionEvent(event: {
+  event_name: string;
+  value?: number;
+  currency?: string;
+  source?: string;
+  external_event_id?: string;
+  occurred_at?: string;
+  metadata?: Record<string, any>;
+}): Promise<{ event_id: number | null; duplicate: boolean }> {
+  const res: AxiosResponse<any> = await apiClient.post('/api/today-workflow/outcomes/conversions', event);
+  return res.data?.data;
+}
+
+export interface ExecuteWorkflowTaskResult {
+  task_id: string;
+  status: string;
+  execution: Record<string, any>;
+}
+
+export async function executeWorkflowTask(
+  taskId: string,
+  payload?: {
+    action_type?: string;
+    target_resource?: string;
+    parameters?: Record<string, any>;
+    expected_outcome?: string;
+    risk_level?: number;
+    requires_approval?: boolean;
+  },
+): Promise<ExecuteWorkflowTaskResult> {
+  const res: AxiosResponse<any> = await apiClient.post(
+    `/api/today-workflow/tasks/${encodeURIComponent(taskId)}/execute`,
+    payload || {},
+  );
+  return res.data?.data;
 }

@@ -32,6 +32,18 @@ class CalendarEventCreate(BaseModel):
     platform: str
     scheduled_date: datetime
     ai_recommendations: Optional[Dict[str, Any]] = None
+    owner_agent: Optional[str] = None
+    recommendation_id: Optional[str] = None
+    task_id: Optional[int] = None
+    meeting_id: Optional[str] = None
+    kpi: Optional[str] = None
+    deadline: Optional[str] = None
+    action_type: Optional[str] = None
+    action_parameters: Optional[Dict[str, Any]] = None
+    evidence: Optional[List[Any]] = None
+    expected_outcome: Optional[str] = None
+    user_approval_state: Optional[str] = "pending"
+    user_timezone: Optional[str] = "UTC"
 
 # Content Gap Analysis Request Models
 class ContentGapAnalysisCreate(BaseModel):

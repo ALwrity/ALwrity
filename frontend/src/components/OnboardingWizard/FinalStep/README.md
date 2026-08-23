@@ -8,8 +8,7 @@ This folder contains the refactored FinalStep component for the Onboarding Wizar
 FinalStep/
 ├── FinalStep.tsx              # Main component container
 ├── components/
-│   ├── SetupSummary.tsx       # Combined setup summary and configuration details
-│   └── CapabilitiesOverview.tsx # Capabilities overview section
+│   └── SetupSummary.tsx       # Combined setup summary, configuration details, and capabilities
 ├── types.ts                   # Shared TypeScript interfaces
 ├── index.ts                   # Export barrel file
 └── README.md                  # This documentation
@@ -26,27 +25,19 @@ FinalStep/
   - Orchestrating child components
 
 ### SetupSummary.tsx
-- **Purpose**: Combined setup summary and configuration details
+- **Purpose**: Combined setup summary, configuration details, and capabilities overview
 - **Features**:
-  - AI Providers list with checkmarks
   - Quick Stats overview
-  - Compact configuration cards (API Keys, Website Analysis, Research Config, Personalization)
+  - Compact configuration cards (Website Analysis, Research Config, Personalization)
   - Expandable details for each configuration section
   - Clickable cards with hover effects
-
-### CapabilitiesOverview.tsx
-- **Purpose**: Display unlocked capabilities and requirements
-- **Features**:
-  - Visual capability cards with icons
-  - Locked/unlocked states
-  - Requirement information for locked capabilities
+  - Capability cards with locked/unlocked states and requirement information
 
 ## Types
 
 ### OnboardingData
 ```typescript
 interface OnboardingData {
-  apiKeys: Record<string, string>;
   websiteUrl?: string;
   researchPreferences?: any;
   personalizationSettings?: any;
