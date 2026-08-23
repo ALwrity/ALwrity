@@ -35,4 +35,9 @@ describe("PlanGenerationMeta", () => {
     expect(screen.getByText(/Research injected/)).toBeInTheDocument();
     expect(screen.getByText(/Gateway: llm_text_gen/)).toBeInTheDocument();
   });
+
+  it("uses a custom heading when provided", () => {
+    render(<PlanGenerationMeta plan={plan} heading="Exact pitch prompt sent to the LLM" />);
+    expect(screen.getByText("Exact pitch prompt sent to the LLM")).toBeInTheDocument();
+  });
 });

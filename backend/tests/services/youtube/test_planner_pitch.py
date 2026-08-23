@@ -44,11 +44,17 @@ class TestPitchJsonStruct:
         for echoed in ("target_audience", "tone", "visual_style", "video_goal"):
             assert echoed not in props
 
-    def test_system_prompt_has_no_json_template(self):
+    def test_system_prompt_is_finalized_pitch_copy(self):
         from services.youtube.planner_pitch_prompts import PITCH_SYSTEM_PROMPT
 
+        assert "YouTube Script Architect" in PITCH_SYSTEM_PROMPT
+        assert "backend JSON engine" in PITCH_SYSTEM_PROMPT
         assert "Do NOT write a full script" in PITCH_SYSTEM_PROMPT
+        assert "≤70 characters" in PITCH_SYSTEM_PROMPT
+        assert "3–5 main beats" in PITCH_SYSTEM_PROMPT
+        assert "never invent statistics" in PITCH_SYSTEM_PROMPT
         assert '"selected_title"' not in PITCH_SYSTEM_PROMPT
+        assert '"video_summary"' not in PITCH_SYSTEM_PROMPT
 
     def test_user_prompt_injects_angle_without_json_example(self):
         from services.youtube.planner_pitch_prompts import build_pitch_user_prompt

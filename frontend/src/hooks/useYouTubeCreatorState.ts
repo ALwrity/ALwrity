@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { VideoPlan, Scene, SceneBuildGeneration } from '../services/youtubeApi';
+import { VideoPlan, VideoPlanGeneration, VideoPlanResearchSource, Scene, SceneBuildGeneration } from '../services/youtubeApi';
 import { Resolution, DurationType, VideoType, YouTubeContentLanguage } from '../components/YouTubeCreator/constants';
 
 export type YouTubeScriptPhase = 'idle' | 'pitch' | 'expanding' | 'ready';
@@ -12,6 +12,10 @@ export interface YouTubeVideoPitch {
   video_summary: string;
   hook_concept: string;
   main_content_beats: string[];
+  /** Exact LLM payload for this pitch (display only; does not change generation). */
+  generation?: VideoPlanGeneration;
+  research_enabled?: boolean;
+  research_sources?: VideoPlanResearchSource[];
 }
 
 export interface YouTubeCreatorState {

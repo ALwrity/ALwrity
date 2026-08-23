@@ -8,12 +8,14 @@ import {
   Typography,
   Button,
   Box,
+  Stack,
 } from '@mui/material';
 import PlayArrow from '@mui/icons-material/PlayArrow';
 import VideoLibrary from '@mui/icons-material/VideoLibrary';
 import { motion } from 'framer-motion';
 import { VideoPlan, Scene } from '../../../services/youtubeApi';
 import { PlanDetails } from './PlanDetails';
+import { PlanGenerationMeta } from './PlanGenerationMeta';
 import { YouTubeUnifiedPlanScript } from './YouTubeUnifiedPlanScript';
 import { YT_BORDER } from '../constants';
 import { OperationButton } from '../../shared/OperationButton';
@@ -116,11 +118,17 @@ export const ScenesStep: React.FC<ScenesStepProps> = React.memo(({
         </Box>
 
         {scriptPhase === 'ready' ? (
-          <YouTubeUnifiedPlanScript
-            value={fullScript || ''}
-            onChange={onFullScriptChange}
-            disabled={loading}
-          />
+          <Stack spacing={2} sx={{ mb: 2 }}>
+            <YouTubeUnifiedPlanScript
+              value={fullScript || ''}
+              onChange={onFullScriptChange}
+              disabled={loading}
+            />
+            <PlanGenerationMeta
+              plan={videoPlan}
+              heading="Exact expand prompt sent to the LLM"
+            />
+          </Stack>
         ) : (
           <PlanDetails
             plan={videoPlan}

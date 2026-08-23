@@ -1,7 +1,7 @@
 """Pitch and expansion prompts/schemas for YouTube progressive plan generation.
 
-JSON shape is enforced via json_struct passed to llm_text_gen — prompt text has
-no inline JSON templates.
+Finalized GPT-OSS-120B system prompts from Issue #434. JSON shape is enforced
+via json_struct passed to llm_text_gen — prompt text has no inline JSON templates.
 """
 
 from typing import Any, Dict, Optional

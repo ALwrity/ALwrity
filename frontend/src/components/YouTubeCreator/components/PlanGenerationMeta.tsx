@@ -20,6 +20,7 @@ import type { VideoPlan, VideoPlanGeneration, VideoPlanResearchSource } from "..
 
 interface PlanGenerationMetaProps {
   plan: VideoPlan;
+  heading?: string;
 }
 
 function PromptBlock({ label, text }: { label: string; text: string }) {
@@ -50,7 +51,10 @@ function PromptBlock({ label, text }: { label: string; text: string }) {
   );
 }
 
-export const PlanGenerationMeta: React.FC<PlanGenerationMetaProps> = ({ plan }) => {
+export const PlanGenerationMeta: React.FC<PlanGenerationMetaProps> = ({
+  plan,
+  heading = "Exact prompt sent to the LLM",
+}) => {
   const generation: VideoPlanGeneration | undefined = plan.generation;
   const sources: VideoPlanResearchSource[] = plan.research_sources || [];
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
@@ -102,7 +106,7 @@ export const PlanGenerationMeta: React.FC<PlanGenerationMetaProps> = ({ plan }) 
     >
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
         <Typography sx={{ fontWeight: 600, color: "#111827", fontSize: "0.9375rem" }}>
-          Exact prompt sent to the LLM
+          {heading}
         </Typography>
       </AccordionSummary>
       <AccordionDetails>

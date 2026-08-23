@@ -62,6 +62,7 @@ import { PlanPromptPreview } from './PlanPromptPreview';
 import { PlanGenerationLoadingPanel } from './PlanGenerationLoadingPanel';
 import { YouTubeCreativeAngleSelector } from './YouTubeCreativeAngleSelector';
 import { YouTubePitchPreviewCard } from './YouTubePitchPreviewCard';
+import { YouTubeLlmPromptMeta } from './YouTubeLlmPromptMeta';
 import type { YouTubeChannelBible } from '../../../services/youtubeApi';
 import type { YouTubeScriptPhase, YouTubeVideoPitch } from '../../../hooks/useYouTubeCreatorState';
 
@@ -729,6 +730,12 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
                 history={pitchHistory}
                 disabled={loading}
                 onSelectHistoryPitch={onSelectPitchFromHistory}
+              />
+              <YouTubeLlmPromptMeta
+                heading="Exact pitch prompt sent to the LLM"
+                generation={currentPitch.generation}
+                researchEnabled={currentPitch.research_enabled}
+                researchSources={currentPitch.research_sources}
               />
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                 <Button
