@@ -46,43 +46,50 @@ export function mapPitchToVideoPlan({
   expansion,
   form,
 }: MapPitchToVideoPlanInput): VideoPlan {
-  const selectedTitle = (pitch.selected_title || expansion.approved_title || "").trim();
-  const hookSpoken = (expansion.hook?.spoken_script || pitch.hook_concept || "").trim();
-  const outline = (expansion.main_content_outline || []).map((beat) => ({
-    section: (beat.section_title || "").trim(),
-    description: (beat.spoken_script || "").trim(),
-    duration_estimate: Number(beat.estimated_duration_seconds) || 0,
-  }));
+  try {
+    const selectedTitle = (pitch.selected_title || expansion.approved_title || "").trim();
+    const hookSpoken = (expansion.hook?.spoken_script || pitch.hook_concept || "").trim();
+    const outline = (expansion.main_content_outline || []).map((beat) => ({
+      section: (beat.section_title || "").trim(),
+      description: (beat.spoken_script || "").trim(),
+      duration_estimate: Number(beat.estimated_duration_seconds) || 0,
+    }));
 
-  const plan: VideoPlan = {
-    video_summary: (pitch.video_summary || "").trim(),
-    target_audience: (form.target_audience || "").trim(),
-    video_goal: (form.video_goal || "").trim() || undefined,
-    key_message: (expansion.key_message || "").trim() || undefined,
-    content_outline: outline,
-    hook_strategy: hookSpoken,
-    call_to_action: (expansion.call_to_action || "").trim() || undefined,
-    visual_style: (form.brand_style || "").trim(),
-    tone: (form.brand_style || "").trim() || undefined,
-    seo_keywords: Array.isArray(expansion.seo_keywords)
-      ? expansion.seo_keywords.map((item) => String(item).trim()).filter(Boolean)
-      : [],
-    selected_title: selectedTitle || undefined,
-    title_suggestions: selectedTitle ? [selectedTitle] : [],
-    duration_type: expansion.duration_type || form.duration_type,
-    duration_metadata: expansion.duration_metadata,
-    research_enabled: expansion.research_enabled,
-    research_sources: expansion.research_sources,
-    research_sources_count: expansion.research_sources_count,
-    generation: expansion.generation,
-  };
+    const plan: VideoPlan = {
+      video_summary: (pitch.video_summary || "").trim(),
+      target_audience: (form.target_audience || "").trim(),
+      video_goal: (form.video_goal || "").trim() || undefined,
+      key_message: (expansion.key_message || "").trim() || undefined,
+      content_outline: outline,
+      hook_strategy: hookSpoken,
+      call_to_action: (expansion.call_to_action || "").trim() || undefined,
+      visual_style: (form.brand_style || "").trim(),
+      tone: (form.brand_style || "").trim() || undefined,
+      seo_keywords: Array.isArray(expansion.seo_keywords)
+        ? expansion.seo_keywords.map((item) => String(item).trim()).filter(Boolean)
+        : [],
+      selected_title: selectedTitle || undefined,
+      title_suggestions: selectedTitle ? [selectedTitle] : [],
+      duration_type: expansion.duration_type || form.duration_type,
+      duration_metadata: expansion.duration_metadata,
+      research_enabled: expansion.research_enabled,
+      research_sources: expansion.research_sources,
+      research_sources_count: expansion.research_sources_count,
+      generation: expansion.generation,
+    };
 
-  console.info("[mapPitchToVideoPlan] Mapped expansion to VideoPlan", {
-    outlineCount: outline.length,
-    hasSelectedTitle: Boolean(selectedTitle),
-    hasHook: Boolean(hookSpoken),
-    hasGeneration: Boolean(expansion.generation),
-  });
+    console.info("[mapPitchToVideoPlan] Mapped expansion to VideoPlan", {
+      outlineCount: outline.length,
+      hasSelectedTitle: Boolean(selectedTitle),
+      hasHook: Boolean(hookSpoken),
+      hasGeneration: Boolean(expansion.generation),
+    });
 
-  return plan;
+    return plan;
+  } catch (error) {
+    console.error("[mapPitchToVideoPlan] Failed to map expansion", {
+      outlineCount: expansion?.main_content_outline?.length ?? 0,
+    });
+    throw error instanceof Error ? error : new Error("Could not map pitch to video plan.");
+  }
 }

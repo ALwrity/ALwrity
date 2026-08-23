@@ -6,6 +6,7 @@ Does not change llm_providers. Existing generate_plan is unchanged.
 from __future__ import annotations
 
 import json
+import time
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from fastapi import HTTPException
@@ -73,6 +74,11 @@ def _parse_llm_json(response: Any, *, label: str) -> Dict[str, Any]:
     return parsed
 
 
+def _estimate_tokens(text: str) -> int:
+    """Rough char/4 estimate. Never log the source text."""
+    return max(1, len(text or "") // 4)
+
+
 def _call_llm_once(
     *,
     prompt: str,
@@ -81,18 +87,43 @@ def _call_llm_once(
     flow_type: str,
     user_id: Optional[str],
 ) -> Any:
+    prompt_token_est = _estimate_tokens(prompt) + _estimate_tokens(system_prompt)
+    started = time.perf_counter()
     logger.info(
-        "[YouTubePlanner] LLM start flow_type={} prompt_len={}",
+        "[YouTubePlanner] LLM start flow_type={} prompt_token_est={}",
         flow_type,
-        len(prompt),
+        prompt_token_est,
     )
-    return llm_text_gen(
-        prompt=prompt,
-        system_prompt=system_prompt,
-        user_id=user_id,
-        json_struct=json_struct,
-        flow_type=flow_type,
-    )
+    try:
+        response = llm_text_gen(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            user_id=user_id,
+            json_struct=json_struct,
+            flow_type=flow_type,
+        )
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
+        if isinstance(response, dict):
+            output_len = len(json.dumps(response, default=str))
+        else:
+            output_len = len(str(response or ""))
+        logger.info(
+            "[YouTubePlanner] LLM complete flow_type={} duration_ms={} "
+            "prompt_token_est={} output_token_est={}",
+            flow_type,
+            elapsed_ms,
+            prompt_token_est,
+            max(1, output_len // 4),
+        )
+        return response
+    except Exception:
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
+        logger.exception(
+            "[YouTubePlanner] LLM failed flow_type={} duration_ms={}",
+            flow_type,
+            elapsed_ms,
+        )
+        raise
 
 
 def _generate_with_one_retry(
@@ -149,6 +180,11 @@ async def _optional_research(
             video_type=video_type,
             target_audience=target_audience,
             user_id=user_id or "",
+        )
+        logger.info(
+            "[YouTubePlanner] Research complete source_count={} context_len={}",
+            len(sources or []),
+            len(context or ""),
         )
         return context or "", sources or [], True
     except HTTPException as http_ex:

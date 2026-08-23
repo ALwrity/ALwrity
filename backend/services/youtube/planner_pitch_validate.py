@@ -66,7 +66,9 @@ def assemble_full_script(expansion_result: Dict[str, Any]) -> str:
 
     script = "\n\n".join(parts).strip()
     if not script:
+        logger.warning("[YouTubePlanner] assemble_full_script failed: no spoken parts")
         raise PitchValidationError("Could not assemble a full script from spoken parts.")
+    logger.info("[YouTubePlanner] assemble_full_script ok script_len={}", len(script))
     return script
 
 

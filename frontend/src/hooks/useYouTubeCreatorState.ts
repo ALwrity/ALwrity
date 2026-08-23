@@ -178,6 +178,8 @@ export const useYouTubeCreatorState = () => {
         
         console.log('[useYouTubeCreatorState] Restored state from localStorage:', {
           hasPlan: !!restoredState.videoPlan,
+          hasPitch: !!restoredState.currentPitch,
+          scriptPhase: restoredState.scriptPhase,
           scenesCount: restoredState.scenes.length,
           activeStep: restoredState.activeStep,
         });

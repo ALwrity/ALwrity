@@ -151,7 +151,7 @@ async def create_video_pitch(
         return PitchResponse(success=False, message=str(exc))
     except Exception as exc:
         logger.error("[YouTubeAPI] Error creating pitch: {}", exc, exc_info=True)
-        return PitchResponse(success=False, message=f"Failed to generate pitch: {exc}")
+        return PitchResponse(success=False, message="Failed to generate pitch. Please try again.")
 
 
 @router.post("/plan/expand", response_model=ExpandResponse)
@@ -218,4 +218,4 @@ async def expand_video_pitch(
         return ExpandResponse(success=False, message=str(exc))
     except Exception as exc:
         logger.error("[YouTubeAPI] Error expanding pitch: {}", exc, exc_info=True)
-        return ExpandResponse(success=False, message=f"Failed to expand pitch: {exc}")
+        return ExpandResponse(success=False, message="Failed to expand pitch. Please try again.")
