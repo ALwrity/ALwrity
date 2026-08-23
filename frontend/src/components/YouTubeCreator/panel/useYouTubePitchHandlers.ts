@@ -94,6 +94,9 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
       });
 
       if (!response.success || !response.pitch) {
+        console.warn("[YouTubeCreator] Pitch generate returned success=false", {
+          messageLen: (response.message || "").length,
+        });
         setError(response.message || "Failed to generate pitch");
         return;
       }
@@ -109,6 +112,11 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
         approvedPitch: null,
         fullScript: null,
         scriptPhase: "pitch",
+      });
+      console.info("[YouTubeCreator] Pitch generated", {
+        titleLen: mapped.selected_title.length,
+        beatCount: mapped.main_content_beats.length,
+        historyCount: nextHistory.length,
       });
       setSuccess("Pitch generated. Expand it, or try another angle.");
       window.setTimeout(() => setSuccess(null), 2500);
@@ -178,6 +186,9 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
       });
 
       if (!response.success || !response.expansion) {
+        console.warn("[YouTubeCreator] Pitch expand returned success=false", {
+          messageLen: (response.message || "").length,
+        });
         updateState({ scriptPhase: "pitch", approvedPitch: null });
         setError(response.message || "Failed to expand pitch");
         return;
@@ -195,11 +206,13 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
       });
       const fullScript = (response.full_script || response.expansion.full_script || "").trim();
       if (!fullScript) {
+        console.warn("[YouTubeCreator] Expansion missing full script");
         updateState({ scriptPhase: "pitch", approvedPitch: null });
         setError("Expansion did not return a full script. Please try again.");
         return;
       }
       if (!videoPlan.content_outline?.length) {
+        console.warn("[YouTubeCreator] Expansion missing content outline");
         updateState({ scriptPhase: "pitch", approvedPitch: null });
         setError("Expansion did not include a content outline. Please try again.");
         return;
@@ -212,6 +225,10 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
         scriptPhase: "ready",
         scenes: [],
         sceneBuildGeneration: null,
+      });
+      console.info("[YouTubeCreator] Pitch expanded", {
+        scriptLen: fullScript.length,
+        outlineCount: videoPlan.content_outline.length,
       });
       setSuccess("Full script ready. Review it, then build scenes.");
       window.setTimeout(() => {

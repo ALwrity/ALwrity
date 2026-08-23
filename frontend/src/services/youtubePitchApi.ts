@@ -114,8 +114,14 @@ export async function generatePitch(request: YouTubePitchRequest): Promise<YouTu
       ideaLen: request.user_idea?.trim().length ?? 0,
     });
     const response = await longRunningApiClient.post(`${API_BASE}/plan/pitch`, request);
+    console.info("[youtubeApi] generatePitch succeeded");
     return response.data;
   } catch (error: unknown) {
+    const err = error as { response?: { status?: number }; message?: string };
+    console.error("[youtubeApi] generatePitch failed", {
+      status: err?.response?.status,
+      timedOut: Boolean(err?.message?.toLowerCase().includes("timeout")),
+    });
     throw new Error(
       pitchErrorMessage(
         error,
@@ -134,8 +140,14 @@ export async function expandPitchToScript(
       titleLen: request.approved_pitch?.selected_title?.trim().length ?? 0,
     });
     const response = await longRunningApiClient.post(`${API_BASE}/plan/expand`, request);
+    console.info("[youtubeApi] expandPitchToScript succeeded");
     return response.data;
   } catch (error: unknown) {
+    const err = error as { response?: { status?: number }; message?: string };
+    console.error("[youtubeApi] expandPitchToScript failed", {
+      status: err?.response?.status,
+      timedOut: Boolean(err?.message?.toLowerCase().includes("timeout")),
+    });
     throw new Error(
       pitchErrorMessage(
         error,

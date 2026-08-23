@@ -117,7 +117,8 @@ class TestCreateVideoPitch:
             result = asyncio.run(create_video_pitch(request=request, current_user=_user()))
 
         assert result.success is False
-        assert "Failed to generate pitch" in result.message
+        assert result.message == "Failed to generate pitch. Please try again."
+        assert "boom" not in result.message
 
     def test_validation_error_returns_error_response_not_http_500(self):
         from api.youtube.router import PitchRequest, create_video_pitch
@@ -197,4 +198,4 @@ class TestExpandVideoPitch:
             result = asyncio.run(expand_video_pitch(request=request, current_user=_user()))
 
         assert result.success is False
-        assert "Failed to expand pitch" in result.message
+        assert result.message == "Failed to expand pitch. Please try again."
