@@ -1,0 +1,146 @@
+/**
+ * YouTube pitch / expand API client (Issue #434 Phase 3).
+ * Lives here because youtubeApi.ts already exceeds 500 lines.
+ */
+
+import { longRunningApiClient } from "../api/client";
+import type { VideoPlanGeneration, VideoPlanRequest, VideoPlanResearchSource } from "./youtubeApi";
+
+const API_BASE = "/api/youtube";
+
+export interface YouTubePitchRequest extends VideoPlanRequest {
+  creative_angle: string;
+}
+
+export interface YouTubePitchPayload {
+  selected_title: string;
+  video_summary: string;
+  hook_concept: string;
+  main_content_beats: string[];
+  angle_used: string;
+  duration_type?: string;
+  generation?: VideoPlanGeneration;
+  research_enabled?: boolean;
+  research_sources?: VideoPlanResearchSource[];
+  research_sources_count?: number;
+}
+
+export interface YouTubePitchResponse {
+  success: boolean;
+  pitch?: YouTubePitchPayload;
+  message: string;
+}
+
+export interface YouTubeApprovedPitch {
+  selected_title: string;
+  video_summary?: string;
+  hook_concept?: string;
+  main_content_beats?: string[];
+  angle_used?: string;
+  creative_angle?: string;
+}
+
+export interface YouTubeExpandRequest extends VideoPlanRequest {
+  approved_pitch: YouTubeApprovedPitch;
+}
+
+export interface YouTubeExpansionBeat {
+  scene_number: number;
+  section_title: string;
+  context?: string;
+  application?: string;
+  frame?: string;
+  mini_hook_out?: string;
+  spoken_script: string;
+  visual?: string;
+  estimated_duration_seconds: number;
+}
+
+export interface YouTubeExpansionHook {
+  context?: string;
+  common_belief?: string;
+  contrarian_turn?: string;
+  proof?: string;
+  plan_statement?: string;
+  spoken_script: string;
+}
+
+export interface YouTubeExpansionPayload {
+  hook: YouTubeExpansionHook;
+  main_content_outline: YouTubeExpansionBeat[];
+  outro: string;
+  call_to_action: string;
+  key_message: string;
+  seo_keywords: string[];
+  full_script?: string;
+  approved_title?: string;
+  duration_type?: string;
+  duration_metadata?: {
+    target_seconds?: number;
+    max_scenes?: number;
+    scene_duration_range?: [number, number];
+    hook_seconds?: number;
+  };
+  generation?: VideoPlanGeneration;
+  research_enabled?: boolean;
+  research_sources?: VideoPlanResearchSource[];
+  research_sources_count?: number;
+}
+
+export interface YouTubeExpandResponse {
+  success: boolean;
+  expansion?: YouTubeExpansionPayload;
+  full_script?: string;
+  message: string;
+}
+
+function pitchErrorMessage(error: unknown, fallback: string): string {
+  const err = error as {
+    name?: string;
+    message?: string;
+    response?: { data?: { message?: string; detail?: string } };
+  };
+  if (err?.name === "RequestTimeoutError" || err?.message?.includes("timeout")) {
+    return fallback;
+  }
+  return err?.response?.data?.message || err?.response?.data?.detail || err?.message || fallback;
+}
+
+export async function generatePitch(request: YouTubePitchRequest): Promise<YouTubePitchResponse> {
+  try {
+    console.info("[youtubeApi] generatePitch started", {
+      durationType: request.duration_type,
+      angleLen: request.creative_angle?.trim().length ?? 0,
+      ideaLen: request.user_idea?.trim().length ?? 0,
+    });
+    const response = await longRunningApiClient.post(`${API_BASE}/plan/pitch`, request);
+    return response.data;
+  } catch (error: unknown) {
+    throw new Error(
+      pitchErrorMessage(
+        error,
+        "Pitch generation is taking longer than expected. Please check your internet connection and try again.",
+      ),
+    );
+  }
+}
+
+export async function expandPitchToScript(
+  request: YouTubeExpandRequest,
+): Promise<YouTubeExpandResponse> {
+  try {
+    console.info("[youtubeApi] expandPitchToScript started", {
+      durationType: request.duration_type,
+      titleLen: request.approved_pitch?.selected_title?.trim().length ?? 0,
+    });
+    const response = await longRunningApiClient.post(`${API_BASE}/plan/expand`, request);
+    return response.data;
+  } catch (error: unknown) {
+    throw new Error(
+      pitchErrorMessage(
+        error,
+        "Script expansion is taking longer than expected. Please check your internet connection and try again.",
+      ),
+    );
+  }
+}

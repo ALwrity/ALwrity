@@ -130,10 +130,7 @@ class TestValidateExpansion:
 class TestExpandPitchToScript:
     def test_success_assembles_full_script(self):
         from services.youtube.planner import YouTubePlannerService
-        from services.youtube.planner_pitch import (
-            EXPANSION_MAX_TOKENS,
-            expand_pitch_to_script,
-        )
+        from services.youtube.planner_pitch import expand_pitch_to_script
 
         svc = YouTubePlannerService()
         approved = {
@@ -162,7 +159,7 @@ class TestExpandPitchToScript:
         assert result["generation"]["text_gateway"] == "llm_text_gen"
         llm_mock.assert_called_once()
         assert llm_mock.call_args.kwargs["flow_type"] == "youtube_script_expand"
-        assert llm_mock.call_args.kwargs["max_tokens"] == EXPANSION_MAX_TOKENS
+        assert "max_tokens" not in llm_mock.call_args.kwargs
 
     def test_missing_approved_pitch_returns_clear_error(self):
         from services.youtube.planner import YouTubePlannerService

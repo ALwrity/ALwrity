@@ -13,6 +13,7 @@ import { useImageGenerationPolling } from "./hooks/useImageGenerationPolling";
 import type { YouTubeSourceArticle } from "./components/planUrlImportUtils";
 import { useYouTubeOpenCreatorPrefill } from "./panel/useYouTubeOpenCreatorPrefill";
 import { useYouTubePlanAndSceneHandlers } from "./panel/useYouTubePlanAndSceneHandlers";
+import { useYouTubePitchHandlers } from "./panel/useYouTubePitchHandlers";
 import { useYouTubeAssetAndRenderHandlers } from "./panel/useYouTubeAssetAndRenderHandlers";
 import { YouTubeVideoCreatorStepper } from "./panel/YouTubeVideoCreatorStepper";
 import { YouTubeVideoCreatorSteps } from "./panel/YouTubeVideoCreatorSteps";
@@ -137,6 +138,7 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
     makingPresentable,
     sourceArticle,
     enableResearch,
+    fullScript,
     updateState,
     setLoading,
     setError,
@@ -145,6 +147,27 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
     setUploadingAvatar,
     setMakingPresentable,
     setRegeneratingAvatar,
+  });
+
+  const pitchHandlers = useYouTubePitchHandlers({
+    userIdea,
+    durationType,
+    videoType,
+    targetAudience,
+    videoGoal,
+    brandStyle,
+    referenceImage,
+    avatarUrl,
+    enableResearch,
+    sourceArticle,
+    creativeAngle,
+    currentPitch,
+    pitchHistory,
+    updateState,
+    setLoading,
+    setError,
+    setSuccess,
+    setActiveStep,
   });
 
   const assetHandlers = useYouTubeAssetAndRenderHandlers({
@@ -183,32 +206,8 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
     [updateState],
   );
 
-  const handleGeneratePitch = useCallback(() => {
-    if (!userIdea.trim()) {
-      setError("Please enter your video idea");
-      return;
-    }
-    if (!creativeAngle.trim()) {
-      setError("Please select or enter a creative strategy angle");
-      return;
-    }
-    console.info("[YouTubeCreator] Pitch generate requested", {
-      angle: creativeAngle,
-      ideaLen: userIdea.trim().length,
-    });
-    setError(
-      "Pitch generation is not available yet. Use Generate Video Plan, or continue after the backend pitch phase is added.",
-    );
-  }, [creativeAngle, userIdea]);
-
-  const handleExpandPitch = useCallback(() => {
-    if (!currentPitch) {
-      setError("Generate a pitch first");
-      return;
-    }
-    console.info("[YouTubeCreator] Pitch expand requested", { pitchId: currentPitch.id });
-    setError("Expand to full script is not available yet.");
-  }, [currentPitch]);
+  const handleGeneratePitch = pitchHandlers.handleGeneratePitch;
+  const handleExpandPitch = pitchHandlers.handleExpandPitch;
 
   const handleSelectPitchFromHistory = useCallback(
     (pitch: NonNullable<typeof currentPitch>) => {

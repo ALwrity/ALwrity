@@ -53,6 +53,68 @@ describe('youtubeApi', () => {
     });
   });
 
+  describe('generatePitch and expandPitchToScript', () => {
+    it('posts pitch requests to /api/youtube/plan/pitch', async () => {
+      const mockResponse = {
+        data: {
+          success: true,
+          pitch: { selected_title: 'Stop Overpacking', main_content_beats: ['A', 'B', 'C'] },
+          message: 'Pitch generated successfully',
+        },
+      };
+      jest.mocked(longRunningApiClient.post).mockResolvedValueOnce(mockResponse);
+
+      const request = {
+        user_idea: 'Budget travel',
+        duration_type: 'shorts' as const,
+        creative_angle: 'Contrarian',
+        enable_research: false,
+      };
+
+      const result = await youtubeApi.generatePitch(request);
+      expect(longRunningApiClient.post).toHaveBeenCalledWith('/api/youtube/plan/pitch', request);
+      expect(result.success).toBe(true);
+      expect(result.pitch?.selected_title).toBe('Stop Overpacking');
+    });
+
+    it('posts expand requests to /api/youtube/plan/expand', async () => {
+      const mockResponse = {
+        data: {
+          success: true,
+          expansion: { full_script: 'Hook.\n\nBody.' },
+          full_script: 'Hook.\n\nBody.',
+          message: 'Pitch expanded to full script successfully',
+        },
+      };
+      jest.mocked(longRunningApiClient.post).mockResolvedValueOnce(mockResponse);
+
+      const request = {
+        user_idea: 'Budget travel',
+        duration_type: 'shorts' as const,
+        approved_pitch: { selected_title: 'Stop Overpacking' },
+      };
+
+      const result = await youtubeApi.expandPitchToScript(request);
+      expect(longRunningApiClient.post).toHaveBeenCalledWith('/api/youtube/plan/expand', request);
+      expect(result.full_script).toBe('Hook.\n\nBody.');
+    });
+
+    it('maps timeout errors for pitch generation', async () => {
+      const timeoutError = new Error('timeout of 60000ms exceeded');
+      jest.mocked(longRunningApiClient.post).mockRejectedValueOnce(timeoutError);
+
+      await expect(
+        youtubeApi.generatePitch({
+          user_idea: 'Budget travel',
+          duration_type: 'shorts',
+          creative_angle: 'Contrarian',
+        }),
+      ).rejects.toThrow(
+        'Pitch generation is taking longer than expected. Please check your internet connection and try again.',
+      );
+    });
+  });
+
   describe('buildScenes', () => {
     it('uses longRunningApiClient to post to /api/youtube/scenes', async () => {
       const mockResponse = { data: { success: true, scenes: [] } };

@@ -97,7 +97,7 @@ def validate_pitch(pitch: Dict[str, Any], *, creative_angle: str) -> Dict[str, A
         raise PitchValidationError("Pitch is missing angle_used.")
 
     logger.info(
-        "[YouTubePlanner] Pitch validated: title_len=%s beats=%s",
+        "[YouTubePlanner] Pitch validated: title_len={} beats={}",
         len(title),
         len(beats),
     )
@@ -174,7 +174,7 @@ def validate_expansion(
     cleaned_keywords = [str(item).strip() for item in keywords if str(item).strip()]
 
     logger.info(
-        "[YouTubePlanner] Expansion validated: beats=%s duration_sum=%s target=%s",
+        "[YouTubePlanner] Expansion validated: beats={} duration_sum={} target={}",
         len(cleaned_beats),
         duration_sum,
         target,

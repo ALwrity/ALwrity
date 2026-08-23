@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -101,7 +102,7 @@ class TestValidatePitch:
 class TestGeneratePitch:
     def test_success_with_mocked_llm(self):
         from services.youtube.planner import YouTubePlannerService
-        from services.youtube.planner_pitch import PITCH_MAX_TOKENS, generate_youtube_pitch
+        from services.youtube.planner_pitch import generate_youtube_pitch
 
         svc = YouTubePlannerService()
         with patch(
@@ -124,7 +125,34 @@ class TestGeneratePitch:
         assert "Contrarian" in result["generation"]["user_prompt"]
         llm_mock.assert_called_once()
         assert llm_mock.call_args.kwargs["flow_type"] == "youtube_pitch"
-        assert llm_mock.call_args.kwargs["max_tokens"] == PITCH_MAX_TOKENS
+        assert "max_tokens" not in llm_mock.call_args.kwargs
+
+    def test_accepts_wavespeed_error_wrapper_with_valid_raw_json(self):
+        from services.youtube.planner import YouTubePlannerService
+        from services.youtube.planner_pitch import generate_youtube_pitch
+
+        svc = YouTubePlannerService()
+        wrapper = {
+            "error": "Failed to parse JSON response",
+            "raw_response": json.dumps(_valid_pitch()),
+        }
+        with patch(
+            "services.youtube.planner_pitch.llm_text_gen",
+            return_value=wrapper,
+        ):
+            result = asyncio.run(
+                generate_youtube_pitch(
+                    svc,
+                    user_idea="Budget travel",
+                    duration_type="shorts",
+                    creative_angle="Contrarian",
+                    user_id="user_pitch",
+                    enable_research=False,
+                )
+            )
+
+        assert result["selected_title"] == "Stop Planning Trips Like This"
+        assert result["main_content_beats"] == ["Rule one", "Rule two", "Rule three"]
 
     def test_retries_once_then_succeeds(self):
         from services.youtube.planner import YouTubePlannerService

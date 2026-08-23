@@ -7,3 +7,5 @@ export const YT_Z_RAIL = 24;
 export const YT_Z_MOBILE_FAB = 1200;
 export const YT_Z_KNOWLEDGE_CENTER = 12000;
 export const YT_Z_MODAL = 13000;
+/** Select menus / tooltips portal to body; they must sit above YT_Z_MODAL. */
+export const YT_Z_MODAL_POPOVER = YT_Z_MODAL + 1;

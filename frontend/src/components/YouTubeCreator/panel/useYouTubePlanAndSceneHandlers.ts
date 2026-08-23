@@ -21,6 +21,7 @@ interface PlanSceneHandlerArgs {
   makingPresentable: boolean;
   sourceArticle: YouTubeSourceArticle | null;
   enableResearch: boolean;
+  fullScript?: string | null;
   updateState: (updates: Partial<YouTubeCreatorState>) => void;
   setLoading: (v: boolean) => void;
   setError: (v: string | null) => void;
@@ -48,6 +49,7 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
     makingPresentable,
     sourceArticle,
     enableResearch,
+    fullScript,
     updateState,
     setLoading,
     setError,
@@ -99,7 +101,12 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
           userPromptLen: generation?.user_prompt?.length ?? 0,
           sourceCount: response.plan.research_sources_count ?? response.plan.research_sources?.length ?? 0,
         });
-        const updates: Partial<YouTubeCreatorState> = { videoPlan: response.plan };
+        const updates: Partial<YouTubeCreatorState> = {
+          videoPlan: response.plan,
+          scriptPhase: "idle",
+          fullScript: null,
+          approvedPitch: null,
+        };
         if (response.plan.auto_generated_avatar_url) {
           updates.avatarUrl = response.plan.auto_generated_avatar_url;
           setSuccess("Video plan generated! Avatar auto-generated based on your plan.");
@@ -269,12 +276,14 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
     setSuccess(null);
 
     try {
+      const customScript = fullScript?.trim() || undefined;
       console.info("[YouTubeCreator] Building scenes from plan", {
         durationType: videoPlan.duration_type,
         outlineCount,
         hasSelectedTitle: Boolean(videoPlan.selected_title?.trim()),
+        hasCustomScript: Boolean(customScript),
       });
-      const response = await youtubeApi.buildScenes(videoPlan);
+      const response = await youtubeApi.buildScenes(videoPlan, customScript);
       if (response.success && response.scenes) {
         if (response.scenes.length === 0) {
           console.error("[YouTubeCreator] Scene build returned empty scenes list", {
@@ -344,7 +353,7 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
     } finally {
       setLoading(false);
     }
-  }, [videoPlan, scenes.length, updateState, setActiveStep, setError, setLoading, setSuccess]);
+  }, [videoPlan, scenes.length, fullScript, updateState, setActiveStep, setError, setLoading, setSuccess]);
 
   const handleEditScene = useCallback(
     (scene: Scene) => {

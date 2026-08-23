@@ -15,6 +15,7 @@ from .handlers import audio as audio_handlers
 from .handlers import channel_bible as channel_bible_handlers
 from .handlers import images as image_handlers
 from .handlers import plan as plan_handlers
+from .handlers import plan_pitch as plan_pitch_handlers
 from .handlers import render as render_handlers
 from .handlers import videos as video_handlers
 from .oauth_router import router as youtube_oauth_router
@@ -30,6 +31,10 @@ from .schemas import (  # noqa: F401
     CombineVideosResponse,
     CostEstimateRequest,
     CostEstimateResponse,
+    ExpandRequest,
+    ExpandResponse,
+    PitchRequest,
+    PitchResponse,
     SceneBuildRequest,
     SceneBuildResponse,
     SceneUpdateRequest,
@@ -48,6 +53,10 @@ from .handlers.plan import (  # noqa: F401
     build_scenes,
     create_video_plan,
     update_scene,
+)
+from .handlers.plan_pitch import (  # noqa: F401
+    create_video_pitch,
+    expand_video_pitch,
 )
 from .handlers.render import (  # noqa: F401
     combine_scene_videos,
@@ -75,6 +84,7 @@ logger = get_service_logger("api.youtube")
 
 # Domain handlers (plan/scenes, render, videos)
 router.include_router(plan_handlers.router)
+router.include_router(plan_pitch_handlers.router)
 router.include_router(channel_bible_handlers.router)
 router.include_router(render_handlers.router)
 router.include_router(video_handlers.router)
@@ -94,6 +104,8 @@ __all__ = [
     "require_authenticated_user",
     "task_manager",
     "create_video_plan",
+    "create_video_pitch",
+    "expand_video_pitch",
     "build_scenes",
     "update_scene",
     "start_video_render",

@@ -10,6 +10,7 @@ from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from fastapi import HTTPException
 
+from services.llm_providers.json_parsing import robust_json_loads
 from services.llm_providers.main_text_generation import llm_text_gen
 from services.youtube.planner_config import VIDEO_TYPE_CONFIGS, get_duration_context
 from services.youtube.planner_generation import attach_plan_generation_metadata
@@ -34,19 +35,38 @@ if TYPE_CHECKING:
 
 logger = get_service_logger("youtube.planner_pitch")
 
-PITCH_MAX_TOKENS = 256
-EXPANSION_MAX_TOKENS = 2048
+
+def _unwrap_provider_payload(response: Any) -> Any:
+    """WaveSpeed returns {error, raw_response} when json_struct parse fails."""
+    if not isinstance(response, dict):
+        return response
+    if (
+        response.get("error")
+        and "raw_response" in response
+        and "selected_title" not in response
+        and "hook" not in response
+    ):
+        logger.warning(
+            "[YouTubePlanner] Provider JSON wrapper error={}; raw_len={}",
+            response.get("error"),
+            len(str(response.get("raw_response") or "")),
+        )
+        return response.get("raw_response")
+    return response
 
 
 def _parse_llm_json(response: Any, *, label: str) -> Dict[str, Any]:
-    if isinstance(response, dict):
-        return response
-    if not isinstance(response, str) or not response.strip():
+    payload = _unwrap_provider_payload(response)
+    if isinstance(payload, dict):
+        if payload.get("error") and "selected_title" not in payload and "hook" not in payload:
+            raise PitchValidationError(f"{label} LLM response was empty or invalid JSON.")
+        return payload
+    if not isinstance(payload, str) or not payload.strip():
         raise PitchValidationError(f"{label} LLM response was empty.")
     try:
-        parsed = json.loads(response)
+        parsed = robust_json_loads(payload)
     except json.JSONDecodeError as exc:
-        logger.error("[YouTubePlanner] Failed to parse %s JSON: %s", label, exc)
+        logger.error("[YouTubePlanner] Failed to parse {} JSON: {}", label, exc)
         raise PitchValidationError(f"Failed to parse {label} response as JSON.") from exc
     if not isinstance(parsed, dict):
         raise PitchValidationError(f"{label} JSON must be an object.")
@@ -59,14 +79,12 @@ def _call_llm_once(
     system_prompt: str,
     json_struct: Dict[str, Any],
     flow_type: str,
-    max_tokens: int,
     user_id: Optional[str],
 ) -> Any:
     logger.info(
-        "[YouTubePlanner] LLM start flow_type=%s prompt_len=%s max_tokens=%s",
+        "[YouTubePlanner] LLM start flow_type={} prompt_len={}",
         flow_type,
         len(prompt),
-        max_tokens,
     )
     return llm_text_gen(
         prompt=prompt,
@@ -74,7 +92,6 @@ def _call_llm_once(
         user_id=user_id,
         json_struct=json_struct,
         flow_type=flow_type,
-        max_tokens=max_tokens,
     )
 
 
@@ -89,12 +106,12 @@ def _generate_with_one_retry(
         try:
             raw = call_llm()
             result = parse_and_validate(raw)
-            logger.info("[YouTubePlanner] %s succeeded on attempt=%s", label, attempt)
+            logger.info("[YouTubePlanner] {} succeeded on attempt={}", label, attempt)
             return result
         except PitchValidationError as exc:
             last_error = exc
             logger.warning(
-                "[YouTubePlanner] %s validation failed attempt=%s err=%s",
+                "[YouTubePlanner] {} validation failed attempt={} err={}",
                 label,
                 attempt,
                 exc,
@@ -104,12 +121,12 @@ def _generate_with_one_retry(
         except Exception as exc:
             last_error = exc
             logger.exception(
-                "[YouTubePlanner] %s LLM call failed attempt=%s",
+                "[YouTubePlanner] {} LLM call failed attempt={}",
                 label,
                 attempt,
             )
     message = str(last_error) if last_error else f"Failed to generate {label}."
-    raise HTTPException(status_code=500, detail=message)
+    raise PitchValidationError(message)
 
 
 async def _optional_research(
@@ -136,12 +153,12 @@ async def _optional_research(
         return context or "", sources or [], True
     except HTTPException as http_ex:
         logger.warning(
-            "[YouTubePlanner] Research skipped (http=%s); continuing without it",
+            "[YouTubePlanner] Research skipped (http={}); continuing without it",
             http_ex.status_code,
         )
         return "", [], True
     except Exception as exc:
-        logger.warning("[YouTubePlanner] Research failed (non-critical): %s", exc)
+        logger.warning("[YouTubePlanner] Research failed (non-critical): {}", exc)
         return "", [], True
 
 
@@ -162,7 +179,7 @@ async def generate_youtube_pitch(
     source_article_summary: Optional[str] = None,
     channel_bible_context: str = "",
 ) -> Dict[str, Any]:
-    """Generate one lightweight pitch. flow_type=youtube_pitch, max_tokens≈256."""
+    """Generate one lightweight pitch. flow_type=youtube_pitch (same llm_text_gen path as generate_plan)."""
     idea = (user_idea or "").strip()
     angle = (creative_angle or "").strip()
     if not idea:
@@ -174,7 +191,7 @@ async def generate_youtube_pitch(
         )
 
     logger.info(
-        "[YouTubePlanner] generate_pitch entry duration=%s angle_len=%s idea_len=%s",
+        "[YouTubePlanner] generate_pitch entry duration={} angle_len={} idea_len={}",
         duration_type,
         len(angle),
         len(idea),
@@ -221,7 +238,6 @@ async def generate_youtube_pitch(
             system_prompt=PITCH_SYSTEM_PROMPT,
             json_struct=json_struct,
             flow_type="youtube_pitch",
-            max_tokens=PITCH_MAX_TOKENS,
             user_id=user_id,
         ),
         parse_and_validate=_parse_and_validate,
@@ -245,7 +261,7 @@ async def generate_youtube_pitch(
         )
     except Exception as meta_err:
         logger.exception(
-            "[YouTubePlanner] Pitch metadata attach failed; returning pitch without it. err=%s",
+            "[YouTubePlanner] Pitch metadata attach failed; returning pitch without it. err={}",
             meta_err,
         )
 
@@ -268,7 +284,7 @@ async def expand_pitch_to_script(
     enable_research: bool = True,
     channel_bible_context: str = "",
 ) -> Dict[str, Any]:
-    """Expand an approved pitch. flow_type=youtube_script_expand, max_tokens≈2048."""
+    """Expand an approved pitch. flow_type=youtube_script_expand (same llm_text_gen path as generate_plan)."""
     idea = (user_idea or "").strip()
     if not idea:
         raise HTTPException(status_code=400, detail="Please enter your video idea.")
@@ -278,7 +294,7 @@ async def expand_pitch_to_script(
         raise HTTPException(status_code=400, detail="An approved pitch is required to expand.")
 
     logger.info(
-        "[YouTubePlanner] expand_pitch_to_script entry duration=%s title_len=%s",
+        "[YouTubePlanner] expand_pitch_to_script entry duration={} title_len={}",
         duration_type,
         len(str(approved_pitch.get("selected_title") or "")),
     )
@@ -321,7 +337,6 @@ async def expand_pitch_to_script(
             system_prompt=EXPANSION_SYSTEM_PROMPT,
             json_struct=json_struct,
             flow_type="youtube_script_expand",
-            max_tokens=EXPANSION_MAX_TOKENS,
             user_id=user_id,
         ),
         parse_and_validate=_parse_and_validate,
@@ -345,7 +360,7 @@ async def expand_pitch_to_script(
         )
     except Exception as meta_err:
         logger.exception(
-            "[YouTubePlanner] Expansion metadata attach failed; returning script without it. err=%s",
+            "[YouTubePlanner] Expansion metadata attach failed; returning script without it. err={}",
             meta_err,
         )
 

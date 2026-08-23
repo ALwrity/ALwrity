@@ -115,9 +115,9 @@ export const ScenesStep: React.FC<ScenesStepProps> = React.memo(({
           )}
         </Box>
 
-        {scriptPhase === 'ready' && fullScript ? (
+        {scriptPhase === 'ready' ? (
           <YouTubeUnifiedPlanScript
-            value={fullScript}
+            value={fullScript || ''}
             onChange={onFullScriptChange}
             disabled={loading}
           />
