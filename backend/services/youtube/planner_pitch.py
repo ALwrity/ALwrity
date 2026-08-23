@@ -1,0 +1,353 @@
+"""YouTube pitch generate / expand (Issue #434 Phase 2).
+
+Does not change llm_providers. Existing generate_plan is unchanged.
+"""
+
+from __future__ import annotations
+
+import json
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+
+from fastapi import HTTPException
+
+from services.llm_providers.main_text_generation import llm_text_gen
+from services.youtube.planner_config import VIDEO_TYPE_CONFIGS, get_duration_context
+from services.youtube.planner_generation import attach_plan_generation_metadata
+from services.youtube.planner_pitch_prompts import (
+    EXPANSION_SYSTEM_PROMPT,
+    PITCH_SYSTEM_PROMPT,
+    build_expansion_json_struct,
+    build_expansion_user_prompt,
+    build_pitch_json_struct,
+    build_pitch_user_prompt,
+)
+from services.youtube.planner_pitch_validate import (
+    PitchValidationError,
+    assemble_full_script,
+    validate_expansion,
+    validate_pitch,
+)
+from utils.logger_utils import get_service_logger
+
+if TYPE_CHECKING:
+    from services.youtube.planner import YouTubePlannerService
+
+logger = get_service_logger("youtube.planner_pitch")
+
+PITCH_MAX_TOKENS = 256
+EXPANSION_MAX_TOKENS = 2048
+
+
+def _parse_llm_json(response: Any, *, label: str) -> Dict[str, Any]:
+    if isinstance(response, dict):
+        return response
+    if not isinstance(response, str) or not response.strip():
+        raise PitchValidationError(f"{label} LLM response was empty.")
+    try:
+        parsed = json.loads(response)
+    except json.JSONDecodeError as exc:
+        logger.error("[YouTubePlanner] Failed to parse %s JSON: %s", label, exc)
+        raise PitchValidationError(f"Failed to parse {label} response as JSON.") from exc
+    if not isinstance(parsed, dict):
+        raise PitchValidationError(f"{label} JSON must be an object.")
+    return parsed
+
+
+def _call_llm_once(
+    *,
+    prompt: str,
+    system_prompt: str,
+    json_struct: Dict[str, Any],
+    flow_type: str,
+    max_tokens: int,
+    user_id: Optional[str],
+) -> Any:
+    logger.info(
+        "[YouTubePlanner] LLM start flow_type=%s prompt_len=%s max_tokens=%s",
+        flow_type,
+        len(prompt),
+        max_tokens,
+    )
+    return llm_text_gen(
+        prompt=prompt,
+        system_prompt=system_prompt,
+        user_id=user_id,
+        json_struct=json_struct,
+        flow_type=flow_type,
+        max_tokens=max_tokens,
+    )
+
+
+def _generate_with_one_retry(
+    *,
+    label: str,
+    call_llm: Callable[[], Any],
+    parse_and_validate: Callable[[Any], Dict[str, Any]],
+) -> Dict[str, Any]:
+    last_error: Optional[Exception] = None
+    for attempt in (1, 2):
+        try:
+            raw = call_llm()
+            result = parse_and_validate(raw)
+            logger.info("[YouTubePlanner] %s succeeded on attempt=%s", label, attempt)
+            return result
+        except PitchValidationError as exc:
+            last_error = exc
+            logger.warning(
+                "[YouTubePlanner] %s validation failed attempt=%s err=%s",
+                label,
+                attempt,
+                exc,
+            )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            last_error = exc
+            logger.exception(
+                "[YouTubePlanner] %s LLM call failed attempt=%s",
+                label,
+                attempt,
+            )
+    message = str(last_error) if last_error else f"Failed to generate {label}."
+    raise HTTPException(status_code=500, detail=message)
+
+
+async def _optional_research(
+    planner: "YouTubePlannerService",
+    *,
+    user_idea: str,
+    video_type: Optional[str],
+    target_audience: str,
+    user_id: Optional[str],
+    enable_research: bool,
+) -> tuple[str, List[Dict[str, Any]], bool]:
+    if not enable_research:
+        logger.info("[YouTubePlanner] Research disabled for pitch/expand")
+        return "", [], False
+
+    logger.info("[YouTubePlanner] Starting Exa research for pitch/expand")
+    try:
+        context, sources = await planner._perform_exa_research(
+            user_idea=user_idea,
+            video_type=video_type,
+            target_audience=target_audience,
+            user_id=user_id or "",
+        )
+        return context or "", sources or [], True
+    except HTTPException as http_ex:
+        logger.warning(
+            "[YouTubePlanner] Research skipped (http=%s); continuing without it",
+            http_ex.status_code,
+        )
+        return "", [], True
+    except Exception as exc:
+        logger.warning("[YouTubePlanner] Research failed (non-critical): %s", exc)
+        return "", [], True
+
+
+async def generate_youtube_pitch(
+    planner: "YouTubePlannerService",
+    *,
+    user_idea: str,
+    duration_type: str,
+    creative_angle: str,
+    video_type: Optional[str] = None,
+    target_audience: Optional[str] = None,
+    video_goal: Optional[str] = None,
+    brand_style: Optional[str] = None,
+    persona_data: Optional[Dict[str, Any]] = None,
+    user_id: Optional[str] = None,
+    enable_research: bool = True,
+    source_article_title: Optional[str] = None,
+    source_article_summary: Optional[str] = None,
+    channel_bible_context: str = "",
+) -> Dict[str, Any]:
+    """Generate one lightweight pitch. flow_type=youtube_pitch, max_tokens≈256."""
+    idea = (user_idea or "").strip()
+    angle = (creative_angle or "").strip()
+    if not idea:
+        raise HTTPException(status_code=400, detail="Please enter your video idea.")
+    if not angle:
+        raise HTTPException(
+            status_code=400,
+            detail="Please select or enter a creative strategy angle.",
+        )
+
+    logger.info(
+        "[YouTubePlanner] generate_pitch entry duration=%s angle_len=%s idea_len=%s",
+        duration_type,
+        len(angle),
+        len(idea),
+    )
+
+    duration_context = planner._get_duration_context(duration_type)
+    video_type_config = VIDEO_TYPE_CONFIGS.get(video_type or "", {})
+    default_audience = target_audience or (
+        f"Viewers interested in {video_type} content" if video_type else "General YouTube audience"
+    )
+    persona_context = planner._build_persona_context(persona_data)
+    research_context, research_sources, research_enabled = await _optional_research(
+        planner,
+        user_idea=idea,
+        video_type=video_type,
+        target_audience=default_audience,
+        user_id=user_id,
+        enable_research=enable_research,
+    )
+
+    user_prompt = build_pitch_user_prompt(
+        user_idea=idea,
+        creative_angle=angle,
+        duration_type=duration_type,
+        video_type=video_type,
+        target_audience=target_audience,
+        video_goal=video_goal,
+        brand_style=brand_style,
+        persona_context=persona_context,
+        channel_bible_context=channel_bible_context or "",
+        research_context=research_context,
+        source_article_title=source_article_title,
+        source_article_summary=source_article_summary,
+    )
+    json_struct = build_pitch_json_struct()
+
+    def _parse_and_validate(raw: Any) -> Dict[str, Any]:
+        return validate_pitch(_parse_llm_json(raw, label="pitch"), creative_angle=angle)
+
+    pitch = _generate_with_one_retry(
+        label="pitch",
+        call_llm=lambda: _call_llm_once(
+            prompt=user_prompt,
+            system_prompt=PITCH_SYSTEM_PROMPT,
+            json_struct=json_struct,
+            flow_type="youtube_pitch",
+            max_tokens=PITCH_MAX_TOKENS,
+            user_id=user_id,
+        ),
+        parse_and_validate=_parse_and_validate,
+    )
+
+    pitch["duration_type"] = duration_type
+    pitch["duration_metadata"] = duration_context
+    pitch["research_enabled"] = research_enabled
+    pitch["research_sources"] = research_sources
+    pitch["research_sources_count"] = len(research_sources)
+    if video_type_config:
+        pitch["video_type"] = video_type
+
+    try:
+        pitch = attach_plan_generation_metadata(
+            pitch,
+            system_prompt=PITCH_SYSTEM_PROMPT,
+            user_prompt=user_prompt,
+            research_enabled=research_enabled,
+            research_context=research_context,
+        )
+    except Exception as meta_err:
+        logger.exception(
+            "[YouTubePlanner] Pitch metadata attach failed; returning pitch without it. err=%s",
+            meta_err,
+        )
+
+    logger.info("[YouTubePlanner] Pitch generated successfully")
+    return pitch
+
+
+async def expand_pitch_to_script(
+    planner: "YouTubePlannerService",
+    *,
+    user_idea: str,
+    duration_type: str,
+    approved_pitch: Dict[str, Any],
+    video_type: Optional[str] = None,
+    target_audience: Optional[str] = None,
+    video_goal: Optional[str] = None,
+    brand_style: Optional[str] = None,
+    persona_data: Optional[Dict[str, Any]] = None,
+    user_id: Optional[str] = None,
+    enable_research: bool = True,
+    channel_bible_context: str = "",
+) -> Dict[str, Any]:
+    """Expand an approved pitch. flow_type=youtube_script_expand, max_tokens≈2048."""
+    idea = (user_idea or "").strip()
+    if not idea:
+        raise HTTPException(status_code=400, detail="Please enter your video idea.")
+    if not isinstance(approved_pitch, dict) or not str(
+        approved_pitch.get("selected_title") or ""
+    ).strip():
+        raise HTTPException(status_code=400, detail="An approved pitch is required to expand.")
+
+    logger.info(
+        "[YouTubePlanner] expand_pitch_to_script entry duration=%s title_len=%s",
+        duration_type,
+        len(str(approved_pitch.get("selected_title") or "")),
+    )
+
+    persona_context = planner._build_persona_context(persona_data)
+    default_audience = target_audience or "General YouTube audience"
+    research_context, research_sources, research_enabled = await _optional_research(
+        planner,
+        user_idea=idea,
+        video_type=video_type,
+        target_audience=default_audience,
+        user_id=user_id,
+        enable_research=enable_research,
+    )
+
+    user_prompt = build_expansion_user_prompt(
+        user_idea=idea,
+        approved_pitch=approved_pitch,
+        duration_type=duration_type,
+        video_type=video_type,
+        target_audience=target_audience,
+        video_goal=video_goal,
+        brand_style=brand_style,
+        persona_context=persona_context,
+        channel_bible_context=channel_bible_context or "",
+        research_context=research_context,
+    )
+    json_struct = build_expansion_json_struct()
+
+    def _parse_and_validate(raw: Any) -> Dict[str, Any]:
+        return validate_expansion(
+            _parse_llm_json(raw, label="expansion"),
+            duration_type=duration_type,
+        )
+
+    expansion = _generate_with_one_retry(
+        label="expansion",
+        call_llm=lambda: _call_llm_once(
+            prompt=user_prompt,
+            system_prompt=EXPANSION_SYSTEM_PROMPT,
+            json_struct=json_struct,
+            flow_type="youtube_script_expand",
+            max_tokens=EXPANSION_MAX_TOKENS,
+            user_id=user_id,
+        ),
+        parse_and_validate=_parse_and_validate,
+    )
+
+    expansion["full_script"] = assemble_full_script(expansion)
+    expansion["duration_type"] = duration_type
+    expansion["duration_metadata"] = get_duration_context(duration_type)
+    expansion["research_enabled"] = research_enabled
+    expansion["research_sources"] = research_sources
+    expansion["research_sources_count"] = len(research_sources)
+    expansion["approved_title"] = approved_pitch.get("selected_title")
+
+    try:
+        expansion = attach_plan_generation_metadata(
+            expansion,
+            system_prompt=EXPANSION_SYSTEM_PROMPT,
+            user_prompt=user_prompt,
+            research_enabled=research_enabled,
+            research_context=research_context,
+        )
+    except Exception as meta_err:
+        logger.exception(
+            "[YouTubePlanner] Expansion metadata attach failed; returning script without it. err=%s",
+            meta_err,
+        )
+
+    logger.info("[YouTubePlanner] Pitch expanded to script successfully")
+    return expansion
