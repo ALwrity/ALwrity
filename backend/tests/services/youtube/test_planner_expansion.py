@@ -67,10 +67,16 @@ class TestExpansionJsonStruct:
         assert "main_content_outline" in props
         assert "spoken_script" in props["hook"]["properties"]
 
-    def test_system_prompt_has_no_json_template(self):
+    def test_system_prompt_is_finalized_expansion_copy(self):
         from services.youtube.planner_pitch_prompts import EXPANSION_SYSTEM_PROMPT
 
+        assert "YouTube Script Architect" in EXPANSION_SYSTEM_PROMPT
         assert "EXPECTATION < REALITY" in EXPANSION_SYSTEM_PROMPT
+        assert "spoken_script" in EXPANSION_SYSTEM_PROMPT
+        assert "mini_hook_out" in EXPANSION_SYSTEM_PROMPT
+        assert "estimated_duration_seconds" in EXPANSION_SYSTEM_PROMPT
+        assert "Do NOT output echoed inputs" in EXPANSION_SYSTEM_PROMPT
+        assert "Do NOT output a separate full_script" in EXPANSION_SYSTEM_PROMPT
         assert '"hook"' not in EXPANSION_SYSTEM_PROMPT
         assert "full_script" in EXPANSION_SYSTEM_PROMPT.lower()
 

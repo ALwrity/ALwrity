@@ -7,6 +7,13 @@ const pitch: YouTubePitchPayload = {
   hook_concept: "You do not need a big bag.",
   main_content_beats: ["Pick three items", "Wear the bulky one", "Leave the just-in-case pile"],
   angle_used: "Contrarian",
+  generation: {
+    text_gateway: "llm_text_gen",
+    system_prompt: "You are ALwrity Pitch.",
+    user_prompt: "Generate a pitch.",
+    json_schema_applied: true,
+  },
+  research_enabled: true,
 };
 
 const expansion: YouTubeExpansionPayload = {
@@ -54,6 +61,9 @@ describe("toYouTubeVideoPitch", () => {
     expect(mapped.creative_angle).toBe("Contrarian");
     expect(mapped.main_content_beats).toHaveLength(3);
     expect(mapped.id).toBeTruthy();
+    expect(mapped.generation?.system_prompt).toBe("You are ALwrity Pitch.");
+    expect(mapped.generation?.user_prompt).toBe("Generate a pitch.");
+    expect(mapped.research_enabled).toBe(true);
   });
 });
 

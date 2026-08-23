@@ -38,6 +38,9 @@ export function toYouTubeVideoPitch(
     main_content_beats: Array.isArray(pitch.main_content_beats)
       ? pitch.main_content_beats.map((beat) => String(beat).trim()).filter(Boolean)
       : [],
+    generation: pitch.generation,
+    research_enabled: pitch.research_enabled,
+    research_sources: pitch.research_sources,
   };
 }
 

@@ -51,6 +51,41 @@ describe("ScenesStep", () => {
     expect(screen.queryByText("SEO Keywords")).not.toBeInTheDocument();
   });
 
+  it("shows the exact expand prompt after Phase 2 without restoring plan chips", () => {
+    render(
+      <ScenesStep
+        videoPlan={{
+          ...videoPlan,
+          generation: {
+            text_gateway: "llm_text_gen",
+            system_prompt: "You are ALwrity Script.",
+            user_prompt: "Expand this approved pitch.",
+            json_schema_applied: true,
+          },
+        }}
+        scenes={[]}
+        editingSceneId={null}
+        editedScene={null}
+        loading={false}
+        onBuildScenes={noop}
+        onEditScene={noop}
+        onSaveScene={noop}
+        onCancelEdit={noop}
+        onEditChange={noop}
+        onToggleScene={noop}
+        onBack={noop}
+        onNext={noop}
+        scriptPhase="ready"
+        fullScript="Hook spoken.\n\nBody spoken."
+      />,
+    );
+
+    expect(screen.getByText("Exact expand prompt sent to the LLM")).toBeInTheDocument();
+    expect(screen.getByText("You are ALwrity Script.")).toBeInTheDocument();
+    expect(screen.getByText("Expand this approved pitch.")).toBeInTheDocument();
+    expect(screen.queryByText("Target Audience")).not.toBeInTheDocument();
+  });
+
   it("shows PlanDetails chip layout for the legacy generated plan", () => {
     render(
       <ScenesStep
