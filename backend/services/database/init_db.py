@@ -40,10 +40,12 @@ import models.backlink_outreach_models  # noqa: E402, F401
 import models.bing_analytics_models  # noqa: E402, F401
 import models.comprehensive_user_data_cache  # noqa: E402, F401
 import models.content_asset_models  # noqa: E402, F401
+import models.conversion_event_models  # noqa: E402, F401
 import models.content_planning  # noqa: E402, F401
 import models.content_strategy_state_models  # noqa: E402, F401
 import models.crawled_content  # noqa: E402, F401
 import models.daily_workflow_models  # noqa: E402, F401
+import models.workflow_execution_models  # noqa: E402, F401
 import models.enhanced_calendar_models  # noqa: E402, F401
 import models.enhanced_strategy_models  # noqa: E402, F401
 import models.gsc_brainstorm_cache_models  # noqa: E402, F401

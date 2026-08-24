@@ -73,12 +73,39 @@ def test_catalog_has_content_guardian_entry():
 
 
 def test_catalog_has_six_entries():
-    """Catalog should have 5 strategy agents + 1 guardian = 6."""
+    """Catalog should have 6 visible committee agents (strategy_orchestrator,
+    content_strategist, competitor_analyst, seo_specialist, social_media_manager,
+    content_guardian) plus 3 hidden system agents (strategy_architect, trend_surfer,
+    content_gap_radar) = 9 total.
+    """
     src = _read("services/intelligence/agents/team_catalog.py")
     catalog = _get_catalog(src)
     assert catalog is not None, "AGENT_TEAM_CATALOG not found"
     assert isinstance(catalog, ast.List)
-    assert len(catalog.elts) == 6, f"expected 6 catalog entries, got {len(catalog.elts)}"
+    assert len(catalog.elts) == 9, f"expected 9 catalog entries, got {len(catalog.elts)}"
+
+
+def test_catalog_hidden_entries():
+    """Three hidden system agents (strategy_orchestrator, trend_surfer,
+    content_gap_radar) must have hidden=True and correct agent_keys.
+    """
+    src = _read("services/intelligence/agents/team_catalog.py")
+    catalog = _get_catalog(src)
+    assert catalog is not None
+    hidden_keys = []
+    for entry in catalog.elts:
+        if not isinstance(entry, ast.Dict):
+            continue
+        entry_dict = {}
+        for k, v in zip(entry.keys, entry.values):
+            if isinstance(k, ast.Constant):
+                if isinstance(v, ast.Constant):
+                    entry_dict[k.value] = v.value
+        if entry_dict.get("hidden") is True:
+            hidden_keys.append(entry_dict.get("agent_key"))
+    assert sorted(hidden_keys) == sorted(["strategy_orchestrator", "trend_surfer", "content_gap_radar"]), (
+        f"expected 3 hidden agents, got: {hidden_keys}"
+    )
 
 
 def test_agent_help_modal_describes_six_member_committee():

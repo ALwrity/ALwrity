@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Box,
   Typography,
+  Alert,
   Chip,
   Tooltip,
   Modal,
@@ -65,7 +66,9 @@ const EnhancedTodayModal: React.FC<EnhancedTodayModalProps> = ({
     completeTask,
     skipTask,
     isLoading,
-    isWorkflowComplete
+    isWorkflowComplete,
+    executeTask,
+    scheduleStatus,
   } = useWorkflowStore();
 
   // Prefer live workflow tasks (to reflect updated statuses), fallback to props
@@ -77,12 +80,65 @@ const EnhancedTodayModal: React.FC<EnhancedTodayModalProps> = ({
   const pillarTasks = liveTasks.filter(task => task.pillarId === pillarId);
   const currentTask = navigationState?.currentTask;
   const isComplete = isWorkflowComplete();
+  const guardianQuarantines = (scheduleStatus?.guardian_review?.decisions || []).filter(
+    (decision) => decision.guardian_outcome === 'quarantined' || decision.guardian_outcome === 'rejected'
+  );
+  const reviewHolds = (scheduleStatus?.proposal_review?.normalized_proposals || [])
+    .filter((decision) => decision.status === 'quarantined' || decision.status === 'rejected')
+    .map((decision) => ({
+      recommendation_id: decision.recommendation_id,
+      title: decision.title,
+      guardian_reasons: decision.review_reasons,
+    }));
+  const heldProposals = [...guardianQuarantines, ...reviewHolds];
+  const preflight = scheduleStatus?.meeting_preflight;
+  const freshness = preflight?.checks?.freshness;
+  const providerCheck = preflight?.checks?.providers;
+  const agentSchedule = scheduleStatus?.agent_schedule || [];
+  const agentEvidence = scheduleStatus?.agent_evidence || [];
+  const meetingLimitations = [
+    ...(preflight?.limitations || []),
+    ...(scheduleStatus?.guardian_review?.limitations || []),
+  ];
 
   const handleTaskAction = async (task: TodayTask) => {
     if (!task.enabled) return;
 
     try {
-      // Execute the task action
+      const executableActionTypes = new Set(['create_content', 'seo_analyze', 'social_draft', 'facebook_draft', 'linkedin_draft', 'calendar_insert', 'create_seo_task']);
+      if (currentWorkflow && executableActionTypes.has(task.actionType)) {
+        const execution = await executeTask(task.id, {
+          action_type: task.actionType,
+          parameters: {
+            ...(task.metadata?.context_data || {}),
+            ...(task.metadata?.action_parameters || {}),
+            task_id: Number(task.id),
+            recommendation_id: task.metadata?.recommendation_id,
+            owner_agent: task.metadata?.source_agent,
+            kpi: task.kpi,
+            deadline: task.deadline,
+            expected_outcome: task.expectedImpact,
+            evidence: task.evidence,
+            user_approval_state: task.metadata?.user_approval_state || 'approved',
+            user_timezone: task.metadata?.user_timezone,
+          },
+        });
+        const executionData = execution?.execution || {};
+        if (executionData.requires_approval) {
+          navigate('/approvals');
+        } else if (task.actionUrl) {
+            navigate(task.actionUrl, {
+              state: {
+                workflowTaskId: task.id,
+                generatedArtifact: executionData,
+                ...(executionData.asset_id ? { restoreBlogAssetId: executionData.asset_id } : {}),
+              },
+            });
+        }
+        return;
+      }
+
+      // Navigation actions open the relevant product workflow.
       if (task.action) {
         task.action();
       } else if (task.actionUrl) {
@@ -369,6 +425,54 @@ const getTaskStatus = (task: TodayTask) => {
 
         {/* Tasks List */}
         <Box sx={{ p: { xs: 2, md: 3 } }}>
+          <Card sx={{ mb: 2, border: '1px solid rgba(35,37,47,0.08)', background: '#fbfcff' }}>
+            <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#23252F', mb: 1 }}>
+                Daily meeting transparency
+              </Typography>
+              <Typography variant="caption" sx={{ display: 'block', color: '#5A5F6A', mb: 1.5 }}>
+                Meeting time: {scheduleStatus?.meeting_timestamp || preflight?.checked_at || 'Not recorded'}
+              </Typography>
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 1.5 }}>
+                <Chip size="small" label={`Freshness: ${freshness?.status || 'unknown'}`} />
+                <Chip size="small" label={`Providers: ${providerCheck?.status || 'unknown'}`} />
+                <Chip size="small" label={`${agentSchedule.filter((agent) => agent.participates).length} agents participated`} />
+              </Stack>
+              {agentSchedule.length > 0 && (
+                <Stack spacing={0.5} sx={{ mb: 1.5 }}>
+                  {agentSchedule.map((agent) => (
+                    <Typography key={agent.agent_key} variant="caption" sx={{ color: agent.participates ? '#2e7d32' : '#6b7280' }}>
+                      {agent.agent_key}: {agent.participates ? 'participated' : `skipped, ${agent.reason}`}
+                    </Typography>
+                  ))}
+                </Stack>
+              )}
+              {agentEvidence.length > 0 && (
+                <Typography variant="caption" sx={{ display: 'block', color: '#5A5F6A' }}>
+                  Evidence sources: {agentEvidence.flatMap((item) => item.evidence || []).map((item) => String(item)).slice(0, 4).join(', ') || 'No evidence returned'}
+                </Typography>
+              )}
+              {meetingLimitations.length > 0 && (
+                <Alert severity="info" sx={{ mt: 1.5 }}>
+                  {meetingLimitations.map((limitation, index) => (
+                    <Typography key={index} variant="caption" display="block">{limitation}</Typography>
+                  ))}
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+          {heldProposals.length > 0 && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                Review held {heldProposals.length} proposal{heldProposals.length === 1 ? '' : 's'}
+              </Typography>
+              {heldProposals.map((decision, index) => (
+                <Typography key={decision.recommendation_id || index} variant="body2">
+                  {decision.title || 'Untitled proposal'}: {(decision.guardian_reasons || []).join('; ') || 'Requires review'}
+                </Typography>
+              ))}
+            </Alert>
+          )}
           <Typography variant="h6" sx={{ mb: 2, color: '#23252F', fontWeight: 800 }}>
             {pillarTitle} Tasks
           </Typography>
@@ -505,6 +609,30 @@ const getTaskStatus = (task: TodayTask) => {
                               <Typography variant="caption" sx={{ color: '#666', display: 'block', lineHeight: 1.4 }}>
                                 "{task.metadata.reasoning}"
                               </Typography>
+                            )}
+                            {(task.metadata.selection_reason?.length || task.metadata.confidence !== undefined || task.evidence) && (
+                              <Box sx={{ mt: 1 }}>
+                                <Typography variant="caption" sx={{ fontWeight: 700, color: '#444', display: 'block' }}>
+                                  Recommended today because:
+                                </Typography>
+                                {(task.metadata.selection_reason || []).map((reason: string, reasonIndex: number) => (
+                                  <Typography key={reasonIndex} variant="caption" sx={{ color: '#666', display: 'block' }}>
+                                    • {reason}
+                                  </Typography>
+                                ))}
+                                {task.evidence && (
+                                  <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>
+                                    Evidence: {Array.isArray(task.evidence) ? task.evidence.join(', ') : task.evidence}
+                                  </Typography>
+                                )}
+                                {task.metadata.confidence !== undefined && (
+                                  <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>
+                                    Confidence: {Math.round(Number(task.metadata.confidence) * 100)}%
+                                  </Typography>
+                                )}
+                                {task.kpi && <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>Expected KPI: {task.kpi}</Typography>}
+                                {task.metadata.required_action && <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>Required action: {task.metadata.required_action}</Typography>}
+                              </Box>
                             )}
                             {/* Gap scoring breakdown for ContentGapRadarAgent tasks */}
                             {task.metadata.source_agent === 'ContentGapRadarAgent' && task.metadata.context_data?.gap?.scoring && (

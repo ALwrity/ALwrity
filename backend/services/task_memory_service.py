@@ -11,12 +11,19 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
 from loguru import logger
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from models.daily_workflow_models import TaskHistory, DailyWorkflowTask
+from models.task_memory_models import TaskMemorySettings
 from services.intelligence.txtai_service import TxtaiIntelligenceService
 
-EXACT_DUPLICATE_LOOKBACK_DAYS = 7
+DEFAULT_SUPPRESSION_WINDOWS = {
+    "exact_duplicate_window_days": 7,
+    "completed_repeat_window_days": 7,
+    "rejected_repeat_window_days": 30,
+    "failed_retry_window_days": 1,
+}
 SEMANTIC_SUPPRESSION_SCORE_THRESHOLD = 0.85
 SUPPRESSED_STATUSES = {"dismissed", "rejected", "skipped"}
 
@@ -39,10 +46,16 @@ class TaskMemoryService:
     3. Retrieve relevant past tasks for context.
     """
 
-    def __init__(self, user_id: str, db: Session):
+    def __init__(self, user_id: str, db: Session, suppression_windows: Optional[Dict[str, int]] = None):
         self.user_id = user_id
         self.db = db
         self.intelligence = TxtaiIntelligenceService(user_id)
+        self.suppression_windows = {
+            **DEFAULT_SUPPRESSION_WINDOWS,
+            **{key: max(0, int(value)) for key, value in (suppression_windows or {}).items()
+               if key in DEFAULT_SUPPRESSION_WINDOWS},
+        }
+        self.last_filter_decisions: List[Dict[str, Any]] = []
         self._metrics_counters: Dict[str, int] = {}
         # M4: debounced-save state. _pending_save_count tracks upserts not
         # yet flushed; _flush_handle is the active asyncio.TimerHandle (or
@@ -152,27 +165,83 @@ class TaskMemoryService:
 
     async def record_task_outcome(self, task: DailyWorkflowTask, feedback_score: int = 0, feedback_text: str = None):
         """
-        Record a task's final status (completed, dismissed, rejected) into memory.
+        Upsert a task's latest outcome while retaining its feedback timeline.
         """
         try:
             task_hash = self._compute_hash(task.title, task.description)
+            now = datetime.utcnow()
+            status = str(task.status or "unknown").lower()
+            metadata = task.metadata_json if isinstance(task.metadata_json, dict) else {}
+            proposed_at = task.created_at or now
+            execution_result = metadata.get("execution_result", metadata.get("outcome_metrics"))
+            history = (self.db.query(TaskHistory)
+                       .filter(TaskHistory.user_id == self.user_id, TaskHistory.task_hash == task_hash)
+                       .first())
+            if history is None:
+                history = TaskHistory(
+                    user_id=self.user_id,
+                    task_hash=task_hash,
+                    created_at=proposed_at,
+                    first_proposed_at=proposed_at,
+                    vector_id=str(uuid.uuid4()),
+                    feedback_history=[],
+                    completion_count=0,
+                    rejection_count=0,
+                    failure_count=0,
+                )
+                self.db.add(history)
 
-            # 1. Update/Create DB Record
-            history = TaskHistory(
-                user_id=self.user_id,
-                task_hash=task_hash,
-                title=task.title,
-                description=task.description,
-                pillar_id=task.pillar_id,
-                status=task.status,
-                source_agent=task.metadata_json.get("source_agent") if task.metadata_json else None,
-                feedback_score=feedback_score,
-                feedback_text=feedback_text,
-                created_at=datetime.utcnow(),
-                vector_id=str(uuid.uuid4())
-            )
-            self.db.add(history)
-            self.db.commit()
+            history.title = task.title
+            history.description = task.description
+            history.pillar_id = task.pillar_id
+            history.workflow_type = getattr(task, "workflow_type", "main") or "main"
+            history.status = status
+            history.source_agent = metadata.get("source_agent")
+            has_feedback = feedback_text is not None or feedback_score != 0
+            if has_feedback:
+                history.feedback_score = feedback_score
+                history.feedback_text = feedback_text
+            history.first_proposed_at = history.first_proposed_at or proposed_at
+            history.last_proposed_at = now
+            if status == "completed":
+                history.last_completed_at = now
+                history.completion_count = (history.completion_count or 0) + 1
+            elif status in SUPPRESSED_STATUSES:
+                history.last_rejected_at = now
+                history.rejection_count = (history.rejection_count or 0) + 1
+            elif status in {"failed", "error"}:
+                history.last_failed_at = now
+                history.failure_count = (history.failure_count or 0) + 1
+
+            feedback_entry = {
+                "recorded_at": now.isoformat(),
+                "score": feedback_score,
+                "text": feedback_text,
+                "status": status,
+            }
+            feedback_history = list(history.feedback_history or [])
+            if has_feedback:
+                feedback_history.append(feedback_entry)
+                history.last_feedback = feedback_entry
+            history.feedback_history = feedback_history[-100:]
+            history.execution_result = execution_result
+            try:
+                self.db.commit()
+            except IntegrityError:
+                # A concurrent worker may have inserted the unique row. Retry
+                # as an update so repeated outcomes remain idempotent.
+                self.db.rollback()
+                history = (self.db.query(TaskHistory)
+                           .filter(TaskHistory.user_id == self.user_id, TaskHistory.task_hash == task_hash)
+                           .first())
+                if history is None:
+                    raise
+                history.status = status
+                history.last_proposed_at = now
+                history.last_feedback = feedback_entry
+                history.feedback_history = (list(history.feedback_history or []) + [feedback_entry])[-100:]
+                history.execution_result = execution_result
+                self.db.commit()
 
             # 2. Index into txtai (if status is meaningful).
             # M4: we always upsert immediately (it's in-memory and fast),
@@ -250,8 +319,138 @@ class TaskMemoryService:
                 # No upsert, no save.
                 pass
 
+            return {"status": "recorded", "task_hash": task_hash, "status_value": status}
         except Exception as e:
             logger.error(f"Failed to record task outcome for user {self.user_id}: {e}")
+            return {"status": "error", "error": str(e)}
+
+    async def record_task_proposal(self, proposal: Any) -> Dict[str, Any]:
+        """Record proposal timing without replacing a known outcome."""
+        try:
+            now = datetime.utcnow()
+            task_hash = self._compute_hash(proposal.title, proposal.description)
+            history = (self.db.query(TaskHistory)
+                       .filter(TaskHistory.user_id == self.user_id, TaskHistory.task_hash == task_hash)
+                       .first())
+            if history is None:
+                history = TaskHistory(
+                    user_id=self.user_id,
+                    task_hash=task_hash,
+                    title=proposal.title,
+                    description=proposal.description,
+                    pillar_id=proposal.pillar_id,
+                    workflow_type="main",
+                    status="proposed",
+                    source_agent=getattr(proposal, "source_agent", None),
+                    created_at=now,
+                    first_proposed_at=now,
+                    last_proposed_at=now,
+                    vector_id=str(uuid.uuid4()),
+                    feedback_history=[],
+                )
+                self.db.add(history)
+            else:
+                history.last_proposed_at = now
+            self.db.commit()
+            return {"status": "recorded", "task_hash": task_hash}
+        except IntegrityError:
+            self.db.rollback()
+            history = (self.db.query(TaskHistory)
+                       .filter(TaskHistory.user_id == self.user_id, TaskHistory.task_hash == task_hash)
+                       .first())
+            if history is None:
+                raise
+            history.last_proposed_at = datetime.utcnow()
+            self.db.commit()
+            return {"status": "recorded", "task_hash": task_hash}
+        except Exception as exc:
+            self.db.rollback()
+            logger.error("Failed to record task proposal for user {}: {}", self.user_id, exc)
+            return {"status": "error", "error": str(exc)}
+
+    def _get_suppression_windows(self) -> Dict[str, int]:
+        """Load tenant-specific windows, falling back to service defaults."""
+        windows = dict(self.suppression_windows)
+        try:
+            settings = (self.db.query(TaskMemorySettings)
+                        .filter(TaskMemorySettings.user_id == self.user_id)
+                        .first())
+            if settings:
+                for key in DEFAULT_SUPPRESSION_WINDOWS:
+                    value = getattr(settings, key, None)
+                    if value is not None:
+                        windows[key] = max(0, int(value))
+        except Exception as exc:
+            logger.warning("Task memory settings unavailable for user_id={} error={}", self.user_id, exc)
+        return windows
+
+    def configure_suppression_windows(self, **windows: int) -> Dict[str, int]:
+        """Persist validated repetition windows for this tenant."""
+        values = {
+            key: max(0, int(value))
+            for key, value in windows.items()
+            if key in DEFAULT_SUPPRESSION_WINDOWS
+        }
+        if not values:
+            return self._get_suppression_windows()
+        settings = (self.db.query(TaskMemorySettings)
+                    .filter(TaskMemorySettings.user_id == self.user_id)
+                    .first())
+        if settings is None:
+            settings = TaskMemorySettings(user_id=self.user_id)
+            self.db.add(settings)
+        for key, value in values.items():
+            setattr(settings, key, value)
+            self.suppression_windows[key] = value
+        self.db.commit()
+        return self._get_suppression_windows()
+
+    def _proposal_explicit_retry(self, proposal: Any) -> bool:
+        context = getattr(proposal, "context_data", None) or {}
+        params = getattr(proposal, "action_parameters", None) or {}
+        return bool(context.get("explicit_request") or context.get("retry_requested") or
+                    params.get("explicit_request") or params.get("retry_requested"))
+
+    def get_proposal_suppression_reason(self, proposal: Any) -> Optional[str]:
+        """Return the current outcome-based suppression reason without mutating state."""
+        task_hash = self._compute_hash(proposal.title, proposal.description)
+        history = (self.db.query(TaskHistory)
+                   .filter(TaskHistory.user_id == self.user_id, TaskHistory.task_hash == task_hash)
+                   .first())
+        if history is None:
+            return None
+        return self._history_suppression(
+            history,
+            datetime.utcnow(),
+            self._get_suppression_windows(),
+            self._proposal_explicit_retry(proposal),
+        )
+
+    def _history_suppression(self, history: TaskHistory, now: datetime, windows: Dict[str, int], explicit_retry: bool) -> Optional[str]:
+        status = str(history.status or "").lower()
+        if status in {"failed", "error"}:
+            if explicit_retry:
+                return None
+            if history.last_failed_at and now - history.last_failed_at <= timedelta(days=windows["failed_retry_window_days"]):
+                return "failed execution is inside the retry window; change parameters or explicitly request retry"
+            return None
+        if status in SUPPRESSED_STATUSES:
+            repeated = (history.rejection_count or 0) >= 2
+            recent = history.last_rejected_at and now - history.last_rejected_at <= timedelta(days=windows["rejected_repeat_window_days"])
+            if repeated or recent:
+                return "task was rejected recently or repeatedly"
+        if status == "completed" and history.last_completed_at:
+            if now - history.last_completed_at <= timedelta(days=windows["completed_repeat_window_days"]):
+                poor = (history.feedback_score or 0) < 0 or any(
+                    str((history.execution_result or {}).get(key, "")).lower() in {"poor", "failed", "failure"}
+                    for key in ("status", "outcome")
+                )
+                return ("recent completion had poor outcome; changed parameters are required for an improved variant"
+                        if poor else "task completed successfully within the repeat window")
+        proposed = history.last_proposed_at or history.created_at
+        if proposed and now - proposed <= timedelta(days=windows["exact_duplicate_window_days"]):
+            return "exact task was proposed recently"
+        return None
 
     async def filter_redundant_proposals(self, proposals: List[Any]) -> List[Any]:
         """
@@ -261,21 +460,31 @@ class TaskMemoryService:
         """
         filtered = []
         
-        # Get recent history hashes (last 7 days)
-        cutoff = datetime.utcnow() - timedelta(days=EXACT_DUPLICATE_LOOKBACK_DAYS)
-        recent_hashes = {
-            row.task_hash for row in 
-            self.db.query(TaskHistory.task_hash)
-            .filter(TaskHistory.user_id == self.user_id, TaskHistory.created_at >= cutoff)
-            .all()
+        now = datetime.utcnow()
+        windows = self._get_suppression_windows()
+        self.last_filter_decisions = []
+        histories = {
+            row.task_hash: row for row in self.db.query(TaskHistory).filter(TaskHistory.user_id == self.user_id).all()
         }
         
         for p in proposals:
             p_hash = self._compute_hash(p.title, p.description)
             
-            # 1. Exact Match Check
-            if p_hash in recent_hashes:
-                logger.info(f"Filtering redundant task (exact match): {p.title}")
+            # 1. Exact match check uses outcome-aware windows.
+            if p_hash in histories:
+                reason = self._history_suppression(
+                    histories[p_hash], now, windows, self._proposal_explicit_retry(p)
+                )
+                self.last_filter_decisions.append({
+                    "pillar_id": getattr(p, "pillar_id", None),
+                    "title": p.title,
+                    "suppressed": bool(reason),
+                    "reason": reason,
+                })
+            else:
+                reason = None
+            if reason:
+                logger.info("Filtering redundant task title={} reason={}", p.title, reason)
                 continue
                 
             # 2. Semantic Similarity Check (only for potential rejections)
@@ -293,29 +502,28 @@ class TaskMemoryService:
                     top_score = float(top.get("score", 0))
                     if top_score >= SEMANTIC_SUPPRESSION_SCORE_THRESHOLD:
                         indexed_status = self._extract_indexed_status(top)
-                        if indexed_status in SUPPRESSED_STATUSES:
+                        vector_id = top.get("id") or top.get("vector_id")
+                        history_row = None
+                        if vector_id:
+                            history_row = (
+                                self.db.query(TaskHistory)
+                                .filter(
+                                    TaskHistory.user_id == self.user_id,
+                                    TaskHistory.vector_id == str(vector_id),
+                                )
+                                .first()
+                            )
+                        if history_row and self._history_suppression(history_row, now, windows, False):
                             logger.info(
                                 f"Filtering redundant task (semantic {top_score:.2f}, indexed status={indexed_status}): {p.title}"
                             )
                             is_semantic_duplicate = True
-                        else:
-                            vector_id = top.get("id") or top.get("vector_id")
-                            if vector_id:
-                                history = (
-                                    self.db.query(TaskHistory.status)
-                                    .filter(
-                                        TaskHistory.user_id == self.user_id,
-                                        TaskHistory.vector_id == str(vector_id),
-                                    )
-                                    .order_by(TaskHistory.created_at.desc())
-                                    .first()
-                                )
-                                history_status = getattr(history, "status", None)
-                                if history_status in SUPPRESSED_STATUSES:
-                                    logger.info(
-                                        f"Filtering redundant task (semantic {top_score:.2f}, history status={history_status}): {p.title}"
-                                    )
-                                    is_semantic_duplicate = True
+                            self.last_filter_decisions.append({
+                                "pillar_id": getattr(p, "pillar_id", None),
+                                "title": p.title,
+                                "suppressed": True,
+                                "reason": "semantically matches a rejected task",
+                            })
             except Exception as semantic_err:
                 self._increment_metric("semantic_filter_failures")
                 self._increment_metric("semantic_filter_degraded_path_taken")

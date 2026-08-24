@@ -65,11 +65,22 @@ class TaskHistory(Base):
     description = Column(Text, nullable=False)
     pillar_id = Column(String(30), nullable=False)
     workflow_type = Column(String(20), nullable=False, default="main", index=True)
-    status = Column(String(30), nullable=False)  # completed, dismissed, rejected
+    status = Column(String(30), nullable=False)  # proposed, completed, dismissed, rejected, failed
     source_agent = Column(String(50), nullable=True)
     feedback_score = Column(Integer, nullable=True)  # -1 (bad), 0 (neutral), 1 (good)
     feedback_text = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    first_proposed_at = Column(DateTime, nullable=True, index=True)
+    last_proposed_at = Column(DateTime, nullable=True, index=True)
+    last_completed_at = Column(DateTime, nullable=True, index=True)
+    last_rejected_at = Column(DateTime, nullable=True, index=True)
+    last_failed_at = Column(DateTime, nullable=True, index=True)
+    last_feedback = Column(JSON, nullable=True)
+    feedback_history = Column(JSON, nullable=True)
+    execution_result = Column(JSON, nullable=True)
+    completion_count = Column(Integer, nullable=False, default=0)
+    rejection_count = Column(Integer, nullable=False, default=0)
+    failure_count = Column(Integer, nullable=False, default=0)
     
     # Metadata for vector index linking
     vector_id = Column(String(36), nullable=True) 

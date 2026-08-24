@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 # Import database service
 from services.content_planning_db import ContentPlanningDBService
+from services.calendar_task_contract import calendar_contract_metadata, normalize_scheduled_date, validate_calendar_insertion
 
 # Import utilities
 from ..utils.error_handlers import ContentPlanningErrorHandler
@@ -26,11 +27,35 @@ class CalendarService:
         """Create a new calendar event."""
         try:
             logger.info(f"Creating calendar event: {event_data.get('title', 'Unknown')}")
+            event_data = normalize_scheduled_date(event_data)
+            errors = validate_calendar_insertion(
+                event_data,
+                db,
+                require_contract=bool(event_data.get("recommendation_id") or event_data.get("task_id")),
+            )
+            if errors:
+                raise ValueError("; ".join(errors))
             
             db_service = ContentPlanningDBService(db)
+            event_data = {**event_data, **calendar_contract_metadata(event_data)}
             created_event = await db_service.create_calendar_event(event_data)
             
             if created_event:
+                if created_event.task_id:
+                    try:
+                        from models.daily_workflow_models import DailyWorkflowTask
+                        task = (db.query(DailyWorkflowTask)
+                                .filter(DailyWorkflowTask.id == created_event.task_id,
+                                        DailyWorkflowTask.user_id == created_event.user_id)
+                                .first())
+                        if task:
+                            metadata = dict(task.metadata_json) if isinstance(task.metadata_json, dict) else {}
+                            metadata.update({"source": "calendar_event", "source_event_id": created_event.id, "calendar_status": created_event.status})
+                            task.metadata_json = dict(metadata)
+                            db.add(task)
+                            db.commit()
+                    except Exception as link_err:
+                        logger.warning(f"Calendar/workflow linkage update failed for event {created_event.id}: {link_err}")
                 logger.info(f"Calendar event created successfully: {created_event.id}")
                 return created_event.to_dict()
             else:
@@ -194,6 +219,15 @@ class CalendarService:
         """Schedule a calendar event with conflict checking."""
         try:
             logger.info(f"Scheduling calendar event: {event_data.get('title', 'Unknown')}")
+            event_data = normalize_scheduled_date(event_data)
+            errors = validate_calendar_insertion(event_data, db, require_contract=True)
+            if errors:
+                return {
+                    "status": "validation_error",
+                    "message": "Calendar task contract validation failed",
+                    "errors": errors,
+                    "event_data": event_data,
+                }
             
             # Check for scheduling conflicts
             conflicts = await self._check_scheduling_conflicts(event_data, db)
