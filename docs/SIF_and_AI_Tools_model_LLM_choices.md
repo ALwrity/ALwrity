@@ -27,6 +27,7 @@ Use remote premium API path by default.
   - `hf`
   - `hf_response_api`
   - `wavespeed` (alias mapping for premium remote route)
+- **OrcaRouter**: `GPT_PROVIDER=orcarouter` routes text generation through the [OrcaRouter](https://www.orcarouter.ai) OpenAI-compatible gateway (`https://api.orcarouter.ai/v1`, default model `orcarouter/auto`). It is a first-class named provider implemented in [orcarouter_provider.py](../backend/services/llm_providers/orcarouter_provider.py) and is treated as an OpenAI-compatible route.
 
 Fallback policy for premium tools:
 
