@@ -56,6 +56,53 @@
     "extends": [
       "react-app",
       "react-app/jest"
+    ],
+    "overrides": [
+      {
+        "files": [
+          "src/components/YouTubeCreator/**/*.{js,jsx,ts,tsx}"
+        ],
+        "excludedFiles": [
+          "src/components/YouTubeCreator/dashboard/youtubeStudioZIndex.ts",
+          "src/components/YouTubeCreator/dashboard/youtubeStudioOverlayInventory.ts",
+          "src/components/YouTubeCreator/dashboard/youtubeStudioZIndexGuardrail.ts",
+          "**/*.test.ts",
+          "**/*.test.tsx"
+        ],
+        "rules": {
+          "no-restricted-syntax": [
+            "error",
+            {
+              "selector": "Property[key.name='zIndex'][value.value=1250]",
+              "message": "YouTube Creator: use YT_Z_CREATOR_SURFACE from youtubeStudioZIndex.ts."
+            },
+            {
+              "selector": "Property[key.name='zIndex'][value.value=1300]",
+              "message": "YouTube Creator: do not hardcode MUI modal z-index; keep nested Dialog/Select on MUI defaults."
+            },
+            {
+              "selector": "Property[key.name='zIndex'][value.value=1400]",
+              "message": "YouTube Creator: do not raise Dialog z-index to beat a host shell."
+            },
+            {
+              "selector": "Property[key.name='zIndex'][value.value=1500]",
+              "message": "YouTube Creator: do not hardcode MUI tooltip/menu z-index."
+            },
+            {
+              "selector": "Property[key.name='zIndex'][value.value=12000]",
+              "message": "YouTube Creator: use YT_Z_KNOWLEDGE_CENTER from youtubeStudioZIndex.ts."
+            },
+            {
+              "selector": "Property[key.name='zIndex'][value.value=13000]",
+              "message": "YouTube Creator: use YT_Z_MODAL from youtubeStudioZIndex.ts."
+            },
+            {
+              "selector": "Property[key.name='zIndex'][value.value=13001]",
+              "message": "YouTube Creator: YT_Z_MODAL + 1 patches are forbidden (YT_Z_MODAL_POPOVER is retired)."
+            }
+          ]
+        }
+      }
     ]
   },
   "browserslist": {

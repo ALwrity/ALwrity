@@ -15,7 +15,6 @@ import {
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import { YouTubeStudioTabButton } from "./YouTubeStudioTabButton";
 import { YT_BORDER, YT_RED, YT_TEXT } from "../constants";
-import { YT_Z_MODAL } from "../dashboard/youtubeStudioZIndex";
 
 interface StartNewVideoButtonProps {
   onConfirm: () => void;
@@ -92,7 +91,6 @@ export const StartNewVideoButton: React.FC<StartNewVideoButtonProps> = ({
         onClose={() => setOpen(false)}
         maxWidth="xs"
         fullWidth
-        sx={{ zIndex: YT_Z_MODAL }}
         slotProps={{
           backdrop: {
             sx: {

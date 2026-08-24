@@ -144,7 +144,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
     }
   }, [creatorState]);
 
-  /** Closes active wedge; openYouTubeCreator opens Full Creator modal via Hub host. */
+  /** Closes active wedge; openYouTubeCreator opens Full Creator surface via Hub host. */
   const goCreate = (detail?: Parameters<typeof openYouTubeCreator>[0]) => {
     onClose();
     openYouTubeCreator(detail);

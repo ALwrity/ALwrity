@@ -127,7 +127,7 @@ export function openYouTubeCreator(detail: YouTubeOpenCreatorDetail = {}): void 
       detail,
     }),
   );
-  // Hub Full Creator modal host listens — do not switch tabs.
+  // Hub Full Creator surface host listens — do not switch tabs.
   console.info("[youtubeStudioEvents] openYouTubeCreator", detail);
 }
 
