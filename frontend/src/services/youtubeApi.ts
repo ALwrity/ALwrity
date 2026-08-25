@@ -1,7 +1,7 @@
 // YouTube Creator Studio API Client
 
 import { apiClient, aiApiClient, longRunningApiClient } from '../api/client';
-import { expandPitchToScript, generatePitch } from './youtubePitchApi';
+import { expandPitchToScript, generatePitch, previewPitchPrompt } from './youtubePitchApi';
 
 const API_BASE = '/api/youtube';
 
@@ -328,6 +328,7 @@ export interface SceneAudioResponse {
 export const youtubeApi = {
   generatePitch,
   expandPitchToScript,
+  previewPitchPrompt,
 
   /**
    * Generate a video plan from user input.

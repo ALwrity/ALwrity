@@ -290,3 +290,81 @@ class TestExpandVideoPitch:
 
         assert result.success is False
         assert result.message == "Failed to expand pitch. Please try again."
+
+
+class TestPreviewVideoPitch:
+    def test_returns_same_builder_prompts_without_exa(self):
+        from api.youtube.router import PitchRequest, preview_video_pitch
+        from services.youtube.planner_pitch_prompts import (
+            PITCH_RESEARCH_PLACEHOLDER,
+            PITCH_SYSTEM_PROMPT,
+        )
+
+        request = PitchRequest(
+            user_idea="Budget travel",
+            duration_type="shorts",
+            creative_angle="Contrarian",
+            language="hi",
+            enable_research=True,
+        )
+        research = AsyncMock(return_value=("", []))
+
+        with patch(
+            "api.youtube.handlers.plan_pitch._load_plan_personalization",
+            return_value=_personalization(),
+        ), patch(
+            "api.youtube.handlers.plan_pitch.YouTubePersonaService.build_prompt_context",
+            return_value="",
+        ), patch(
+            "services.youtube.planner_research.perform_exa_research",
+            research,
+        ), patch(
+            "api.youtube.handlers.plan_pitch.generate_youtube_pitch",
+            new_callable=AsyncMock,
+        ) as generate:
+            result = asyncio.run(preview_video_pitch(request=request, current_user=_user()))
+
+        assert result.success is True
+        assert result.system_prompt == PITCH_SYSTEM_PROMPT
+        assert "Create ONE short video pitch" in (result.user_prompt or "")
+        assert "Contrarian" in (result.user_prompt or "")
+        assert "**Content language:** Hindi" in (result.user_prompt or "")
+        assert PITCH_RESEARCH_PLACEHOLDER in (result.user_prompt or "")
+        assert "Create a YouTube video plan" not in (result.user_prompt or "")
+        research.assert_not_called()
+        generate.assert_not_called()
+
+    def test_empty_idea_raises_http_400(self):
+        from api.youtube.router import PitchRequest, preview_video_pitch
+
+        request = PitchRequest(
+            user_idea="   ",
+            duration_type="shorts",
+            creative_angle="Contrarian",
+        )
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(preview_video_pitch(request=request, current_user=_user()))
+        assert exc.value.status_code == 400
+        assert "idea" in str(exc.value.detail).lower()
+
+    def test_invalid_builder_payload_raises_http_500(self):
+        from api.youtube.router import PitchRequest, preview_video_pitch
+
+        request = PitchRequest(
+            user_idea="Budget travel",
+            duration_type="shorts",
+            creative_angle="Contrarian",
+        )
+        with patch(
+            "api.youtube.handlers.plan_pitch._load_plan_personalization",
+            return_value=_personalization(),
+        ), patch(
+            "api.youtube.handlers.plan_pitch.YouTubePersonaService.build_prompt_context",
+            return_value="",
+        ), patch(
+            "api.youtube.handlers.plan_pitch.build_pitch_preview_prompts",
+            return_value={},
+        ):
+            with pytest.raises(HTTPException) as exc:
+                asyncio.run(preview_video_pitch(request=request, current_user=_user()))
+        assert exc.value.status_code == 500

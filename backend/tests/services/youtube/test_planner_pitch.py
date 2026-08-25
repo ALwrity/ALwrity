@@ -122,6 +122,69 @@ class TestPitchJsonStruct:
         assert "Content language from the user message" in PITCH_SYSTEM_PROMPT
 
 
+class TestPitchPreviewBuilder:
+    def test_preview_uses_pitch_system_prompt_and_creative_angle(self):
+        from services.youtube.planner_pitch_prompts import (
+            PITCH_RESEARCH_PLACEHOLDER,
+            PITCH_SYSTEM_PROMPT,
+            build_pitch_preview_prompts,
+        )
+
+        preview = build_pitch_preview_prompts(
+            user_idea="Budget travel",
+            creative_angle="Contrarian",
+            duration_type="medium",
+            language="hi",
+            enable_research=True,
+        )
+        assert preview["system_prompt"] == PITCH_SYSTEM_PROMPT
+        assert "Create ONE short video pitch" in preview["user_prompt"]
+        assert "Create a YouTube video plan" not in preview["user_prompt"]
+        assert "**Creative angle (primary lens):** Contrarian" in preview["user_prompt"]
+        assert "**Content language:** Hindi" in preview["user_prompt"]
+        assert PITCH_RESEARCH_PLACEHOLDER in preview["user_prompt"]
+
+    def test_preview_omits_placeholder_when_research_off(self):
+        from services.youtube.planner_pitch_prompts import (
+            PITCH_RESEARCH_PLACEHOLDER,
+            build_pitch_preview_prompts,
+        )
+
+        preview = build_pitch_preview_prompts(
+            user_idea="Budget travel",
+            creative_angle="Contrarian",
+            duration_type="shorts",
+            enable_research=False,
+        )
+        assert PITCH_RESEARCH_PLACEHOLDER not in preview["user_prompt"]
+
+    def test_preview_and_generate_share_non_research_prefix(self):
+        from services.youtube.planner_pitch_prompts import (
+            build_pitch_preview_prompts,
+            build_pitch_user_prompt,
+            pitch_user_prompt_non_research_prefix,
+        )
+
+        kwargs = {
+            "user_idea": "Budget travel",
+            "creative_angle": "Contrarian",
+            "duration_type": "shorts",
+            "video_type": "tutorial",
+            "target_audience": "First timers",
+            "language": "hi",
+        }
+        preview = build_pitch_preview_prompts(**kwargs, enable_research=True)
+        generated = build_pitch_user_prompt(
+            **kwargs,
+            research_context="LIVE FACTS FROM EXA — ignore URLs in tests",
+        )
+        assert pitch_user_prompt_non_research_prefix(preview["user_prompt"]) == (
+            pitch_user_prompt_non_research_prefix(generated)
+        )
+        assert "LIVE FACTS FROM EXA" in generated
+        assert "LIVE FACTS FROM EXA" not in preview["user_prompt"]
+
+
 class TestValidatePitch:
     def test_accepts_valid_pitch_and_strips_echoed_keys(self):
         from services.youtube.planner_pitch_validate import validate_pitch
