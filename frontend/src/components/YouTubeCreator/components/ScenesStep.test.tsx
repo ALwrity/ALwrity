@@ -109,4 +109,29 @@ describe("ScenesStep", () => {
     expect(screen.getByText("Target Audience")).toBeInTheDocument();
     expect(screen.queryByLabelText("Full video script")).not.toBeInTheDocument();
   });
+
+  it("does not wrap Scenes in a Hub modal shell or trap asset dialogs", () => {
+    const { container } = render(
+      <ScenesStep
+        videoPlan={videoPlan}
+        scenes={[]}
+        editingSceneId={null}
+        editedScene={null}
+        loading={false}
+        onBuildScenes={noop}
+        onEditScene={noop}
+        onSaveScene={noop}
+        onCancelEdit={noop}
+        onEditChange={noop}
+        onToggleScene={noop}
+        onBack={noop}
+        onNext={noop}
+        scriptPhase="idle"
+      />,
+    );
+
+    expect(container.querySelector(".yt-modal-backdrop")).toBeNull();
+    expect(container.querySelector(".yt-creator-surface")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 });

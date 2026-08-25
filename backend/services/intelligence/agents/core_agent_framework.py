@@ -6,6 +6,7 @@ Built on txtai's native Agent framework (smolagents)
 import asyncio
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Callable
 from dataclasses import dataclass, asdict
@@ -27,6 +28,10 @@ except ImportError:
 
 _core_llm_cache = {}
 
+# Thread pool for running async orchestrator tools from sync txtai Agent calls.
+# Each worker thread gets its own event loop via asyncio.new_event_loop().
+_orchestrator_tool_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="orch_tool")
+
 # Optional MLflow integration
 try:
     import mlflow # type: ignore # pylint: disable=import-error
@@ -41,6 +46,16 @@ from services.intelligence.agents.safety_framework import get_safety_framework
 from services.agent_activity_service import AgentActivityService, build_agent_event_payload
 from services.intelligence.agents.agent_usage_tracking import track_agent_usage_sync
 from services.llm_providers.main_text_generation import llm_text_gen
+from services.intelligence.agents.team_catalog import AGENT_TEAM_CATALOG, get_agent_catalog_entry
+from services.intelligence.agents.prompt_context import build_prompt_context, comma_join_context
+from services.intelligence.agents.output_contracts import (
+    ACTION_TYPES,
+    normalize_contract_text,
+    resolve_recommendation_action,
+    task_output_schema,
+    get_role_contract,
+)
+from services.intelligence.agents.quality_gates import validate_action_content
 import time
 
 logger = get_service_logger(__name__)
@@ -134,6 +149,25 @@ class TaskProposal:
     context_data: Optional[Dict[str, Any]] = None
     action_type: str = "navigate"
     action_url: Optional[str] = None
+    evidence: Optional[str] = None
+    expected_impact: Optional[str] = None
+    effort: Optional[str] = None
+    risk_level: str = "low"
+    measurement: Optional[str] = None
+    recommendation: Optional[str] = None
+    next_action: Optional[str] = None
+    owner_agent: Optional[str] = None
+    kpi: Optional[str] = None
+    deadline: Optional[str] = None
+    action_parameters: Optional[Dict[str, Any]] = None
+    # How this proposal's text was produced:
+    #   "llm"              -- personalized LLM generation grounded in context.
+    #   "data_derived"     -- deterministic rules over real measured data.
+    #   "template_fallback" -- static canned text substituted after LLM
+    #                          synthesis failed or returned nothing.
+    # Static constructions default to the fallback mode; every non-fallback
+    # producer must set its own value explicitly.
+    synthesis_mode: str = "template_fallback"
 
 @dataclass
 class MarketSignal:
@@ -173,8 +207,11 @@ class AgentPerformance:
 class BaseALwrityAgent(ABC):
     """Base class for all ALwrity marketing agents"""
 
-    _prompt_context_cache: Dict[str, Dict[str, Any]] = {}
-    _profile_cache: Dict[str, Dict[str, Any]] = {}
+    # TTL-bounded caches: long-lived orchestrator instances must pick up
+    # fresh onboarding data and saved profile edits without a process restart.
+    _CONTEXT_CACHE_TTL_SECONDS = 600
+    _prompt_context_cache: Dict[str, Any] = {}  # user_id -> (expires_at, context)
+    _profile_cache: Dict[str, Any] = {}  # user_id:agent_key -> (expires_at, profile_data)
     
     def __init__(self, user_id: str, agent_type: str, model_name: str = "Qwen/Qwen2.5-1.5B-Instruct", llm: Any = None, enable_tracing: bool = True, **kwargs):
         self.user_id = user_id
@@ -287,11 +324,16 @@ class BaseALwrityAgent(ABC):
         """
         Helper to generate text using the agent's LLM with usage tracking.
         Centralized method for all agents inheriting from BaseALwrityAgent.
+        Injects the effective system prompt so direct LLM calls use onboarding context.
         """
         if not self.llm:
             logger.error("LLM unavailable for agent %s (%s)", self.agent_type, self.agent_id)
             raise RuntimeError(f"LLM unavailable for agent {self.agent_type}")
-            
+
+        system_prompt = self.get_effective_system_prompt()
+        if system_prompt and system_prompt.strip() and not prompt.startswith(system_prompt.strip()):
+            prompt = f"{system_prompt.strip()}\n\n{prompt}"
+
         try:
             # Run in executor to avoid blocking if LLM is synchronous
             loop = asyncio.get_event_loop()
@@ -361,14 +403,19 @@ class BaseALwrityAgent(ABC):
         cache_key = f"{self.user_id}:{self.agent_key}"
         cached = BaseALwrityAgent._profile_cache.get(cache_key)
         if cached is not None:
-            return cached
+            expires_at, data = cached
+            if time.time() < expires_at:
+                return data
 
         profile_data: Dict[str, Any] = {}
         db = None
         try:
             db = get_session_for_user(self.user_id)
             if not db:
-                BaseALwrityAgent._profile_cache[cache_key] = profile_data
+                BaseALwrityAgent._profile_cache[cache_key] = (
+                    time.time() + BaseALwrityAgent._CONTEXT_CACHE_TTL_SECONDS,
+                    profile_data,
+                )
                 return profile_data
             from models.agent_activity_models import AgentProfile
 
@@ -403,67 +450,57 @@ class BaseALwrityAgent(ABC):
             except Exception:
                 pass
 
-        BaseALwrityAgent._profile_cache[cache_key] = profile_data
+        BaseALwrityAgent._profile_cache[cache_key] = (
+            time.time() + BaseALwrityAgent._CONTEXT_CACHE_TTL_SECONDS,
+            profile_data,
+        )
         return profile_data
 
     def _load_prompt_context(self) -> Dict[str, Any]:
         cached = BaseALwrityAgent._prompt_context_cache.get(self.user_id)
         if cached is not None:
-            return cached
+            expires_at, data = cached
+            if time.time() < expires_at:
+                return data
 
         context: Dict[str, Any] = {"website_name": "Your", "website_url": "", "user_id": self.user_id}
         db = None
         try:
             db = get_session_for_user(self.user_id)
             if not db:
-                BaseALwrityAgent._prompt_context_cache[self.user_id] = context
+                BaseALwrityAgent._prompt_context_cache[self.user_id] = (
+                    time.time() + BaseALwrityAgent._CONTEXT_CACHE_TTL_SECONDS,
+                    context,
+                )
                 return context
 
             from api.content_planning.services.content_strategy.onboarding.data_integration import (
                 OnboardingDataIntegrationService,
             )
 
-            svc = OnboardingDataIntegrationService()
-            integrated = svc.get_integrated_data_sync(self.user_id, db) or {}
-            website_analysis = integrated.get("website_analysis") or {}
-            # E.3 (deferred): STRUCTURED consumer — read canonical_profile.brand_voice ONLY
-            # (unified persona-or-website, §2.2); legacy writing_tone/voice is the shim, removed at E.4.
-            canonical = integrated.get("canonical_profile") or {}
+            integrated = OnboardingDataIntegrationService().get_integrated_data_sync(
+                self.user_id, db
+            ) or {}
+            context = comma_join_context(build_prompt_context(integrated))
+            context["user_id"] = self.user_id
 
-            website_url = (
-                website_analysis.get("website_url")
-                or website_analysis.get("website")
-                or canonical.get("website_url")
-                or canonical.get("website")
-                or ""
+            # Preserve the previous runtime prompt size limits.
+            for key, max_len in (
+                ("brand_voice", 1200),
+                ("target_audience", 1200),
+                ("core_belief", 400),
+                ("style_guidelines", 1200),
+                ("seo_summary", 1200),
+            ):
+                value = str(context.get(key) or "").strip()
+                if len(value) > max_len:
+                    context[key] = value[: max_len - 20] + " …(truncated)"
+        except Exception as context_error:
+            logger.warning(
+                "Failed to build shared prompt context for user %s: %s",
+                self.user_id,
+                context_error,
             )
-            domain = website_analysis.get("domain") or canonical.get("domain") or ""
-            website_name = ""
-            if domain:
-                website_name = str(domain).split(".")[0].strip()
-            if not website_name and website_url:
-                try:
-                    from urllib.parse import urlparse
-                    host = urlparse(str(website_url)).hostname or ""
-                    host = host.replace("www.", "")
-                    website_name = host.split(".")[0].strip() or host
-                except Exception:
-                    website_name = ""
-
-            context = {
-                "user_id": self.user_id,
-                "website_url": str(website_url or ""),
-                "website_name": str(website_name or "Your"),
-            }
-
-            writing_style = canonical.get("writing_style") or {}
-            if isinstance(writing_style, dict):
-                if writing_style.get("tone"):
-                    context["writing_tone"] = writing_style.get("tone")
-                if writing_style.get("voice"):
-                    context["writing_voice"] = writing_style.get("voice")
-        except Exception:
-            pass
         finally:
             try:
                 if db:
@@ -471,35 +508,191 @@ class BaseALwrityAgent(ABC):
             except Exception:
                 pass
 
-        BaseALwrityAgent._prompt_context_cache[self.user_id] = context
+        BaseALwrityAgent._prompt_context_cache[self.user_id] = (
+            time.time() + BaseALwrityAgent._CONTEXT_CACHE_TTL_SECONDS,
+            context,
+        )
         return context
 
     def _render_prompt_template(self, text: str) -> str:
         value = str(text or "")
-        ctx = self._prompt_context or {}
+        # Read through the TTL-bounded loader so long-lived agent instances
+        # pick up refreshed onboarding data instead of a stale __init__ snapshot.
+        ctx = self._load_prompt_context() or {}
         for k, v in ctx.items():
             placeholder = "{" + str(k) + "}"
             if placeholder in value:
                 value = value.replace(placeholder, str(v))
         return value
 
-    def get_effective_system_prompt(self, default_prompt: str) -> str:
-        override = (self._agent_profile or {}).get("system_prompt")
+    def _get_catalog_defaults(self) -> Dict[str, Any]:
+        """Load catalog defaults for this agent's agent_key."""
+        entry = get_agent_catalog_entry(self.agent_key) or {}
+        return entry.get("defaults") or {}
+
+    def get_effective_system_prompt(self, default_prompt: str = "") -> str:
+        profile = self._load_agent_profile_overrides() or {}
+        override = profile.get("system_prompt")
+        catalog_default = self._get_catalog_defaults().get("system_prompt_template")
         selected = override if (override is not None and str(override).strip()) else default_prompt
+        if not selected:
+            selected = catalog_default
         return self._render_prompt_template(selected)
 
     def get_effective_task_prompt_template(self, default_template: str = "") -> str:
-        override = (self._agent_profile or {}).get("task_prompt_template")
+        profile = self._load_agent_profile_overrides() or {}
+        override = profile.get("task_prompt_template")
+        catalog_default = self._get_catalog_defaults().get("task_prompt_template")
         selected = override if (override is not None and str(override).strip()) else default_template
+        if not selected:
+            selected = catalog_default
         return self._render_prompt_template(selected)
 
     def build_task_prompt(self, instruction: str, task_context: Optional[Dict[str, Any]] = None, default_template: str = "") -> str:
+        system_prompt = self.get_effective_system_prompt()
         template = self.get_effective_task_prompt_template(default_template or "")
         context_json = json.dumps(task_context or {}, ensure_ascii=False)
+        body = ""
         if template and template.strip():
-            return f"{template}\n\nInstruction: {instruction}\nContext: {context_json}"
-        return f"Task: {instruction}\nContext: {context_json}\n\nPlease execute this task using your specialized tools and provide a detailed report."
-    
+            body = f"{template}\n\nInstruction: {instruction}\nContext: {context_json}"
+        else:
+            body = f"Task: {instruction}\nContext: {context_json}\n\nPlease execute this task using your specialized tools and provide a detailed report."
+        if system_prompt and system_prompt.strip():
+            return f"{system_prompt.strip()}\n\n{body}"
+        return body
+
+    def _parse_task_proposals(self, result: Any, max_tasks: int = 5) -> List[TaskProposal]:
+        """Parse LLM output into validated TaskProposal objects.
+
+        Tolerant of str/dict/list shapes. Invalid or malformed tasks are
+        skipped; an empty result signals the caller to fall back.
+        """
+        data = result
+        if isinstance(result, str):
+            try:
+                data = json.loads(result)
+            except Exception:
+                return []
+        if not isinstance(data, dict):
+            return []
+
+        tasks = data.get("tasks")
+        if not isinstance(tasks, list):
+            return []
+
+        valid_pillars = {"plan", "generate", "publish", "analyze", "engage", "remarket"}
+        valid_priorities = {"high", "medium", "low"}
+
+        proposals: List[TaskProposal] = []
+        for t in tasks[:max_tasks]:
+            if not isinstance(t, dict):
+                continue
+            title = str(t.get("title") or "").strip()
+            if not title:
+                continue
+            pillar = str(t.get("pillar_id") or "plan").strip().lower()
+            if pillar not in valid_pillars:
+                pillar = "plan"
+            priority = str(t.get("priority") or "medium").strip().lower()
+            if priority not in valid_priorities:
+                priority = "medium"
+            try:
+                estimated_time = int(t.get("estimated_time") or 20)
+            except (TypeError, ValueError):
+                estimated_time = 20
+            risk_level = str(t.get("risk_level") or "low").strip().lower()
+            if risk_level not in {"low", "medium", "high"}:
+                risk_level = "low"
+            action_type = str(t.get("action_type") or "navigate").strip().lower()
+            if action_type not in ACTION_TYPES:
+                action_type = "navigate"
+            proposals.append(
+                TaskProposal(
+                    title=title,
+                    description=str(t.get("description") or ""),
+                    pillar_id=pillar,
+                    priority=priority,
+                    estimated_time=max(1, estimated_time),
+                    source_agent=self.__class__.__name__,
+                    reasoning=str(t.get("reasoning") or ""),
+                    action_type=action_type,
+                    action_url=str(t.get("action_url") or ""),
+                    evidence=normalize_contract_text(t.get("evidence")),
+                    expected_impact=normalize_contract_text(t.get("expected_impact")),
+                    effort=normalize_contract_text(t.get("effort")),
+                    risk_level=risk_level,
+                    measurement=normalize_contract_text(t.get("measurement")),
+                    recommendation=normalize_contract_text(t.get("recommendation")),
+                    next_action=normalize_contract_text(t.get("next_action")),
+                    owner_agent=normalize_contract_text(t.get("owner_agent")),
+                    kpi=normalize_contract_text(t.get("kpi")),
+                    deadline=normalize_contract_text(t.get("deadline"), 100),
+                    action_parameters=t.get("action_parameters") if isinstance(t.get("action_parameters"), dict) else None,
+                    synthesis_mode="llm",
+                )
+            )
+        return proposals
+
+    async def _synthesize_task_proposals(
+        self,
+        context: Dict[str, Any],
+        default_proposals: List[TaskProposal],
+        instructions: str,
+        max_tasks: int = 5,
+    ) -> List[TaskProposal]:
+        """Synthesize contextual daily-task proposals via the LLM.
+
+        Uses the agent's effective system prompt + task prompt template (both
+        already enriched with onboarding context) to generate personalized
+        proposals. Falls back to ``default_proposals`` on any failure so the
+        daily workflow never breaks.
+
+        Every returned proposal carries an explicit ``synthesis_mode``:
+        successfully parsed LLM output is tagged ``llm``; the fallback bundle
+        is tagged ``template_fallback`` so downstream review, persistence,
+        and the UI can surface degraded synthesis instead of hiding it.
+        """
+        try:
+            role_guidance = get_role_contract(self.agent_key)
+            contract_instruction = (
+                "\nFor every task, include evidence, expected_impact, effort, "
+                "risk_level (low, medium, or high), and measurement.\n"
+                + "\n".join(f"- {key}: {value}" for key, value in role_guidance.items())
+            )
+            prompt = self.build_task_prompt(
+                instruction=instructions + contract_instruction,
+                task_context={"onboarding_data": (context or {}).get("onboarding_data", {})},
+            )
+            schema = task_output_schema(self.agent_key)
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: llm_text_gen(
+                    prompt=prompt,
+                    json_struct=schema,
+                    user_id=self.user_id,
+                    flow_type="sif_agent",
+                ),
+            )
+            proposals = self._parse_task_proposals(result, max_tasks)
+            if not proposals:
+                logger.info(
+                    f"[{self.__class__.__name__}] LLM synthesis returned no valid tasks; "
+                    "using default proposals."
+                )
+                for proposal in default_proposals:
+                    proposal.synthesis_mode = "template_fallback"
+                return default_proposals
+            return proposals
+        except Exception as e:
+            logger.warning(
+                f"[{self.__class__.__name__}] LLM task synthesis failed, "
+                f"using default proposals: {e}"
+            )
+            for proposal in default_proposals:
+                proposal.synthesis_mode = "template_fallback"
+            return default_proposals
+
     @abstractmethod
     def _create_txtai_agent(self) -> Agent:
         """Create txtai agent with specific tools and configuration"""
@@ -626,6 +819,55 @@ class BaseALwrityAgent(ABC):
             except Exception:
                 activity = None
                 run_record = None
+
+            quality_gate = validate_action_content(
+                action.parameters,
+                self._load_prompt_context(),
+            )
+            quality_override_pending = (
+                isinstance(action.parameters, dict)
+                and action.parameters.get("quality_override_requested") is True
+                and action.requires_approval
+            )
+            quality_override_approved = (
+                isinstance(action.parameters, dict)
+                and action.parameters.get("quality_override_approved") is True
+            )
+            if not quality_gate["is_compliant"] and not quality_override_pending and not quality_override_approved:
+                if activity and run_record:
+                    activity.log_event(
+                        event_type="decision",
+                        severity="warning",
+                        message="Action blocked by content quality gate",
+                        payload=build_agent_event_payload(
+                            phase="validation",
+                            step="quality_gate_blocked",
+                            tool_name="quality_gates",
+                            progress_percent=10,
+                            input_summary=action.action_type,
+                            output_summary="Content violates brand or safety rules",
+                            decision_reason="Deterministic content quality gate rejected action",
+                            safe_debug=True,
+                            metadata={
+                                "action_id": action.action_id,
+                                "quality_gate": quality_gate,
+                            },
+                        ),
+                        run_id=run_record.id,
+                        agent_type=self.agent_type,
+                    )
+                    activity.finish_run(
+                        run_record.id,
+                        success=False,
+                        error_message="Action blocked by content quality gate",
+                    )
+                return {
+                    "success": False,
+                    "error": "Action blocked by content quality gate",
+                    "action_id": action.action_id,
+                    "agent_id": self.agent_id,
+                    "quality_gate": quality_gate,
+                }
             
             # 1. Validate action safety
             if not await self._validate_action_safety(action):
@@ -643,7 +885,8 @@ class BaseALwrityAgent(ABC):
                     "success": False,
                     "error": "Action failed safety validation",
                     "action_id": action.action_id,
-                    "agent_id": self.agent_id
+                    "agent_id": self.agent_id,
+                    "quality_gate": quality_gate,
                 }
 
             if action.requires_approval:
@@ -757,7 +1000,8 @@ class BaseALwrityAgent(ABC):
                 "action_id": action.action_id,
                 "agent_id": self.agent_id,
                 "execution_time": response_time,
-                "timestamp": end_time.isoformat()
+                "timestamp": end_time.isoformat(),
+                "quality_gate": quality_gate,
             }
             
         except Exception as e:
@@ -888,7 +1132,8 @@ class BaseALwrityAgent(ABC):
     
     def _prepare_agent_prompt(self, action: AgentAction) -> str:
         """Prepare prompt for txtai agent"""
-        return f"""
+        system_prompt = self.get_effective_system_prompt()
+        action_prompt = f"""
         You are the {self.agent_type} agent for ALwrity user {self.user_id}.
         
         Action Details:
@@ -901,6 +1146,9 @@ class BaseALwrityAgent(ABC):
         Please execute this action and provide a detailed response.
         Consider user goals, safety constraints, and potential impacts.
         """
+        if system_prompt and system_prompt.strip():
+            return f"{system_prompt.strip()}\n{action_prompt}"
+        return action_prompt
     
     async def _validate_action_safety(self, action: AgentAction) -> bool:
         """Validate action against safety constraints"""
@@ -950,20 +1198,20 @@ class BaseALwrityAgent(ABC):
                 self.performance.successful_actions / self.performance.total_actions
             )
 
-    async def propose_daily_tasks(self, context: Dict[str, Any]) -> List[TaskProposal]:
-        """
-        Propose daily tasks based on the agent's domain and context.
-        Must be implemented by specialized agents.
-        """
-        return []
-        
         # Calculate efficiency score (0.0 to 1.0)
         # Based on success rate and response time
         time_factor = min(1.0, 30.0 / max(self.performance.average_response_time, 1.0))
         self.performance.efficiency_score = (
             self.performance.success_rate * 0.7 + time_factor * 0.3
         )
-    
+
+    async def propose_daily_tasks(self, context: Dict[str, Any]) -> List[TaskProposal]:
+        """
+        Propose daily tasks based on the agent's domain and context.
+        Must be implemented by specialized agents.
+        """
+        return []
+
     def get_performance_metrics(self) -> AgentPerformance:
         """Get current performance metrics"""
         return self.performance
@@ -1001,7 +1249,88 @@ class StrategyOrchestratorAgent(BaseALwrityAgent):
         _llm_for_agent = self.llm
         for _ in range(3):
             _llm_for_agent = getattr(_llm_for_agent, "llm", _llm_for_agent)
-        return Agent(llm=_llm_for_agent, tools=[], max_iterations=15)
+        return Agent(
+            llm=_llm_for_agent,
+            tools=[
+                {
+                    "name": "market_signal_detector",
+                    "description": "Detects current market signals (competitor moves, SERP changes, social trends) and returns the latest signals with threat level assessment.",
+                    "target": self._market_signal_detector_tool_sync,
+                },
+                {
+                    "name": "google_trends_fetcher",
+                    "description": "Fetches Google Trends data for given keywords, timeframe, and geo. Indexes results for semantic search. Expected context: keywords (list), timeframe (e.g. 'today 12-m'), geo (e.g. 'US').",
+                    "target": self._google_trends_fetcher_tool_sync,
+                },
+                {
+                    "name": "agent_coordinator",
+                    "description": "Lists available sub-agents and their coordination status. Use this to discover which specialist agents can be delegated to.",
+                    "target": self._agent_coordinator_tool_sync,
+                },
+                {
+                    "name": "performance_analyzer",
+                    "description": "Analyzes performance metrics across all agents. Returns overall performance data, efficiency scores, and optimization recommendations.",
+                    "target": self._performance_analyzer_tool_sync,
+                },
+                {
+                    "name": "kickoff_gsc_first_pass",
+                    "description": "Invokes SEO and Content agents' default GSC (Google Search Console) first-pass plans and combines results. Expected context: start_date, end_date.",
+                    "target": self._kickoff_gsc_first_pass_tool_sync,
+                },
+                {
+                    "name": "strategy_synthesizer",
+                    "description": "Synthesizes active strategies into a unified marketing strategy. Returns current strategy count and synthesis capability status.",
+                    "target": self._strategy_synthesizer_tool_sync,
+                },
+                {
+                    "name": "task_delegator",
+                    "description": "Delegates a specific task to a specialized sub-agent. Expected context: agent_name (str, must match a key from agent_coordinator), instruction (str, the task to perform), task_context (dict, optional additional context).",
+                    "target": self._delegate_task_tool_sync,
+                },
+            ],
+            max_iterations=15,
+            task="language-generation",
+        )
+
+    def _run_async_tool_sync(self, coro) -> Any:
+        """Run an async coroutine in a thread pool, returning the result synchronously.
+
+        Used to bridge async orchestrator tool methods with txtai's sync Agent tool calls.
+        Each invocation creates a fresh event loop in a worker thread, runs the coroutine,
+        and closes the loop — safe to call from within an already-running async context.
+        """
+        def _run_in_thread():
+            loop = asyncio.new_event_loop()
+            try:
+                return loop.run_until_complete(coro)
+            finally:
+                try:
+                    loop.close()
+                except Exception:
+                    pass
+        future = _orchestrator_tool_executor.submit(_run_in_thread)
+        return future.result(timeout=120)
+
+    def _market_signal_detector_tool_sync(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        return self._run_async_tool_sync(self._market_signal_detector_tool(context))
+
+    def _google_trends_fetcher_tool_sync(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        return self._run_async_tool_sync(self._google_trends_fetcher_tool(context))
+
+    def _agent_coordinator_tool_sync(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        return self._run_async_tool_sync(self._agent_coordinator_tool(context))
+
+    def _performance_analyzer_tool_sync(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        return self._run_async_tool_sync(self._performance_analyzer_tool(context))
+
+    def _kickoff_gsc_first_pass_tool_sync(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        return self._run_async_tool_sync(self._kickoff_gsc_first_pass_tool(context))
+
+    def _strategy_synthesizer_tool_sync(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        return self._run_async_tool_sync(self._strategy_synthesizer_tool(context))
+
+    def _delegate_task_tool_sync(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        return self._run_async_tool_sync(self._delegate_task_tool(context))
     
     async def _market_signal_detector_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Tool for detecting market signals"""
@@ -1092,17 +1421,49 @@ class StrategyOrchestratorAgent(BaseALwrityAgent):
             "last_coordination": datetime.utcnow().isoformat()
         }
     
+    @staticmethod
+    def _derive_performance_recommendations(perf_rows: List[Dict[str, Any]]) -> List[str]:
+        """Derive recommendations from real agent performance rows.
+
+        Every recommendation must trace to an actual metric value; when no
+        threshold is breached the list is empty rather than padded.
+        """
+        recommendations: List[str] = []
+        for row in perf_rows or []:
+            if not isinstance(row, dict):
+                continue
+            agent_id = str(row.get("agent_id") or "unknown-agent")
+            try:
+                total_actions = int(row.get("total_actions") or 0)
+                success_rate = float(row.get("success_rate") or 0.0)
+                response_time = float(row.get("response_time") or 0.0)
+            except (TypeError, ValueError):
+                continue
+            if total_actions == 0:
+                recommendations.append(
+                    f"{agent_id}: has not executed any actions yet - verify it is enabled and scheduled."
+                )
+            elif success_rate < 0.7:
+                recommendations.append(
+                    f"{agent_id}: success rate {success_rate:.0%} is below target - inspect recent run errors."
+                )
+            elif response_time > 30.0:
+                recommendations.append(
+                    f"{agent_id}: average response time {response_time:.1f}s exceeds the 30s budget - reduce task scope or tool latency."
+                )
+        return recommendations
+
     async def _performance_analyzer_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Tool for analyzing performance metrics"""
         try:
-            perf_data = {}
+            perf_data: List[Dict[str, Any]] = []
             if self.performance_monitor:
-                perf_data = self.performance_monitor.get_all_agents_performance()
-                
+                perf_data = await self.performance_monitor.get_all_agents_performance() or []
+
             return {
                 "overall_performance": perf_data,
                 "agent_efficiency": self.performance.efficiency_score,
-                "recommendations": ["Optimize content agent latency", "Increase SEO agent throughput"],
+                "recommendations": self._derive_performance_recommendations(perf_data),
                 "timestamp": datetime.utcnow().isoformat()
             }
         except Exception as e:
@@ -1140,13 +1501,118 @@ class StrategyOrchestratorAgent(BaseALwrityAgent):
             return {"status": "error", "error": str(e)}
     
     async def _strategy_synthesizer_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Tool for synthesizing strategies"""
-        return {
-            "strategies_active": len(self.active_strategies),
-            "synthesis_capability": "ready",
-            "unified_strategy": "Focus on high-engagement topics while monitoring competitor X",
-            "last_synthesis": datetime.utcnow().isoformat()
-        }
+        """Synthesize a unified strategy from active strategies and onboarding context.
+
+        Grounds the output in real user data (active strategies, business goals,
+        content pillars, competitors) instead of returning a canned claim. Falls
+        back to a deterministic digest of the same inputs when the LLM is
+        unavailable.
+        """
+        try:
+            prompt_ctx = self._load_prompt_context()
+
+            strategy_summaries: List[str] = []
+            for s in list(self.active_strategies or [])[:10]:
+                if isinstance(s, dict):
+                    summary = s.get("name") or s.get("title") or s.get("goal") or ""
+                else:
+                    summary = getattr(s, "name", "") or str(s)
+                summary = str(summary).strip()
+                if summary:
+                    strategy_summaries.append(summary)
+
+            inputs: List[str] = []
+            if strategy_summaries:
+                inputs.append("Active strategies:\n- " + "\n- ".join(strategy_summaries))
+            for key, label in (
+                ("business_goals", "Business goals"),
+                ("content_pillars", "Content pillars"),
+                ("target_audience", "Target audience"),
+                ("brand_voice", "Brand voice"),
+                ("competitors", "Competitors"),
+            ):
+                value = str(prompt_ctx.get(key) or "").strip()
+                if value:
+                    inputs.append(f"{label}: {value}")
+            roster = ", ".join(sorted(self.sub_agents.keys())) or "none"
+            inputs.append(f"Available specialist agents: {roster}")
+
+            has_real_input = bool(strategy_summaries) or bool(
+                str(prompt_ctx.get("business_goals") or "").strip()
+            )
+
+            result = {
+                "strategies_active": len(self.active_strategies or []),
+                "synthesis_capability": "ready",
+                "inputs_considered": len(inputs),
+                "last_synthesis": datetime.utcnow().isoformat(),
+            }
+
+            if not has_real_input:
+                result["unified_strategy"] = ""
+                result["note"] = (
+                    "No active strategies or business goals available yet; "
+                    "complete onboarding to enable synthesis."
+                )
+                return result
+
+            schema = {
+                "type": "object",
+                "properties": {
+                    "unified_strategy": {"type": "string"},
+                    "key_priorities": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["unified_strategy"],
+            }
+            prompt = (
+                "You are synthesizing a unified marketing strategy.\n"
+                "Combine the inputs below into ONE coherent strategy paragraph "
+                "(max ~120 words), then list up to 5 key priorities.\n"
+                "Ground every statement in the inputs - do not invent data.\n\n"
+                + "\n".join(inputs)
+            )
+
+            unified = ""
+            priorities: List[str] = []
+            try:
+                loop = asyncio.get_event_loop()
+                llm_result = await loop.run_in_executor(
+                    None,
+                    lambda: llm_text_gen(
+                        prompt=prompt,
+                        json_struct=schema,
+                        user_id=self.user_id,
+                        flow_type="sif_agent",
+                    ),
+                )
+                if isinstance(llm_result, str):
+                    try:
+                        llm_result = json.loads(llm_result)
+                    except (ValueError, TypeError):
+                        llm_result = {}
+                unified = str((llm_result or {}).get("unified_strategy") or "").strip()
+                priorities = [
+                    str(p).strip()
+                    for p in ((llm_result or {}).get("key_priorities") or [])
+                    if str(p).strip()
+                ][:5]
+            except Exception as llm_err:
+                logger.warning(
+                    f"_strategy_synthesizer_tool LLM synthesis failed, using input digest: {llm_err}"
+                )
+
+            if not unified:
+                unified = " | ".join(inputs[:4])
+                result["note"] = (
+                    "LLM synthesis unavailable; returning structured digest of inputs."
+                )
+
+            result["unified_strategy"] = unified
+            if priorities:
+                result["key_priorities"] = priorities
+            return result
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
     
     async def _delegate_task_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """

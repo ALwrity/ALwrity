@@ -8,11 +8,6 @@ from typing import Dict, Any
 
 from services.database import get_db
 from middleware.auth_middleware import get_current_user
-from services.subscription.schema_utils import (
-    ensure_subscription_plan_columns,
-    ensure_usage_summaries_columns,
-    ensure_api_usage_logs_columns
-)
 
 
 def verify_user_access(
@@ -56,29 +51,3 @@ def get_user_id_from_token(
     if not user_id:
         raise HTTPException(status_code=401, detail="User not authenticated")
     return user_id
-
-
-def ensure_schema_columns(
-    db: Session = Depends(get_db),
-    include_usage_logs: bool = False
-) -> Session:
-    """
-    Ensure required schema columns exist before queries.
-    
-    Args:
-        db: Database session
-        include_usage_logs: Whether to check api_usage_logs columns
-        
-    Returns:
-        Database session
-    """
-    try:
-        ensure_subscription_plan_columns(db)
-        ensure_usage_summaries_columns(db)
-        if include_usage_logs:
-            ensure_api_usage_logs_columns(db)
-    except Exception as schema_err:
-        # Log warning but don't fail - will be caught by error handlers
-        from loguru import logger
-        logger.warning(f"Schema check failed, will retry on query: {schema_err}")
-    return db

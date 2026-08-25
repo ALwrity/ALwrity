@@ -1,3 +1,15 @@
+/**
+ * Hub leaf overlay shell. Portals to document.body at YT_Z_MODAL so it sits
+ * above Knowledge Centre (12000). Rail stacking no longer requires this
+ * (Phase 4: Hub main is not isolated).
+ *
+ * Allowed: Hub wedges and other leaf dialogs (Plan, Create, Publish, etc.).
+ * Forbidden: hosting multi-step apps here. Full Creator uses the dedicated
+ * surface (YouTubeVideoCreatorModal / YT_Z_CREATOR_SURFACE) as of Phase 2.
+ *
+ * Do not raise YT_Z_MODAL. Do not add +n patches for nested MUI overlays.
+ * See youtubeStudioZIndex.ts and youtubeStudioOverlayInventory.ts.
+ */
 import React from "react";
 import { createPortal } from "react-dom";
 import { YouTubeModalBackButton } from "./YouTubeModalBackButton";
@@ -13,7 +25,7 @@ interface YouTubeActionModalProps {
   backLabel?: string;
   children: React.ReactNode;
   maxWidth?: number;
-  /** Extra card class (e.g. yt-modal-card--pipeline for Full Creator). */
+  /** Extra card class (e.g. yt-modal-card--wedge). */
   cardClassName?: string;
 }
 

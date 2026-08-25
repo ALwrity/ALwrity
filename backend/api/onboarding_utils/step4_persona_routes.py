@@ -29,7 +29,6 @@ from services.database import get_session_for_user
 from services.intelligence.agent_flat_context import AgentFlatContextStore
 from models.onboarding import OnboardingSession, PersonaData
 from models.persona_task_models import PersonaGenerationTask
-from models.base import Base
 
 
 def _get_session_or_404(db: Session, user_id: str) -> OnboardingSession:
@@ -100,18 +99,6 @@ def _save_persona_data(db: Session, user_id: str, data: Dict[str, Any]) -> None:
 PERSONA_TASK_STALE_MINUTES = 10
 
 
-def _ensure_persona_task_table(db: Session) -> None:
-    """Create the persona task table on the user's DB if it doesn't exist yet."""
-    try:
-        Base.metadata.create_all(
-            bind=db.get_bind(),
-            tables=[PersonaGenerationTask.__table__],
-            checkfirst=True,
-        )
-    except Exception as e:
-        logger.warning(f"Could not ensure persona task table: {e}")
-
-
 def _task_row_to_dict(task: PersonaGenerationTask) -> Dict[str, Any]:
     return {
         "task_id": task.task_id,
@@ -140,7 +127,7 @@ def _create_persona_task(
     if not db:
         return
     try:
-        _ensure_persona_task_table(db)
+
         db.add(PersonaGenerationTask(
             task_id=task_id,
             user_id=user_id,
@@ -172,7 +159,7 @@ def _update_persona_task(
     if not db:
         return
     try:
-        _ensure_persona_task_table(db)
+
         task = db.query(PersonaGenerationTask).filter(
             PersonaGenerationTask.task_id == task_id,
             PersonaGenerationTask.user_id == user_id,
@@ -207,7 +194,7 @@ def _get_persona_task(user_id: str, task_id: str) -> Optional[Dict[str, Any]]:
     if not db:
         return None
     try:
-        _ensure_persona_task_table(db)
+
         task = db.query(PersonaGenerationTask).filter(
             PersonaGenerationTask.task_id == task_id,
             PersonaGenerationTask.user_id == user_id,

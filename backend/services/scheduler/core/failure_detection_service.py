@@ -528,7 +528,7 @@ class FailureDetectionService:
                 advertools_tasks = advertools_tasks.filter(AdvertoolsTask.user_id == user_id)
             
             for task in advertools_tasks.all():
-                pattern = failure_detection.analyze_task_failures(task.id, "advertools", task.user_id)
+                pattern = self.analyze_task_failures(task.id, "advertools", task.user_id)
                 tasks_needing_intervention.append({
                     "task_id": task.id,
                     "task_type": "advertools",
@@ -558,7 +558,7 @@ class FailureDetectionService:
             if user_id:
                 linkedin_profile_tasks = linkedin_profile_tasks.filter(LinkedInProfileSyncTask.user_id == user_id)
             for task in linkedin_profile_tasks.all():
-                pattern = failure_detection.analyze_task_failures(task.id, "linkedin_profile_sync", task.user_id)
+                pattern = self.analyze_task_failures(task.id, "linkedin_profile_sync", task.user_id)
                 tasks_needing_intervention.append({
                     "task_id": task.id,
                     "task_type": "linkedin_profile_sync",
@@ -580,7 +580,7 @@ class FailureDetectionService:
             if user_id:
                 linkedin_post_tasks = linkedin_post_tasks.filter(LinkedInPostAnalyticsSyncTask.user_id == user_id)
             for task in linkedin_post_tasks.all():
-                pattern = failure_detection.analyze_task_failures(task.id, "linkedin_post_analytics_sync", task.user_id)
+                pattern = self.analyze_task_failures(task.id, "linkedin_post_analytics_sync", task.user_id)
                 tasks_needing_intervention.append({
                     "task_id": task.id,
                     "task_type": "linkedin_post_analytics_sync",
@@ -602,7 +602,7 @@ class FailureDetectionService:
             if user_id:
                 linkedin_growth_tasks = linkedin_growth_tasks.filter(LinkedInGrowthReanalysisTask.user_id == user_id)
             for task in linkedin_growth_tasks.all():
-                pattern = failure_detection.analyze_task_failures(task.id, "linkedin_growth_reanalysis", task.user_id)
+                pattern = self.analyze_task_failures(task.id, "linkedin_growth_reanalysis", task.user_id)
                 tasks_needing_intervention.append({
                     "task_id": task.id,
                     "task_type": "linkedin_growth_reanalysis",

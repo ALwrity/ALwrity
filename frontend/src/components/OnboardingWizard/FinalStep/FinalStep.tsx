@@ -18,11 +18,12 @@ import {
 } from '@mui/icons-material';
 // import OnboardingButton from '../common/OnboardingButton';
 import { useNavigate } from 'react-router-dom';
-import { getApiKeys, completeOnboarding, getOnboardingSummary, getWebsiteAnalysisData, getResearchPreferencesData, setCurrentStep } from '../../../api/onboarding';
-import { SetupSummary, CapabilitiesOverview, AgentTeamSection, TaskSchedulingPanel } from './components';
+import { completeOnboarding, getOnboardingSummary, getWebsiteAnalysisData, getResearchPreferencesData, setCurrentStep } from '../../../api/onboarding';
+import { SetupSummary, AgentTeamSection, TaskSchedulingPanel, AgentTeamPreview } from './components';
 import { SifIndexingPanel } from '../common/SifIndexingPanel';
 import { FinalStepProps, OnboardingData, Capability, OnboardingCompletionResult } from './types';
-import { getAgentTeam, type AgentTeamCatalogEntry } from '../../../api/agentsTeam';
+import { getAgentTeam, type AgentTeamCatalogEntry, type AgentTeamContextSummary, type TeamCertification } from '../../../api/agentsTeam';
+import { onboardingCache } from '../../../services/onboardingCache';
 
 const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, onboardingType }) => {
   const navigate = useNavigate();
@@ -30,11 +31,12 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
   const [dataLoading, setDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({
-    apiKeys: {}
   });
   const [expandedSection, setExpandedSection] = useState<string | null>('summary');
   const [validationStatus, setValidationStatus] = useState<{isValid: boolean, missingSteps: string[]} | null>(null);
   const [agentTeam, setAgentTeam] = useState<AgentTeamCatalogEntry[]>([]);
+  const [agentContextSummary, setAgentContextSummary] = useState<AgentTeamContextSummary>({});
+  const [agentCertification, setAgentCertification] = useState<TeamCertification | null>(null);
   const [agentTeamError, setAgentTeamError] = useState<string | null>(null);
   const [completionResult, setCompletionResult] = useState<OnboardingCompletionResult | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -49,6 +51,14 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
         ? 'Review your LinkedIn profile, persona, and content preferences before launching your AI-powered LinkedIn growth workspace.'
         : 'Review your configuration and confirm all settings before launching your AI-powered content creation workspace.'
     });
+    // Pre-populate from cache so a refresh shows the team/context immediately.
+    const cachedFinal = onboardingCache.getFinalStepData();
+    if (cachedFinal.agentTeam?.length) {
+      setAgentTeam(cachedFinal.agentTeam);
+    }
+    if (cachedFinal.agentContextSummary) {
+      setAgentContextSummary(cachedFinal.agentContextSummary);
+    }
     // Always attempt to load data once on mount
     loadOnboardingData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -97,11 +107,16 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
       const websiteAnalysis = await getWebsiteAnalysisData();
       const researchPreferences = await getResearchPreferencesData();
       try {
-        const team = await getAgentTeam();
-        setAgentTeam(team || []);
+        const { agents, contextSummary, certification } = await getAgentTeam();
+        setAgentTeam(agents || []);
+        setAgentContextSummary(contextSummary || {});
+        setAgentCertification(certification || null);
+        onboardingCache.saveFinalStepData({ agentTeam: agents || [], agentContextSummary: contextSummary || {} });
         setAgentTeamError(null);
       } catch (e: any) {
         setAgentTeam([]);
+        setAgentContextSummary({});
+        setAgentCertification(null);
         setAgentTeamError(e?.message || 'Failed to load agent team configuration');
       }
       // Frontend fallbacks to Step 2 cached data (ensures non-breaking UI)
@@ -110,11 +125,10 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
       const cachedAnalysis = cachedAnalysisRaw ? safeParseJSON(cachedAnalysisRaw) : undefined;
 
       const newOnboardingData = {
-        apiKeys: summary.api_keys || {},
         websiteUrl: websiteAnalysis?.website_url || summary.website_url || cachedUrl || undefined,
         researchPreferences: researchPreferences || summary.research_preferences,
         personalizationSettings: summary.personalization_settings,
-        integrations: summary.integrations || {},
+        integrations: (summary.configuration_and_capabilities?.configuration_details) || summary.integrations || {},
         styleAnalysis: websiteAnalysis?.style_analysis || summary.style_analysis || cachedAnalysis || undefined,
         canonicalProfile: summary.canonical_profile
       };
@@ -128,22 +142,6 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
     } catch (error) {
       console.error('Error loading onboarding data:', error);
       setError('Could not load all onboarding data. Some features may be limited.');
-      
-      // Fallback to just API keys if other endpoints fail
-      try {
-        const apiKeys = await getApiKeys();
-        setOnboardingData({
-          apiKeys,
-          websiteUrl: undefined,
-          researchPreferences: undefined,
-          personalizationSettings: undefined,
-          integrations: undefined,
-          styleAnalysis: undefined
-        });
-      } catch (fallbackError) {
-        console.error('Error loading API keys as fallback:', fallbackError);
-        // Error handling is managed by global API client interceptors
-      }
     } finally {
       setDataLoading(false);
       clearTimeout(loadingTimeout);
@@ -151,6 +149,13 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
   };
 
   const websiteName = React.useMemo(() => {
+    // LinkedIn onboarding has no website URL; use the profile name instead of
+    // falling back to the URL hostname (which would render as "linkedin").
+    if (isLinkedIn) {
+      const profileName = agentContextSummary?.profile_name;
+      if (profileName && profileName.trim()) return profileName.trim();
+      return 'Your';
+    }
     const url = onboardingData.websiteUrl;
     if (!url) return 'Your';
     try {
@@ -161,52 +166,24 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
     } catch {
       return 'Your';
     }
-  }, [onboardingData.websiteUrl]);
+  }, [onboardingData.websiteUrl, isLinkedIn, agentContextSummary]);
 
   const agentContextCard = React.useMemo(() => {
-    const style = onboardingData.styleAnalysis || {};
-    const persona = onboardingData.personalizationSettings || {};
-    const canonical = onboardingData.canonicalProfile || {};
-    const research = onboardingData.researchPreferences || {};
-
-    const contentPillars =
-      style?.content_strategy_insights?.content_pillars ||
-      style?.sitemap_analysis?.content_pillars ||
-      canonical?.content_pillars ||
-      [];
-
-    const competitors =
-      research?.competitors ||
-      canonical?.competitors ||
-      [];
-
+    // The backend now builds the authoritative context (from integrated data)
+    // for AI-Optimize/Preview. The frontend card only supplies LinkedIn-specific
+    // fields the backend does not expose (profile identity + content preferences).
     if (isLinkedIn) {
       return {
         profile_name: websiteName,
         profile_url: onboardingData.websiteUrl,
-        brand_voice: persona?.corePersona || persona?.platformPersonas || persona?.brand_voice || canonical?.brand_voice || "",
-        target_audience: research?.target_audience || style?.target_audience || canonical?.target_audience || "",
-        content_pillars: Array.isArray(contentPillars) ? contentPillars : [],
-        competitors: Array.isArray(competitors) ? competitors : [],
-        growth_summary: research?.growth_summary || "",
-        content_types: research?.content_types || [],
+        growth_summary: onboardingData.researchPreferences?.growth_summary || "",
         posting_cadence: onboardingData.integrations?.postingCadence || "",
         preferred_formats: onboardingData.integrations?.preferredFormats || [],
         content_topics: onboardingData.integrations?.contentTopics || "",
         engagement_goals: onboardingData.integrations?.engagementGoals || "",
       };
     }
-
-    return {
-      website_name: websiteName,
-      website_url: onboardingData.websiteUrl,
-      brand_voice: persona?.corePersona || persona?.platformPersonas || persona?.brand_voice || canonical?.brand_voice || "",
-      target_audience: style?.target_audience || canonical?.target_audience || "",
-      style_guidelines: style?.style_guidelines || style?.style_patterns || canonical?.style_guidelines || "",
-      content_pillars: Array.isArray(contentPillars) ? contentPillars : [],
-      competitors: Array.isArray(competitors) ? competitors : [],
-      business_goals: canonical?.business_goals || [],
-    };
+    return {};
   }, [onboardingData, websiteName, isLinkedIn]);
 
   // Safe JSON parser for cached data
@@ -221,16 +198,6 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
     const missingSteps: string[] = [];
     
     try {
-      if (!isLinkedIn) {
-        // Website onboarding: user must have entered API keys in step 1.
-        const apiKeyEntries = Object.entries(data.apiKeys || {}).filter(([, v]) => v && String(v).length > 0);
-        const hasApiKeys = apiKeyEntries.length > 0;
-
-        if (!hasApiKeys) {
-          missingSteps.push('API Keys');
-        }
-      }
-      
       if (isLinkedIn) {
         // LinkedIn onboarding: the backend has already validated connection,
         // profile, research, and persona. We only sanity-check that research
@@ -421,8 +388,8 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
           title: 'LinkedIn Content Engine',
           description: 'Generate posts, articles, and carousels matched to your voice',
           icon: <CheckCircle />,
-          unlocked: Object.keys(onboardingData.apiKeys).length > 0 || !!onboardingData.personalizationSettings,
-          required: ['API Keys']
+          unlocked: !!onboardingData.personalizationSettings,
+          required: ['Persona Generation']
         },
         {
           id: 'linkedin-monitoring',
@@ -447,8 +414,7 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
           title: 'AI Content Generation',
           description: 'Generate high-quality, personalized content using advanced AI models',
           icon: <CheckCircle />,
-          unlocked: Object.keys(onboardingData.apiKeys).length > 0,
-          required: ['API Keys']
+          unlocked: true
         },
         {
           id: 'style-analysis',
@@ -494,9 +460,6 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
         missing.push('LinkedIn persona data');
       }
       return missing;
-    }
-    if (Object.keys(onboardingData.apiKeys).length === 0) {
-      missing.push('At least one AI provider API key');
     }
     if (!onboardingData.websiteUrl) {
       missing.push('Website URL for style analysis');
@@ -573,7 +536,7 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
               </React.Fragment>
             ) : (
               <React.Fragment>
-                {/* Setup Summary */}
+                {/* Combined: Setup Summary + Capabilities Overview (Configuration Details & Capabilities) */}
                 <SetupSummary 
                   onboardingData={onboardingData}
                   capabilities={capabilities}
@@ -581,9 +544,6 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
                   setExpandedSection={setExpandedSection}
                   onboardingType={onboardingType}
                 />
-
-                {/* Capabilities Overview */}
-                <CapabilitiesOverview capabilities={capabilities} />
 
                 {/* SIF Indexing Status */}
                 <SifIndexingPanel />
@@ -598,8 +558,11 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
                   </Alert>
                 )}
                 {!agentTeamError && agentTeam.length > 0 && (
-                  <AgentTeamSection websiteName={websiteName} agents={agentTeam} contextCard={agentContextCard} />
+                  <AgentTeamSection websiteName={websiteName} agents={agentTeam} contextCard={agentContextCard} contextSummary={agentContextSummary} certification={agentCertification} />
                 )}
+
+                {/* Pre-launch team preview: dry-run the committee before launching */}
+                {!agentTeamError && agentTeam.length > 0 && <AgentTeamPreview />}
 
                 {/* Missing Requirements Warning */}
                 {missingRequirements.length > 0 && (

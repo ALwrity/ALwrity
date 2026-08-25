@@ -20,11 +20,13 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "jsxImportSource": "react",
+    "incremental": true,
+    "tsBuildInfoFile": ".tsbuildinfo",
     "typeRoots": [
       "./node_modules/@types",
       "./src/types"
     ],
-    "types": ["node", "jest"]
+    "types": ["node", "jest", "vite/client"]
   },
   "include": [
     "src"

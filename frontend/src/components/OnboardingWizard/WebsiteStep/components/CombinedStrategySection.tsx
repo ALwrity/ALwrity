@@ -54,6 +54,13 @@ const CombinedStrategySection: React.FC<CombinedStrategySectionProps> = ({
     setActiveTab(newValue);
   };
 
+  // style_patterns from the API is a wrapper object { patterns, style_consistency, unique_elements }.
+  // StyleAnalysisSection expects the inner `patterns` map for its table, with consistency/uniqueElements passed separately.
+  const stylePatternsInner =
+    stylePatterns && typeof stylePatterns === 'object' && !Array.isArray(stylePatterns) && 'patterns' in stylePatterns
+      ? (stylePatterns as any).patterns
+      : stylePatterns;
+
   return (
     <Paper 
       elevation={0} 
@@ -98,7 +105,7 @@ const CombinedStrategySection: React.FC<CombinedStrategySectionProps> = ({
           <Tab 
             icon={<PsychologyIcon />} 
             iconPosition="start" 
-            label={`Style Analysis for ${domainName}`} 
+            label={`Style Analysis for ${domainName || 'Your Website'}`} 
           />
         </Tabs>
       </Box>
@@ -124,7 +131,7 @@ const CombinedStrategySection: React.FC<CombinedStrategySectionProps> = ({
           <Fade in timeout={500}>
             <Box>
               <StyleAnalysisSection 
-                patterns={stylePatterns}
+                patterns={stylePatternsInner}
                 consistency={styleConsistency}
                 uniqueElements={uniqueElements}
                 domainName={domainName}

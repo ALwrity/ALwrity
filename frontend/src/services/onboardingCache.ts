@@ -44,6 +44,11 @@ interface OnboardingCacheData {
   step5?: {
     integrations?: any;
   };
+  finalStep?: {
+    agentTeam?: any[];
+    agentContextSummary?: any;
+    todayPlanPreview?: any;
+  };
 }
 
 class OnboardingCacheService {
@@ -165,24 +170,6 @@ class OnboardingCacheService {
   }
 
   /**
-   * Get API keys from cache
-   */
-  getApiKeys(): Record<string, string> {
-    const step1Data = this.getStepData(1);
-    return step1Data?.apiKeys || {};
-  }
-
-  /**
-   * Save API key to cache
-   */
-  saveApiKey(provider: string, apiKey: string): void {
-    const step1Data = this.getStepData(1) || {};
-    const apiKeys = step1Data.apiKeys || {};
-    apiKeys[provider] = apiKey;
-    this.saveStepData(1, { ...step1Data, apiKeys });
-  }
-
-  /**
    * Get website data from cache
    */
   getWebsiteData(): any {
@@ -194,6 +181,33 @@ class OnboardingCacheService {
    */
   saveWebsiteData(data: any): void {
     this.saveStepData(2, data);
+  }
+
+  /**
+   * Save final-step results (agent team, context summary, today plan preview)
+   * so a refresh of the final onboarding step does not lose them.
+   */
+  saveFinalStepData(data: { agentTeam?: any[]; agentContextSummary?: any; todayPlanPreview?: any }): void {
+    try {
+      const cache = this.getCache();
+      cache.finalStep = { ...(cache.finalStep || {}), ...data };
+      this.setCache(cache);
+    } catch (error) {
+      console.error('❌ Onboarding cache: Failed to save final step data', error);
+    }
+  }
+
+  /**
+   * Get cached final-step results.
+   */
+  getFinalStepData(): { agentTeam?: any[]; agentContextSummary?: any; todayPlanPreview?: any } {
+    try {
+      const cache = this.getCache();
+      return cache.finalStep || {};
+    } catch (error) {
+      console.error('❌ Onboarding cache: Failed to get final step data', error);
+      return {};
+    }
   }
 }
 

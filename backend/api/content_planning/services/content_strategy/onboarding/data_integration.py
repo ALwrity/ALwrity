@@ -26,6 +26,14 @@ from models.website_analysis_monitoring_models import (
     DeepCompetitorAnalysisTask,
     DeepCompetitorAnalysisExecutionLog
 )
+from .canonical_profile_builder import (
+    build_canonical_profile,
+    build_persona_synthesis,
+    build_brand_voice,
+    build_competitor_seo_benchmarks,
+)
+from .data_quality import assess_data_quality
+from .analytics_fetchers import fetch_gsc_analytics, fetch_bing_analytics
 import os
 
 logger = get_service_logger("onboarding.data_integration")
@@ -477,81 +485,10 @@ class OnboardingDataIntegrationService:
             return {}
 
     def _build_persona_synthesis(self, persona_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Map ``PersonaData.core_persona`` into a compact structured ``persona`` block.
-
-        Read paths mirror ``PersonaPromptBuilder.get_persona_schema`` (the generator
-        contract). Returns ``None`` when there is no core_persona, so the block is
-        ABSENT (not empty) for no-persona users — never populated from website data.
-        """
-        if not persona_data or not isinstance(persona_data, dict):
-            return None
-        core = persona_data.get('core_persona') or persona_data.get('corePersona')
-        if not core or not isinstance(core, dict):
-            return None
-
-        identity = core.get('identity') or {}
-        tonal = core.get('tonal_range') or {}
-        linguistic = core.get('linguistic_fingerprint') or {}
-        lexical = linguistic.get('lexical_features') or {}
-        rhetorical = linguistic.get('rhetorical_devices') or {}
-        stylistic = core.get('stylistic_constraints') or {}
-
-        return {
-            'identity': {
-                'persona_name': identity.get('persona_name'),
-                'archetype': identity.get('archetype'),
-                'core_belief': identity.get('core_belief'),
-                'brand_voice_description': identity.get('brand_voice_description'),
-            },
-            'tonal_range': {
-                'default_tone': tonal.get('default_tone'),
-                'permissible_tones': tonal.get('permissible_tones') or [],
-                'forbidden_tones': tonal.get('forbidden_tones') or [],
-                'emotional_range': tonal.get('emotional_range'),
-            },
-            'linguistic_fingerprint': {
-                'go_to_phrases': lexical.get('go_to_phrases') or [],
-                'go_to_words': lexical.get('go_to_words') or [],
-                'avoid_words': lexical.get('avoid_words') or [],
-                'vocabulary_level': lexical.get('vocabulary_level'),
-                'storytelling_style': rhetorical.get('storytelling_style'),
-            },
-            'stylistic_constraints': {
-                'punctuation': stylistic.get('punctuation') or {},
-                'formatting': stylistic.get('formatting') or {},
-            },
-            'quality_metrics': persona_data.get('quality_metrics') or {},
-            # Verbatim mirror of PersonaData.platform_personas (E.2b). No consumer
-            # reads a normalized platform slice from canonical_profile (they read the
-            # raw persona_data), so keep it lossless rather than inventing a shape.
-            'platform_personas': persona_data.get('platform_personas') or persona_data.get('platformPersonas') or {},
-        }
+        return build_persona_synthesis(persona_data)
 
     def _build_brand_voice(self, persona_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Build a flat, structured ``brand_voice`` summary from the persona (NOT prose).
-
-        Present only when a persona exists (source ``persona_core``); never populated
-        from ``website_analysis.writing_style`` (that legacy path is retired in E.4).
-        """
-        if not persona_data or not isinstance(persona_data, dict):
-            return None
-        core = persona_data.get('core_persona') or persona_data.get('corePersona')
-        if not core or not isinstance(core, dict):
-            return None
-
-        identity = core.get('identity') or {}
-        tonal = core.get('tonal_range') or {}
-        linguistic = core.get('linguistic_fingerprint') or {}
-        lexical = linguistic.get('lexical_features') or {}
-
-        return {
-            'default_tone': tonal.get('default_tone'),
-            'voice_description': identity.get('brand_voice_description'),
-            'go_to_phrases': lexical.get('go_to_phrases') or [],
-            'avoid_words': lexical.get('avoid_words') or [],
-            'vocabulary_level': lexical.get('vocabulary_level'),
-            'emotional_range': tonal.get('emotional_range'),
-        }
+        return build_brand_voice(persona_data)
 
     def _build_canonical_profile(
         self,
@@ -563,393 +500,23 @@ class OnboardingDataIntegrationService:
         deep_competitor_analysis: Dict[str, Any],
         linkedin_profile: Dict[str, Any] = None,
     ) -> Dict[str, Any]:
-        try:
-            core_persona = None
-            if persona_data:
-                if isinstance(persona_data, dict):
-                    core_persona = persona_data.get('corePersona') or persona_data.get('core_persona')
-
-            persona_block = self._build_persona_synthesis(persona_data)
-            brand_voice = self._build_brand_voice(persona_data)
-
-            website_target = {}
-            if website_analysis and isinstance(website_analysis, dict):
-                value = website_analysis.get('target_audience') or {}
-                if isinstance(value, dict):
-                    website_target = value
-
-            research_target = {}
-            if research_preferences and isinstance(research_preferences, dict):
-                value = research_preferences.get('target_audience') or {}
-                if isinstance(value, dict):
-                    research_target = value
-
-            # industry source-of-record = WebsiteAnalysis (persona has no `industry`
-            # field), fallback ResearchPreferences — matches §3.
-            industry = None
-            if website_target:
-                value = website_target.get('industry_focus')
-                if value:
-                    industry = value
-            if not industry and research_target:
-                value = research_target.get('industry_focus')
-                if value:
-                    industry = value
-
-            target_audience = None
-            target_source = None
-            # ResearchPreferences is the explicit user choice — source-of-record for
-            # target_audience (§3). Read it before the crawl-inferred website value.
-            if research_target:
-                value = research_target.get('demographics') or research_target.get('target_audience')
-                if value:
-                    target_audience = value
-                    target_source = 'research_preferences'
-            if not target_audience and website_target:
-                value = website_target.get('demographics') or website_target.get('target_audience')
-                if value:
-                    target_audience = value
-                    target_source = 'website_analysis'
-
-            writing_style = {}
-            if website_analysis and isinstance(website_analysis, dict):
-                value = website_analysis.get('writing_style')
-                if isinstance(value, dict):
-                    writing_style = value
-            if not writing_style and research_preferences and isinstance(research_preferences, dict):
-                value = research_preferences.get('writing_style')
-                if isinstance(value, dict):
-                    writing_style = value
-
-            writing_tone = None
-            writing_voice = None
-            writing_complexity = None
-            writing_engagement = None
-            writing_source = None
-            if writing_style:
-                value = writing_style.get('tone')
-                if value:
-                    writing_tone = value
-                
-                value = writing_style.get('voice')
-                if value:
-                    writing_voice = value
-
-                value = writing_style.get('complexity')
-                if value:
-                    writing_complexity = value
-
-                value = writing_style.get('engagement_level')
-                if value:
-                    writing_engagement = value
-
-                if website_analysis and website_analysis.get('writing_style'):
-                    writing_source = 'website_analysis'
-                elif research_preferences and research_preferences.get('writing_style'):
-                    writing_source = 'research_preferences'
-
-            # Brand & Visual Identity
-            brand_colors = []
-            brand_values = []
-            visual_style = {}
-            brand_source = None
-            
-            if website_analysis and isinstance(website_analysis, dict):
-                brand_analysis = website_analysis.get('brand_analysis', {})
-                if brand_analysis:
-                    brand_colors = brand_analysis.get('color_palette', [])
-                    brand_values = brand_analysis.get('brand_values', [])
-                    brand_source = 'website_analysis'
-                
-                style_guidelines = website_analysis.get('style_guidelines', {})
-                if style_guidelines:
-                    visual_style = {
-                        'aesthetic': style_guidelines.get('aesthetic'),
-                        'visual_style': style_guidelines.get('visual_style')
-                    }
-
-            # Content Strategy Insights
-            strategy_insights = {}
-            if website_analysis and isinstance(website_analysis, dict):
-                strategy_insights = website_analysis.get('content_strategy_insights', {})
-
-            seo_profile: Dict[str, Any] = {}
-            if website_analysis and isinstance(website_analysis, dict):
-                seo_profile["homepage_seo_audit"] = website_analysis.get("seo_audit") or {}
-                seo_profile["full_site_seo_summary"] = website_analysis.get("full_site_seo_summary") or {}
-                sitemap_strategy = website_analysis.get("sitemap_strategy_insights")
-                if sitemap_strategy:
-                    seo_profile["sitemap_strategy_insights"] = sitemap_strategy
-
-            competitor_seo_benchmarks = self._build_competitor_seo_benchmarks(competitor_analysis)
-            if competitor_seo_benchmarks:
-                seo_profile["competitor_seo_benchmarks"] = competitor_seo_benchmarks
-
-            # Platform Preferences
-            platform_preferences = []
-            platform_source = None
-            
-            if core_persona and isinstance(core_persona, dict):
-                # Check persona_data for platforms
-                if isinstance(persona_data, dict):
-                    selected = persona_data.get('selectedPlatforms')
-                    if selected:
-                        platform_preferences = selected
-                        platform_source = 'persona_data'
-                    else:
-                        platform_personas = persona_data.get('platformPersonas')
-                        if platform_personas:
-                            platform_preferences = list(platform_personas.keys())
-                            platform_source = 'persona_data'
-
-            content_types = []
-            content_source = None
-            if research_preferences and isinstance(research_preferences, dict):
-                prefs_content = research_preferences.get('content_types')
-                if isinstance(prefs_content, list):
-                    content_types = list(prefs_content)
-                    if content_types:
-                        content_source = 'research_preferences'
-            if not content_types and website_analysis and isinstance(website_analysis, dict):
-                content_type_data = website_analysis.get('content_type') or {}
-                if isinstance(content_type_data, dict):
-                    primary = content_type_data.get('primary_type')
-                    if primary:
-                        content_types.append(primary)
-                    secondary = content_type_data.get('secondary_types')
-                    if isinstance(secondary, list):
-                        content_types.extend(secondary)
-                    if content_types:
-                        content_source = 'website_analysis'
-
-            research_depth = None
-            auto_research = None
-            factual_content = None
-            if research_preferences and isinstance(research_preferences, dict):
-                research_depth = research_preferences.get('research_depth')
-                auto_research = research_preferences.get('auto_research')
-                factual_content = research_preferences.get('factual_content')
-
-            business_info = {}
-            if industry:
-                business_info['industry'] = industry
-            if target_audience:
-                business_info['target_audience'] = target_audience
-
-            sources = {
-                'industry': None,
-                'target_audience': target_source,
-                'writing_tone': writing_source,
-                'content_types': content_source,
-                'brand_identity': brand_source,
-                'platform_preferences': platform_source,
-                'persona': 'persona_core' if persona_block else None,
-                'brand_voice': 'persona_core' if brand_voice else None,
-                'seo_profile': 'website_analysis' if website_analysis else None
-            }
-            if website_target.get('industry_focus'):
-                sources['industry'] = 'website_analysis'
-            elif research_target.get('industry_focus'):
-                sources['industry'] = 'research_preferences'
-
-            competitive_sitemap_benchmarking = {}
-            try:
-                if website_analysis and isinstance(website_analysis, dict):
-                    seo_audit = website_analysis.get("seo_audit")
-                    if isinstance(seo_audit, dict):
-                        report = seo_audit.get("competitive_sitemap_benchmarking")
-                        if isinstance(report, dict):
-                            benchmark = report.get("benchmark") if isinstance(report.get("benchmark"), dict) else {}
-                            gaps = benchmark.get("gaps") if isinstance(benchmark.get("gaps"), dict) else {}
-                            missing_sections = gaps.get("missing_sections") if isinstance(gaps.get("missing_sections"), list) else []
-                            competitive_sitemap_benchmarking = {
-                                "status": "available",
-                                "last_run": report.get("timestamp") or report.get("analysis_date"),
-                                "competitors_analyzed": benchmark.get("competitors_analyzed"),
-                                "missing_sections_count": len(missing_sections)
-                            }
-            except Exception:
-                competitive_sitemap_benchmarking = {}
-
-            competitive_intelligence = {
-                'deep_competitor_analysis': deep_competitor_analysis or {},
-                'competitive_sitemap_benchmarking': competitive_sitemap_benchmarking,
-                'strategic_insights_history': website_analysis.get("strategic_insights_history", []) if isinstance(website_analysis, dict) else []
-            }
-
-            return {
-                'industry': industry,
-                'target_audience': target_audience,
-                'writing_tone': writing_tone,
-                'writing_voice': writing_voice,
-                'writing_complexity': writing_complexity,
-                'writing_engagement': writing_engagement,
-                'content_types': content_types,
-                'brand_colors': brand_colors,
-                'brand_values': brand_values,
-                'visual_style': visual_style,
-                'strategy_insights': strategy_insights,
-                'seo_profile': seo_profile,
-                'competitive_intelligence': competitive_intelligence,
-                'platform_preferences': platform_preferences,
-                'research_depth': research_depth,
-                'auto_research': auto_research,
-                'factual_content': factual_content,
-                'business_info': business_info,
-                'persona': persona_block,
-                'brand_voice': brand_voice,
-                'sources': sources
-            }
-        except Exception as e:
-            logger.error(f"Error building canonical profile: {str(e)}")
-            return {}
+        return build_canonical_profile(
+            website_analysis,
+            research_preferences,
+            persona_data,
+            onboarding_session,
+            competitor_analysis,
+            deep_competitor_analysis,
+            linkedin_profile,
+        )
 
     def _build_competitor_seo_benchmarks(self, competitor_analysis: List[Dict[str, Any]]) -> Dict[str, Any]:
-        try:
-            if not competitor_analysis:
-                return {}
+        return build_competitor_seo_benchmarks(competitor_analysis)
 
-            rows = []
-            for comp in competitor_analysis:
-                analysis_data = comp.get("analysis_data") if isinstance(comp, dict) else None
-                if not isinstance(analysis_data, dict):
-                    continue
-                seo_audit = analysis_data.get("seo_audit")
-                if not isinstance(seo_audit, dict):
-                    continue
-                score = seo_audit.get("overall_score")
-                if score is None:
-                    continue
-                rows.append({
-                    "competitor_url": comp.get("competitor_url") or comp.get("url") or comp.get("website_url"),
-                    "competitor_domain": comp.get("competitor_domain") or comp.get("domain"),
-                    "overall_score": score,
-                    "last_analyzed_at": comp.get("updated_at") or comp.get("analysis_date")
-                })
-
-            if not rows:
-                return {}
-
-            scores = [r["overall_score"] for r in rows if isinstance(r.get("overall_score"), (int, float))]
-            avg_score = round(sum(scores) / len(scores), 1) if scores else None
-
-            best = max(rows, key=lambda r: r.get("overall_score") or 0)
-            worst = min(rows, key=lambda r: r.get("overall_score") or 0)
-
-            return {
-                "competitors_with_seo_audit": len(rows),
-                "avg_homepage_seo_score": avg_score,
-                "best_competitor": best,
-                "worst_competitor": worst
-            }
-        except Exception as e:
-            logger.error(f"Error building competitor SEO benchmarks: {str(e)}")
-            return {}
 
     def _assess_data_quality(self, website_analysis: Dict, research_preferences: Dict, persona_data: Dict = None, competitor_analysis: List = None, gsc_analytics: Dict = None, bing_analytics: Dict = None) -> Dict[str, Any]:
-        """Assess the quality and completeness of onboarding data."""
-        try:
-            quality_metrics = {
-                'overall_score': 0.0,
-                'completeness': 0.0,
-                'freshness': 0.0,
-                'relevance': 0.0,
-                'confidence': 0.0
-            }
+        return assess_data_quality(website_analysis, research_preferences, persona_data, competitor_analysis, gsc_analytics, bing_analytics)
 
-            # Calculate completeness
-            total_fields = 0
-            filled_fields = 0
-
-            # Website analysis completeness
-            website_fields = ['domain', 'industry', 'business_type', 'target_audience', 'content_goals']
-            for field in website_fields:
-                total_fields += 1
-                if website_analysis.get(field):
-                    filled_fields += 1
-
-            # Research preferences completeness
-            research_fields = ['research_topics', 'content_types', 'target_audience', 'industry_focus']
-            for field in research_fields:
-                total_fields += 1
-                if research_preferences.get(field):
-                    filled_fields += 1
-
-            # Persona data completeness
-            total_fields += 1
-            if persona_data and persona_data.get('core_persona'):
-                filled_fields += 1
-
-            # Competitor analysis completeness
-            total_fields += 1
-            if competitor_analysis and len(competitor_analysis) > 0:
-                filled_fields += 1
-
-            # GSC analytics completeness
-            total_fields += 1
-            if gsc_analytics and (gsc_analytics.get('data') or gsc_analytics.get('metrics')):
-                filled_fields += 1
-
-            # Bing analytics completeness
-            total_fields += 1
-            if bing_analytics and (bing_analytics.get('data') or bing_analytics.get('summary')):
-                filled_fields += 1
-
-            quality_metrics['completeness'] = filled_fields / total_fields if total_fields > 0 else 0.0
-
-            # Calculate freshness
-            freshness_scores = []
-            for data_source in [website_analysis, research_preferences]:
-                if data_source.get('data_freshness'):
-                    freshness_scores.append(data_source['data_freshness'])
-            if persona_data and persona_data.get('data_freshness'):
-                freshness_scores.append(persona_data['data_freshness'])
-            if competitor_analysis:
-                for competitor in competitor_analysis:
-                    if competitor.get('data_freshness'):
-                        freshness_scores.append(competitor['data_freshness'])
-                        break  # Just use first competitor's freshness
-            if gsc_analytics and gsc_analytics.get('data_freshness'):
-                freshness_scores.append(gsc_analytics['data_freshness'])
-            if bing_analytics and bing_analytics.get('data_freshness'):
-                freshness_scores.append(bing_analytics['data_freshness'])
-            
-            quality_metrics['freshness'] = sum(freshness_scores) / len(freshness_scores) if freshness_scores else 0.0
-
-            # Calculate relevance (based on data presence and quality)
-            relevance_score = 0.0
-            if website_analysis.get('domain'):
-                relevance_score += 0.20
-            if research_preferences.get('research_topics'):
-                relevance_score += 0.15
-            if persona_data and persona_data.get('core_persona'):
-                relevance_score += 0.15
-            if competitor_analysis and len(competitor_analysis) > 0:
-                relevance_score += 0.15
-            if gsc_analytics and (gsc_analytics.get('data') or gsc_analytics.get('metrics')):
-                relevance_score += 0.15  # Real analytics data is highly relevant
-            if bing_analytics and (bing_analytics.get('data') or bing_analytics.get('summary')):
-                relevance_score += 0.10  # Real analytics data is highly relevant
-            
-            quality_metrics['relevance'] = relevance_score
-
-            # Calculate confidence
-            quality_metrics['confidence'] = (quality_metrics['completeness'] + quality_metrics['freshness'] + quality_metrics['relevance']) / 3
-
-            # Calculate overall score
-            quality_metrics['overall_score'] = quality_metrics['confidence']
-
-            return quality_metrics
-
-        except Exception as e:
-            logger.error(f"Error assessing data quality: {str(e)}")
-            return {
-                'overall_score': 0.0,
-                'completeness': 0.0,
-                'freshness': 0.0,
-                'relevance': 0.0,
-                'confidence': 0.0
-            }
 
     def _calculate_freshness(self, created_at: datetime) -> float:
         """Calculate data freshness score (0.0 to 1.0)."""
@@ -1173,118 +740,11 @@ class OnboardingDataIntegrationService:
             return {}
 
     async def _get_gsc_analytics(self, user_id: str) -> Dict[str, Any]:
-        """Get Google Search Console analytics data for the user."""
-        try:
-            from services.seo.dashboard_service import SEODashboardService
-            from services.database import get_db_session
-            
-            db = get_db_session(user_id)
-            try:
-                dashboard_service = SEODashboardService(db)
-                gsc_data = await dashboard_service.get_gsc_data(user_id)
-            finally:
-                db.close()
-            
-            if gsc_data and gsc_data.get('status') != 'disconnected' and not gsc_data.get('error'):
-                logger.debug(f"Retrieved GSC analytics for user {user_id}")
-                return {
-                    'data': gsc_data.get('data', {}),
-                    'metrics': gsc_data.get('metrics', {}),
-                    'date_range': gsc_data.get('date_range', {}),
-                    'data_freshness': 1.0,  # GSC data is typically fresh
-                    'confidence_level': 0.9
-                }
-            else:
-                # "not connected" is the normal state for a user who
-                # hasn't completed the GSC OAuth step yet. Log at
-                # debug level — logging_config.py only emits WARNING+
-                # to the console, so a stream of these would otherwise
-                # make every healthy user look like they have a
-                # problem.
-                logger.debug(f"No GSC analytics for user {user_id} (GSC not connected or no data)")
-                return {}
-                
-        except Exception as e:
-            logger.error(f"Error getting GSC analytics for user {user_id}: {str(e)}")
-            return {}
+        return await fetch_gsc_analytics(user_id)
 
     async def _get_bing_analytics(self, user_id: str) -> Dict[str, Any]:
-        """Get Bing Webmaster Tools analytics data for the user."""
-        try:
-            from services.seo.dashboard_service import SEODashboardService
-            from services.bing_analytics_storage_service import BingAnalyticsStorageService
-            from services.database import get_db_session
-            
-            db = get_db_session(user_id)
-            try:
-                dashboard_service = SEODashboardService(db)
-                bing_data = await dashboard_service.get_bing_data(user_id)
-            finally:
-                db.close()
-            
-            # Also try to get from storage service for more detailed metrics
-            from services.database import get_user_db_path
-            db_path = get_user_db_path(user_id)
-            bing_storage = BingAnalyticsStorageService(f'sqlite:///{db_path}')
-            
-            # Get site URL from onboarding session if available
-            site_url = None
-            try:
-                from services.database import get_db_session
-                with get_db_session(user_id) as db:
-                    session = db.query(OnboardingSession).filter(
-                        OnboardingSession.user_id == user_id
-                    ).order_by(OnboardingSession.updated_at.desc()).first()
-                    if session:
-                        website_analysis = db.query(WebsiteAnalysis).filter(
-                            WebsiteAnalysis.session_id == session.id
-                        ).order_by(WebsiteAnalysis.updated_at.desc()).first()
-                        if website_analysis:
-                            site_url = website_analysis.website_url
-            except Exception as e:
-                logger.warning(f"Could not get site URL for Bing analytics: {e}")
-            
-            analytics_summary = {}
-            if site_url:
-                try:
-                    analytics_summary = bing_storage.get_analytics_summary(user_id, site_url, days=30)
-                except Exception as e:
-                    logger.warning(f"Could not get Bing analytics summary: {e}")
-            
-            if bing_data and bing_data.get('status') != 'disconnected' and not bing_data.get('error'):
-                logger.debug(f"Retrieved Bing analytics for user {user_id}")
-                return {
-                    'data': bing_data.get('data', {}),
-                    'metrics': bing_data.get('metrics', {}),
-                    'summary': analytics_summary,
-                    'date_range': bing_data.get('date_range', {}),
-                    'data_freshness': 1.0,  # Bing data is typically fresh
-                    'confidence_level': 0.9
-                }
-            elif analytics_summary and not analytics_summary.get('error'):
-                # Use stored analytics if available even if API is disconnected
-                logger.debug(f"Retrieved Bing analytics from storage for user {user_id}")
-                return {
-                    'data': {},
-                    'metrics': {},
-                    'summary': analytics_summary,
-                    'date_range': {},
-                    'data_freshness': 0.8,  # Stored data might be slightly older
-                    'confidence_level': 0.85
-                }
-            else:
-                # "not connected" is the normal state for a user who
-                # hasn't completed the Bing OAuth step yet. Log at
-                # debug level — logging_config.py only emits WARNING+
-                # to the console, so a stream of these would otherwise
-                # make every healthy user look like they have a
-                # problem.
-                logger.debug(f"No Bing analytics for user {user_id} (Bing not connected or no data)")
-                return {}
-                
-        except Exception as e:
-            logger.error(f"Error getting Bing analytics for user {user_id}: {str(e)}")
-            return {}
+        return await fetch_bing_analytics(user_id)
+
 
     async def get_integrated_data(self, user_id: int, db: Session) -> Optional[Dict[str, Any]]:
         """Get previously integrated onboarding data for a user."""
@@ -1335,7 +795,12 @@ class OnboardingDataIntegrationService:
             profile = json.loads(row.get("normalized_profile_json", "{}")) if row.get("normalized_profile_json") else {}
             if not profile:
                 return None
+            name = profile.get("name") or ""
+            if not name:
+                personal = profile.get("personal_information") or {}
+                name = personal.get("name") or ""
             return {
+                "name": name,
                 "headline": profile.get("headline"),
                 "industry": profile.get("industry"),
                 "skills": profile.get("skills", []),

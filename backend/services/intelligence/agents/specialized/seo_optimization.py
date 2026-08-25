@@ -7,6 +7,7 @@ from loguru import logger
 from .base import SIFBaseAgent, TXTAI_AVAILABLE, Agent
 from services.intelligence.agents.core_agent_framework import BaseALwrityAgent, TaskProposal
 from services.database import has_onboarding_session
+from services.intelligence.agents.tool_contracts import unavailable_tool
 
 try:
     from services.intelligence.sif_integration import SIFIntegrationService
@@ -78,19 +79,8 @@ class SEOOptimizationAgent(BaseALwrityAgent):
         """
         website_url = context.get("website_url", "unknown")
         if not self.sif_service:
-            return {
-                "health": "unknown",
-                "issues": [],
-                "status": "sif_unavailable",
-                "message": "SIF service not initialized. Call perform_seo_audit() for async analysis."
-            }
-        return {
-            "health": "pending",
-            "website_url": website_url,
-            "issues": [],
-            "status": "sif_available",
-            "message": "SIF available. Call perform_seo_audit() for detailed async analysis."
-        }
+            return unavailable_tool("sif", "SIF service not initialized")
+        return unavailable_tool("sif", "Use async perform_seo_audit() for detailed SEO data")
 
     def _keyword_researcher_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -98,29 +88,17 @@ class SEOOptimizationAgent(BaseALwrityAgent):
         """
         seed = context.get("seed_keywords", context.get("topic", "unknown"))
         if not self.sif_service:
-            return {"keywords": [], "status": "sif_unavailable", "message": "SIF not available."}
-        return {
-            "keywords": [],
-            "status": "sif_available",
-            "message": f"SIF available. Use async search_keywords(topic='{seed}') for detailed research."
-        }
+            return unavailable_tool("sif", "SIF service not initialized")
+        return unavailable_tool("sif", f"Use async search_keywords(topic='{seed}') for keyword data")
 
     def _on_page_optimizer_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """On-page optimization tool. Requires async analysis."""
-        return {
-            "optimized": False,
-            "status": "unavailable",
-            "message": "On-page optimization requires async analysis via propose_daily_tasks()."
-        }
+        return unavailable_tool("seo", "On-page optimization provider is unavailable")
 
     def _technical_fixer_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Technical SEO fixer tool. Auto-fix not implemented."""
         issue_id = context.get("issue_id", "unknown")
-        return {
-            "fixed": False,
-            "status": "unavailable",
-            "message": f"Issue '{issue_id}' requires manual review. Automated fixes not implemented."
-        }
+        return unavailable_tool("seo", f"Issue '{issue_id}' requires manual review; automated fixes are not implemented")
 
     # Async entry points
     
@@ -152,7 +130,7 @@ class SEOOptimizationAgent(BaseALwrityAgent):
         """
         Propose SEO-focused tasks based on real SIF index data.
         """
-        proposals = []
+        default_proposals = []
         issues_found = 0
         website_url = context.get("website_url", "")
 
@@ -166,7 +144,7 @@ class SEOOptimizationAgent(BaseALwrityAgent):
                 logger.debug(f"[SEOOptimizationAgent] SIF search for issues failed: {e}")
 
         if issues_found > 0:
-            proposals.append(TaskProposal(
+            default_proposals.append(TaskProposal(
                 title="Review SEO Issues",
                 description=f"SIF indexed content suggests {issues_found} areas that may need SEO attention.",
                 pillar_id="analyze",
@@ -178,7 +156,7 @@ class SEOOptimizationAgent(BaseALwrityAgent):
                 action_url="/seo-dashboard"
             ))
         else:
-            proposals.append(TaskProposal(
+            default_proposals.append(TaskProposal(
                 title="Run SEO Audit",
                 description="Perform a comprehensive SEO audit to identify optimization opportunities.",
                 pillar_id="analyze",
@@ -190,4 +168,13 @@ class SEOOptimizationAgent(BaseALwrityAgent):
                 action_url="/seo-dashboard"
             ))
 
-        return proposals
+        return await self._synthesize_task_proposals(
+            context,
+            default_proposals,
+            instructions=(
+                "Propose the next SEO actions for this brand based on its website, industry, "
+                "content pillars, and target audience. Each task must have a pillar_id from "
+                "[plan, generate, publish, analyze, engage, remarket] and an action_url "
+                "pointing to /seo-dashboard."
+            ),
+        )

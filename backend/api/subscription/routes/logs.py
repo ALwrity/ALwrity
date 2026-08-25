@@ -7,15 +7,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import Dict, Any, Optional
 from loguru import logger
-import sqlite3
 
 from services.database import get_db
 from services.subscription.log_wrapping_service import LogWrappingService
-from services.subscription.schema_utils import ensure_api_usage_logs_columns
 from middleware.auth_middleware import get_current_user
 from models.subscription_models import APIProvider, APIUsageLog
 from ..dependencies import get_user_id_from_token
-from ..utils import handle_schema_error
 
 router = APIRouter()
 
@@ -47,9 +44,6 @@ async def get_usage_logs(
     try:
         # Get user_id from current_user
         user_id = get_user_id_from_token(current_user)
-        
-        # Ensure schema columns exist (especially actual_provider_name)
-        ensure_api_usage_logs_columns(db)
         
         # Build query
         query = db.query(APIUsageLog).filter(
@@ -241,15 +235,6 @@ async def get_usage_logs(
     
     except HTTPException:
         raise
-    except (sqlite3.OperationalError, Exception) as e:
-        error_str = str(e).lower()
-        if 'no such column' in error_str and 'actual_provider_name' in error_str:
-            return handle_schema_error(
-                e,
-                db,
-                error_str,
-                lambda: get_usage_logs(limit, offset, provider, status_code, billing_period, current_user, db)
-            )
-        
+    except Exception as e:
         logger.error(f"Error getting usage logs: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get usage logs: {str(e)}")

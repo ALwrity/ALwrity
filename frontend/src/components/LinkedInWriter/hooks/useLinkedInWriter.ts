@@ -26,6 +26,7 @@ import {
 } from "../../../services/linkedInWriterApi";
 import { CopilotPersistenceManager } from "../utils/enhancedPersistence";
 import { stripSourceCitations } from "../utils/linkedInPublishFormatters";
+import { diffMarkup } from "../utils/contentFormatters";
 import {
   assembleLinkedInPostContent,
   DEFAULT_LINKEDIN_POST_MAX_LENGTH,
@@ -1065,7 +1066,6 @@ export function useLinkedInWriter() {
 
       // Use diff highlighting for professional content changes
       try {
-        const { diffMarkup } = require("../utils/contentFormatters");
         setLivePreviewHtml(diffMarkup(src, target));
       } catch (error) {
         // Fallback to simple text if diffMarkup fails to load

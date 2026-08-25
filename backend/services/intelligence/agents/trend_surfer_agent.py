@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 from loguru import logger
 
 from services.intelligence.agents.specialized_agents import SIFBaseAgent
-from services.intelligence.agents.market_signal_detector import MarketSignalDetector, MarketSignal, UrgencyLevel, SignalType
+from services.intelligence.agents.market_signal_detector import MarketSignalDetector, MarketSignal, UrgencyLevel, SignalType, compute_signal_confidence
 from services.intelligence.txtai_service import TxtaiIntelligenceService
 from services.research.trends.google_trends_service import GoogleTrendsService
 
@@ -99,6 +99,23 @@ class TrendSurferAgent(SIFBaseAgent):
                 avg_interest = sum(values) / len(values)
                 last_interest = values[-1]
                 
+                # Derive confidence from measurable trend factors instead of a
+                # fixed constant: sample depth, momentum vs the flat baseline,
+                # and data freshness (fetched live moments ago).
+                if avg_interest > 0:
+                    confidence_score, confidence_basis, is_estimate = compute_signal_confidence(
+                        sample_count=len(values),
+                        change_ratio=last_interest / avg_interest,  # threshold is 1.0 (flat trend)
+                        data_age_hours=0.0,
+                    )
+                else:
+                    confidence_score = None
+                    is_estimate = True
+                    confidence_basis = "Insufficient samples: zero-interest series"
+                if confidence_score is None:
+                    logger.info(f"Skipping trend signal for '{trend_kw}': {confidence_basis}")
+                    continue
+                
                 # Calculate impact/urgency
                 impact_score = min(last_interest / 100.0, 1.0) # Normalized
                 urgency = UrgencyLevel.MEDIUM
@@ -115,10 +132,16 @@ class TrendSurferAgent(SIFBaseAgent):
                     description=f"Surging interest in '{trend_kw}'",
                     impact_score=impact_score,
                     urgency_level=urgency,
-                    confidence_score=0.9,
+                    confidence_score=confidence_score,
                     related_topics=[t.get("topic_title", "") for t in trend_data.get("related_topics", {}).get("top", [])[:3]],
                     suggested_actions=["Create timely content", "Update social media"],
-                    metadata=trend_data
+                    metadata={
+                        **trend_data,
+                        'avg_interest': avg_interest,
+                        'last_interest': last_interest,
+                        'confidence_basis': confidence_basis,
+                        'confidence_is_estimate': is_estimate,
+                    }
                 )
                 signals.append(signal)
                 

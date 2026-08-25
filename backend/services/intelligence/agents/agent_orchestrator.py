@@ -25,6 +25,8 @@ from utils.logger_utils import get_service_logger
 from services.intelligence.agents.core_agent_framework import (
     BaseALwrityAgent, AgentAction, AgentPerformance, StrategyOrchestratorAgent
 )
+from services.publishing_capabilities import evaluate_publish_gate
+from services.intelligence.agents.quality_gates import validate_pre_publish_quality
 from services.intelligence.agents.specialized_agents import (
     ContentStrategyAgent,
     CompetitorResponseAgent,
@@ -32,6 +34,7 @@ from services.intelligence.agents.specialized_agents import (
     SocialAmplificationAgent,
     StrategyArchitectAgent,
 )
+from services.intelligence.agents.tool_inventory import get_tool_health_report
 from services.intelligence.agents.trend_surfer_agent import TrendSurferAgent
 from services.intelligence.agents.market_signal_detector import (
     MarketSignal, MarketSignalDetector
@@ -54,6 +57,10 @@ class AgentTeamConfiguration:
     enable_safety: bool = True
     enable_performance_monitoring: bool = True
     enable_market_signals: bool = True
+    # When True, agent initialization is allowed even if onboarding is not yet
+    # marked complete. Used by the onboarding "preview team" dry-run, which runs
+    # the committee before the user launches.
+    allow_preview_init: bool = False
     created_at: str = None
     
     def __post_init__(self):
@@ -126,7 +133,7 @@ class ALwrityAgentOrchestrator:
                 from services.onboarding.progress_service import OnboardingProgressService
                 onboarding_service = OnboardingProgressService()
                 status = onboarding_service.get_onboarding_status(self.user_id)
-                if not status.get("is_completed", False):
+                if not status.get("is_completed", False) and not self.config.allow_preview_init:
                     logger.info(f"Skipping agent initialization for user {self.user_id} - Onboarding incomplete")
                     self.execution_history.append({
                         "user_id": self.user_id,
@@ -417,7 +424,7 @@ class ALwrityAgentOrchestrator:
             # Get performance metrics if available
             performance_summary = {}
             if self.performance_monitor:
-                all_performance = self.performance_monitor.get_all_agents_performance()
+                all_performance = await self.performance_monitor.get_all_agents_performance()
                 performance_summary = {perf['agent_id']: perf for perf in all_performance}
             
             return {
@@ -428,7 +435,8 @@ class ALwrityAgentOrchestrator:
                 "recent_activity": self.get_execution_history(limit=5),
                 "market_signals_active": self.config.enable_market_signals,
                 "safety_enabled": self.config.enable_safety,
-                "performance_monitoring_enabled": self.config.enable_performance_monitoring
+                "performance_monitoring_enabled": self.config.enable_performance_monitoring,
+                "tool_health": get_tool_health_report(),
             }
             
         except Exception as e:
@@ -451,14 +459,45 @@ class ALwrityAgentOrchestrator:
         return self.execution_history[-limit:]
 
     async def _prepare_orchestrator_context(self, market_context: Dict[str, Any]) -> Dict[str, Any]:
-        """Prepare comprehensive context for orchestrator"""
+        """Prepare comprehensive context for orchestrator, enriched with onboarding data."""
+        from starlette.concurrency import run_in_threadpool
+        from services.database import get_session_for_user
+        from api.content_planning.services.content_strategy.onboarding.data_integration import (
+            OnboardingDataIntegrationService,
+        )
+        from services.intelligence.agents.prompt_context import (
+            build_prompt_context,
+            comma_join_context,
+        )
+
+        onboarding_context: Dict[str, Any] = {}
+        try:
+            db = get_session_for_user(self.user_id)
+            if db:
+                try:
+                    svc = OnboardingDataIntegrationService()
+                    integrated = await run_in_threadpool(
+                        svc.get_integrated_data_sync, self.user_id, db
+                    )
+                    onboarding_context = comma_join_context(
+                        build_prompt_context(integrated or {})
+                    )
+                finally:
+                    try:
+                        db.close()
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.warning(f"Could not load onboarding context for orchestrator (user {self.user_id}): {e}")
+
         context = {
             "user_id": self.user_id,
             "market_conditions": market_context,
             "timestamp": datetime.utcnow().isoformat(),
             "available_agents": list(self.agents.keys()),
             "agent_capabilities": self._get_agent_capabilities(),
-            "system_status": await self.get_agent_status()
+            "system_status": await self.get_agent_status(),
+            "onboarding_data": onboarding_context,
         }
         
         return context
@@ -467,11 +506,13 @@ class ALwrityAgentOrchestrator:
         """Get capabilities of each agent type"""
         return {
             "content": ["Content analysis", "Gap detection", "Optimization", "Performance tracking"],
+            "strategy": ["Content pillar discovery", "Semantic gap detection", "Strategic task proposals"],
             "competitor": ["Competitor monitoring", "Threat analysis", "Response generation", "Strategy execution"],
             "seo": ["SEO auditing", "Issue prioritization", "Auto-fixing", "Strategy generation"],
             "social": ["Social monitoring", "Content adaptation", "Engagement optimization", "Distribution management"],
             "trend": ["Trend detection", "Opportunity analysis", "Content angle generation"],
-            "content_gap_radar": ["Content gap detection", "SERP opportunity scoring", "Competitor content deep-dive", "ROI-based topic prioritization", "Content brief generation"]
+            "guardian": ["Committee output auditing", "Brand alignment checking", "Quality scoring", "Coverage gap detection"],
+            "content_gap_radar": ["Content gap detection", "SERP opportunity scoring", "Competitor content deep-dive", "ROI-based topic prioritization", "Content brief generation"],
         }
 
 # Service class for agent orchestration
@@ -524,7 +565,7 @@ class AgentOrchestrationService:
         self.orchestrators[user_id] = orchestrator
         self._evict_orchestrator_lru()
 
-    async def get_or_create_orchestrator(self, user_id: str) -> ALwrityAgentOrchestrator:
+    async def get_or_create_orchestrator(self, user_id: str, allow_preview_init: bool = False) -> ALwrityAgentOrchestrator:
         """Get or create an orchestrator for a user.
 
         LRU semantics: every call marks the user's orchestrator as
@@ -533,7 +574,7 @@ class AgentOrchestrationService:
         """
         onboarding_gated_initialization = False
         if user_id not in self.orchestrators:
-            config = AgentTeamConfiguration(user_id=user_id)
+            config = AgentTeamConfiguration(user_id=user_id, allow_preview_init=allow_preview_init)
             self._cache_orchestrator(user_id, ALwrityAgentOrchestrator(config))
             logger.info(f"Created new orchestrator for user: {user_id}")
         else:
@@ -650,9 +691,139 @@ class AgentOrchestrationService:
 orchestration_service = AgentOrchestrationService()
 
 # Convenience functions for external use
+_AGENT_OPERATION_KEYS = {
+    "contentstrategyagent": "content",
+    "content_strategist": "content",
+    "content": "content",
+    "strategyarchitectagent": "strategy",
+    "strategy_architect": "strategy",
+    "strategy": "strategy",
+    "competitorresponseagent": "competitor",
+    "competitor_analyst": "competitor",
+    "competitor": "competitor",
+    "seooptimizationagent": "seo",
+    "seo_specialist": "seo",
+    "seo": "seo",
+    "socialamplificationagent": "social",
+    "social_media_manager": "social",
+    "social": "social",
+    "trendsurferagent": "trend",
+    "trend_surfer": "trend",
+    "trend": "trend",
+    "contentguardianagent": "guardian",
+    "content_guardian": "guardian",
+    "guardian": "guardian",
+    "contentgapradaragent": "content_gap_radar",
+    "content_gap_radar": "content_gap_radar",
+}
+
+
+def _resolve_agent_operation_key(agent_type: str) -> str:
+    normalized = str(agent_type or "").strip().lower()
+    return _AGENT_OPERATION_KEYS.get(normalized, normalized)
+
+
 async def execute_marketing_strategy(user_id: str, market_context: Dict[str, Any]) -> Dict[str, Any]:
     """Execute marketing strategy for a user"""
     return await orchestration_service.execute_marketing_strategy(user_id, market_context)
+
+
+async def execute_agent_action(user_id: str, agent_type: str, action: AgentAction) -> Dict[str, Any]:
+    """Execute an approved/manual action through the user's cached agent.
+
+    The public API accepts catalog names while the orchestrator stores agents
+    under short operational keys. Keep that translation in one place and do
+    not bypass the agent's safety, approval, rollback, or activity lifecycle.
+    """
+    normalized_action = str(action.action_type or "").strip().lower()
+    if normalized_action in {"publish", "post", "send", "schedule"}:
+        action_parameters = action.parameters if isinstance(action.parameters, dict) else {}
+        quality_gate = validate_pre_publish_quality(action_parameters)
+        content = str(
+            action_parameters.get("content")
+            or action_parameters.get("draft")
+            or action_parameters.get("text")
+            or ""
+        ).strip()
+        if content and (
+            action_parameters.get("originality_score") is None
+            or action_parameters.get("cannibalization_warning") is None
+        ):
+            try:
+                orchestrator = await orchestration_service.get_or_create_orchestrator(user_id)
+                guardian = orchestrator.agents.get("guardian")
+                if guardian:
+                    if action_parameters.get("originality_score") is None:
+                        originality = await guardian.verify_originality(content, None)
+                        action_parameters["originality_score"] = originality.get("originality_score")
+                        action_parameters["originality_result"] = originality
+                    if action_parameters.get("cannibalization_warning") is None:
+                        cannibalization = await guardian.check_cannibalization(content)
+                        action_parameters["cannibalization_warning"] = cannibalization.get("warning", False)
+                        action_parameters["cannibalization_result"] = cannibalization
+                    quality_gate = validate_pre_publish_quality(action_parameters)
+            except Exception as quality_error:
+                logger.warning("Pre-publish Guardian checks failed for user {}: {}", user_id, quality_error)
+        if not quality_gate["allowed"] and action_parameters.get("quality_override_approved") is not True:
+            if action_parameters.get("quality_override_requested") is True and action.requires_approval:
+                orchestrator = await orchestration_service.get_or_create_orchestrator(user_id)
+                agent = orchestrator.agents.get(_resolve_agent_operation_key(agent_type))
+                if agent:
+                    action_parameters["pre_publish_quality_gate"] = quality_gate
+                    action.parameters = action_parameters
+                    return await agent.execute_action(action)
+            return {
+                "success": False,
+                "error": "Publishing blocked by pre-publish quality checks",
+                "error_code": "PUBLISHING_QUALITY_GATE_FAILED",
+                "quality_gate": quality_gate,
+                "override_approval_required": bool(action_parameters.get("quality_override_requested")),
+                "requires_approval": False,
+                "action_id": action.action_id,
+            }
+        if action_parameters.get("quality_override_approved") is True:
+            action_parameters["quality_gate_passed"] = True
+            action.parameters = action_parameters
+        publish_gate = evaluate_publish_gate(action)
+        if not publish_gate["allowed"]:
+            return {
+                "success": False,
+                "error": "Platform publishing is not allowed by the publishing capability gate",
+                "error_code": "PUBLISHING_ROLLBACK_NOT_VERIFIED",
+                "failed_checks": publish_gate["failed_checks"],
+                "publish_gate": publish_gate,
+                "requires_approval": False,
+                "action_id": action.action_id,
+            }
+
+    orchestrator = await orchestration_service.get_or_create_orchestrator(user_id)
+    agent = orchestrator.agents.get(_resolve_agent_operation_key(agent_type))
+    if not agent:
+        return {
+            "success": False,
+            "error": f"Agent '{agent_type}' is not available for this user",
+            "agent_type": agent_type,
+        }
+    return await agent.execute_action(action)
+
+
+async def record_agent_action_performance(
+    user_id: str,
+    agent_type: str,
+    success: bool,
+    response_time: float,
+) -> bool:
+    """Update the owning agent's counters for direct product-service adapters."""
+    try:
+        orchestrator = await orchestration_service.get_or_create_orchestrator(user_id)
+        agent = orchestrator.agents.get(_resolve_agent_operation_key(agent_type))
+        if not agent or not hasattr(agent, "_update_performance_metrics"):
+            return False
+        await agent._update_performance_metrics(success, response_time)
+        return True
+    except Exception as exc:
+        logger.warning("Could not update direct action performance for user {}: {}", user_id, exc)
+        return False
 
 async def get_agent_system_status(user_id: str) -> Dict[str, Any]:
     """Get agent system status for a user"""

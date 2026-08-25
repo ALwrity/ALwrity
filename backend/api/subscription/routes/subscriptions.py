@@ -7,11 +7,9 @@ from sqlalchemy.orm import Session
 from typing import Dict, Any
 from datetime import datetime, timedelta
 from loguru import logger
-import sqlite3
 
 from services.database import get_db
 from services.subscription import UsageTrackingService, PricingService
-from services.subscription.schema_utils import ensure_subscription_plan_columns
 from services.user_workspace_manager import UserWorkspaceManager
 from middleware.auth_middleware import get_current_user
 from models.subscription_models import (
@@ -19,7 +17,7 @@ from models.subscription_models import (
     SubscriptionTier, BillingCycle, UsageStatus, SubscriptionRenewalHistory
 )
 from ..dependencies import verify_user_access
-from ..utils import enum_value, format_plan_limits, handle_schema_error
+from ..utils import enum_value, format_plan_limits
 
 router = APIRouter()
 
@@ -35,7 +33,6 @@ async def get_user_subscription(
     verify_user_access(user_id, current_user)
     
     try:
-        ensure_subscription_plan_columns(db)
         subscription = db.query(UserSubscription).filter(
             UserSubscription.user_id == user_id,
             UserSubscription.is_active == True
@@ -124,11 +121,6 @@ async def get_subscription_status(
     verify_user_access(user_id, current_user)
 
     try:
-        ensure_subscription_plan_columns(db)
-    except Exception as schema_err:
-        logger.warning(f"Schema check failed, will retry on query: {schema_err}")
-
-    try:
         subscription = db.query(UserSubscription).filter(
             UserSubscription.user_id == user_id,
             UserSubscription.is_active == True
@@ -199,91 +191,7 @@ async def get_subscription_status(
             }
         }
 
-    except (sqlite3.OperationalError, Exception) as e:
-        error_str = str(e).lower()
-        if 'no such column' in error_str and ('exa_calls_limit' in error_str or 'video_calls_limit' in error_str or 'image_edit_calls_limit' in error_str or 'audio_calls_limit' in error_str):
-            # Try to fix schema and retry once
-            logger.warning("Missing column detected in subscription status query, attempting schema fix...")
-            try:
-                import services.subscription.schema_utils as schema_utils
-                schema_utils._checked_subscription_plan_columns = False
-                ensure_subscription_plan_columns(db)
-                db.commit()  # Ensure schema changes are committed
-                db.expire_all()
-                # Retry the query - query subscription without eager loading plan
-                subscription = db.query(UserSubscription).filter(
-                    UserSubscription.user_id == user_id,
-                    UserSubscription.is_active == True
-                ).first()
-                
-                if not subscription:
-                    free_plan = db.query(SubscriptionPlan).filter(
-                        SubscriptionPlan.tier == SubscriptionTier.FREE,
-                        SubscriptionPlan.is_active == True
-                    ).first()
-                    if free_plan:
-                        return {
-                            "success": True,
-                            "data": {
-                                "active": True,
-                                "plan": "free",
-                                "tier": "free",
-                                "can_use_api": True,
-                                "limits": format_plan_limits(free_plan)
-                            }
-                        }
-                elif subscription:
-                    # Query plan separately after schema fix to avoid lazy loading issues
-                    plan = db.query(SubscriptionPlan).filter(
-                        SubscriptionPlan.id == subscription.plan_id
-                    ).first()
-                    
-                    if not plan:
-                        raise HTTPException(status_code=404, detail="Plan not found")
-                    
-                    now = datetime.utcnow()
-                    if subscription.current_period_end < now:
-                        if getattr(subscription, 'auto_renew', False):
-                            try:
-                                from services.subscription.pricing_service import PricingService
-                                pricing = PricingService(db)
-                                pricing._ensure_subscription_current(subscription)
-                            except Exception as e2:
-                                logger.error(f"Failed to auto-advance subscription: {e2}")
-                        else:
-                            return {
-                                "success": True,
-                                "data": {
-                                    "active": False,
-                                    "plan": plan.tier.value,
-                                    "tier": plan.tier.value,
-                                    "can_use_api": False,
-                                    "reason": "Subscription expired"
-                                }
-                            }
-                    return {
-                        "success": True,
-                        "data": {
-                            "active": True,
-                            "plan": plan.tier.value,
-                            "tier": plan.tier.value,
-                            "can_use_api": True,
-                            "limits": format_plan_limits(plan)
-                        }
-                    }
-            except Exception as retry_err:
-                logger.error(f"Schema fix and retry failed: {retry_err}", exc_info=True)
-                return {
-                    "success": True,
-                    "data": {
-                        "active": False,
-                        "plan": "none",
-                        "tier": "none",
-                        "can_use_api": False,
-                        "reason": f"Database schema error: {str(e)}"
-                    }
-                }
-        
+    except Exception as e:
         logger.error(f"Error getting subscription status: {e}", exc_info=True)
         return {
             "success": True,
@@ -312,7 +220,6 @@ async def subscribe_to_plan(
         from services.database.init_db import init_user_database
 
         init_user_database(user_id)
-        ensure_subscription_plan_columns(db)
         plan_id = subscription_data.get("plan_id")
         tier_hint = subscription_data.get("tier")
         billing_cycle = subscription_data.get("billing_cycle", "monthly")

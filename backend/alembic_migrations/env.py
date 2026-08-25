@@ -28,10 +28,13 @@ import models.backlink_outreach_models  # noqa: E402, F401
 import models.bing_analytics_models  # noqa: E402, F401
 import models.comprehensive_user_data_cache  # noqa: E402, F401
 import models.content_asset_models  # noqa: E402, F401
+import models.conversion_event_models  # noqa: E402, F401
 import models.content_planning  # noqa: E402, F401
 import models.content_strategy_state_models  # noqa: E402, F401
 import models.crawled_content  # noqa: E402, F401
+import models.daily_meeting_models  # noqa: E402, F401
 import models.daily_workflow_models  # noqa: E402, F401
+import models.workflow_execution_models  # noqa: E402, F401
 import models.enhanced_calendar_models  # noqa: E402, F401
 import models.enhanced_strategy_models  # noqa: E402, F401
 import models.gsc_brainstorm_cache_models  # noqa: E402, F401
@@ -42,8 +45,11 @@ import models.linkedin_post_analytics_model  # noqa: E402, F401
 import models.linkedin_pymk_cache_model  # noqa: E402, F401
 import models.linkedin_watchdog_db_models  # noqa: E402, F401
 import models.monitoring_models  # noqa: E402, F401
+import models.linkedin_oauth_models  # noqa: E402, F401
 import models.oauth_token_monitoring_models  # noqa: E402, F401
+import models.oauth_provider_models  # noqa: E402, F401
 import models.onboarding  # noqa: E402, F401
+import models.persona_task_models  # noqa: E402, F401
 import models.platform_insights_monitoring_models  # noqa: E402, F401
 import models.podcast_models  # noqa: E402, F401
 import models.post_analytics_snapshot_model  # noqa: E402, F401
@@ -58,8 +64,10 @@ import models.seo_analysis  # noqa: E402, F401
 import models.sif_indexing_watermark  # noqa: E402, F401
 import models.story_project_models  # noqa: E402, F401
 import models.subscription_models  # noqa: E402, F401
+import models.task_memory_models  # noqa: E402, F401
 import models.user_business_info  # noqa: E402, F401
 import models.video_models  # noqa: E402, F401
+import models.wordpress_models  # noqa: E402, F401
 import models.website_analysis_monitoring_models  # noqa: E402, F401
 import models.youtube_task_models  # noqa: E402, F401
 import models.youtube_channel_bible_models  # noqa: E402, F401

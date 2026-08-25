@@ -15,7 +15,10 @@ import json
 from middleware.auth_middleware import get_current_user, get_current_user_with_query_token
 from utils.logger_utils import get_service_logger
 from services.intelligence.agents.agent_orchestrator import (
-    execute_marketing_strategy, get_agent_system_status, process_market_signals_for_user
+    execute_agent_action,
+    execute_marketing_strategy,
+    get_agent_system_status,
+    process_market_signals_for_user,
 )
 from services.intelligence.agents.core_agent_framework import AgentAction
 from services.intelligence.agents.market_signal_detector import MarketSignal
@@ -33,11 +36,139 @@ from services.agent_activity_serializers import (
 )
 from sqlalchemy.orm import Session
 from models.agent_activity_models import AgentProfile, AgentRun, AgentEvent, AgentAlert, AgentApprovalRequest
+from models.daily_workflow_models import DailyWorkflowTask
+from models.workflow_execution_models import WorkflowTaskExecution
 from services.intelligence.agents.team_catalog import AGENT_TEAM_CATALOG, get_agent_catalog_entry
+from services.tool_certification import get_agent_certification_rollup
+
+# Certification rollup is static per deploy; cache it briefly so the team
+# endpoint doesn't re-run file scans on every request.
+_CERTIFICATION_CACHE: Dict[str, Any] = {"data": None, "computed_at": 0.0}
+_CERTIFICATION_CACHE_TTL_SECONDS = 60.0
+
+
+def _get_cached_certification_rollup() -> Optional[Dict[str, Any]]:
+    import time as _time
+
+    now = _time.monotonic()
+    cached = _CERTIFICATION_CACHE["data"]
+    if cached is not None and (now - _CERTIFICATION_CACHE["computed_at"]) < _CERTIFICATION_CACHE_TTL_SECONDS:
+        return cached
+    try:
+        rollup = get_agent_certification_rollup()
+        _CERTIFICATION_CACHE["data"] = rollup
+        _CERTIFICATION_CACHE["computed_at"] = now
+        return rollup
+    except Exception as cert_err:
+        logger.warning(f"Certification rollup unavailable: {cert_err}")
+        return None
+
+
+from services.intelligence.agents.prompt_context import (
+    build_prompt_context,
+    comma_join_context,
+    select_agent_context,
+    format_context,
+)
 
 logger = get_service_logger(__name__)
 
 router = APIRouter(prefix="/api/agents", tags=["Autonomous Agents"])
+
+
+def _build_context_emphasis(agent_key: str, ctx: Dict[str, Any]) -> str:
+    """Build a data-grounded emphasis for an agent, naming the user's actual
+    onboarding data (competitors, pillars, voice, audience, platforms) so the
+    LLM personalizes around the real brand rather than a generic role hint.
+    """
+    def _names(items: Any, limit: int = 5) -> str:
+        if not isinstance(items, list):
+            return ""
+        flat = [str(i).strip() for i in items if i and str(i).strip()]
+        if not flat:
+            return ""
+        if len(flat) > limit:
+            return ", ".join(flat[:limit]) + f" (and {len(flat) - limit} more)"
+        return ", ".join(flat)
+
+    persona = ctx.get("persona") or {}
+    brand_voice = ctx.get("brand_voice") or persona.get("brand_voice_description") or ""
+    audience = ctx.get("target_audience") or ""
+    website = ctx.get("website_url") or ""
+    pillars = _names(ctx.get("content_pillars"))
+    competitors = _names(ctx.get("competitors"))
+    content_types = _names(ctx.get("content_types"))
+    cadence = ctx.get("posting_cadence") or ""
+    avoid_words = _names(ctx.get("avoid_words") or persona.get("avoid_words"), limit=8)
+    forbidden_tones = _names(ctx.get("forbidden_tones") or persona.get("forbidden_tones"), limit=8)
+
+    if agent_key == "competitor_analyst":
+        bits = []
+        if competitors:
+            bits.append(f"track competitors {competitors}")
+        if audience:
+            bits.append(f"position responses for their audience ({audience})")
+        if pillars:
+            bits.append(f"find gaps against their pillars ({pillars})")
+        return ("Personalize this agent to " + "; ".join(bits) + ".") if bits else \
+            "Personalize this agent around the user's competitors and content gaps."
+
+    if agent_key == "content_strategist":
+        bits = []
+        if pillars:
+            bits.append(f"anchor recommendations to pillars: {pillars}")
+        if brand_voice:
+            bits.append(f"write in the brand voice \"{brand_voice}\"")
+        if audience:
+            bits.append(f"speak to the audience {audience}")
+        return ("Personalize this agent to " + "; ".join(bits) + ".") if bits else \
+            "Personalize this agent around the user's pillars, voice, and audience."
+
+    if agent_key == "seo_specialist":
+        bits = []
+        if website:
+            bits.append(f"optimize the site {website}")
+        if pillars:
+            bits.append(f"serve pillars: {pillars}")
+        if audience:
+            bits.append(f"stay aligned to the audience {audience}")
+        return ("Personalize this agent to " + "; ".join(bits) + ".") if bits else \
+            "Personalize this agent around the user's website and SEO goals."
+
+    if agent_key == "social_media_manager":
+        bits = []
+        if content_types:
+            bits.append(f"distribute their content types ({content_types})")
+        if cadence:
+            bits.append(f"respect their posting cadence ({cadence})")
+        if brand_voice:
+            bits.append(f"keep every post in the brand voice \"{brand_voice}\"")
+        return ("Personalize this agent to " + "; ".join(bits) + ".") if bits else \
+            "Personalize this agent around the user's platforms, cadence, and content types."
+
+    if agent_key == "content_guardian":
+        bits = []
+        if brand_voice:
+            bits.append(f"protect the brand voice \"{brand_voice}\"")
+        if forbidden_tones:
+            bits.append(f"reject forbidden tones ({forbidden_tones})")
+        if avoid_words:
+            bits.append(f"flag avoid-words ({avoid_words})")
+        return ("Personalize this agent to " + "; ".join(bits) + ".") if bits else \
+            "Personalize this agent around the user's brand voice and quality rules."
+
+    if agent_key in ("strategy_orchestrator", "strategy_architect"):
+        bits = []
+        if pillars:
+            bits.append(f"coordinate around pillars {pillars}")
+        if competitors:
+            bits.append(f"factor in competitors {competitors}")
+        if audience:
+            bits.append(f"keep delegations aligned to the audience {audience}")
+        return ("Personalize this agent to " + "; ".join(bits) + ".") if bits else \
+            "Personalize this agent around the user's business goals and content pillars."
+
+    return "Personalize this agent using the user's onboarding context."
 
 
 def _can_access_advanced_activity(current_user: Dict[str, Any]) -> bool:
@@ -133,8 +264,14 @@ async def get_agent_team_endpoint(
         agents = []
         for entry in AGENT_TEAM_CATALOG:
             agent_key = entry.get("agent_key")
-            defaults = entry.get("defaults") or {}
+            # Shallow copy so the rendered fields we add below never mutate the
+            # module-level catalog (which is shared across requests/users).
+            defaults = dict(entry.get("defaults") or {})
             profile = profile_by_key.get(agent_key)
+
+            # Hidden agents are internal system agents — not shown in UI.
+            if entry.get("hidden"):
+                continue
 
             agents.append(
                 {
@@ -158,9 +295,68 @@ async def get_agent_team_endpoint(
                 }
             )
 
+        # Single source-of-truth context summary derived from canonical onboarding data.
+        context_summary = {}
+        render_context: Dict[str, str] = comma_join_context(build_prompt_context({}))
+        try:
+            from api.content_planning.services.content_strategy.onboarding.data_integration import (
+                OnboardingDataIntegrationService,
+            )
+
+            svc = OnboardingDataIntegrationService()
+            integrated = svc.get_integrated_data_sync(user_id, db) or {}
+            linkedin_profile = integrated.get("linkedin_profile") or {}
+
+            # Single authoritative structured context (from prompt_context builder).
+            structured = build_prompt_context(integrated)
+
+            context_summary = {
+                "website_name": structured.get("website_name") or "",
+                "website_url": structured.get("website_url") or "",
+                "profile_name": linkedin_profile.get("name") or "",
+                "industry": structured.get("industry") or "",
+                "brand_voice": structured.get("brand_voice") or "",
+                "target_audience": structured.get("target_audience") or "",
+                "content_pillars": structured.get("content_pillars") or [],
+                "competitors": structured.get("competitors") or [],
+                "research_depth": structured.get("research_depth") or "",
+                "content_types": structured.get("content_types") or [],
+                "connected_platforms": structured.get("connected_platforms") or [],
+                "posting_cadence": structured.get("posting_cadence") or "",
+                "business_goals": structured.get("business_goals") or [],
+            }
+
+            # Flattened variant for {placeholder} template rendering.
+            render_context = comma_join_context(structured)
+        except Exception as ctx_err:
+            logger.warning(f"Could not build context_summary for agent team (user {user_id}): {ctx_err}")
+
+        # Render the catalog prompt templates with the user's context so the UI
+        # shows resolved values instead of raw {placeholders}.
+        def _render_template(text: Any) -> str:
+            value = str(text or "")
+            for key, val in render_context.items():
+                value = value.replace("{" + key + "}", str(val))
+            return value
+
+        for agent in agents:
+            defaults = agent.get("defaults") or {}
+            defaults["rendered_system_prompt"] = _render_template(defaults.get("system_prompt_template"))
+            defaults["rendered_task_prompt_template"] = _render_template(defaults.get("task_prompt_template"))
+            agent["defaults"] = defaults
+
+        # Honest certification labels: never claim production-real behavior
+        # that the tool gates don't back. Absent on rollup failure so the
+        # team payload itself never breaks.
+        certification = _get_cached_certification_rollup()
+
         return {
             "success": True,
-            "data": {"agents": agents},
+            "data": {
+                "agents": agents,
+                "context_summary": context_summary,
+                "certification": certification,
+            },
             "timestamp": datetime.utcnow().isoformat(),
             "user_id": user_id,
         }
@@ -334,16 +530,19 @@ async def ai_optimize_agent_profile_endpoint(
                 return text
             return text[: max_len - 20] + " …(truncated)"
 
-        compact_context = {
-            "website_name": _truncate(context_card.get("website_name"), 120),
-            "website_url": _truncate(context_card.get("website_url"), 300),
-            "brand_voice": _truncate(context_card.get("brand_voice"), 1200),
-            "target_audience": _truncate(context_card.get("target_audience"), 1200),
-            "style_guidelines": _truncate(context_card.get("style_guidelines"), 1200),
-            "content_pillars": context_card.get("content_pillars") if isinstance(context_card.get("content_pillars"), list) else [],
-            "competitors": context_card.get("competitors") if isinstance(context_card.get("competitors"), list) else [],
-            "business_goals": context_card.get("business_goals") if isinstance(context_card.get("business_goals"), list) else [],
-        }
+        # Build the authoritative context server-side from the full integrated
+        # data, then select only the role-relevant fields for this agent.
+        # The frontend card is kept as a thin overlay for LinkedIn-specific
+        # fields (growth_summary, preferred_formats, …) not in the raw data.
+        from api.content_planning.services.content_strategy.onboarding.data_integration import (
+            OnboardingDataIntegrationService,
+        )
+        integrated = OnboardingDataIntegrationService().get_integrated_data_sync(user_id, db) or {}
+        full_context = {**context_card}
+        for key, value in build_prompt_context(integrated).items():
+            if value:
+                full_context[key] = value
+        selected_context = select_agent_context(agent_key, full_context)
 
         from services.llm_providers.main_text_generation import llm_text_gen
 
@@ -397,8 +596,11 @@ Current editable state:
   "task_prompt_template": {(_truncate(current_state.get('task_prompt_template'), 3000) if current_state.get('task_prompt_template') else "")}
 }}
 
-Personalization context (from onboarding steps 1-5):
-{compact_context}
+Relevant context for this agent:
+{format_context(selected_context)}
+
+What matters most for this agent:
+{_build_context_emphasis(agent_key, selected_context)}
 
 Return ONLY a JSON object that matches the schema.
 """
@@ -441,6 +643,18 @@ async def preview_agent_profile_endpoint(
         if context_card is not None and not isinstance(context_card, dict):
             raise HTTPException(status_code=400, detail="context_card must be an object")
 
+        # Build the authoritative context server-side, then select only the
+        # role-relevant fields for this agent.
+        from api.content_planning.services.content_strategy.onboarding.data_integration import (
+            OnboardingDataIntegrationService,
+        )
+        integrated = OnboardingDataIntegrationService().get_integrated_data_sync(user_id, db) or {}
+        full_context = {**context_card}
+        for key, value in build_prompt_context(integrated).items():
+            if value:
+                full_context[key] = value
+        selected_context = select_agent_context(agent_key, full_context)
+
         profile = (
             db.query(AgentProfile)
             .filter(AgentProfile.user_id == user_id, AgentProfile.agent_key == agent_key)
@@ -448,11 +662,24 @@ async def preview_agent_profile_endpoint(
         )
         defaults = entry.get("defaults") or {}
 
-        system_prompt = (profile.system_prompt if profile and profile.system_prompt else "")
-        task_prompt_template = (profile.task_prompt_template if profile and profile.task_prompt_template else "")
+        # Prefer unsaved draft prompts sent by the frontend, so Preview reflects
+        # the user's current edits (not just the last-saved profile). Fall back
+        # to the saved profile when no draft is provided.
+        draft_system_prompt = body.get("system_prompt")
+        draft_task_prompt = body.get("task_prompt_template")
+        system_prompt = (
+            draft_system_prompt
+            if draft_system_prompt is not None
+            else (profile.system_prompt if profile and profile.system_prompt else "")
+        )
+        task_prompt_template = (
+            draft_task_prompt
+            if draft_task_prompt is not None
+            else (profile.task_prompt_template if profile and profile.task_prompt_template else "")
+        )
 
         display_name_template = (defaults.get("display_name_template") or entry.get("role") or agent_key)
-        website_name = str(context_card.get("website_name") or "Your").strip()
+        website_name = str(full_context.get("website_name") or "Your").strip()
         display_name = (profile.display_name if profile and profile.display_name else display_name_template.replace("{website_name}", website_name))
 
         from services.llm_providers.main_text_generation import llm_text_gen
@@ -486,8 +713,11 @@ System prompt (editable):
 Task prompt template (editable):
 {task_prompt_template}
 
-Personalization context:
-{context_card}
+Relevant context for this agent:
+{format_context(selected_context)}
+
+What matters most for this agent:
+{_build_context_emphasis(agent_key, selected_context)}
 
 Return ONLY a JSON object that matches the schema.
 """
@@ -677,41 +907,6 @@ async def get_agent_approvals_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/huddle/feed")
-async def get_agent_huddle_feed_endpoint(
-    since_run_id: int = 0,
-    since_event_id: int = 0,
-    since_alert_id: int = 0,
-    since_approval_id: int = 0,
-    limit: int = 50,
-    detail_tier: str = DETAIL_TIER_SUMMARY,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    try:
-        user_id = str(current_user.get("id"))
-        resolved_tier = _resolve_detail_tier(detail_tier, current_user)
-        payload = _build_huddle_snapshot(
-            db=db,
-            user_id=user_id,
-            since_run_id=max(0, int(since_run_id)),
-            since_event_id=max(0, int(since_event_id)),
-            since_alert_id=max(0, int(since_alert_id)),
-            since_approval_id=max(0, int(since_approval_id)),
-            limit=max(1, min(int(limit), 200)),
-            detail_tier=resolved_tier,
-        )
-        return {
-            "success": True,
-            "data": payload,
-            "timestamp": datetime.utcnow().isoformat(),
-            "user_id": user_id,
-        }
-    except Exception as e:
-        logger.error(f"Error getting huddle feed for user {current_user.get('id')}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.get("/huddle/stream")
 async def stream_agent_huddle_endpoint(
     detail_tier: str = DETAIL_TIER_SUMMARY,
@@ -865,10 +1060,100 @@ async def decide_agent_approval_endpoint(
         if not decision:
             raise HTTPException(status_code=400, detail="decision is required")
         user_comments = body.get("user_comments") or ""
+        existing_req = (
+            db.query(AgentApprovalRequest)
+            .filter(
+                AgentApprovalRequest.id == approval_id,
+                AgentApprovalRequest.user_id == user_id,
+            )
+            .first()
+        )
+        was_pending = bool(existing_req and existing_req.status == "pending")
         service = AgentActivityService(db, user_id)
         req = service.decide_approval_request(approval_id, decision=decision, user_comments=user_comments)
         if not req:
             raise HTTPException(status_code=404, detail="Approval request not found")
+
+        execution = None
+        if was_pending and req.status == "approved":
+            payload = req.payload if isinstance(req.payload, dict) else {}
+            required_action_fields = {
+                "action_id",
+                "agent_type",
+                "action_type",
+                "target_resource",
+                "parameters",
+                "expected_outcome",
+                "risk_level",
+            }
+            if required_action_fields <= payload.keys():
+                approved_parameters = dict(payload["parameters"]) if isinstance(payload["parameters"], dict) else {}
+                approved_parameters.update(
+                    {
+                        "approval_recorded": True,
+                        "approval_id": req.id,
+                        "quality_override_approved": payload.get("parameters", {}).get("quality_override_requested") is True,
+                    }
+                )
+                approved_action = AgentAction(
+                    action_id=str(payload["action_id"]),
+                    agent_type=str(payload["agent_type"]),
+                    action_type=str(payload["action_type"]),
+                    target_resource=str(payload["target_resource"]),
+                    parameters=approved_parameters,
+                    expected_outcome=str(payload["expected_outcome"]),
+                    risk_level=float(payload["risk_level"]),
+                    # The user has already approved this exact action. Safety
+                    # validation still runs, but it must not create a second
+                    # approval request.
+                    requires_approval=False,
+                )
+                execution = await execute_agent_action(
+                    user_id, approved_action.agent_type, approved_action
+                )
+            else:
+                execution = {
+                    "success": False,
+                    "error": "Approval payload is not executable",
+                }
+
+                task_id = payload.get("parameters", {}).get("task_id") if isinstance(payload.get("parameters"), dict) else None
+                execution_id = payload.get("parameters", {}).get("execution_id") if isinstance(payload.get("parameters"), dict) else None
+                if task_id is not None and isinstance(execution, dict) and not execution.get("requires_approval"):
+                    workflow_task = (
+                        db.query(DailyWorkflowTask)
+                        .filter(
+                            DailyWorkflowTask.id == task_id,
+                            DailyWorkflowTask.user_id == user_id,
+                        )
+                        .first()
+                    )
+                    if workflow_task:
+                        workflow_task.status = "completed" if execution.get("success") else "pending"
+                        workflow_task.completion_notes = (
+                            "Approved action executed successfully."
+                            if execution.get("success")
+                            else str(execution.get("error") or "Approved action failed")[:4000]
+                        )
+                        workflow_task.updated_at = datetime.utcnow()
+                        db.add(workflow_task)
+                        db.commit()
+                if execution_id is not None and isinstance(execution, dict) and not execution.get("requires_approval"):
+                    workflow_execution = (
+                        db.query(WorkflowTaskExecution)
+                        .filter(
+                            WorkflowTaskExecution.id == execution_id,
+                            WorkflowTaskExecution.user_id == user_id,
+                        )
+                        .first()
+                    )
+                    if workflow_execution:
+                        workflow_execution.status = "succeeded" if execution.get("success") else "failed"
+                        workflow_execution.result_json = execution
+                        workflow_execution.error_message = None if execution.get("success") else str(execution.get("error") or "")[:4000]
+                        workflow_execution.completed_at = datetime.utcnow()
+                        db.add(workflow_execution)
+                        db.commit()
         service.create_alert(
             alert_type="approval_decision",
             title=f"Approval {req.status}",
@@ -880,7 +1165,10 @@ async def decide_agent_approval_endpoint(
         )
         return {
             "success": True,
-            "data": {"approval": {"id": req.id, "status": req.status, "decision": req.decision}},
+            "data": {
+                "approval": {"id": req.id, "status": req.status, "decision": req.decision},
+                "execution": execution,
+            },
             "timestamp": datetime.utcnow().isoformat(),
             "user_id": user_id,
         }
@@ -990,6 +1278,8 @@ async def get_market_signals_endpoint(
                 "impact_score": signal.impact_score,
                 "urgency_level": signal.urgency_level.value,
                 "confidence_score": signal.confidence_score,
+                "confidence_basis": (signal.metadata or {}).get('confidence_basis'),
+                "confidence_is_estimate": bool((signal.metadata or {}).get('confidence_is_estimate', False)),
                 "related_topics": signal.related_topics,
                 "suggested_actions": signal.suggested_actions,
                 "metadata": signal.metadata,
@@ -1040,19 +1330,29 @@ async def execute_agent_action_endpoint(
                 raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
         
         # Create AgentAction object
+        action_type = str(action["action_type"]).strip().lower()
+        requires_approval = bool(action.get("requires_approval", False)) or action_type in {
+            "publish",
+            "post",
+            "send",
+            "schedule",
+        }
         agent_action = AgentAction(
             action_id=f"manual_{action.get('action_type')}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
             agent_type=action["agent_type"],
-            action_type=action["action_type"],
+            action_type=action_type,
             target_resource=action["target_resource"],
             parameters=action["parameters"],
             expected_outcome=action.get("expected_outcome", "Manual action execution"),
             risk_level=action.get("risk_level", 0.5),
-            requires_approval=action.get("requires_approval", False)
+            requires_approval=requires_approval
+        )
+        agent_action.parameters.setdefault(
+            "idempotency_key",
+            str(action.get("idempotency_key") or agent_action.action_id),
         )
         
-        # Execute action through agent system
-        from services.intelligence.agents.core_agent_framework import execute_agent_action
+        # Execute action through the user's cached agent system.
         result = await execute_agent_action(user_id, action["agent_type"], agent_action)
         
         if not result.get("success", False):
@@ -1067,6 +1367,8 @@ async def execute_agent_action_endpoint(
             "user_id": user_id
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error executing agent action for user {current_user.get('id')}: {e}")
         raise HTTPException(status_code=500, detail=str(e))

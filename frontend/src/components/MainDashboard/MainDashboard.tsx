@@ -4,6 +4,7 @@ import {
   Container,
   Alert,
   Snackbar,
+  Button,
   useTheme
 } from '@mui/material';
 import Lightbulb from '@mui/icons-material/Lightbulb';
@@ -333,13 +334,24 @@ const MainDashboard: React.FC = () => {
 
   const statusChips = React.useMemo(() => {
     const scheduled = !!scheduleStatus?.scheduled_run_completed;
-    const chips = [
+      const chips = [
       {
         label: scheduled ? 'Scheduled workflow ready' : 'Scheduled workflow pending',
         color: scheduled ? '#22c55e' : '#ef4444',
         icon: <Lightbulb sx={{ color: scheduled ? '#22c55e' : '#ef4444' }} />,
       },
-    ];
+      ];
+
+    const scheduleDecisions = scheduleStatus?.agent_schedule || [];
+    if (scheduleDecisions.length > 0) {
+      const participating = scheduleDecisions.filter((decision) => decision.participates).length;
+      const eligible = scheduleDecisions.filter((decision) => decision.eligible).length;
+      chips.push({
+        label: `Agent schedule: ${participating} participating / ${eligible} eligible`,
+        color: participating > 0 ? '#22c55e' : '#9e9e9e',
+        icon: <Lightbulb sx={{ color: participating > 0 ? '#22c55e' : '#9e9e9e' }} />,
+      });
+    }
 
     if (sifHealth) {
       if (!sifHealth.has_task) {
@@ -461,6 +473,11 @@ const MainDashboard: React.FC = () => {
               fallbackMessage="Your subscription is not active. Please upgrade to access the dashboard features."
               showUpgradeButton={true}
             >
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                <Button variant="outlined" onClick={() => navigate('/marketing-outcomes')} sx={{ backgroundColor: 'rgba(255,255,255,0.92)' }}>
+                  View marketing outcomes
+                </Button>
+              </Box>
               {/* Content Lifecycle Pillars - First Panel */}
               <ContentLifecyclePillars />
 

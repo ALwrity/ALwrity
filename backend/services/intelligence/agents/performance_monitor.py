@@ -85,11 +85,11 @@ class OptimizationRecommendation:
     recommendation_type: str
     priority: str  # "high", "medium", "low"
     description: str
-    expected_impact: float  # Expected improvement in performance
+    expected_impact: Optional[float]  # Expected improvement in performance; None when not derivable
     implementation_steps: List[str]
     estimated_effort: str  # "low", "medium", "high"
-    created_at: str
-    expires_at: str
+    created_at: Optional[str] = None
+    expires_at: Optional[str] = None
     
     def __post_init__(self):
         if self.created_at is None:
@@ -160,38 +160,100 @@ class AgentPerformanceMonitor:
             logger.error(f"Error recording performance data for agent {agent_id}: {e}")
             return False
     
+    async def _durable_stats(self, agent_id: str):
+        """Durable per-agent stats from the AgentRun table (hot-cache backstop)."""
+        from services.intelligence.agents.agent_run_metrics import get_agent_run_stats
+        return await get_agent_run_stats(self.user_id, agent_id, window_hours=720)
+
+    def _snapshot_from_durable(
+        self,
+        agent_id: str,
+        status: AgentStatus,
+        durable,
+    ) -> AgentPerformanceSnapshot:
+        """Build a snapshot purely from durable run stats (post-restart safe).
+
+        Metrics that cannot be derived from runs (efficiency, market impact,
+        resource usage) stay honestly at zero instead of being invented.
+        """
+        return AgentPerformanceSnapshot(
+            agent_id=agent_id,
+            user_id=self.user_id,
+            timestamp=datetime.utcnow().isoformat(),
+            status=status,
+            total_actions=durable.total_runs,
+            successful_actions=durable.successful_runs,
+            failed_actions=durable.failed_runs,
+            average_response_time=durable.avg_duration_seconds or 0.0,
+            success_rate=durable.success_rate if durable.success_rate is not None else 0.0,
+            efficiency_score=0.0,
+            resource_usage={},
+            market_impact_score=0.0,
+            last_action_at=durable.last_run_at or datetime.utcnow().isoformat(),
+        )
+
     async def update_agent_snapshot(self, agent_id: str, status: AgentStatus, action_result: Dict[str, Any] = None) -> AgentPerformanceSnapshot:
-        """Update performance snapshot for an agent"""
+        """Update performance snapshot for an agent.
+
+        Durable ``agent_runs`` aggregates are the source of truth for action
+        counts, success rate, and response duration; the in-memory data points
+        act as a hot cache that supplements metrics not derivable from runs
+        (efficiency, market impact, resource usage).
+        """
         try:
-            # Get recent performance data
+            durable = await self._durable_stats(agent_id)
             recent_data = self.performance_data[agent_id]
-            
-            # Calculate metrics from recent data
-            total_actions = len([dp for dp in recent_data if dp.metric_type == PerformanceMetric.SUCCESS_RATE])
-            successful_actions = len([dp for dp in recent_data if dp.metric_type == PerformanceMetric.SUCCESS_RATE and dp.value > 0.5])
-            failed_actions = total_actions - successful_actions
-            
-            # Calculate average response time
-            response_time_data = [dp.value for dp in recent_data if dp.metric_type == PerformanceMetric.RESPONSE_TIME]
-            avg_response_time = sum(response_time_data) / len(response_time_data) if response_time_data else 0.0
-            
-            # Calculate success rate
-            success_rate = successful_actions / total_actions if total_actions > 0 else 0.0
-            
-            # Calculate efficiency score
+
+            if durable.total_runs > 0:
+                # Durable layer authoritative for counts and response time.
+                total_actions = durable.total_runs
+                successful_actions = durable.successful_runs
+                failed_actions = durable.failed_runs
+                success_rate = durable.success_rate if durable.success_rate is not None else 0.0
+
+                response_time_data = [dp.value for dp in recent_data if dp.metric_type == PerformanceMetric.RESPONSE_TIME]
+                if durable.avg_duration_seconds is not None:
+                    avg_response_time = durable.avg_duration_seconds
+                elif response_time_data:
+                    avg_response_time = sum(response_time_data) / len(response_time_data)
+                else:
+                    avg_response_time = 0.0
+
+                last_durable = (
+                    datetime.fromisoformat(durable.last_run_at)
+                    if durable.last_run_at
+                    else None
+                )
+                last_inmemory = max(
+                    (datetime.fromisoformat(dp.timestamp) for dp in recent_data),
+                    default=None,
+                )
+                if last_durable and (not last_inmemory or last_durable >= last_inmemory):
+                    last_action_at = durable.last_run_at
+                elif last_inmemory:
+                    last_action_at = last_inmemory.isoformat()
+                else:
+                    last_action_at = datetime.utcnow().isoformat()
+            else:
+                # No persisted runs: fall back to hot-cache derivation.
+                total_actions = len([dp for dp in recent_data if dp.metric_type == PerformanceMetric.SUCCESS_RATE])
+                successful_actions = len([dp for dp in recent_data if dp.metric_type == PerformanceMetric.SUCCESS_RATE and dp.value > 0.5])
+                failed_actions = total_actions - successful_actions
+                success_rate = successful_actions / total_actions if total_actions > 0 else 0.0
+                response_time_data = [dp.value for dp in recent_data if dp.metric_type == PerformanceMetric.RESPONSE_TIME]
+                avg_response_time = sum(response_time_data) / len(response_time_data) if response_time_data else 0.0
+                last_action_at = max([dp.timestamp for dp in recent_data], default=datetime.utcnow().isoformat()) if recent_data else datetime.utcnow().isoformat()
+
+            # Hot-cache-only metric families.
             efficiency_data = [dp.value for dp in recent_data if dp.metric_type == PerformanceMetric.EFFICIENCY_SCORE]
             avg_efficiency = sum(efficiency_data) / len(efficiency_data) if efficiency_data else 0.0
-            
-            # Calculate market impact
+
             market_impact_data = [dp.value for dp in recent_data if dp.metric_type == PerformanceMetric.MARKET_IMPACT]
             avg_market_impact = sum(market_impact_data) / len(market_impact_data) if market_impact_data else 0.0
-            
+
             # Get resource usage
             resource_usage = self._calculate_resource_usage(agent_id, recent_data)
-            
-            # Get last action time
-            last_action_at = max([dp.timestamp for dp in recent_data], default=datetime.utcnow().isoformat()) if recent_data else datetime.utcnow().isoformat()
-            
+
             # Create snapshot
             snapshot = AgentPerformanceSnapshot(
                 agent_id=agent_id,
@@ -261,7 +323,12 @@ class AgentPerformanceMonitor:
         return resource_usage
     
     async def analyze_performance_trends(self, agent_id: str, period_hours: int = 24) -> List[PerformanceTrend]:
-        """Analyze performance trends for an agent"""
+        """Analyze performance trends for an agent.
+
+        Trends are computed from the in-memory hot cache, which carries
+        fine-grained metric types (efficiency, market impact) that runs do
+        not. Sparse data honestly yields an empty list.
+        """
         try:
             cutoff_time = datetime.utcnow().timestamp() - (period_hours * 60 * 60)
             agent_data = [
@@ -465,14 +532,22 @@ class AgentPerformanceMonitor:
             for trend in trends:
                 if trend.trend_strength > 0.7 and trend.confidence > 0.8:  # Strong trend with high confidence
                     if trend.trend_direction == "declining":
+                        change_display = (
+                            f"{trend.change_rate:.1f}% change per hour"
+                            if trend.change_rate is not None
+                            else "change rate unavailable from sparse data"
+                        )
                         recommendation = OptimizationRecommendation(
                             recommendation_id=f"trend_{trend.metric_type.value}_{agent_id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
                             agent_id=agent_id,
                             user_id=self.user_id,
                             recommendation_type="trend_reversal",
                             priority="high" if trend.trend_strength > 0.8 else "medium",
-                            description=f"Strong declining trend detected in {trend.metric_type.value}: {trend.change_rate:.1f}% change per hour",
-                            expected_impact=0.3,  # Estimate 30% improvement potential
+                            description=f"Strong declining trend detected in {trend.metric_type.value}: {change_display}",
+                            # Derive expected impact from the measured decline
+                            # magnitude instead of an invented constant; omit
+                            # entirely when change_rate carries no usable value.
+                            expected_impact=min(1.0, abs(trend.change_rate) / 100.0) if trend.change_rate is not None else None,
                             implementation_steps=[
                                 f"Investigate causes of declining {trend.metric_type.value}",
                                 "Identify specific factors contributing to the trend",
@@ -484,8 +559,11 @@ class AgentPerformanceMonitor:
                         )
                         recommendations.append(recommendation)
             
-            # Sort by priority and expected impact
-            recommendations.sort(key=lambda x: (self._priority_weight(x.priority), x.expected_impact), reverse=True)
+            # Sort by priority and expected impact (None sorts last)
+            recommendations.sort(
+                key=lambda x: (self._priority_weight(x.priority), x.expected_impact is not None, x.expected_impact or 0.0),
+                reverse=True
+            )
             
             # Keep only top 10 recommendations
             recommendations = recommendations[:10]
@@ -581,11 +659,21 @@ class AgentPerformanceMonitor:
             return []
     
     async def get_performance_summary(self, agent_id: str) -> Dict[str, Any]:
-        """Get comprehensive performance summary for an agent"""
+        """Get comprehensive performance summary for an agent.
+
+        Survives restarts: when no in-memory snapshot exists yet, one is
+        rebuilt from durable ``agent_runs`` aggregates rather than reporting
+        an empty history for a known-active agent.
+        """
         try:
             snapshot = self.agent_snapshots.get(agent_id)
             if not snapshot:
-                return {}
+                durable = await self._durable_stats(agent_id)
+                if durable.total_runs > 0:
+                    snapshot = self._snapshot_from_durable(agent_id, AgentStatus.IDLE, durable)
+                    self.agent_snapshots[agent_id] = snapshot
+                else:
+                    return {}
             
             # Get trends
             trends = await self.analyze_performance_trends(agent_id)
@@ -643,11 +731,32 @@ class AgentPerformanceMonitor:
             logger.error(f"Error calculating health score: {e}")
             return 0.0
     
-    def get_all_agents_performance(self) -> List[Dict[str, Any]]:
-        """Get performance summary for all agents"""
+    async def get_all_agents_performance(self) -> List[Dict[str, Any]]:
+        """Get performance summary for all agents.
+
+        Merges in-memory snapshots with durable ``agent_runs`` aggregates so
+        agents with persisted history still appear after a restart. Metrics
+        that runs cannot derive stay at honest zeros for durable-only agents.
+        """
+        from services.intelligence.agents.agent_run_metrics import get_all_agent_run_stats
+
         all_performance = []
-        
-        for agent_id, snapshot in self.agent_snapshots.items():
+
+        try:
+            durable_by_agent = await get_all_agent_run_stats(self.user_id, window_hours=720)
+        except Exception as exc:
+            logger.error(f"Durable stats unavailable for user {self.user_id}: {exc}")
+            durable_by_agent = {}
+
+        seen_agents = set(self.agent_snapshots.keys()) | set(durable_by_agent.keys())
+
+        for agent_id in sorted(seen_agents):
+            snapshot = self.agent_snapshots.get(agent_id)
+            if snapshot is None:
+                durable = durable_by_agent[agent_id]
+                if durable.total_runs <= 0:
+                    continue
+                snapshot = self._snapshot_from_durable(agent_id, AgentStatus.IDLE, durable)
             performance_summary = {
                 "agent_id": agent_id,
                 "user_id": self.user_id,
@@ -661,7 +770,7 @@ class AgentPerformanceMonitor:
                 "health_score": self._calculate_health_score(snapshot)
             }
             all_performance.append(performance_summary)
-        
+
         return all_performance
 
 # Service class for performance monitoring
@@ -710,7 +819,7 @@ class AgentPerformanceService:
     async def get_all_agents_performance_summary(self, user_id: str) -> List[Dict[str, Any]]:
         """Get performance summary for all agents for a user"""
         monitor = await self.get_monitor(user_id)
-        return monitor.get_all_agents_performance()
+        return await monitor.get_all_agents_performance()
     
     async def get_global_performance_stats(self) -> Dict[str, Any]:
         """Get global performance statistics across all users and agents"""

@@ -174,6 +174,9 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
           if (result.analysis) {
             setAnalysis(result.analysis);
           }
+          if (result.domainName) {
+            setDomainName(result.domainName);
+          }
         }
       } catch (error) {
         // Silently fail - non-critical pre-fill
