@@ -275,7 +275,7 @@ class AdvertoolsService:
             self.logger.info(f"Analyzing sitemap: {sitemap_url}")
             
             loop = asyncio.get_event_loop()
-            await _throttle_domain(_extract_domain(sitemap_url))
+            await loop.run_in_executor(None, lambda: _throttle_domain_sync(_extract_domain(sitemap_url)))
             df = await loop.run_in_executor(None, lambda: self._sitemap_to_df_with_retry(sitemap_url))
             
             if df is None or df.empty or 'loc' not in df.columns:
@@ -513,7 +513,8 @@ class AdvertoolsService:
                 custom_settings={
                     'LOG_LEVEL': 'WARNING',
                     'CLOSESPIDER_PAGECOUNT': 15, # Guardrail: Max 15 pages
-                    'DOWNLOAD_TIMEOUT': 30        # Guardrail: 30s timeout per page
+                    'DOWNLOAD_TIMEOUT': 30,      # Guardrail: 30s timeout per page
+                    'DOWNLOAD_FAIL_ON_DATALOSS': False  # Allow partial responses
                 }
             ))
             
@@ -595,6 +596,7 @@ class AdvertoolsService:
                     'DOWNLOAD_TIMEOUT': 30,
                     'CONCURRENT_REQUESTS_PER_DOMAIN': 3,
                     'DEPTH_LIMIT': 3,
+                    'DOWNLOAD_FAIL_ON_DATALOSS': False,  # Allow partial responses
                 }
             ))
             
@@ -923,6 +925,7 @@ class AdvertoolsService:
                     'AUTOTHROTTLE_MAX_DELAY': 5.0,
                     'AUTOTHROTTLE_TARGET_CONCURRENCY': 1.0,
                     'RETRY_ENABLED': True,
+                    'DOWNLOAD_FAIL_ON_DATALOSS': False,
                     'RETRY_TIMES': 2,
                     'RETRY_DELAY': 3.0,
                     'DEPTH_LIMIT': 2,
@@ -1161,7 +1164,8 @@ class AdvertoolsService:
                 custom_settings={
                     'LOG_LEVEL': 'WARNING',
                     'CLOSESPIDER_PAGECOUNT': 10,
-                    'DOWNLOAD_TIMEOUT': 30
+                    'DOWNLOAD_TIMEOUT': 30,
+                    'DOWNLOAD_FAIL_ON_DATALOSS': False,
                 }
             ))
             

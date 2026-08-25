@@ -78,6 +78,9 @@ class TxtaiIntelligenceService:
         self._disable_ann_queries = False  # Set when FAISS nprobe incompatibility is detected
         self.fail_fast = str(os.getenv("SIF_FAIL_FAST", "true")).lower() in {"1", "true", "yes", "on"}
         
+        # Lock to serialize embeddings operations and prevent "Recursive use of cursors" errors
+        self._embeddings_lock = threading.Lock()
+        
         # Mark as initialized for singleton pattern
         self._singleton_initialized = True
         
@@ -454,9 +457,13 @@ class TxtaiIntelligenceService:
                 metadata_json = json.dumps(metadata) if metadata else "{}"
                 processed_items.append((id_val, text, metadata_json))
 
-            # Phase 2.1: off-loop to keep the event loop free.
-            await self._run_blocking(self.embeddings.upsert, processed_items)
-            await self._run_blocking(self.embeddings.save, self.index_path)
+            # Serialize embeddings operations to prevent "Recursive use of cursors" SQLite error
+            def _do_upsert_and_save():
+                with self._embeddings_lock:
+                    self.embeddings.upsert(processed_items)
+                    self.embeddings.save(self.index_path)
+            
+            await self._run_blocking(_do_upsert_and_save)
             count = len(processed_items)
             logger.info(f"Upserted {count} items for user {self.user_id}")
             # Phase 4.2 / 4.5: record success.
@@ -501,9 +508,13 @@ class TxtaiIntelligenceService:
         self._maybe_cleanup_singleton(self)
 
         try:
-            # Phase 2.1: off-loop to keep the event loop free.
-            await self._run_blocking(self.embeddings.delete, doc_ids)
-            await self._run_blocking(self.embeddings.save, self.index_path)
+            # Serialize embeddings operations to prevent "Recursive use of cursors" SQLite error
+            def _do_delete_and_save():
+                with self._embeddings_lock:
+                    self.embeddings.delete(doc_ids)
+                    self.embeddings.save(self.index_path)
+            
+            await self._run_blocking(_do_delete_and_save)
             logger.info(f"Deleted {len(doc_ids)} documents for user {self.user_id}")
             # Phase 4.2 / 4.5: record success.
             self._record_sif_event(
@@ -545,9 +556,13 @@ class TxtaiIntelligenceService:
                 metadata_json = json.dumps(metadata) if metadata else "{}"
                 processed_items.append((id_val, text, metadata_json))
 
-            # Phase 2.1: off-loop to keep the event loop free.
-            await self._run_blocking(self.embeddings.index, processed_items, reindex=True)
-            await self._run_blocking(self.embeddings.save, self.index_path)
+            # Serialize embeddings operations to prevent "Recursive use of cursors" SQLite error
+            def _do_index_and_save():
+                with self._embeddings_lock:
+                    self.embeddings.index(processed_items, reindex=True)
+                    self.embeddings.save(self.index_path)
+            
+            await self._run_blocking(_do_index_and_save)
             count = len(processed_items)
             logger.info(f"Reindexed all {count} items for user {self.user_id}")
             # Phase 4.2 / 4.5: record success.
