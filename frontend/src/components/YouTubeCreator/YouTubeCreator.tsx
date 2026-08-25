@@ -16,9 +16,7 @@ import {
 import { useYouTubePublish } from "../../hooks/useYouTubePublish";
 import { youtubeApi, type YouTubeChannelBible } from "../../services/youtubeApi";
 import { YT_CHANNEL_BIBLE_UPDATED_EVENT } from "./dashboard/youtubeStudioEvents";
-import "./dashboard/youtube-dashboard-layout.css";
-import "./dashboard/youtube-rail-controls.css";
-import "./dashboard/youtube-studio-header.css";
+import "./dashboard/youtubeStudioDashboardStyles";
 
 const YouTubeCreator: React.FC = () => {
   const { setTab } = useYouTubeStudioTab();

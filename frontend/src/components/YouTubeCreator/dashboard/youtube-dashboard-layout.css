@@ -192,7 +192,9 @@ body.youtube-studio-view #root {
 
 @media (min-width: 601px) {
   body.youtube-studio-view .yt-studio-hub {
-    display: block;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
     flex: 1 1 auto;
     min-height: 0;
     height: 100%;
@@ -200,12 +202,15 @@ body.youtube-studio-view #root {
   }
 
   body.youtube-studio-view .yt-studio-hub-main {
-    width: 100%;
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
     min-height: 0;
     height: 100%;
     padding-bottom: 0;
     display: flex;
     flex-direction: column;
+    overflow: visible;
   }
 
   body.youtube-studio-view .yt-studio-hub-hero-stage {
@@ -218,8 +223,9 @@ body.youtube-studio-view #root {
     align-items: stretch;
     padding-top: clamp(8px, 2vh, 24px);
     padding-left: clamp(4px, 1vw, 12px);
-    padding-bottom: 30px;
+    padding-bottom: 36px;
     position: relative;
+    overflow: visible;
   }
 
   body.youtube-studio-view .yt-studio-hub-hero {
@@ -236,7 +242,7 @@ body.youtube-studio-view #root {
   body.youtube-studio-view .yt-studio-hub-connect-anchor--hub-bottom {
     position: absolute !important;
     left: var(--yt-hub-center-left, 50%) !important;
-    bottom: 12px !important;
+    bottom: 14px !important;
     top: auto !important;
     transform: translateX(-50%) !important;
     z-index: 25;
@@ -245,6 +251,9 @@ body.youtube-studio-view #root {
     justify-content: center;
     align-items: center;
     min-width: 0;
+    width: auto;
+    max-width: none;
+    overflow: visible;
   }
 
   body.youtube-studio-view .yt-studio-bottom-dock {
@@ -272,12 +281,14 @@ body.youtube-studio-view #root {
   }
 
   body.youtube-studio-view .yt-studio-right-rail {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 24;
+    position: relative !important;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    flex: 0 0 340px;
+    z-index: 5;
     pointer-events: auto;
+    overflow: hidden;
   }
 }
 
@@ -675,7 +686,7 @@ body.youtube-studio-view #root {
 
 /* Plan wedge START HERE bookmark — matches LinkedIn radial hero (desktop only) */
 @media (min-width: 601px) {
-  .workflow-wedge-bookmark-badge {
+  body.youtube-studio-view .workflow-wedge-bookmark-badge {
     --bookmark-accent: var(--bookmark-ribbon-color, #b9faf8);
     position: absolute;
     top: 0;
@@ -694,7 +705,7 @@ body.youtube-studio-view #root {
     animation: workflowBookmarkBadgeFloat 2.8s ease-in-out infinite;
   }
 
-  .workflow-wedge-bookmark-badge__svg {
+  body.youtube-studio-view .workflow-wedge-bookmark-badge__svg {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -702,14 +713,14 @@ body.youtube-studio-view #root {
     overflow: visible;
   }
 
-  .workflow-wedge-bookmark-badge__path {
+  body.youtube-studio-view .workflow-wedge-bookmark-badge__path {
     stroke: rgba(255, 255, 255, 0.85);
     stroke-width: 1.2;
     stroke-linejoin: round;
     paint-order: stroke fill;
   }
 
-  .workflow-wedge-bookmark-badge__text {
+  body.youtube-studio-view .workflow-wedge-bookmark-badge__text {
     position: absolute;
     inset: 0;
     z-index: 1;
@@ -723,7 +734,7 @@ body.youtube-studio-view #root {
     padding-bottom: 6px;
   }
 
-  .workflow-wedge-bookmark-badge__line {
+  body.youtube-studio-view .workflow-wedge-bookmark-badge__line {
     display: block;
     font-size: 7px;
     font-weight: 800;
@@ -733,7 +744,7 @@ body.youtube-studio-view #root {
     text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
   }
 
-  .workflow-wedge-bookmark-badge__line--bold {
+  body.youtube-studio-view .workflow-wedge-bookmark-badge__line--bold {
     font-size: 8px;
     font-weight: 900;
     letter-spacing: 0.02em;
@@ -751,7 +762,7 @@ body.youtube-studio-view #root {
 }
 
 @media (min-width: 601px) and (prefers-reduced-motion: reduce) {
-  .workflow-wedge-bookmark-badge {
+  body.youtube-studio-view .workflow-wedge-bookmark-badge {
     animation: none;
     transform: translateX(-50%);
   }

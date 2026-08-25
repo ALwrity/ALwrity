@@ -46,12 +46,15 @@ const PLAN_CONNECT_SLOT_HEIGHT = 38;
 const RING_EDGE_PAD = 4;
 const PLAN_ANCHOR_BELOW_EXTENT = 12;
 
-/** Desktop hub X — column center with a slight left nudge (Studio landing layout). */
+/** Shift hub/ring/connect axis right to balance the analytics rail (LinkedIn parity). */
+function ringHorizontalOffset(viewW: number): number {
+  return Math.round(Math.min(100, Math.max(20, viewW * 0.08)));
+}
+
 function youtubeHubCenterX(viewW: number, desktop: boolean): number {
-  if (!desktop) return viewW / 2;
   const columnCenter = viewW / 2;
-  const leftNudge = Math.round(Math.min(72, Math.max(16, viewW * 0.05)));
-  return Math.round(columnCenter - leftNudge);
+  if (!desktop) return columnCenter;
+  return Math.round(columnCenter + ringHorizontalOffset(viewW));
 }
 
 function computeInnerRadius(): number {

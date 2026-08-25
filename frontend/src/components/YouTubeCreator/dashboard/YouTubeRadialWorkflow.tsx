@@ -5,11 +5,13 @@ import {
   PLAN_PINNED_HINT_KEY,
   RECOMMENDED_WORKFLOW_CARD_ID,
   WEDGE_PANEL_GAP_DEG,
+  resolveYouTubeWorkflowIcon,
   type YouTubeWorkflowCardId,
 } from "./youtubeWorkflowConfig";
 import { isWedgeConnectGated } from "./studioHubAccessConfig";
 import type { YouTubeRadialLayout } from "./youtubeRadialLayout";
-import { PlanStartHereBadge } from "../../LinkedInWriter/components/dashboard/PlanStartHereBadge";
+import { YouTubePlanStartHereBadge } from "./YouTubePlanStartHereBadge";
+import { isYouTubePlanWedge, youtubePlanWedgeLabelLayout } from "./youtubePlanWedgeUi";
 import { ConnectLockBadge } from "../../LinkedInWriter/components/dashboard/ConnectLockIcon";
 import {
   youtubeWedgeHeaderTextGap,
@@ -168,8 +170,9 @@ export const YouTubeRadialWorkflow: React.FC<YouTubeRadialWorkflowProps> = ({
     const isHovered = hoveredId === card.id;
     const isFocused = focusedId === card.id;
     const isActive = isHovered || isFocused;
-    const isRecommended =
-      showRecommended && card.id === RECOMMENDED_WORKFLOW_CARD_ID;
+    const isPlanWedge = isYouTubePlanWedge(card.id);
+    const isRecommended = showRecommended && isPlanWedge;
+    const planLabelLayout = youtubePlanWedgeLabelLayout(isPlanWedge);
     const isConnectLocked = isWedgeConnectGated(card.id, connected);
     const panelStartDeg = card.startAngle - PANEL_GAP_DEGREES;
     const panelEndDeg = card.endAngle + PANEL_GAP_DEGREES;
@@ -192,6 +195,7 @@ export const YouTubeRadialWorkflow: React.FC<YouTubeRadialWorkflowProps> = ({
       panelStartDeg,
       panelEndDeg,
     );
+    const WorkflowIcon = resolveYouTubeWorkflowIcon(card.id);
 
     return (
       <g
@@ -298,20 +302,20 @@ export const YouTubeRadialWorkflow: React.FC<YouTubeRadialWorkflowProps> = ({
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              justifyContent: isRecommended ? "flex-start" : "center",
+              justifyContent: planLabelLayout.justifyContent,
               textAlign: "center",
-              padding: isRecommended ? "29px 6px 4px" : "4px 6px",
+              padding: planLabelLayout.padding,
               boxSizing: "border-box",
             }}
           >
-            {isRecommended && <PlanStartHereBadge />}
+            {isPlanWedge && <YouTubePlanStartHereBadge />}
             <div
               style={{
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                flex: isRecommended ? "1 1 auto" : undefined,
+                flex: planLabelLayout.innerFlex,
                 minHeight: 0,
                 width: "100%",
               }}
@@ -328,11 +332,11 @@ export const YouTubeRadialWorkflow: React.FC<YouTubeRadialWorkflowProps> = ({
                   transition: "color 180ms ease",
                 }}
               >
-                {React.createElement(card.icon, {
-                  sx: { color: "currentColor", fontSize: iconFontSize, display: "block" },
-                  "aria-hidden": true,
-                  focusable: false,
-                })}
+                <WorkflowIcon
+                  sx={{ color: "currentColor", fontSize: iconFontSize, display: "block" }}
+                  aria-hidden
+                  focusable={false}
+                />
               </div>
               <div
                 style={{

@@ -1,0 +1,67 @@
+/**
+ * YouTube Studio radial hero — hub overlay and connect CTA.
+ */
+
+.yt-studio-hub-hub .yt-profile-hub-cluster {
+  width: var(--hub-inner-diameter, 166px);
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.yt-studio-hub-hub .yt-profile-hub-avatar-row {
+  width: var(--hub-avatar-size, 115px);
+  height: var(--hub-avatar-size, 115px);
+  min-width: var(--hub-avatar-size, 115px);
+  min-height: var(--hub-avatar-size, 115px);
+  margin: 0 auto;
+}
+
+.yt-hub-connect-anchor {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-width: 360px;
+}
+
+.yt-hub-connect-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+}
+
+.yt-studio-hub-connect-anchor--hub-bottom {
+  width: auto;
+  max-width: none;
+  overflow: visible;
+}
+
+@media (max-width: 600px) {
+  .yt-hub-connect-anchor {
+    width: 100% !important;
+    max-width: min(320px, 100%) !important;
+  }
+
+  .yt-hub-connect-btn {
+    width: 100%;
+    min-height: 48px;
+    max-width: 320px;
+    padding: 12px 16px;
+    white-space: normal;
+  }
+
+  .yt-studio-hub-connect-anchor--in-canvas {
+    position: relative;
+    margin-top: 6px;
+    width: 100%;
+    max-width: min(360px, 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 20;
+    pointer-events: auto;
+    overflow: visible;
+  }
+}
