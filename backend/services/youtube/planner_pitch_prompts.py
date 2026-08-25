@@ -6,7 +6,14 @@ via json_struct passed to llm_text_gen — prompt text has no inline JSON templa
 
 from typing import Any, Dict, Optional
 
-from services.youtube.planner_config import get_duration_context
+from services.youtube.planner_config import (
+    DEFAULT_CONTENT_LANGUAGE_LABEL,
+    get_duration_context,
+    resolve_content_language,
+)
+from utils.logger_utils import get_service_logger
+
+logger = get_service_logger("youtube.planner_pitch_prompts")
 
 PITCH_SYSTEM_PROMPT = """You are ALwrity's YouTube Script Architect. You operate as ALwrity's backend JSON engine.
 The end user never writes a prompt; ALwrity injects their form fields and chosen creative angle into the user message.
@@ -18,6 +25,7 @@ RULES:
 - Ground every beat in the video idea. If research is present, use it only for factual angles — never invent statistics.
 - Title: irresistible curiosity, clear payoff, ≤70 characters.
 - Output: title, 2-sentence summary, hook concept (1–2 sentences), 3–5 main beats (short phrases).
+- Write all generated copy in the Content language from the user message. Do not mix English except proper nouns, brand names, and widely used loanwords.
 - Reply with the JSON object specified by the API schema. No markdown, no commentary.
 """
 
@@ -37,6 +45,7 @@ CTA: One natural CTA woven into the flow — not an ad break.
 PACING: estimated_duration_seconds per beat must sum to target duration (±20%).
 
 OUTPUT: JSON per API schema only. Do NOT output echoed inputs (audience, tone, style, goal). Do NOT output a separate full_script — spoken parts will be assembled programmatically.
+Write spoken_script, outro, CTA, titles, and other generated copy in the Content language from the user message. Do not mix English except proper nouns, brand names, and widely used loanwords.
 """
 
 
@@ -120,6 +129,25 @@ def build_expansion_json_struct() -> Dict[str, Any]:
     }
 
 
+def build_content_language_prompt_block(language_code: Optional[str] = None) -> str:
+    """User-message language contract. Always uses a display label, never raw hi/en only."""
+    try:
+        label = resolve_content_language(language_code).label
+    except Exception:
+        logger.exception(
+            "[YouTubePlanner] Content language prompt block failed; using English"
+        )
+        label = DEFAULT_CONTENT_LANGUAGE_LABEL
+    if label == DEFAULT_CONTENT_LANGUAGE_LABEL:
+        instruction = "Write every field in English."
+    else:
+        instruction = (
+            f"Write every field in {label}. Do not mix English except proper nouns, "
+            "brand names, and widely used loanwords."
+        )
+    return f"**Content language:** {label}\n{instruction}"
+
+
 def build_pitch_user_prompt(
     *,
     user_idea: str,
@@ -134,6 +162,7 @@ def build_pitch_user_prompt(
     research_context: str = "",
     source_article_title: Optional[str] = None,
     source_article_summary: Optional[str] = None,
+    language: Optional[str] = None,
 ) -> str:
     """Lightweight user message for a single pitch. No full-script rules, no JSON example."""
     duration_context = get_duration_context(duration_type)
@@ -142,6 +171,7 @@ def build_pitch_user_prompt(
         "",
         f"**Creative angle (primary lens):** {creative_angle.strip()}",
         f"**Duration:** {duration_type} ({duration_context['target_seconds']}s target)",
+        build_content_language_prompt_block(language),
     ]
     if video_type:
         parts.append(f"**Video type:** {video_type}")
@@ -190,6 +220,7 @@ def build_expansion_user_prompt(
     persona_context: str = "",
     channel_bible_context: str = "",
     research_context: str = "",
+    language: Optional[str] = None,
 ) -> str:
     """User message to expand an approved pitch into a production script. No JSON example."""
     duration_context = get_duration_context(duration_type)
@@ -210,6 +241,7 @@ def build_expansion_user_prompt(
         f"(hook {duration_context['hook_seconds']}s, main {duration_context['main_seconds']}s, "
         f"CTA {duration_context['cta_seconds']}s). Max scenes: {duration_context['max_scenes']}.",
         "Beat estimated_duration_seconds must sum to the target (±20%).",
+        build_content_language_prompt_block(language),
     ]
     if video_type:
         parts.append(f"**Video type:** {video_type}")

@@ -69,6 +69,58 @@ class TestPitchJsonStruct:
         assert '"video_summary"' not in prompt
         assert "target_audience" not in prompt.lower() or "do not echo" in prompt.lower()
 
+    def test_user_prompt_uses_hindi_label_for_hi(self):
+        from services.youtube.planner_pitch_prompts import build_pitch_user_prompt
+
+        prompt = build_pitch_user_prompt(
+            user_idea="Budget travel",
+            creative_angle="Contrarian",
+            duration_type="medium",
+            language="hi",
+        )
+        assert "**Content language:** Hindi" in prompt
+        assert "Write every field in Hindi." in prompt
+        assert "\nhi\n" not in prompt
+        assert "**Content language:** English" not in prompt
+
+    def test_user_prompt_uses_english_for_en_and_when_omitted(self):
+        from services.youtube.planner_pitch_prompts import build_pitch_user_prompt
+
+        english = build_pitch_user_prompt(
+            user_idea="Budget travel",
+            creative_angle="Contrarian",
+            duration_type="medium",
+            language="en",
+        )
+        omitted = build_pitch_user_prompt(
+            user_idea="Budget travel",
+            creative_angle="Contrarian",
+            duration_type="medium",
+        )
+        assert "**Content language:** English" in english
+        assert "Write every field in English." in english
+        assert "**Content language:** English" in omitted
+        assert "Hindi" not in english
+        assert "Hindi" not in omitted
+
+    def test_user_prompt_maps_locale_and_display_name_to_hindi(self):
+        from services.youtube.planner_pitch_prompts import build_pitch_user_prompt
+
+        for language in ("hi-IN", "Hindi", "  HI  "):
+            prompt = build_pitch_user_prompt(
+                user_idea="Budget travel",
+                creative_angle="Contrarian",
+                duration_type="medium",
+                language=language,
+            )
+            assert "**Content language:** Hindi" in prompt
+            assert "**Content language:** English" not in prompt
+
+    def test_system_prompt_requires_user_message_content_language(self):
+        from services.youtube.planner_pitch_prompts import PITCH_SYSTEM_PROMPT
+
+        assert "Content language from the user message" in PITCH_SYSTEM_PROMPT
+
 
 class TestValidatePitch:
     def test_accepts_valid_pitch_and_strips_echoed_keys(self):
@@ -129,6 +181,7 @@ class TestGeneratePitch:
         assert result["selected_title"]
         assert result["generation"]["text_gateway"] == "llm_text_gen"
         assert "Contrarian" in result["generation"]["user_prompt"]
+        assert "**Content language:** English" in result["generation"]["user_prompt"]
         llm_mock.assert_called_once()
         assert llm_mock.call_args.kwargs["flow_type"] == "youtube_pitch"
         assert "max_tokens" not in llm_mock.call_args.kwargs
@@ -203,3 +256,37 @@ class TestGeneratePitch:
             )
         assert exc.value.status_code == 400
         assert "angle" in str(exc.value.detail).lower()
+
+
+class TestContentLanguageLabels:
+    def test_hi_maps_to_hindi(self):
+        from services.youtube.planner_config import resolve_content_language
+
+        resolved = resolve_content_language("hi")
+        assert resolved.code == "hi"
+        assert resolved.label == "Hindi"
+        assert resolved.used_fallback is False
+        assert resolve_content_language("HI").code == "hi"
+
+    def test_locale_and_display_name_map_to_code(self):
+        from services.youtube.planner_config import resolve_content_language
+
+        assert resolve_content_language("hi-IN").code == "hi"
+        assert resolve_content_language("Hindi").code == "hi"
+        assert resolve_content_language("hindi").label == "Hindi"
+
+    def test_empty_and_unknown_map_to_english(self):
+        from services.youtube.planner_config import (
+            resolve_content_language,
+            resolve_content_language_label,
+        )
+
+        omitted = resolve_content_language(None)
+        unknown = resolve_content_language("xx")
+        assert omitted.code == "en"
+        assert omitted.label == "English"
+        assert omitted.used_fallback is True
+        assert unknown.requested == "xx"
+        assert unknown.used_fallback is True
+        assert resolve_content_language_label("") == "English"
+        assert resolve_content_language_label("xx") == "English"

@@ -4,6 +4,7 @@ import type { YouTubeCreatorState, YouTubeVideoPitch } from "../../../hooks/useY
 import type { YouTubeSourceArticle } from "../components/planUrlImportUtils";
 import { mapPitchToVideoPlan, toYouTubeVideoPitch } from "../utils/mapPitchToVideoPlan";
 import { youtubeHandlerErrorMessage } from "../utils/youtubeHandlerError";
+import { resolveYoutubeContentLanguageCode } from "../constants";
 
 const PITCH_HISTORY_LIMIT = 3;
 
@@ -18,6 +19,7 @@ interface YouTubePitchHandlerArgs {
   avatarUrl: string | null;
   enableResearch: boolean;
   sourceArticle: YouTubeSourceArticle | null;
+  language: YouTubeCreatorState["language"];
   creativeAngle: string;
   currentPitch: YouTubeVideoPitch | null;
   pitchHistory: YouTubeVideoPitch[];
@@ -40,6 +42,7 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
     avatarUrl,
     enableResearch,
     sourceArticle,
+    language,
     creativeAngle,
     currentPitch,
     pitchHistory,
@@ -66,6 +69,8 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
     setError(null);
     setSuccess(null);
 
+    const contentLanguage = resolveYoutubeContentLanguageCode(language);
+
     try {
       console.info("[YouTubeCreator] Generating pitch", {
         durationType,
@@ -75,6 +80,7 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
         ideaLen: userIdea.trim().length,
         hasSourceArticle: Boolean(sourceArticle?.url),
         hasAvatar: Boolean(avatarUrl),
+        language: contentLanguage,
       });
       const response = await youtubeApi.generatePitch({
         user_idea: userIdea,
@@ -90,17 +96,29 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
         source_article_summary: sourceArticle?.summary,
         enable_research: enableResearch,
         creative_angle: creativeAngle.trim(),
+        language: contentLanguage,
       });
 
       if (!response.success || !response.pitch) {
         console.warn("[YouTubeCreator] Pitch generate returned success=false", {
+          language: contentLanguage,
           messageLen: (response.message || "").length,
         });
         setError(response.message || "Failed to generate pitch");
         return;
       }
 
-      const mapped = toYouTubeVideoPitch(response.pitch, creativeAngle.trim());
+      let mapped: YouTubeVideoPitch;
+      try {
+        mapped = toYouTubeVideoPitch(response.pitch, creativeAngle.trim());
+      } catch (mapErr: unknown) {
+        console.error("[YouTubeCreator] Pitch response mapping failed", {
+          language: contentLanguage,
+          error: youtubeHandlerErrorMessage(mapErr, "Invalid pitch response"),
+        });
+        setError("Pitch was generated but could not be displayed. Please try again.");
+        return;
+      }
       const nextHistory = [mapped, ...pitchHistory.filter((item) => item.id !== mapped.id)].slice(
         0,
         PITCH_HISTORY_LIMIT,
@@ -113,6 +131,7 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
         scriptPhase: "pitch",
       });
       console.info("[YouTubeCreator] Pitch generated", {
+        language: contentLanguage,
         titleLen: mapped.selected_title.length,
         beatCount: mapped.main_content_beats.length,
         historyCount: nextHistory.length,
@@ -121,6 +140,7 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
       window.setTimeout(() => setSuccess(null), 2500);
     } catch (err: unknown) {
       console.error("[YouTubeCreator] Pitch generation failed", {
+        language: contentLanguage,
         enableResearch,
         durationType,
         error: youtubeHandlerErrorMessage(err, "Failed to generate pitch"),
@@ -135,6 +155,7 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
     creativeAngle,
     durationType,
     enableResearch,
+    language,
     pitchHistory,
     referenceImage,
     setError,
@@ -159,6 +180,8 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
     setError(null);
     setSuccess(null);
 
+    const contentLanguage = resolveYoutubeContentLanguageCode(language);
+
     try {
       updateState({ scriptPhase: "expanding", approvedPitch: currentPitch });
       console.info("[YouTubeCreator] Expanding pitch", {
@@ -166,6 +189,7 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
         durationType,
         enableResearch,
         beatCount: currentPitch.main_content_beats.length,
+        language: contentLanguage,
       });
       const response = await youtubeApi.expandPitchToScript({
         user_idea: userIdea,
@@ -177,6 +201,7 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
         reference_image_description: referenceImage || undefined,
         avatar_url: avatarUrl || undefined,
         enable_research: enableResearch,
+        language: contentLanguage,
         approved_pitch: {
           selected_title: currentPitch.selected_title,
           video_summary: currentPitch.video_summary,
@@ -189,6 +214,7 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
 
       if (!response.success || !response.expansion) {
         console.warn("[YouTubeCreator] Pitch expand returned success=false", {
+          language: contentLanguage,
           messageLen: (response.message || "").length,
         });
         updateState({ scriptPhase: "pitch", approvedPitch: null });
@@ -196,25 +222,36 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
         return;
       }
 
-      const videoPlan = mapPitchToVideoPlan({
-        pitch: currentPitch,
-        expansion: response.expansion,
-        form: {
-          duration_type: durationType,
-          target_audience: targetAudience,
-          video_goal: videoGoal,
-          brand_style: brandStyle,
-        },
-      });
+      let videoPlan;
+      try {
+        videoPlan = mapPitchToVideoPlan({
+          pitch: currentPitch,
+          expansion: response.expansion,
+          form: {
+            duration_type: durationType,
+            target_audience: targetAudience,
+            video_goal: videoGoal,
+            brand_style: brandStyle,
+          },
+        });
+      } catch (mapErr: unknown) {
+        console.error("[YouTubeCreator] Expansion mapping failed", {
+          language: contentLanguage,
+          error: youtubeHandlerErrorMessage(mapErr, "Invalid expansion response"),
+        });
+        updateState({ scriptPhase: "pitch", approvedPitch: null });
+        setError("Script was generated but could not be displayed. Please try again.");
+        return;
+      }
       const fullScript = (response.full_script || response.expansion.full_script || "").trim();
       if (!fullScript) {
-        console.warn("[YouTubeCreator] Expansion missing full script");
+        console.warn("[YouTubeCreator] Expansion missing full script", { language: contentLanguage });
         updateState({ scriptPhase: "pitch", approvedPitch: null });
         setError("Expansion did not return a full script. Please try again.");
         return;
       }
       if (!videoPlan.content_outline?.length) {
-        console.warn("[YouTubeCreator] Expansion missing content outline");
+        console.warn("[YouTubeCreator] Expansion missing content outline", { language: contentLanguage });
         updateState({ scriptPhase: "pitch", approvedPitch: null });
         setError("Expansion did not include a content outline. Please try again.");
         return;
@@ -229,6 +266,7 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
         sceneBuildGeneration: null,
       });
       console.info("[YouTubeCreator] Pitch expanded", {
+        language: contentLanguage,
         scriptLen: fullScript.length,
         outlineCount: videoPlan.content_outline.length,
       });
@@ -239,6 +277,7 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
       }, 1500);
     } catch (err: unknown) {
       console.error("[YouTubeCreator] Pitch expand failed", {
+        language: contentLanguage,
         pitchId: currentPitch.id,
         error: youtubeHandlerErrorMessage(err, "Failed to expand pitch"),
       });
@@ -253,6 +292,7 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
     currentPitch,
     durationType,
     enableResearch,
+    language,
     referenceImage,
     setActiveStep,
     setError,

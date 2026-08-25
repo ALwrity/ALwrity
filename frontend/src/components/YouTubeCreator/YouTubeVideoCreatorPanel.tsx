@@ -156,6 +156,7 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
     avatarUrl,
     enableResearch,
     sourceArticle,
+    language,
     creativeAngle,
     currentPitch,
     pitchHistory,

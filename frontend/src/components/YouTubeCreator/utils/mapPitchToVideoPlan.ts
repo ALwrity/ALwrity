@@ -92,6 +92,7 @@ export function mapPitchToVideoPlan({
   } catch (error) {
     console.error("[mapPitchToVideoPlan] Failed to map expansion", {
       outlineCount: expansion?.main_content_outline?.length ?? 0,
+      error: error instanceof Error ? error.message : "unknown",
     });
     throw error instanceof Error ? error : new Error("Could not map pitch to video plan.");
   }

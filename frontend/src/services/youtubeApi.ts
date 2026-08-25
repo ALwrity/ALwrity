@@ -20,6 +20,8 @@ export interface VideoPlanRequest {
   source_article_summary?: string;
   avatar_url?: string;
   enable_research?: boolean;
+  /** Content language code from Plan Your Video (e.g. en, hi). Pitch/expand prompts use this. */
+  language?: string;
 }
 
 export interface YouTubeChannelBible {

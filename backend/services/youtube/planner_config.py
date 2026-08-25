@@ -1,6 +1,11 @@
 """YouTube planner video-type and duration configuration."""
 
-from typing import Any, Dict
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
+
+from utils.logger_utils import get_service_logger
+
+logger = get_service_logger("youtube.planner_config")
 
 
 VIDEO_TYPE_CONFIGS = {
@@ -114,3 +119,108 @@ DURATION_CONTEXTS: Dict[str, Dict[str, Any]] = {
 def get_duration_context(duration_type: str) -> Dict[str, Any]:
     """Get duration-specific context and constraints."""
     return DURATION_CONTEXTS.get(duration_type, DURATION_CONTEXTS["medium"])
+
+
+# Matches frontend YOUTUBE_CONTENT_LANGUAGE_OPTIONS labels (code → display name).
+CONTENT_LANGUAGE_LABELS: Dict[str, str] = {
+    "en": "English",
+    "es": "Spanish",
+    "fr": "French",
+    "de": "German",
+    "pt": "Portuguese",
+    "it": "Italian",
+    "hi": "Hindi",
+    "ar": "Arabic",
+    "ru": "Russian",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "zh": "Chinese",
+    "vi": "Vietnamese",
+    "id": "Indonesian",
+    "tr": "Turkish",
+    "nl": "Dutch",
+    "pl": "Polish",
+    "th": "Thai",
+}
+
+DEFAULT_CONTENT_LANGUAGE_CODE = "en"
+DEFAULT_CONTENT_LANGUAGE_LABEL = "English"
+
+
+@dataclass(frozen=True)
+class ContentLanguageResolution:
+    """Normalized pitch/expand content language. Codes are not secrets."""
+
+    code: str
+    label: str
+    requested: str
+    used_fallback: bool
+
+
+def _normalize_language_token(language_code: Optional[str]) -> str:
+    """Strip, lowercase, and take the BCP-47 primary subtag (hi-IN → hi)."""
+    raw = (language_code or "").strip().lower()
+    if not raw:
+        return ""
+    primary = raw.replace("_", "-").split("-", 1)[0].strip()
+    return primary[:16]
+
+
+def _english_fallback(requested: str) -> ContentLanguageResolution:
+    return ContentLanguageResolution(
+        code=DEFAULT_CONTENT_LANGUAGE_CODE,
+        label=DEFAULT_CONTENT_LANGUAGE_LABEL,
+        requested=requested,
+        used_fallback=True,
+    )
+
+
+def resolve_content_language(language_code: Optional[str]) -> ContentLanguageResolution:
+    """Resolve Step-1 language to a known code + display label.
+
+    Empty or unknown values fall back to English so the LLM always gets an
+    explicit language. Accepts ISO codes (hi), BCP-47 tags (hi-IN), and
+    display names (Hindi). Logs codes/labels only — never the video idea.
+    """
+    requested = _normalize_language_token(language_code)
+    if not requested:
+        logger.debug("[YouTubePlanner] Content language omitted; using English")
+        return _english_fallback("")
+
+    known_label = CONTENT_LANGUAGE_LABELS.get(requested)
+    if known_label:
+        return ContentLanguageResolution(
+            code=requested,
+            label=known_label,
+            requested=requested,
+            used_fallback=False,
+        )
+
+    labels_to_codes = {
+        label.lower(): code for code, label in CONTENT_LANGUAGE_LABELS.items()
+    }
+    mapped_code = labels_to_codes.get(requested)
+    if mapped_code:
+        mapped_label = CONTENT_LANGUAGE_LABELS[mapped_code]
+        logger.info(
+            "[YouTubePlanner] Content language display name mapped to code={} label={}",
+            mapped_code,
+            mapped_label,
+        )
+        return ContentLanguageResolution(
+            code=mapped_code,
+            label=mapped_label,
+            requested=requested,
+            used_fallback=False,
+        )
+
+    logger.warning(
+        "[YouTubePlanner] Unknown content language; using English. requested={}",
+        requested,
+    )
+    return _english_fallback(requested)
+
+
+def resolve_content_language_label(language_code: Optional[str]) -> str:
+    """Map a Step-1 language value to a prompt label (e.g. hi → Hindi)."""
+    return resolve_content_language(language_code).label

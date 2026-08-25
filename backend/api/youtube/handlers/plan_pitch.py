@@ -21,6 +21,11 @@ router = APIRouter(tags=["youtube"])
 logger = get_service_logger("api.youtube.plan_pitch")
 
 
+def _inbound_language_log(language: Optional[str]) -> str:
+    """Safe inbound language for logs (code only, never idea text)."""
+    return (language or "").strip() or "en"
+
+
 def _load_plan_personalization(
     user_id: str,
     *,
@@ -102,11 +107,12 @@ async def create_video_pitch(
         angle = (request.creative_angle or "").strip()
         logger.info(
             "[YouTubeAPI] Creating pitch: idea_len={} duration={} angle_len={} "
-            "enable_research={} user={}",
+            "enable_research={} language={} user={}",
             len(request.user_idea or ""),
             request.duration_type,
             len(angle),
             request.enable_research,
+            _inbound_language_log(request.language),
             user_id,
         )
 
@@ -141,16 +147,26 @@ async def create_video_pitch(
             source_article_title=request.source_article_title,
             source_article_summary=request.source_article_summary,
             channel_bible_context=channel_bible_context,
+            language=request.language,
         )
-        logger.info("[YouTubeAPI] Pitch generated successfully")
+        logger.info("[YouTubeAPI] Pitch generated successfully language={}", _inbound_language_log(request.language))
         return PitchResponse(success=True, pitch=pitch, message="Pitch generated successfully")
     except HTTPException:
         raise
     except PitchValidationError as exc:
-        logger.warning("[YouTubeAPI] Pitch generation rejected: {}", exc)
+        logger.warning(
+            "[YouTubeAPI] Pitch generation rejected: {} language={}",
+            exc,
+            _inbound_language_log(request.language),
+        )
         return PitchResponse(success=False, message=str(exc))
     except Exception as exc:
-        logger.error("[YouTubeAPI] Error creating pitch: {}", exc, exc_info=True)
+        logger.error(
+            "[YouTubeAPI] Error creating pitch: {} language={}",
+            exc,
+            _inbound_language_log(request.language),
+            exc_info=True,
+        )
         return PitchResponse(success=False, message="Failed to generate pitch. Please try again.")
 
 
@@ -165,11 +181,12 @@ async def expand_video_pitch(
         title = str((request.approved_pitch or {}).get("selected_title") or "")
         logger.info(
             "[YouTubeAPI] Expanding pitch: idea_len={} duration={} title_len={} "
-            "enable_research={} user={}",
+            "enable_research={} language={} user={}",
             len(request.user_idea or ""),
             request.duration_type,
             len(title),
             request.enable_research,
+            _inbound_language_log(request.language),
             user_id,
         )
 
@@ -202,9 +219,10 @@ async def expand_video_pitch(
             user_id=user_id,
             enable_research=bool(request.enable_research),
             channel_bible_context=channel_bible_context,
+            language=request.language,
         )
         full_script = expansion.get("full_script") if isinstance(expansion, dict) else None
-        logger.info("[YouTubeAPI] Pitch expanded successfully")
+        logger.info("[YouTubeAPI] Pitch expanded successfully language={}", _inbound_language_log(request.language))
         return ExpandResponse(
             success=True,
             expansion=expansion,
@@ -214,8 +232,17 @@ async def expand_video_pitch(
     except HTTPException:
         raise
     except PitchValidationError as exc:
-        logger.warning("[YouTubeAPI] Pitch expansion rejected: {}", exc)
+        logger.warning(
+            "[YouTubeAPI] Pitch expansion rejected: {} language={}",
+            exc,
+            _inbound_language_log(request.language),
+        )
         return ExpandResponse(success=False, message=str(exc))
     except Exception as exc:
-        logger.error("[YouTubeAPI] Error expanding pitch: {}", exc, exc_info=True)
+        logger.error(
+            "[YouTubeAPI] Error expanding pitch: {} language={}",
+            exc,
+            _inbound_language_log(request.language),
+            exc_info=True,
+        )
         return ExpandResponse(success=False, message="Failed to expand pitch. Please try again.")
