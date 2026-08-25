@@ -3,6 +3,7 @@ import { youtubeApi } from "../../../services/youtubeApi";
 import type { YouTubeCreatorState, YouTubeVideoPitch } from "../../../hooks/useYouTubeCreatorState";
 import type { YouTubeSourceArticle } from "../components/planUrlImportUtils";
 import { mapPitchToVideoPlan, toYouTubeVideoPitch } from "../utils/mapPitchToVideoPlan";
+import { youtubeHandlerErrorMessage } from "../utils/youtubeHandlerError";
 
 const PITCH_HISTORY_LIMIT = 3;
 
@@ -25,13 +26,6 @@ interface YouTubePitchHandlerArgs {
   setError: (value: string | null) => void;
   setSuccess: (value: string | null) => void;
   setActiveStep: (step: number) => void;
-}
-
-function handlerErrorMessage(err: unknown, fallback: string): string {
-  if (err instanceof Error && err.message) {
-    return err.message;
-  }
-  return fallback;
 }
 
 export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
@@ -58,10 +52,12 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
 
   const handleGeneratePitch = useCallback(async () => {
     if (!userIdea.trim()) {
+      console.warn("[YouTubeCreator] Pitch generate blocked: empty idea");
       setError("Please enter your video idea");
       return;
     }
     if (!creativeAngle.trim()) {
+      console.warn("[YouTubeCreator] Pitch generate blocked: empty creative angle");
       setError("Please select or enter a creative strategy angle");
       return;
     }
@@ -74,8 +70,11 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
       console.info("[YouTubeCreator] Generating pitch", {
         durationType,
         enableResearch,
+        videoType: videoType || "",
         angleLen: creativeAngle.trim().length,
         ideaLen: userIdea.trim().length,
+        hasSourceArticle: Boolean(sourceArticle?.url),
+        hasAvatar: Boolean(avatarUrl),
       });
       const response = await youtubeApi.generatePitch({
         user_idea: userIdea,
@@ -124,9 +123,9 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
       console.error("[YouTubeCreator] Pitch generation failed", {
         enableResearch,
         durationType,
-        error: handlerErrorMessage(err, "Failed to generate pitch"),
+        error: youtubeHandlerErrorMessage(err, "Failed to generate pitch"),
       });
-      setError(handlerErrorMessage(err, "Failed to generate pitch"));
+      setError(youtubeHandlerErrorMessage(err, "Failed to generate pitch"));
     } finally {
       setLoading(false);
     }
@@ -151,6 +150,7 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
 
   const handleExpandPitch = useCallback(async () => {
     if (!currentPitch) {
+      console.warn("[YouTubeCreator] Pitch expand blocked: no current pitch");
       setError("Generate a pitch first");
       return;
     }
@@ -158,12 +158,14 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
     setLoading(true);
     setError(null);
     setSuccess(null);
-    updateState({ scriptPhase: "expanding", approvedPitch: currentPitch });
 
     try {
+      updateState({ scriptPhase: "expanding", approvedPitch: currentPitch });
       console.info("[YouTubeCreator] Expanding pitch", {
         pitchId: currentPitch.id,
         durationType,
+        enableResearch,
+        beatCount: currentPitch.main_content_beats.length,
       });
       const response = await youtubeApi.expandPitchToScript({
         user_idea: userIdea,
@@ -238,10 +240,10 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
     } catch (err: unknown) {
       console.error("[YouTubeCreator] Pitch expand failed", {
         pitchId: currentPitch.id,
-        error: handlerErrorMessage(err, "Failed to expand pitch"),
+        error: youtubeHandlerErrorMessage(err, "Failed to expand pitch"),
       });
       updateState({ scriptPhase: "pitch", approvedPitch: null });
-      setError(handlerErrorMessage(err, "Failed to expand pitch"));
+      setError(youtubeHandlerErrorMessage(err, "Failed to expand pitch"));
     } finally {
       setLoading(false);
     }
