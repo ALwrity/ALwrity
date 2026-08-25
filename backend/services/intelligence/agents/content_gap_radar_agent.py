@@ -216,6 +216,7 @@ class ContentGapRadarAgent(SIFBaseAgent):
                 action_type="navigate",
                 action_url=action_url,
                 context_data={"gap": gap},
+                synthesis_mode="data_derived",
             ))
 
         return proposals

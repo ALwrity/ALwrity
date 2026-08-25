@@ -24,9 +24,9 @@ async def initialize_onboarding(current_user: Dict[str, Any] = Depends(get_curre
 
         completion_data = progress_service.get_completion_data(user_id) or {}
         
-        # Build steps data based on database state
+        # Build steps data based on database state (4 steps matching frontend)
         steps_data = []
-        for step_num in range(1, 6):  # Steps 1-5
+        for step_num in range(1, 5):  # Steps 1-4 (Connect, Research, Personalization, Finish)
             step_completed = False
             step_data = None
             
@@ -35,7 +35,7 @@ async def initialize_onboarding(current_user: Dict[str, Any] = Depends(get_curre
                 website = completion_data.get('website_analysis') or {}
                 step_completed = bool(website.get('website_url') or website.get('writing_style'))
                 if step_completed:
-                    step_data = website
+                    step_data = dict(website)
                     # Include LinkedIn profile analysis if available
                     try:
                         from services.integrations.linkedin.profile_repository import ProfileRepository
@@ -52,38 +52,20 @@ async def initialize_onboarding(current_user: Dict[str, Any] = Depends(get_curre
                             }
                     except Exception:
                         pass
+                    # Expose persisted sitemap analysis under the key the frontend expects
+                    if not step_data.get('sitemapAnalysis') and (website.get('seo_audit') or {}).get('sitemap_analysis'):
+                        step_data['sitemapAnalysis'] = website['seo_audit']['sitemap_analysis']
             elif step_num == 2:  # Research
-                research = completion_data.get('research_preferences') or {}
-                step_completed = bool(research.get('research_depth') or research.get('content_types'))
-                if step_completed:
-                    step_data = dict(research)
-                    # Merge crawl social media into social_media_accounts
-                    website = completion_data.get('website_analysis') or {}
-                    social_media = dict(website.get('social_media_presence') or website.get('social_media_accounts', {}) or {})
-                    crawl_result = website.get('crawl_result', {}) or {}
-                    crawl_social_media = {}
-                    if isinstance(crawl_result, dict):
-                        crawl_content = crawl_result.get('content', {}) or {}
-                        crawl_social_media = crawl_content.get('social_media', {}) or {}
-                        if not isinstance(crawl_social_media, dict):
-                            crawl_social_media = {}
-                        def _norm_url(u: str) -> str:
-                            if not isinstance(u, str):
-                                return ''
-                            u = u.strip()
-                            if not u:
-                                return ''
-                            if u.startswith('//'):
-                                return 'https:' + u
-                            if not u.startswith('http://') and not u.startswith('https://'):
-                                return 'https://' + u if '.' in u else ''
-                            return u
-                        for platform, url in list(crawl_social_media.items()):
-                            existing = social_media.get(platform)
-                            if not existing or str(existing).strip().lower() in ('', '1', 'true', 'none'):
-                                social_media[platform] = _norm_url(url)
-                    step_data['social_media_accounts'] = social_media
-                    step_data['crawl_social_media'] = crawl_social_media
+                # Use the SSOT step-management endpoint to get the full Research
+                # step payload (competitors, sitemap analysis, content pillars).
+                # This ensures the frontend can restore the step from DB instead
+                # of re-running LLM calls after cache expiry.
+                from api.onboarding_utils.step_management_service import StepManagementService
+                step_service = StepManagementService()
+                step2_result = await step_service.get_step_data(2, current_user)
+                if step2_result and step2_result.get('data'):
+                    step_data = step2_result['data']
+                    step_completed = step2_result.get('status') == 'completed'
             elif step_num == 3:  # Personalization
                 persona = completion_data.get('persona_data') or {}
                 step_completed = bool(
@@ -93,8 +75,6 @@ async def initialize_onboarding(current_user: Dict[str, Any] = Depends(get_curre
                 if step_completed:
                     step_data = persona
             elif step_num == 4:  # Finish
-                step_completed = status['is_completed']
-            elif step_num == 5:  # Complete
                 step_completed = status['is_completed']
             
             steps_data.append({
@@ -131,7 +111,6 @@ async def initialize_onboarding(current_user: Dict[str, Any] = Depends(get_curre
                 if step['status'] != 'completed':
                     next_step = step['step_number']
                     break
-
 
         response_data = {
             "user": {

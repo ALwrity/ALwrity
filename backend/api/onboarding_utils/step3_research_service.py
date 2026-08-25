@@ -137,7 +137,7 @@ class Step3ResearchService:
                 db = get_session_for_user(user_id)
                 if db:
                     svc = StepManagementService()
-                    svc._save_competitor_analysis(user_id, enhanced_competitors, industry_context, db)
+                    svc._save_competitor_analysis(user_id, enhanced_competitors, industry_context, db, content_pillars=pillars_results)
                     db.close()
                     logger.info(f"Competitor analysis persisted for user {user_id}")
             except Exception as persist_err:

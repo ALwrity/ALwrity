@@ -41,6 +41,9 @@ interface StepHeaderContent {
   description: string;
 }
 
+const getBackendStep = (backendSteps: any[], frontendIndex: number) =>
+  backendSteps.find(step => step.step_number === frontendIndex + 1);
+
 const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   const [activeStep, setActiveStep] = useState(0);
   const { loading, currentStep, completionPercentage, data, refresh, markStepComplete } = useOnboarding();
@@ -82,6 +85,22 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
 
   const onboardingType = data?.onboarding?.onboarding_type || defaultOnboardingType;
   const steps = useMemo(() => websiteSteps, []);
+
+  // Derived from persisted statuses plus the current progression step. Completed steps
+  // remain reachable after going backward, while the current in-progress step remains selectable.
+  const furthestAccessibleStep = useMemo(() => {
+    const backendSteps = data?.onboarding?.steps || [];
+    let frontier = 0;
+    for (let index = 0; index < steps.length; index += 1) {
+      const backendStep = getBackendStep(backendSteps, index);
+      if (backendStep?.status !== 'completed' && backendStep?.status !== 'skipped') {
+        break;
+      }
+      frontier = index;
+    }
+    const currentProgressionStep = Math.max(0, Math.min(steps.length - 1, currentStep - 1));
+    return Math.max(frontier, currentProgressionStep);
+  }, [currentStep, data, steps]);
 
   useEffect(() => {
     if (activeStep < 1) return;
@@ -244,7 +263,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     // Merge step payload data from backend.
     // Renumbered: 1=Connect, 2=Research, 3=Personalization (frontend 0,1,2).
     if (onboarding.steps && Array.isArray(onboarding.steps)) {
-      const step1Data = onboarding.steps.find((step: any) => step.step_number === 1);
+      const step1Data = getBackendStep(onboarding.steps, 0);
       if (step1Data?.data) {
         const d = step1Data.data;
         setStepData((prev: any) => ({
@@ -254,11 +273,11 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           analysis: d.analysis || d
         }));
       }
-      const step2Data = onboarding.steps.find((step: any) => step.step_number === 2);
+      const step2Data = getBackendStep(onboarding.steps, 1);
       if (step2Data?.data) {
         setStepData((prev: any) => ({ ...prev, ...step2Data.data }));
       }
-      const step3Data = onboarding.steps.find((step: any) => step.step_number === 3);
+      const step3Data = getBackendStep(onboarding.steps, 2);
       if (step3Data?.data) {
         setStepData((prev: any) => ({ ...prev, ...step3Data.data }));
       }
@@ -561,15 +580,20 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     setDirection('left');
     const prevStep = activeStep - 1;
     setActiveStep(prevStep);
+    try {
+      localStorage.setItem('onboarding_active_step', String(prevStep));
+    } catch (_e) {}
     // Do not complete a step when navigating back; just update UI state
     // Backend step progression should only occur on forward completion with valid data
   }, [activeStep]);
 
   const handleStepClick = (stepIndex: number) => {
-    if (stepIndex <= activeStep) {
+    if (stepIndex <= furthestAccessibleStep) {
       setDirection(stepIndex > activeStep ? 'right' : 'left');
       setActiveStep(stepIndex);
-      // Do not complete a step on arbitrary step navigation; only adjust UI
+      try {
+        localStorage.setItem('onboarding_active_step', String(stepIndex));
+      } catch (_e) {}
     }
   };
 
@@ -724,6 +748,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         {/* Header with Stepper */}
         <WizardHeader
           activeStep={activeStep}
+          furthestAccessibleStep={furthestAccessibleStep}
           progress={completionPercentage}
           stepHeaderContent={stepHeaderContent}
           showProgressMessage={showProgressMessage}

@@ -183,3 +183,56 @@ def get_tool_certification_report(
             for state in CERTIFICATION_STATES
         },
     }
+
+
+# Worst-first ordering used to roll tool states up to an agent badge.
+_STATE_SEVERITY = {
+    "not certified": 0,
+    "degraded": 1,
+    "certified_with_provider_dependency": 2,
+    "certified": 3,
+}
+
+
+def get_agent_certification_rollup(
+    inventory: Optional[Iterable[Dict[str, Any]]] = None,
+    catalog: Optional[Iterable[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Compact per-agent certification summary for user-facing surfaces.
+
+    Returns ``team_label``, ``default_meeting_ready``, the state histogram,
+    and a per-agent rollup where each agent's badge reflects its worst
+    certified tool. Agents whose tools are absent from the inventory are
+    omitted entirely rather than being silently marked as certified.
+    """
+    report = get_tool_certification_report(inventory, catalog)
+    agents: Dict[str, Dict[str, Any]] = {}
+    for tool_report in report.get("tools", []):
+        owner = tool_report.get("agent_owner")
+        if not owner:
+            continue
+        state = tool_report.get("state")
+        entry = agents.setdefault(
+            owner,
+            {"state": state, "tools_total": 0, "tools_blocked": 0, "missing_gates": []},
+        )
+        entry["tools_total"] += 1
+        severity = _STATE_SEVERITY.get(state)
+        current_severity = _STATE_SEVERITY.get(entry.get("state"))
+        if severity is not None and (
+            current_severity is None or severity < current_severity
+        ):
+            entry["state"] = state
+        if state not in {"certified", "certified_with_provider_dependency"}:
+            entry["tools_blocked"] += 1
+            for gate in tool_report.get("missing_gates") or []:
+                if gate not in entry["missing_gates"]:
+                    entry["missing_gates"].append(gate)
+    for entry in agents.values():
+        entry["missing_gates"] = sorted(entry["missing_gates"])
+    return {
+        "team_label": report.get("team_label"),
+        "default_meeting_ready": report.get("default_meeting_ready"),
+        "summary": report.get("summary", {}),
+        "agents": agents,
+    }

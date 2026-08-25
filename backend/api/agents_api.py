@@ -39,6 +39,31 @@ from models.agent_activity_models import AgentProfile, AgentRun, AgentEvent, Age
 from models.daily_workflow_models import DailyWorkflowTask
 from models.workflow_execution_models import WorkflowTaskExecution
 from services.intelligence.agents.team_catalog import AGENT_TEAM_CATALOG, get_agent_catalog_entry
+from services.tool_certification import get_agent_certification_rollup
+
+# Certification rollup is static per deploy; cache it briefly so the team
+# endpoint doesn't re-run file scans on every request.
+_CERTIFICATION_CACHE: Dict[str, Any] = {"data": None, "computed_at": 0.0}
+_CERTIFICATION_CACHE_TTL_SECONDS = 60.0
+
+
+def _get_cached_certification_rollup() -> Optional[Dict[str, Any]]:
+    import time as _time
+
+    now = _time.monotonic()
+    cached = _CERTIFICATION_CACHE["data"]
+    if cached is not None and (now - _CERTIFICATION_CACHE["computed_at"]) < _CERTIFICATION_CACHE_TTL_SECONDS:
+        return cached
+    try:
+        rollup = get_agent_certification_rollup()
+        _CERTIFICATION_CACHE["data"] = rollup
+        _CERTIFICATION_CACHE["computed_at"] = now
+        return rollup
+    except Exception as cert_err:
+        logger.warning(f"Certification rollup unavailable: {cert_err}")
+        return None
+
+
 from services.intelligence.agents.prompt_context import (
     build_prompt_context,
     comma_join_context,
@@ -320,9 +345,18 @@ async def get_agent_team_endpoint(
             defaults["rendered_task_prompt_template"] = _render_template(defaults.get("task_prompt_template"))
             agent["defaults"] = defaults
 
+        # Honest certification labels: never claim production-real behavior
+        # that the tool gates don't back. Absent on rollup failure so the
+        # team payload itself never breaks.
+        certification = _get_cached_certification_rollup()
+
         return {
             "success": True,
-            "data": {"agents": agents, "context_summary": context_summary},
+            "data": {
+                "agents": agents,
+                "context_summary": context_summary,
+                "certification": certification,
+            },
             "timestamp": datetime.utcnow().isoformat(),
             "user_id": user_id,
         }
@@ -1244,6 +1278,8 @@ async def get_market_signals_endpoint(
                 "impact_score": signal.impact_score,
                 "urgency_level": signal.urgency_level.value,
                 "confidence_score": signal.confidence_score,
+                "confidence_basis": (signal.metadata or {}).get('confidence_basis'),
+                "confidence_is_estimate": bool((signal.metadata or {}).get('confidence_is_estimate', False)),
                 "related_topics": signal.related_topics,
                 "suggested_actions": signal.suggested_actions,
                 "metadata": signal.metadata,

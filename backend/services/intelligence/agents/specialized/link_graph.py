@@ -78,7 +78,8 @@ class LinkGraphAgent(SIFBaseAgent):
                 source_agent="LinkGraphAgent",
                 reasoning="Connecting content clusters improves SEO and user navigation.",
                 action_type="navigate",
-                action_url="/content-planning-dashboard"
+                action_url="/content-planning-dashboard",
+                synthesis_mode="data_derived",
             ))
         else:
             proposals.append(TaskProposal(
@@ -90,7 +91,8 @@ class LinkGraphAgent(SIFBaseAgent):
                 source_agent="LinkGraphAgent",
                 reasoning="Structured content clusters drive organic growth.",
                 action_type="navigate",
-                action_url="/content-planning-dashboard"
+                action_url="/content-planning-dashboard",
+                synthesis_mode="data_derived",
             ))
 
         return proposals

@@ -424,7 +424,7 @@ class ALwrityAgentOrchestrator:
             # Get performance metrics if available
             performance_summary = {}
             if self.performance_monitor:
-                all_performance = self.performance_monitor.get_all_agents_performance()
+                all_performance = await self.performance_monitor.get_all_agents_performance()
                 performance_summary = {perf['agent_id']: perf for perf in all_performance}
             
             return {

@@ -30,6 +30,8 @@ def test_normalize_proposal_has_stable_shared_contract():
         "recommendation_id", "agent", "title", "description", "pillar", "evidence",
         "reasoning", "priority", "expected_impact", "effort", "kpi", "deadline",
         "action_type", "action_parameters", "confidence",
+        # Phase 2 honesty contract: how the proposal text was produced.
+        "synthesis_mode",
     }
     assert result["recommendation_id"].startswith("rec-")
     assert result["evidence"] == ["gsc:page:/guide"]

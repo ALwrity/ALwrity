@@ -418,6 +418,8 @@ async def preview_workflow(
         agent = ((task.get("metadata") or {}).get("source_agent")) or "unknown"
         proposals_by_agent.setdefault(agent, []).append(task)
 
+    from services.today_workflow_pillar import count_template_fallback_tasks
+
     return {
         "success": True,
         "data": {
@@ -428,6 +430,9 @@ async def preview_workflow(
             "committee_agent_count": plan.committee_agent_count,
             "fallback_used": bool(plan.fallback_used),
             "proposals_by_agent": proposals_by_agent,
+            # Transparency: how many suggestions are static templates
+            # because agent analysis was unavailable.
+            "template_fallback_count": count_template_fallback_tasks(response_tasks),
         },
     }
 

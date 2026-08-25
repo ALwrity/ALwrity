@@ -250,11 +250,11 @@ class StepManagementService:
             db.rollback()
             raise e
 
-    def _save_competitor_analysis(self, user_id: str, competitors: List[Dict[str, Any]], industry_context: Optional[str], db: Session) -> bool:
+    def _save_competitor_analysis(self, user_id: str, competitors: List[Dict[str, Any]], industry_context: Optional[str], db: Session, content_pillars: Optional[Dict[str, Any]] = None) -> bool:
         """Save competitor analysis results to database."""
         try:
             session = self._get_or_create_session(user_id, db)
-            
+
             logger.info(f" COMPETITOR SAVE: Starting to save {len(competitors)} competitors for session {session.id}")
             
             saved_count = 0
@@ -319,6 +319,31 @@ class StepManagementService:
             
             db.commit()
             logger.info(f" Saved {saved_count} competitors ({failed_count} failed)")
+
+            # Persist discovered content pillars so they survive cache expiry
+            if content_pillars:
+                try:
+                    research_prefs = db.query(ResearchPreferences).filter(
+                        ResearchPreferences.session_id == session.id
+                    ).first()
+                    if research_prefs:
+                        research_prefs.content_pillars = content_pillars
+                        research_prefs.updated_at = datetime.utcnow()
+                    else:
+                        research_prefs = ResearchPreferences(
+                            session_id=session.id,
+                            research_depth='Comprehensive',
+                            content_types=["Blog Posts", "Social Media", "Newsletters"],
+                            auto_research=True,
+                            factual_content=True,
+                            content_pillars=content_pillars,
+                        )
+                        db.add(research_prefs)
+                    db.commit()
+                    logger.info(f" Saved content_pillars for session {session.id}")
+                except Exception as pillars_err:
+                    logger.warning(f"Failed to save content_pillars for user {user_id}: {pillars_err}")
+                    db.rollback()
 
             # Refresh Step 3 flat context with competitor details saved by this flow
             try:
@@ -674,7 +699,8 @@ class StepManagementService:
                 step_data['competitors'] = competitors
                 step_data['social_media_accounts'] = social_media
                 step_data['crawl_social_media'] = crawl_social_media
-                
+                step_data['content_pillars'] = research.get('content_pillars') if isinstance(research, dict) else None
+
                 # Include saved sitemap analysis if available
                 seo_audit = website.get('seo_audit', {}) or {}
                 if seo_audit.get('sitemap_analysis'):

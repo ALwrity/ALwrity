@@ -385,7 +385,6 @@ export const useBlogWriterState = () => {
 
       // Save to localStorage for persistence (using shared cache utility)
       try {
-        const { blogWriterCache } = require('../services/blogWriterCache');
         blogWriterCache.cacheOutline(result.outline, combinedTitleOptions);
         localStorage.setItem('blog_title_options', JSON.stringify(combinedTitleOptions));
         localStorage.setItem('blog_selected_title', nextSelectedTitle || '');

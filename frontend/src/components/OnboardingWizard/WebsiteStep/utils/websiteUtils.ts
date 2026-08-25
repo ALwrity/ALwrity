@@ -296,6 +296,7 @@ export const fetchLastAnalysis = async (): Promise<{
   success: boolean;
   website?: string;
   analysis?: any;
+  domainName?: string;
   error?: string;
 }> => {
   try {
@@ -309,7 +310,8 @@ export const fetchLastAnalysis = async (): Promise<{
         return {
           success: true,
           website: last.website_url,
-          analysis: last.style_analysis
+          analysis: buildAnalysisDisplayModel(last),
+          domainName: extractDomainName(last.website_url)
         };
       }
     }

@@ -172,6 +172,14 @@ class WebsiteAnalysisExecutor(TaskExecutor):
                 return result
                 
         except Exception as e:
+            # The flush/commit above may have failed and left the session in a
+            # pending-rollback state. Roll back first so we can safely write the
+            # failure log below without hitting PendingRollbackError.
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            
             execution_time_ms = int((time.time() - start_time) * 1000)
             
             error = TaskExecutionError(

@@ -15,6 +15,10 @@ depends_on = None
 
 
 def upgrade():
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if "daily_meetings" in inspector.get_table_names():
+        return
     op.create_table(
         "daily_meetings",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -47,6 +51,10 @@ def upgrade():
 
 
 def downgrade():
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if "daily_meetings" not in inspector.get_table_names():
+        return
     op.drop_index("ix_daily_meetings_user_date", table_name="daily_meetings")
     op.drop_index("ix_daily_meetings_status", table_name="daily_meetings")
     op.drop_index("ix_daily_meetings_meeting_date", table_name="daily_meetings")

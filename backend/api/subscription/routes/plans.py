@@ -6,13 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Dict, Any
 from loguru import logger
-import sqlite3
 
 from services.database import get_db
 from services.subscription.plans_db import get_plans_db
 from models.subscription_models import SubscriptionPlan
-from services.subscription.schema_utils import ensure_subscription_plan_columns
-from ..utils import enum_value, format_plan_limits, handle_schema_error
+from ..utils import enum_value, format_plan_limits
 from fastapi import Query
 from typing import Optional
 
@@ -24,11 +22,6 @@ async def get_subscription_plans(
     db: Session = Depends(get_plans_db),
 ) -> Dict[str, Any]:
     """Get all available subscription plans (public — no auth required)."""
-    
-    try:
-        ensure_subscription_plan_columns(db)
-    except Exception as schema_err:
-        logger.warning(f"Schema check failed, will retry on query: {schema_err}")
     
     try:
         plans = db.query(SubscriptionPlan).filter(
@@ -56,16 +49,7 @@ async def get_subscription_plans(
             }
         }
     
-    except (sqlite3.OperationalError, Exception) as e:
-        error_str = str(e).lower()
-        if 'no such column' in error_str and ('exa_calls_limit' in error_str or 'video_calls_limit' in error_str or 'image_edit_calls_limit' in error_str or 'audio_calls_limit' in error_str):
-            return handle_schema_error(
-                e,
-                db,
-                error_str,
-                lambda: get_subscription_plans(db)
-            )
-        
+    except Exception as e:
         logger.error(f"Error getting subscription plans: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -20,12 +20,6 @@ class ComprehensiveUserDataCacheService:
     def __init__(self, db_session: Session):
         self.db = db_session
         self.data_processor = ComprehensiveUserDataProcessor()
-        # Ensure table exists in dev environments where migrations may not have run yet
-        try:
-            ComprehensiveUserDataCache.__table__.create(bind=self.db.bind, checkfirst=True)
-        except Exception:
-            # Non-fatal; subsequent operations handle absence defensively
-            pass
         
     async def get_cached_data(
         self, 

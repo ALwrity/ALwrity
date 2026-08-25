@@ -65,43 +65,6 @@ def test_semantic_health_check_model_exists():
     assert found, "SemanticHealthCheck class not found"
 
 
-def test_database_migration_creates_semantic_health_checks_table():
-    """services/database.py must include the auto-migration for
-    the new semantic_health_checks table.
-    """
-    src = _read("services/database.py")
-    assert "_ensure_semantic_health_checks_table" in src
-    # Find the function and verify its body has the right CREATE TABLE
-    # statement. We use re.search anchored on the function name to
-    # avoid the previous "wrong function" bug where a non-greedy
-    # capture matched the first adjacent function instead.
-    lines = src.splitlines()
-    # Find the function definition line
-    def_line = None
-    for i, line in enumerate(lines):
-        if line.startswith("def _ensure_semantic_health_checks_table("):
-            def_line = i
-            break
-    assert def_line is not None
-    # Walk forward until we hit the next top-level def or end of file
-    body_lines = []
-    for line in lines[def_line + 1:]:
-        if line.startswith("def ") or line.startswith("class "):
-            break
-        body_lines.append(line)
-    body = "\n".join(body_lines)
-    assert "semantic_health_checks" in body, "CREATE TABLE for semantic_health_checks missing"
-    assert "user_id" in body
-    assert "last_check_at" in body
-    assert "status" in body
-    assert "value" in body
-    # Must be wired into the init sequence
-    assert re.search(
-        r"_ensure_semantic_health_checks_table\(engine,\s*user_id\)",
-        src,
-    ), "auto-migration not wired into DB init"
-
-
 def test_runtime_record_and_read_back_last_check():
     """Round-trip: record a check, read it back, verify it survives."""
     # Use an in-memory SQLite to exercise the model without a real
@@ -172,33 +135,6 @@ def test_semantic_monitoring_snapshot_model_exists():
             assert "get_recent_snapshots" in methods
             assert "prune_old_snapshots" in methods
     assert found, "SemanticMonitoringSnapshot class not found"
-
-
-def test_database_migration_creates_semantic_monitoring_snapshots_table():
-    src = _read("services/database.py")
-    assert "_ensure_semantic_monitoring_snapshots_table" in src
-    lines = src.splitlines()
-    def_line = None
-    for i, line in enumerate(lines):
-        if line.startswith("def _ensure_semantic_monitoring_snapshots_table("):
-            def_line = i
-            break
-    assert def_line is not None
-    body_lines = []
-    for line in lines[def_line + 1:]:
-        if line.startswith("def ") or line.startswith("class "):
-            break
-        body_lines.append(line)
-    body = "\n".join(body_lines)
-    assert "semantic_monitoring_snapshots" in body
-    assert "user_id" in body
-    assert "captured_at" in body
-    assert "snapshot_json" in body
-    # Must be wired into the init sequence
-    assert re.search(
-        r"_ensure_semantic_monitoring_snapshots_table\(engine,\s*user_id\)",
-        src,
-    ), "auto-migration not wired into DB init"
 
 
 def test_monitoring_loop_persists_snapshot_to_db():

@@ -22,9 +22,7 @@ from loguru import logger
 
 from services.integrations.oauth_provider_base import OAuthProviderBase, resolve_encryption_key
 from services.integrations.linkedin.oauth_schema_migrations import (
-    ensure_linkedin_oauth_token_columns,
     existing_token_encryption_columns,
-    normalize_unipile_provider_mode,
 )
 from services.integrations.linkedin.linkedin_oauth_token_store import (
     upsert_unipile_credentials_row,
@@ -88,8 +86,52 @@ class LinkedInOAuthService(OAuthProviderBase):
         self._migration_done: set[str] = set()
 
     def _init_db(self, user_id: str) -> None:
+        """Ensure the per-user schema exists (owned by Alembic migrations).
+
+        Avoids calling ``get_engine_for_user`` when the tables already exist,
+        which keeps tests that patch ``get_user_db_path`` fast and isolated.
+        """
         db_path = self._get_db_path(user_id)
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
+        required_tables = {
+            "linkedin_oauth_tokens",
+            "linkedin_oauth_states",
+            "linkedin_analysis_context",
+        }
+        try:
+            with sqlite3.connect(db_path) as conn:
+                existing = {
+                    row[0]
+                    for row in conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'"
+                    )
+                }
+        except Exception:
+            existing = set()
+
+        if not required_tables.issubset(existing):
+            if self.db_path:
+                # Custom DB paths (e.g. ProfileRepository unit tests) are not
+                # Alembic-managed tenant DBs; bootstrap them with raw DDL.
+                self._ensure_tables_in_path(self.db_path)
+            else:
+                try:
+                    from services.database import get_engine_for_user
+
+                    get_engine_for_user(user_id)
+                except Exception as ensure_error:
+                    logger.warning(
+                        f"Could not ensure Alembic schema for user {user_id}: {ensure_error}"
+                    )
+
+    def _ensure_tables_in_path(self, db_path: str) -> None:
+        """Raw-SQL bootstrap for non-Alembic DB paths (tests/ProfileRepository).
+
+        DDL here mirrors the canonical schema owned by migration
+        ``f9a0b1c2d3e4_add_linkedin_oauth_tables``; it is idempotent and never
+        DROPs legacy columns.
+        """
         with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -97,7 +139,7 @@ class LinkedInOAuthService(OAuthProviderBase):
                 CREATE TABLE IF NOT EXISTS linkedin_oauth_tokens (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id TEXT NOT NULL,
-                    provider_mode TEXT NOT NULL,
+                    provider_mode TEXT NOT NULL DEFAULT 'unipile',
                     linkedin_access_token TEXT,
                     linkedin_refresh_token TEXT,
                     expires_at TIMESTAMP,
@@ -112,15 +154,12 @@ class LinkedInOAuthService(OAuthProviderBase):
                 )
                 """
             )
-            # Legacy tenant DBs may predate Unipile columns; backfill idempotently.
-            # Leave any leftover zernio_* columns in place (unused; DROP is unsafe/unneeded).
-            ensure_linkedin_oauth_token_columns(cursor, user_id=user_id)
-            normalized = normalize_unipile_provider_mode(cursor)
-            if normalized:
-                logger.info(
-                    f"[LinkedInOAuthSchema] Normalized provider_mode to unipile "
-                    f"user_id={user_id} rows={normalized}"
-                )
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_linkedin_oauth_user_active
+                ON linkedin_oauth_tokens (user_id, is_active)
+                """
+            )
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS linkedin_oauth_states (
@@ -136,29 +175,20 @@ class LinkedInOAuthService(OAuthProviderBase):
             )
             cursor.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_linkedin_oauth_user_active
-                ON linkedin_oauth_tokens (user_id, is_active)
-                """
-            )
-            cursor.execute(
-                """
                 CREATE TABLE IF NOT EXISTS linkedin_analysis_context (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id TEXT NOT NULL UNIQUE,
                     unipile_account_id TEXT NOT NULL,
-
                     normalized_profile_json TEXT,
                     raw_userprofile_json TEXT,
                     profile_content_hash TEXT,
                     fetched_at TIMESTAMP,
-
                     profile_context_json TEXT,
                     profile_validation_json TEXT,
                     user_completion_json TEXT,
                     ai_profile_intelligence_json TEXT,
                     topic_recommendations_json TEXT,
                     profile_optimization_json TEXT,
-
                     profile_context_updated_at TIMESTAMP,
                     ai_intelligence_updated_at TIMESTAMP,
                     recommendations_updated_at TIMESTAMP,
@@ -168,28 +198,6 @@ class LinkedInOAuthService(OAuthProviderBase):
                 )
                 """
             )
-            cursor.execute("PRAGMA table_info(linkedin_analysis_context)")
-            analysis_cols = {row[1] for row in cursor.fetchall()}
-            if "topic_recommendations_json" not in analysis_cols:
-                cursor.execute(
-                    "ALTER TABLE linkedin_analysis_context "
-                    "ADD COLUMN topic_recommendations_json TEXT"
-                )
-            if "recommendations_updated_at" not in analysis_cols:
-                cursor.execute(
-                    "ALTER TABLE linkedin_analysis_context "
-                    "ADD COLUMN recommendations_updated_at TIMESTAMP"
-                )
-            if "profile_optimization_json" not in analysis_cols:
-                cursor.execute(
-                    "ALTER TABLE linkedin_analysis_context "
-                    "ADD COLUMN profile_optimization_json TEXT"
-                )
-            if "profile_optimization_updated_at" not in analysis_cols:
-                cursor.execute(
-                    "ALTER TABLE linkedin_analysis_context "
-                    "ADD COLUMN profile_optimization_updated_at TIMESTAMP"
-                )
             cursor.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_linkedin_analysis_user

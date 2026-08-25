@@ -60,7 +60,7 @@ class _StubMonitor:
     def __init__(self, rows):
         self._rows = rows
 
-    def get_all_agents_performance(self):
+    async def get_all_agents_performance(self):
         return self._rows
 
 

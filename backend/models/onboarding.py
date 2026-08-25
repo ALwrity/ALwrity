@@ -153,7 +153,8 @@ class ResearchPreferences(Base):
     content_characteristics = Column(JSON)  # Sentence structure, vocabulary from analysis
     target_audience = Column(JSON)  # Demographics, expertise level from analysis
     recommended_settings = Column(JSON)  # AI-generated recommendations from analysis
-    
+    content_pillars = Column(JSON, nullable=True)  # Discovered content pillars from competitor analysis
+
     # Metadata
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -177,6 +178,7 @@ class ResearchPreferences(Base):
             'content_characteristics': self.content_characteristics,
             'target_audience': self.target_audience,
             'recommended_settings': self.recommended_settings,
+            'content_pillars': self.content_pillars,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         } 

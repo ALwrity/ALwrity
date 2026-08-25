@@ -122,6 +122,15 @@ export const AgentTeamPreview: React.FC = () => {
             </Alert>
           )}
 
+          {(preview.template_fallback_count ?? 0) > 0 && (
+            <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
+              {preview.template_fallback_count} suggestion
+              {(preview.template_fallback_count ?? 0) === 1 ? " is" : "s are"} generic
+              template{((preview.template_fallback_count ?? 0) === 1) ? "" : "s"} because agent
+              analysis couldn&apos;t complete.
+            </Alert>
+          )}
+
           <Stack spacing={2}>
             {Object.entries(preview.proposals_by_agent).map(([agent, tasks]) => (
               <Box key={agent}>

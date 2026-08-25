@@ -736,39 +736,6 @@ def upgrade() -> None:
     sa.Column('data_source_transparency', sa.JSON(), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('enhanced_writing_personas',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('user_id', sa.Integer(), nullable=False),
-    sa.Column('persona_name', sa.String(length=255), nullable=False),
-    sa.Column('archetype', sa.String(length=100), nullable=True),
-    sa.Column('core_belief', sa.Text(), nullable=True),
-    sa.Column('brand_voice_description', sa.Text(), nullable=True),
-    sa.Column('linguistic_fingerprint', sa.JSON(), nullable=True),
-    sa.Column('writing_style_signature', sa.JSON(), nullable=True),
-    sa.Column('vocabulary_profile', sa.JSON(), nullable=True),
-    sa.Column('sentence_patterns', sa.JSON(), nullable=True),
-    sa.Column('rhetorical_style', sa.JSON(), nullable=True),
-    sa.Column('style_consistency_score', sa.Float(), nullable=True),
-    sa.Column('authenticity_score', sa.Float(), nullable=True),
-    sa.Column('readability_score', sa.Float(), nullable=True),
-    sa.Column('engagement_potential', sa.Float(), nullable=True),
-    sa.Column('feedback_history', sa.JSON(), nullable=True),
-    sa.Column('performance_metrics', sa.JSON(), nullable=True),
-    sa.Column('adaptation_history', sa.JSON(), nullable=True),
-    sa.Column('onboarding_session_id', sa.Integer(), nullable=True),
-    sa.Column('source_website_analysis', sa.JSON(), nullable=True),
-    sa.Column('source_research_preferences', sa.JSON(), nullable=True),
-    sa.Column('ai_analysis_version', sa.String(length=50), nullable=True),
-    sa.Column('confidence_score', sa.Float(), nullable=True),
-    sa.Column('analysis_date', sa.DateTime(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.Column('is_active', sa.Boolean(), nullable=True),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index('idx_created_at', 'enhanced_writing_personas', ['created_at'], unique=False)
-    op.create_index('idx_user_active', 'enhanced_writing_personas', ['user_id', 'is_active'], unique=False)
-    op.create_index(op.f('ix_enhanced_writing_personas_user_id'), 'enhanced_writing_personas', ['user_id'], unique=False)
     op.create_table('fraud_warnings',
     sa.Column('id', sa.String(length=100), nullable=False),
     sa.Column('charge_id', sa.String(length=100), nullable=False),
@@ -1726,26 +1693,6 @@ def upgrade() -> None:
     op.create_index(op.f('ix_website_analysis_tasks_id'), 'website_analysis_tasks', ['id'], unique=False)
     op.create_index(op.f('ix_website_analysis_tasks_next_check'), 'website_analysis_tasks', ['next_check'], unique=False)
     op.create_index(op.f('ix_website_analysis_tasks_user_id'), 'website_analysis_tasks', ['user_id'], unique=False)
-    op.create_table('writing_personas',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('user_id', sa.String(length=255), nullable=False),
-    sa.Column('persona_name', sa.String(length=255), nullable=False),
-    sa.Column('archetype', sa.String(length=100), nullable=True),
-    sa.Column('core_belief', sa.Text(), nullable=True),
-    sa.Column('brand_voice_description', sa.Text(), nullable=True),
-    sa.Column('linguistic_fingerprint', sa.JSON(), nullable=True),
-    sa.Column('platform_adaptations', sa.JSON(), nullable=True),
-    sa.Column('onboarding_session_id', sa.Integer(), nullable=True),
-    sa.Column('source_website_analysis', sa.JSON(), nullable=True),
-    sa.Column('source_research_preferences', sa.JSON(), nullable=True),
-    sa.Column('ai_analysis_version', sa.String(length=50), nullable=True),
-    sa.Column('confidence_score', sa.Float(), nullable=True),
-    sa.Column('analysis_date', sa.DateTime(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.Column('is_active', sa.Boolean(), nullable=True),
-    sa.PrimaryKeyConstraint('id')
-    )
     op.create_table('youtube_video_tasks',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('task_id', sa.String(length=36), nullable=False),
@@ -1868,16 +1815,6 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_ai_calendar_recommendations_user_id'), 'ai_calendar_recommendations', ['user_id'], unique=False)
-    op.create_table('api_keys',
-    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-    sa.Column('session_id', sa.Integer(), nullable=True),
-    sa.Column('provider', sa.String(length=64), nullable=False),
-    sa.Column('key', sa.String(length=256), nullable=False),
-    sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['session_id'], ['onboarding_sessions.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
     op.create_table('backlink_leads',
     sa.Column('id', sa.String(length=64), nullable=False),
     sa.Column('campaign_id', sa.String(length=64), nullable=False),
@@ -2089,28 +2026,6 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['strategy_id'], ['enhanced_content_strategies.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('enhanced_platform_personas',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('writing_persona_id', sa.Integer(), nullable=False),
-    sa.Column('platform_type', sa.String(length=50), nullable=False),
-    sa.Column('platform_linguistic_adaptation', sa.JSON(), nullable=True),
-    sa.Column('platform_engagement_patterns', sa.JSON(), nullable=True),
-    sa.Column('platform_content_optimization', sa.JSON(), nullable=True),
-    sa.Column('platform_algorithm_insights', sa.JSON(), nullable=True),
-    sa.Column('content_performance_history', sa.JSON(), nullable=True),
-    sa.Column('engagement_metrics', sa.JSON(), nullable=True),
-    sa.Column('optimization_suggestions', sa.JSON(), nullable=True),
-    sa.Column('platform_compliance_score', sa.Float(), nullable=True),
-    sa.Column('optimization_effectiveness', sa.Float(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.Column('is_active', sa.Boolean(), nullable=True),
-    sa.ForeignKeyConstraint(['writing_persona_id'], ['enhanced_writing_personas.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index('idx_persona_platform', 'enhanced_platform_personas', ['writing_persona_id', 'platform_type'], unique=False)
-    op.create_index('idx_platform_active', 'enhanced_platform_personas', ['platform_type', 'is_active'], unique=False)
-    op.create_index(op.f('ix_enhanced_platform_personas_platform_type'), 'enhanced_platform_personas', ['platform_type'], unique=False)
     op.create_table('linkedin_growth_reanalysis_execution_logs',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('task_id', sa.Integer(), nullable=False),
@@ -2246,26 +2161,6 @@ def upgrade() -> None:
     op.create_index('idx_onboarding_full_website_analysis_execution_logs_task_date', 'onboarding_full_website_analysis_execution_logs', ['task_id', 'execution_date'], unique=False)
     op.create_index(op.f('ix_onboarding_full_website_analysis_execution_logs_id'), 'onboarding_full_website_analysis_execution_logs', ['id'], unique=False)
     op.create_index(op.f('ix_onboarding_full_website_analysis_execution_logs_task_id'), 'onboarding_full_website_analysis_execution_logs', ['task_id'], unique=False)
-    op.create_table('persona_analysis_results',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('user_id', sa.Integer(), nullable=False),
-    sa.Column('writing_persona_id', sa.Integer(), nullable=True),
-    sa.Column('analysis_prompt', sa.Text(), nullable=True),
-    sa.Column('input_data', sa.JSON(), nullable=True),
-    sa.Column('linguistic_analysis', sa.JSON(), nullable=True),
-    sa.Column('personality_analysis', sa.JSON(), nullable=True),
-    sa.Column('platform_recommendations', sa.JSON(), nullable=True),
-    sa.Column('style_guidelines', sa.JSON(), nullable=True),
-    sa.Column('analysis_confidence', sa.Float(), nullable=True),
-    sa.Column('data_sufficiency_score', sa.Float(), nullable=True),
-    sa.Column('recommendation_quality', sa.Float(), nullable=True),
-    sa.Column('ai_provider', sa.String(length=50), nullable=True),
-    sa.Column('model_version', sa.String(length=100), nullable=True),
-    sa.Column('processing_time', sa.Float(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['writing_persona_id'], ['writing_personas.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
     op.create_table('persona_data',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('session_id', sa.Integer(), nullable=False),
@@ -2278,20 +2173,6 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['session_id'], ['onboarding_sessions.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('persona_learning_data',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('writing_persona_id', sa.Integer(), nullable=False),
-    sa.Column('user_writing_samples', sa.JSON(), nullable=True),
-    sa.Column('successful_content_examples', sa.JSON(), nullable=True),
-    sa.Column('user_preferences', sa.JSON(), nullable=True),
-    sa.Column('style_refinements', sa.JSON(), nullable=True),
-    sa.Column('vocabulary_updates', sa.JSON(), nullable=True),
-    sa.Column('pattern_adjustments', sa.JSON(), nullable=True),
-    sa.Column('learning_date', sa.DateTime(), nullable=True),
-    sa.Column('learning_type', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['writing_persona_id'], ['enhanced_writing_personas.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('platform_insights_execution_logs',
@@ -2322,27 +2203,6 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('updated_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['session_id'], ['onboarding_sessions.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('platform_personas',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('writing_persona_id', sa.Integer(), nullable=False),
-    sa.Column('platform_type', sa.String(length=50), nullable=False),
-    sa.Column('sentence_metrics', sa.JSON(), nullable=True),
-    sa.Column('lexical_features', sa.JSON(), nullable=True),
-    sa.Column('rhetorical_devices', sa.JSON(), nullable=True),
-    sa.Column('tonal_range', sa.JSON(), nullable=True),
-    sa.Column('stylistic_constraints', sa.JSON(), nullable=True),
-    sa.Column('content_format_rules', sa.JSON(), nullable=True),
-    sa.Column('engagement_patterns', sa.JSON(), nullable=True),
-    sa.Column('posting_frequency', sa.JSON(), nullable=True),
-    sa.Column('content_types', sa.JSON(), nullable=True),
-    sa.Column('platform_best_practices', sa.JSON(), nullable=True),
-    sa.Column('algorithm_considerations', sa.JSON(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.Column('updated_at', sa.DateTime(), nullable=True),
-    sa.Column('is_active', sa.Boolean(), nullable=True),
-    sa.ForeignKeyConstraint(['writing_persona_id'], ['writing_personas.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('product_assets',
@@ -2673,41 +2533,6 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['strategy_id'], ['content_strategies.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_table('persona_quality_metrics',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('writing_persona_id', sa.Integer(), nullable=False),
-    sa.Column('platform_persona_id', sa.Integer(), nullable=True),
-    sa.Column('style_accuracy', sa.Float(), nullable=True),
-    sa.Column('content_quality', sa.Float(), nullable=True),
-    sa.Column('engagement_rate', sa.Float(), nullable=True),
-    sa.Column('consistency_score', sa.Float(), nullable=True),
-    sa.Column('user_satisfaction', sa.Float(), nullable=True),
-    sa.Column('user_feedback', sa.Text(), nullable=True),
-    sa.Column('improvement_requests', sa.JSON(), nullable=True),
-    sa.Column('ai_quality_assessment', sa.JSON(), nullable=True),
-    sa.Column('improvement_suggestions', sa.JSON(), nullable=True),
-    sa.Column('assessment_date', sa.DateTime(), nullable=True),
-    sa.Column('assessor_type', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['platform_persona_id'], ['enhanced_platform_personas.id'], ),
-    sa.ForeignKeyConstraint(['writing_persona_id'], ['enhanced_writing_personas.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('persona_validation_results',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('writing_persona_id', sa.Integer(), nullable=False),
-    sa.Column('platform_persona_id', sa.Integer(), nullable=True),
-    sa.Column('stylometric_accuracy', sa.Float(), nullable=True),
-    sa.Column('consistency_score', sa.Float(), nullable=True),
-    sa.Column('platform_compliance', sa.Float(), nullable=True),
-    sa.Column('sample_outputs', sa.JSON(), nullable=True),
-    sa.Column('validation_feedback', sa.JSON(), nullable=True),
-    sa.Column('improvement_suggestions', sa.JSON(), nullable=True),
-    sa.Column('validation_date', sa.DateTime(), nullable=True),
-    sa.Column('validator_type', sa.String(length=50), nullable=True),
-    sa.ForeignKeyConstraint(['platform_persona_id'], ['platform_personas.id'], ),
-    sa.ForeignKeyConstraint(['writing_persona_id'], ['writing_personas.id'], ),
-    sa.PrimaryKeyConstraint('id')
-    )
     op.create_table('product_marketing_assets',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('campaign_id', sa.String(length=255), nullable=False),
@@ -3002,8 +2827,6 @@ def downgrade() -> None:
     op.drop_index('idx_pm_asset_user_status', table_name='product_marketing_assets')
     op.drop_index('idx_pm_asset_campaign_node', table_name='product_marketing_assets')
     op.drop_table('product_marketing_assets')
-    op.drop_table('persona_validation_results')
-    op.drop_table('persona_quality_metrics')
     op.drop_table('content_performance_tracking')
     op.drop_index(op.f('ix_content_optimizations_user_id'), table_name='content_optimizations')
     op.drop_table('content_optimizations')
@@ -3060,16 +2883,13 @@ def downgrade() -> None:
     op.drop_index('idx_user_product', table_name='product_assets')
     op.drop_index('idx_product_type', table_name='product_assets')
     op.drop_table('product_assets')
-    op.drop_table('platform_personas')
     op.drop_table('platform_integrations')
     op.drop_index(op.f('ix_platform_insights_execution_logs_task_id'), table_name='platform_insights_execution_logs')
     op.drop_index(op.f('ix_platform_insights_execution_logs_id'), table_name='platform_insights_execution_logs')
     op.drop_index('idx_platform_insights_log_task_execution_date', table_name='platform_insights_execution_logs')
     op.drop_index('idx_platform_insights_log_status', table_name='platform_insights_execution_logs')
     op.drop_table('platform_insights_execution_logs')
-    op.drop_table('persona_learning_data')
     op.drop_table('persona_data')
-    op.drop_table('persona_analysis_results')
     op.drop_index(op.f('ix_onboarding_full_website_analysis_execution_logs_task_id'), table_name='onboarding_full_website_analysis_execution_logs')
     op.drop_index(op.f('ix_onboarding_full_website_analysis_execution_logs_id'), table_name='onboarding_full_website_analysis_execution_logs')
     op.drop_index('idx_onboarding_full_website_analysis_execution_logs_task_date', table_name='onboarding_full_website_analysis_execution_logs')
@@ -3103,10 +2923,6 @@ def downgrade() -> None:
     op.drop_index('idx_linkedin_growth_reanalysis_execution_logs_task_date', table_name='linkedin_growth_reanalysis_execution_logs')
     op.drop_index('idx_linkedin_growth_reanalysis_execution_logs_status', table_name='linkedin_growth_reanalysis_execution_logs')
     op.drop_table('linkedin_growth_reanalysis_execution_logs')
-    op.drop_index(op.f('ix_enhanced_platform_personas_platform_type'), table_name='enhanced_platform_personas')
-    op.drop_index('idx_platform_active', table_name='enhanced_platform_personas')
-    op.drop_index('idx_persona_platform', table_name='enhanced_platform_personas')
-    op.drop_table('enhanced_platform_personas')
     op.drop_table('enhanced_ai_analysis_results')
     op.drop_index(op.f('ix_deep_website_crawl_execution_logs_task_id'), table_name='deep_website_crawl_execution_logs')
     op.drop_index(op.f('ix_deep_website_crawl_execution_logs_id'), table_name='deep_website_crawl_execution_logs')
@@ -3145,7 +2961,6 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_backlink_leads_created_at'), table_name='backlink_leads')
     op.drop_index(op.f('ix_backlink_leads_campaign_id'), table_name='backlink_leads')
     op.drop_table('backlink_leads')
-    op.drop_table('api_keys')
     op.drop_index(op.f('ix_ai_calendar_recommendations_user_id'), table_name='ai_calendar_recommendations')
     op.drop_table('ai_calendar_recommendations')
     op.drop_table('ai_analysis_results')
@@ -3180,7 +2995,6 @@ def downgrade() -> None:
     op.drop_index('idx_youtube_task_user_status', table_name='youtube_video_tasks')
     op.drop_index('idx_youtube_task_created', table_name='youtube_video_tasks')
     op.drop_table('youtube_video_tasks')
-    op.drop_table('writing_personas')
     op.drop_index(op.f('ix_website_analysis_tasks_user_id'), table_name='website_analysis_tasks')
     op.drop_index(op.f('ix_website_analysis_tasks_next_check'), table_name='website_analysis_tasks')
     op.drop_index(op.f('ix_website_analysis_tasks_id'), table_name='website_analysis_tasks')
@@ -3405,10 +3219,6 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_gsc_brainstorm_cache_expires_at'), table_name='gsc_brainstorm_cache')
     op.drop_table('gsc_brainstorm_cache')
     op.drop_table('fraud_warnings')
-    op.drop_index(op.f('ix_enhanced_writing_personas_user_id'), table_name='enhanced_writing_personas')
-    op.drop_index('idx_user_active', table_name='enhanced_writing_personas')
-    op.drop_index('idx_created_at', table_name='enhanced_writing_personas')
-    op.drop_table('enhanced_writing_personas')
     op.drop_table('enhanced_content_strategies')
     op.drop_index(op.f('ix_end_user_website_content_website_url'), table_name='end_user_website_content')
     op.drop_index(op.f('ix_end_user_website_content_user_id'), table_name='end_user_website_content')

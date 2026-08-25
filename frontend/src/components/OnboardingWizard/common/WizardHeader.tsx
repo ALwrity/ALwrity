@@ -18,6 +18,7 @@ import UserBadge from '../../shared/UserBadge';
 
 interface WizardHeaderProps {
   activeStep: number;
+  furthestAccessibleStep: number;
   progress: number;
   stepHeaderContent: {
     title: string;
@@ -38,6 +39,7 @@ interface WizardHeaderProps {
 
 export const WizardHeader: React.FC<WizardHeaderProps> = ({
   activeStep,
+  furthestAccessibleStep,
   progress,
   stepHeaderContent,
   showProgressMessage,
@@ -209,9 +211,9 @@ export const WizardHeader: React.FC<WizardHeaderProps> = ({
                 <StepLabel
                   onClick={() => onStepClick(index)}
                   sx={{
-                    cursor: index <= activeStep ? 'pointer' : 'default',
+                    cursor: index <= furthestAccessibleStep ? 'pointer' : 'default',
                     '& .MuiStepLabel-iconContainer': {
-                      background: index <= activeStep 
+                      background: index <= furthestAccessibleStep 
                         ? 'rgba(255, 255, 255, 0.2)'
                         : 'rgba(255, 255, 255, 0.08)',
                       borderRadius: '50%',
@@ -220,17 +222,17 @@ export const WizardHeader: React.FC<WizardHeaderProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: index <= activeStep ? 'white' : 'rgba(255, 255, 255, 0.6)',
+                      color: index <= furthestAccessibleStep ? 'white' : 'rgba(255, 255, 255, 0.6)',
                       transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                      boxShadow: index <= activeStep 
+                      boxShadow: index <= furthestAccessibleStep 
                         ? '0 3px 10px rgba(15, 23, 42, 0.45)'
                         : 'none',
                       border: index < activeStep
                         ? '1px solid rgba(248, 250, 252, 0.9)'
                         : '1px solid rgba(148, 163, 184, 0.4)',
                       '&:hover': {
-                        transform: index <= activeStep ? 'translateY(-1px) scale(1.03)' : 'none',
-                        boxShadow: index <= activeStep 
+                        transform: index <= furthestAccessibleStep ? 'translateY(-1px) scale(1.03)' : 'none',
+                        boxShadow: index <= furthestAccessibleStep 
                           ? '0 5px 14px rgba(15, 23, 42, 0.55)'
                           : 'none',
                       }
@@ -240,7 +242,7 @@ export const WizardHeader: React.FC<WizardHeaderProps> = ({
                       fontWeight: 600,
                       textAlign: 'center',
                       textDecoration: index < activeStep ? 'underline' : 'none',
-                      opacity: index <= activeStep ? 0.98 : 0.7
+                      opacity: index <= furthestAccessibleStep ? 0.98 : 0.7
                     }
                   }}
                 >

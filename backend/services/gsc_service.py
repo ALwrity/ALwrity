@@ -95,53 +95,15 @@ class GSCService:
         return get_user_db_path(user_id)
     
     def _init_gsc_tables(self, user_id: str):
-        """Initialize GSC-related database tables."""
+        """Ensure the per-user schema exists (owned by Alembic migrations)."""
         try:
-            db_path = self._get_db_path(user_id)
-            os.makedirs(os.path.dirname(db_path), exist_ok=True)
-            
-            with sqlite3.connect(db_path) as conn:
-                cursor = conn.cursor()
-                
-                # GSC credentials table
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS gsc_credentials (
-                        user_id TEXT PRIMARY KEY,
-                        credentials_json TEXT NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
-                
-                # GSC data cache table
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS gsc_data_cache (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id TEXT NOT NULL,
-                        site_url TEXT NOT NULL,
-                        data_type TEXT NOT NULL,
-                        data_json TEXT NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        expires_at TIMESTAMP NOT NULL,
-                        FOREIGN KEY (user_id) REFERENCES gsc_credentials (user_id)
-                    )
-                ''')
-                
-                # GSC OAuth states table
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS gsc_oauth_states (
-                        state TEXT PRIMARY KEY,
-                        user_id TEXT NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
-                
-                conn.commit()
-                # logger.debug(f"GSC database tables initialized for user {user_id}")
-                
-        except Exception as e:
-            logger.error(f"Error initializing GSC tables for user {user_id}: {e}")
-            raise
+            from services.database import get_engine_for_user
+
+            get_engine_for_user(user_id)
+        except Exception as ensure_error:
+            logger.warning(f"Could not ensure Alembic schema for user {user_id}: {ensure_error}")
+        db_path = self._get_db_path(user_id)
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
     
     def save_user_credentials(self, user_id: str, credentials: Credentials) -> bool:
         """Save user's GSC credentials to database."""
@@ -264,7 +226,9 @@ class GSCService:
                 state=state
             )
             
-            # Store state for verification in the user-specific DB
+            # Ensure the per-user schema exists (Alembic-owned) before storing
+            # the OAuth state, so state storage and the callback lookup resolve
+            # to the same file.
             self._init_gsc_tables(user_id)
             db_path = self._get_db_path(user_id)
             
