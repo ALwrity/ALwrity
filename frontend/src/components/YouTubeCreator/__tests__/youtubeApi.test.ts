@@ -22,7 +22,7 @@ describe('youtubeApi', () => {
   });
 
   describe('createPlan', () => {
-    it('uses longRunningApiClient to post to /api/youtube/plan', async () => {
+    it('keeps POST /api/youtube/plan available (Plan step UI no longer calls it)', async () => {
       const mockResponse = { data: { success: true, plan: { video_summary: 'Test summary' } } };
       jest.mocked(longRunningApiClient.post).mockResolvedValueOnce(mockResponse);
 

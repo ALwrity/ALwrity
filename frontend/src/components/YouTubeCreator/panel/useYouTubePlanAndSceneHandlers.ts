@@ -2,25 +2,20 @@ import { useCallback } from "react";
 import { youtubeApi, type Scene, type VideoPlan } from "../../../services/youtubeApi";
 import { YOUTUBE_CONTENT_LANGUAGE_OPTIONS, type YouTubeContentLanguage } from "../constants";
 import type { YouTubeCreatorState } from "../../../hooks/useYouTubeCreatorState";
-import type { YouTubeSourceArticle } from "../components/planUrlImportUtils";
 import type { ContentAsset } from "../../../hooks/useContentAssets";
+import { youtubeHandlerErrorMessage } from "../utils/youtubeHandlerError";
 
 interface PlanSceneHandlerArgs {
-  userIdea: string;
-  durationType: YouTubeCreatorState["durationType"];
   videoType: YouTubeCreatorState["videoType"];
   targetAudience: string;
   videoGoal: string;
   brandStyle: string;
-  referenceImage: string;
   avatarUrl: string | null;
   videoPlan: VideoPlan | null;
   scenes: Scene[];
   editingSceneId: number | null;
   editedScene: Partial<Scene> | null;
   makingPresentable: boolean;
-  sourceArticle: YouTubeSourceArticle | null;
-  enableResearch: boolean;
   fullScript?: string | null;
   updateState: (updates: Partial<YouTubeCreatorState>) => void;
   setLoading: (v: boolean) => void;
@@ -34,21 +29,16 @@ interface PlanSceneHandlerArgs {
 
 export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
   const {
-    userIdea,
-    durationType,
     videoType,
     targetAudience,
     videoGoal,
     brandStyle,
-    referenceImage,
     avatarUrl,
     videoPlan,
     scenes,
     editingSceneId,
     editedScene,
     makingPresentable,
-    sourceArticle,
-    enableResearch,
     fullScript,
     updateState,
     setLoading,
@@ -60,108 +50,32 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
     setRegeneratingAvatar,
   } = args;
 
-  const handleGeneratePlan = useCallback(async () => {
-    if (!userIdea.trim()) {
-      setError("Please enter your video idea");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      console.info("[YouTubeCreator] Generating plan", {
-        durationType,
-        enableResearch,
-        ideaLen: userIdea.trim().length,
-      });
-      const response = await youtubeApi.createPlan({
-        user_idea: userIdea,
-        duration_type: durationType,
-        video_type: videoType || undefined,
-        target_audience: targetAudience || undefined,
-        video_goal: videoGoal || undefined,
-        brand_style: brandStyle || undefined,
-        reference_image_description: referenceImage || undefined,
-        avatar_url: avatarUrl || undefined,
-        source_article_url: sourceArticle?.url,
-        source_article_title: sourceArticle?.title,
-        source_article_summary: sourceArticle?.summary,
-        enable_research: enableResearch,
-      });
-
-      if (response.success && response.plan) {
-        const generation = response.plan.generation;
-        console.info("[YouTubeCreator] Plan generated", {
-          durationType,
-          enableResearch,
-          hasGeneration: Boolean(generation),
-          researchInjected: Boolean(generation?.research_injected),
-          userPromptLen: generation?.user_prompt?.length ?? 0,
-          sourceCount: response.plan.research_sources_count ?? response.plan.research_sources?.length ?? 0,
-        });
-        const updates: Partial<YouTubeCreatorState> = {
-          videoPlan: response.plan,
-          scriptPhase: "idle",
-          fullScript: null,
-          approvedPitch: null,
-        };
-        if (response.plan.auto_generated_avatar_url) {
-          updates.avatarUrl = response.plan.auto_generated_avatar_url;
-          setSuccess("Video plan generated! Avatar auto-generated based on your plan.");
-        } else {
-          setSuccess("Video plan generated successfully!");
-        }
-        updateState(updates);
-        setTimeout(() => {
-          setActiveStep(1);
-          setSuccess(null);
-        }, 2000);
-      } else {
-        console.warn("[YouTubeCreator] Plan generation returned unsuccessful response", {
-          message: response.message,
-          enableResearch,
-        });
-        setError(response.message || "Failed to generate plan");
-      }
-    } catch (err: any) {
-      console.error("[YouTubeCreator] Plan generation failed", {
-        enableResearch,
-        durationType,
-        error: err?.message || String(err),
-      });
-      setError(err.message || "Failed to generate video plan");
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    userIdea,
-    durationType,
-    videoType,
-    targetAudience,
-    videoGoal,
-    brandStyle,
-    referenceImage,
-    avatarUrl,
-    sourceArticle,
-    enableResearch,
-    updateState,
-    setActiveStep,
-    setError,
-    setLoading,
-    setSuccess,
-  ]);
-
   const handleAvatarUpload = useCallback(
     async (file: File) => {
+      if (!file) {
+        console.warn("[YouTubeCreator] Avatar upload blocked: no file");
+        setError("Please choose an image file to upload.");
+        return;
+      }
       setUploadingAvatar(true);
       setError(null);
       try {
+        console.info("[YouTubeCreator] Uploading avatar", {
+          fileSize: file.size,
+          fileType: file.type || "unknown",
+        });
         const response = await youtubeApi.uploadAvatar(file);
+        if (!response?.avatar_url) {
+          console.warn("[YouTubeCreator] Avatar upload returned no URL");
+          setError("Avatar upload did not return an image. Please try again.");
+          return;
+        }
         updateState({ avatarUrl: response.avatar_url });
-      } catch (err: any) {
-        setError(err.message || "Failed to upload avatar");
+        console.info("[YouTubeCreator] Avatar uploaded");
+      } catch (err: unknown) {
+        const message = youtubeHandlerErrorMessage(err, "Failed to upload avatar");
+        console.error("[YouTubeCreator] Avatar upload failed", { error: message });
+        setError(message);
       } finally {
         setUploadingAvatar(false);
       }
@@ -171,21 +85,40 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
 
   const handleAvatarSelectFromLibrary = useCallback(
     (asset: ContentAsset) => {
-      if (!asset?.file_url) return;
-      updateState({ avatarUrl: asset.file_url });
-      setError(null);
-      setSuccess("Avatar selected from Asset Library");
-      setTimeout(() => setSuccess(null), 2000);
+      try {
+        if (!asset?.file_url) {
+          console.warn("[YouTubeCreator] Asset library avatar skipped: missing file_url");
+          setError("That asset has no image URL. Please pick another avatar.");
+          return;
+        }
+        updateState({ avatarUrl: asset.file_url });
+        setError(null);
+        setSuccess("Avatar selected from Asset Library");
+        console.info("[YouTubeCreator] Avatar selected from library");
+        setTimeout(() => setSuccess(null), 2000);
+      } catch (err: unknown) {
+        const message = youtubeHandlerErrorMessage(err, "Failed to select avatar");
+        console.error("[YouTubeCreator] Avatar library select failed", { error: message });
+        setError(message);
+      }
     },
     [updateState, setError, setSuccess],
   );
 
   const handleRemoveAvatar = useCallback(() => {
-    updateState({ avatarUrl: null });
-  }, [updateState]);
+    try {
+      updateState({ avatarUrl: null });
+      console.info("[YouTubeCreator] Avatar removed");
+    } catch (err: unknown) {
+      const message = youtubeHandlerErrorMessage(err, "Failed to remove avatar");
+      console.error("[YouTubeCreator] Avatar remove failed", { error: message });
+      setError(message);
+    }
+  }, [updateState, setError]);
 
   const handleAvatarRegenerate = useCallback(async () => {
     if (!videoPlan) {
+      console.warn("[YouTubeCreator] Avatar regenerate blocked: missing video plan");
       setError("Please generate a plan first");
       return;
     }
@@ -195,6 +128,7 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
     setSuccess(null);
 
     try {
+      console.info("[YouTubeCreator] Regenerating avatar");
       const response = await youtubeApi.regenerateCreatorAvatar(videoPlan);
       if (response.avatar_url) {
         updateState({ avatarUrl: response.avatar_url });
@@ -202,23 +136,36 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
           updateState({ videoPlan: { ...videoPlan, avatar_prompt: response.avatar_prompt } });
         }
         setSuccess("Avatar regenerated successfully!");
+        console.info("[YouTubeCreator] Avatar regenerated");
         setTimeout(() => setSuccess(null), 2000);
       } else {
+        console.warn("[YouTubeCreator] Avatar regenerate returned no URL");
         setError(response.message || "Failed to regenerate avatar");
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to regenerate avatar");
+    } catch (err: unknown) {
+      const message = youtubeHandlerErrorMessage(err, "Failed to regenerate avatar");
+      console.error("[YouTubeCreator] Avatar regenerate failed", { error: message });
+      setError(message);
     } finally {
       setRegeneratingAvatar(false);
     }
   }, [videoPlan, updateState, setError, setRegeneratingAvatar, setSuccess]);
 
   const handleMakePresentable = useCallback(async () => {
-    if (!avatarUrl || makingPresentable) return;
+    if (!avatarUrl || makingPresentable) {
+      console.warn("[YouTubeCreator] Make presentable skipped", {
+        hasAvatar: Boolean(avatarUrl),
+        makingPresentable,
+      });
+      return;
+    }
     setMakingPresentable(true);
     setError(null);
     setSuccess(null);
     try {
+      console.info("[YouTubeCreator] Making avatar presentable", {
+        videoType: videoType || "",
+      });
       const response = await youtubeApi.makeAvatarPresentable(
         avatarUrl,
         undefined,
@@ -227,11 +174,19 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
         videoGoal || undefined,
         brandStyle || undefined,
       );
+      if (!response?.avatar_url) {
+        console.warn("[YouTubeCreator] Make presentable returned no URL");
+        setError("Could not optimize the avatar. Please try again.");
+        return;
+      }
       updateState({ avatarUrl: response.avatar_url });
       setSuccess("✨ Avatar transformed successfully! Your photo has been optimized for YouTube.");
+      console.info("[YouTubeCreator] Avatar made presentable");
       setTimeout(() => setSuccess(null), 5000);
-    } catch (err: any) {
-      setError(err.message || "Failed to optimize avatar");
+    } catch (err: unknown) {
+      const message = youtubeHandlerErrorMessage(err, "Failed to optimize avatar");
+      console.error("[YouTubeCreator] Make presentable failed", { error: message });
+      setError(message);
     } finally {
       setMakingPresentable(false);
     }
@@ -342,14 +297,13 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
         setError(response.message || "Failed to build scenes");
       }
     } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error ? err.message : typeof err === "string" ? err : "Failed to build scenes";
+      const errorMessage = youtubeHandlerErrorMessage(err, "Failed to build scenes");
       console.error("[YouTubeCreator] Scene build failed", {
         durationType: videoPlan.duration_type,
         outlineCount,
         error: errorMessage,
       });
-      setError(errorMessage || "Failed to build scenes");
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -371,10 +325,17 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
   );
 
   const handleSaveScene = useCallback(async () => {
-    if (!editingSceneId || !editedScene) return;
+    if (!editingSceneId || !editedScene) {
+      console.warn("[YouTubeCreator] Scene save blocked: nothing to save", {
+        hasEditingId: Boolean(editingSceneId),
+        hasEditedScene: Boolean(editedScene),
+      });
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
+      console.info("[YouTubeCreator] Saving scene edit", { sceneNumber: editingSceneId });
       const response = await youtubeApi.updateScene(editingSceneId, {
         narration: editedScene.narration,
         visual_description: editedScene.visual_prompt,
@@ -388,11 +349,21 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
           editedScene: null,
         });
         setSuccess("Scene updated successfully!");
+        console.info("[YouTubeCreator] Scene updated", { sceneNumber: editingSceneId });
       } else {
+        console.warn("[YouTubeCreator] Scene save returned success=false", {
+          sceneNumber: editingSceneId,
+          messageLen: (response.message || "").length,
+        });
         setError(response.message || "Failed to update scene");
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to update scene");
+    } catch (err: unknown) {
+      const message = youtubeHandlerErrorMessage(err, "Failed to update scene");
+      console.error("[YouTubeCreator] Scene update failed", {
+        sceneNumber: editingSceneId,
+        error: message,
+      });
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -422,17 +393,35 @@ export function useYouTubePlanAndSceneHandlers(args: PlanSceneHandlerArgs) {
 
   const handleLanguageChange = useCallback(
     (value: YouTubeContentLanguage) => {
-      const opt = YOUTUBE_CONTENT_LANGUAGE_OPTIONS.find((o) => o.value === value);
-      updateState({
-        language: value,
-        languageBoost: opt?.languageBoost || "auto",
-      });
+      try {
+        const opt = YOUTUBE_CONTENT_LANGUAGE_OPTIONS.find((o) => o.value === value);
+        const languageBoost = opt?.languageBoost || "auto";
+        if (!opt) {
+          console.warn("[YouTubeCreator] Unknown content language; using auto boost", {
+            language: value,
+          });
+        }
+        updateState({
+          language: value,
+          languageBoost,
+        });
+        console.info("[YouTubeCreator] Content language updated", {
+          language: value,
+          languageBoost,
+        });
+      } catch (err: unknown) {
+        const message = youtubeHandlerErrorMessage(err, "Failed to update content language");
+        console.error("[YouTubeCreator] Content language update failed", {
+          language: value,
+          error: message,
+        });
+        setError(message);
+      }
     },
-    [updateState],
+    [updateState, setError],
   );
 
   return {
-    handleGeneratePlan,
     handleAvatarUpload,
     handleAvatarSelectFromLibrary,
     handleRemoveAvatar,

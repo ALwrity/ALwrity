@@ -52,7 +52,7 @@ import {
 import { OperationButton } from '../../shared/OperationButton';
 import { AssetLibraryImageModal } from '../../shared/AssetLibraryImageModal';
 import { ContentAsset } from '../../../hooks/useContentAssets';
-import { buildVideoPlanningOperation, buildImageEditingOperation } from '../utils/operationHelpers';
+import { buildImageEditingOperation } from '../utils/operationHelpers';
 import { useAvatarBlobUrl } from '../hooks/useAvatarBlobUrl';
 import { SelectWithCustom } from './SelectWithCustom';
 import { PlanDiscoveryShortcuts } from './PlanDiscoveryShortcuts';
@@ -88,7 +88,6 @@ interface PlanStepProps {
   onBrandStyleChange: (style: string) => void;
   onReferenceImageChange: (image: string) => void;
   onLanguageChange: (language: YouTubeContentLanguage) => void;
-  onGeneratePlan: () => void;
   onAvatarUpload: (file: File) => void;
   onRemoveAvatar: () => void;
   onMakePresentable: () => void;
@@ -135,7 +134,6 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
   onBrandStyleChange,
   onReferenceImageChange,
   onLanguageChange,
-  onGeneratePlan,
   onAvatarUpload,
   onRemoveAvatar,
   onMakePresentable,
@@ -160,11 +158,6 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
   onSelectPitchFromHistory,
 }) => {
   // Memoize operation objects to avoid recreating on every render
-  const videoPlanningOperation = useMemo(
-    () => buildVideoPlanningOperation(durationType),
-    [durationType]
-  );
-
   const imageEditingOperation = useMemo(
     () => buildImageEditingOperation(),
     [] // No dependencies - always returns same object
@@ -199,17 +192,30 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
   }, [brandStyle]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) {
+        console.warn("[PlanStep] Avatar file input had no file");
+        return;
+      }
       onAvatarUpload(file);
+    } catch (error) {
+      console.error("[PlanStep] Avatar file selection failed", error);
     }
   };
 
   const handleAssetLibrarySelect = useCallback(
     (asset: ContentAsset) => {
-      if (!asset.file_url) return;
-      onAvatarSelectFromLibrary(asset);
-      setAssetLibraryOpen(false);
+      try {
+        if (!asset.file_url) {
+          console.warn("[PlanStep] Asset library selection skipped: missing file_url");
+          return;
+        }
+        onAvatarSelectFromLibrary(asset);
+        setAssetLibraryOpen(false);
+      } catch (error) {
+        console.error("[PlanStep] Asset library selection failed", error);
+      }
     },
     [onAvatarSelectFromLibrary]
   );
@@ -441,12 +447,12 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
             </FormControl>
           </Box>
 
-          {/* Content Language (affects multilingual audio) */}
+          {/* Content Language (pitch, script, and default audio) */}
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
               <InputLabel sx={labelSx}>Content Language</InputLabel>
               <Tooltip
-                title="This controls narration pronunciation and the default voice selection for audio generation. You can still override per-scene in Audio Settings."
+                title="Pitch, full script, and default audio (voice + pronunciation) use this language. You can still override per-scene in Audio Settings."
                 arrow
                 sx={tooltipSx}
                 PopperProps={tooltipPopperProps}
@@ -470,7 +476,7 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
                 ))}
               </Select>
               <FormHelperText sx={helperSx}>
-                Sets default audio language (voice + pronunciation). Planning/scenes are still generated in English for now.
+                Pitch, script, and default audio use this language. Per-scene Audio Settings can still override the voice.
               </FormHelperText>
             </FormControl>
           </Box>
@@ -550,7 +556,9 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
                             src={avatarBlobUrl || undefined}
                             alt="Avatar preview"
                             onError={() => {
-                              console.warn('[PlanStep] Avatar image failed to load');
+                              console.warn("[PlanStep] Avatar image failed to load", {
+                                hasBlobUrl: Boolean(avatarBlobUrl),
+                              });
                             }}
                             sx={{
                               width: '100%',
@@ -779,22 +787,6 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
           {loading ? (
             <PlanGenerationLoadingPanel enableResearch={enableResearch} />
           ) : null}
-
-          <OperationButton
-            operation={videoPlanningOperation}
-            label="Generate Video Plan"
-            variant="contained"
-            color="error"
-            size="large"
-            startIcon={<PlayArrow />}
-            onClick={onGeneratePlan}
-            disabled={loading || !userIdea.trim()}
-            loading={loading}
-            checkOnHover={true}
-            checkOnMount={false}
-            showCost={true}
-            sx={{ alignSelf: 'flex-start', px: 4 }}
-          />
         </Stack>
       </Paper>
     <AssetLibraryImageModal

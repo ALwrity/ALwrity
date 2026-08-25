@@ -18,6 +18,7 @@ import { useYouTubeAssetAndRenderHandlers } from "./panel/useYouTubeAssetAndRend
 import { YouTubeVideoCreatorStepper } from "./panel/YouTubeVideoCreatorStepper";
 import { YouTubeVideoCreatorSteps } from "./panel/YouTubeVideoCreatorSteps";
 import { hasYouTubeCreatorDraft } from "./utils/youtubeCreatorDraftUtils";
+import { youtubeHandlerErrorMessage } from "./utils/youtubeHandlerError";
 
 export const YouTubeVideoCreatorPanel: React.FC = () => {
   const { state, updateState, clearState } = useYouTubeCreatorState();
@@ -123,21 +124,16 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
   );
 
   const planHandlers = useYouTubePlanAndSceneHandlers({
-    userIdea,
-    durationType,
     videoType,
     targetAudience,
     videoGoal,
     brandStyle,
-    referenceImage,
     avatarUrl,
     videoPlan,
     scenes,
     editingSceneId,
     editedScene,
     makingPresentable,
-    sourceArticle,
-    enableResearch,
     fullScript,
     updateState,
     setLoading,
@@ -233,19 +229,25 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
   const showStartNewVideo = useMemo(() => hasYouTubeCreatorDraft(state), [state]);
 
   const handleStartNewVideo = useCallback(() => {
-    console.info("[YouTubeCreator] Starting new video — clearing session draft");
-    clearState();
-    setActiveStep(0);
-    setLoading(false);
-    setError(null);
-    setUploadingAvatar(false);
-    setMakingPresentable(false);
-    setRegeneratingAvatar(false);
-    setGeneratingImageSceneId(null);
-    setGeneratingAudioSceneId(null);
-    setSourceArticle(null);
-    setSuccess("Started a fresh video. Your Channel Bible is unchanged.");
-    window.setTimeout(() => setSuccess(null), 4000);
+    try {
+      console.info("[YouTubeCreator] Starting new video — clearing session draft");
+      clearState();
+      setActiveStep(0);
+      setLoading(false);
+      setError(null);
+      setUploadingAvatar(false);
+      setMakingPresentable(false);
+      setRegeneratingAvatar(false);
+      setGeneratingImageSceneId(null);
+      setGeneratingAudioSceneId(null);
+      setSourceArticle(null);
+      setSuccess("Started a fresh video. Your Channel Bible is unchanged.");
+      window.setTimeout(() => setSuccess(null), 4000);
+    } catch (err: unknown) {
+      const message = youtubeHandlerErrorMessage(err, "Could not start a new video. Please refresh and try again.");
+      console.error("[YouTubeCreator] Start new video failed", { error: message });
+      setError(message);
+    }
   }, [clearState]);
 
   return (
@@ -299,7 +301,6 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
         setSourceArticle={setSourceArticle}
         setActiveStep={setActiveStep}
         handleLanguageChange={planHandlers.handleLanguageChange}
-        handleGeneratePlan={planHandlers.handleGeneratePlan}
         creativeAngle={creativeAngle}
         currentPitch={currentPitch}
         pitchHistory={pitchHistory}
