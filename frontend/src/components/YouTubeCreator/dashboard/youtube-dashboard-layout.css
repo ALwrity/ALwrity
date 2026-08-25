@@ -70,6 +70,14 @@ body.youtube-studio-view #root {
   flex-direction: column;
 }
 
+/*
+ * Phase 4 stacking (Problem 1):
+ * Do not isolate `.yt-studio-hub-main`. Isolation trapped in-tree z-index so
+ * Hub content could not paint over the sibling Channel Pulse rail (z-index 24).
+ * Hub main and rail now share `.yt-studio-hub`'s stacking context.
+ * Leaf wedges still portal to body (YouTubeActionModal) to sit above Knowledge
+ * Centre (12000), not to beat the rail.
+ */
 .yt-studio-hub {
   width: 100%;
   display: flex;
@@ -89,12 +97,12 @@ body.youtube-studio-view #root {
   flex-direction: column;
   gap: 0;
   position: relative;
-  isolation: isolate;
   padding: 0 8px;
   padding-bottom: 90px;
   box-sizing: border-box;
 }
 
+/* In-tree Hub chrome (not a body overlay). 25 > rail 24 if they overlap. */
 .yt-studio-hub-toolbar {
   position: absolute;
   top: 8px;
@@ -271,6 +279,7 @@ body.youtube-studio-view #root {
     flex: 0 0 auto;
   }
 
+  /* In-tree rail chrome only. Hub leaf modals do not raise z-index to beat this. */
   body.youtube-studio-view .yt-studio-right-rail {
     position: absolute;
     top: 0;
@@ -467,16 +476,19 @@ body.youtube-studio-view #root {
   background: #fff;
 }
 
+/*
+ * Hub leaf backdrop. z-index comes from YouTubeActionModal inline YT_Z_MODAL
+ * (beats Knowledge Centre). Do not isolate — z-index already stacks this layer.
+ * Do not duplicate 13000 here (Phase 4 unified source of truth).
+ */
 .yt-modal-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.38);
-  z-index: 13000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
-  isolation: isolate;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -658,6 +670,7 @@ body.youtube-studio-view #root {
     display: none !important;
   }
 
+  /* In-tree mobile chrome (YT_Z_MOBILE_FAB). Below MUI modal 1300. */
   .yt-studio-mobile-copilot-fab {
     display: block;
     position: fixed;
@@ -755,4 +768,63 @@ body.youtube-studio-view #root {
     animation: none;
     transform: translateX(-50%);
   }
+}
+
+/* Phase 2: Full Creator dedicated surface (below MUI modal, not YT_Z_MODAL). */
+.yt-creator-surface {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.yt-creator-surface-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px 8px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.yt-creator-surface-header-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.yt-creator-surface-header-main h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.yt-creator-surface-intro {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.yt-creator-surface-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 16px 16px;
+}
+
+body.yt-creator-surface-active {
+  overflow: hidden;
+}
+
+body.yt-creator-surface-active .yt-studio-right-rail,
+body.yt-creator-surface-active .yt-knowledge-center-portal,
+body.yt-creator-surface-active .yt-studio-bottom-dock,
+body.yt-creator-surface-active .yt-studio-mobile-copilot-fab {
+  visibility: hidden !important;
+  pointer-events: none !important;
 }

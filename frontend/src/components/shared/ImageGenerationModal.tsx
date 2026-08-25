@@ -48,9 +48,6 @@ import {
   DEFAULT_THEME,
   DEFAULT_MODELS,
 } from './ImageGenerationModal.types';
-import {
-  IMAGE_GENERATION_DIALOG_Z_INDEX,
-} from './imageGenerationSelectMenuProps';
 import { createImageGenerationModalStyles } from './imageGenerationModalStyles';
 
 export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
@@ -146,7 +143,6 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
       onClose={onClose}
       maxWidth="md"
       fullWidth
-      sx={{ zIndex: IMAGE_GENERATION_DIALOG_Z_INDEX }}
       scroll="paper"
       PaperProps={{
         sx: styles.dialogPaperSx,

@@ -4,7 +4,6 @@
  */
 
 import { YT_RED, YT_TEXT } from './constants';
-import { YT_Z_MODAL_POPOVER } from './dashboard/youtubeStudioZIndex';
 
 // Enhanced color palette for better contrast
 const BORDER_COLOR = '#d1d5db'; // Lighter gray for better contrast
@@ -89,13 +88,10 @@ export const selectSx = {
   },
 };
 
-// Menu props for Select dropdown — light theme, above Full Creator modal (z 13000)
+// Menu props for Select dropdown. Stacking is MUI-native (Phase 3).
 export const selectMenuProps = {
-  style: { zIndex: YT_Z_MODAL_POPOVER },
-  sx: { zIndex: YT_Z_MODAL_POPOVER },
   PaperProps: {
     sx: {
-      zIndex: YT_Z_MODAL_POPOVER,
       backgroundColor: BACKGROUND,
       color: TEXT_PRIMARY,
       borderRadius: 2,
@@ -191,10 +187,8 @@ export const sectionTitleSx = {
   lineHeight: 1.4,
 };
 
-export const tooltipPopperProps = {
-  sx: { zIndex: YT_Z_MODAL_POPOVER },
-  style: { zIndex: YT_Z_MODAL_POPOVER },
-};
+/** Tooltip Popper — MUI default z-index (1500). No Studio +1 patch. */
+export const tooltipPopperProps = {};
 
 export const tooltipSx = {
   '& .MuiTooltip-tooltip': {
