@@ -10,7 +10,7 @@ export interface WedgeModalBaseProps {
   goCreate: GoCreateFn;
 }
 
-/** Optional OAuth gate props — no-ops while STUDIO_HUB_UNLOCK_ALL_FOR_TESTING is on. */
+/** Optional OAuth gate props — enforced inside sub-modals when live data is required. */
 export interface GatedWedgeProps extends WedgeModalBaseProps {
   connected: boolean;
   onRequestConnect: () => void;

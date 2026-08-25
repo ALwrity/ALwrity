@@ -1,8 +1,6 @@
 import {
   CONNECT_GATED_WORKFLOW_IDS,
-  STUDIO_HUB_UNLOCK_ALL_FOR_TESTING,
   arePlanComingSoonTilesLocked,
-  isStudioHubTestingUnlockEnabled,
   isTileConnectGated,
   isWedgeConnectGated,
 } from "../studioHubAccessConfig";
@@ -13,24 +11,17 @@ import {
 import { resolveOAuthTileClick } from "../studioHubTileActions";
 
 describe("studioHubAccessConfig", () => {
-  it("enables testing unlock by default", () => {
-    expect(STUDIO_HUB_UNLOCK_ALL_FOR_TESTING).toBe(true);
-    expect(isStudioHubTestingUnlockEnabled()).toBe(true);
-  });
-
-  it("exposes no connect-gated wedges while testing unlock is on", () => {
+  it("keeps all hero wedges open on the landing page", () => {
     expect(CONNECT_GATED_WORKFLOW_IDS).toEqual([]);
-  });
-
-  it("does not gate wedges or tiles when testing unlock is on", () => {
     expect(isWedgeConnectGated("analysis", false)).toBe(false);
+    expect(isWedgeConnectGated("engagement", false)).toBe(false);
     expect(isTileConnectGated(false)).toBe(false);
     expect(arePlanComingSoonTilesLocked()).toBe(false);
   });
 });
 
 describe("studioHubWedgeNavigation", () => {
-  it("opens wedges without connect gate while testing unlock is on", () => {
+  it("opens any wedge without a connect gate", () => {
     const onOpenWedge = jest.fn();
     const onConnectGate = jest.fn();
 
@@ -43,20 +34,13 @@ describe("studioHubWedgeNavigation", () => {
 });
 
 describe("studioHubTileActions", () => {
-  it("runs tile actions without connect while testing unlock is on", () => {
+  it("runs tile actions without a hub-level connect gate", () => {
     const onAction = jest.fn();
     const onRequestConnect = jest.fn();
-    const infoSpy = jest.spyOn(console, "info").mockImplementation(() => {});
 
     resolveOAuthTileClick(false, "channel_pulse", onAction, onRequestConnect);
 
     expect(onAction).toHaveBeenCalled();
     expect(onRequestConnect).not.toHaveBeenCalled();
-    expect(infoSpy).toHaveBeenCalledWith(
-      "[StudioHub] Opening OAuth-backed sub-modal while disconnected",
-      expect.objectContaining({ action: "channel_pulse", testingUnlock: true }),
-    );
-
-    infoSpy.mockRestore();
   });
 });
