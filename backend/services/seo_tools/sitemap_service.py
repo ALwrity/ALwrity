@@ -440,8 +440,8 @@ class SitemapService:
 
         except ET.ParseError as e:
             err_msg = str(e).lower()
-            if any(kw in err_msg for kw in ("no element found", "not a valid xml", "syntax error", "mismatched tag")):
-                logger.info(f"Sitemap unavailable for {sitemap_url}: not valid XML — skipping")
+            if any(kw in err_msg for kw in ("no element found", "not a valid xml", "syntax error", "mismatched tag", "unclosed token")):
+                logger.info(f"Sitemap unavailable for {sitemap_url}: malformed XML — skipping ({err_msg[:50]}...)")
                 return {"urls": [], "sitemaps": [], "total_urls": 0}
             if not content or not content.strip():
                 logger.info(f"Sitemap is empty: {sitemap_url}")
@@ -458,6 +458,10 @@ class SitemapService:
             err_msg = str(e).lower()
             if any(kw in err_msg for kw in ("no element found", "not a valid xml", "webpage", "html")):
                 logger.info(f"Sitemap unavailable for {sitemap_url}: not a sitemap")
+            elif "http 403" in err_msg or "http 403" in str(e).lower():
+                logger.warning(f"Sitemap access forbidden (403) for {sitemap_url}: skipping gracefully")
+            elif "http 404" in err_msg or "http 404" in str(e).lower():
+                logger.warning(f"Sitemap not found (404) for {sitemap_url}: skipping gracefully")
             else:
                 logger.error(f"Error fetching sitemap data for {sitemap_url}: {e}")
             return {"urls": [], "sitemaps": [], "total_urls": 0}

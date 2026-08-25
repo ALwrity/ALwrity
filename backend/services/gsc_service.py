@@ -389,6 +389,19 @@ class GSCService:
                            start_date: str = None, end_date: str = None) -> Dict[str, Any]:
         """Get search analytics data from GSC."""
         try:
+            # Normalize site_url: some callers pass the full GSC site resource dict
+            # ({'siteUrl': ..., 'permissionLevel': ...}) instead of the URL string,
+            # which breaks both the API call and DB caching.
+            if isinstance(site_url, dict):
+                site_url = (
+                    site_url.get('siteUrl')
+                    or site_url.get('site_url')
+                    or next(iter(site_url.values()), None)
+                )
+                logger.warning(f"get_search_analytics received dict for site_url; extracted: {site_url}")
+            if not isinstance(site_url, str):
+                site_url = str(site_url) if site_url else ''
+
             # Set default date range (last 30 days)
             if not end_date:
                 end_date = datetime.now().strftime('%Y-%m-%d')
