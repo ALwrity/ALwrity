@@ -645,6 +645,104 @@ class SIFSyncMixin:
             if db:
                 db.close()
 
+    async def sync_seo_audit_to_sif(self) -> None:
+        """
+        Index per-page SEO audit data into SIF for semantic search.
+
+        Allows agents to query for specific SEO issues across pages,
+        e.g., "find pages with poor alt text coverage" or
+        "which pages have missing title tags".
+
+        Raises:
+            SIFEmbeddingFailed: If the underlying intelligence_service
+                raised during the index call.
+        """
+        try:
+            logger.info(f"Syncing SEO audit page data to SIF for user {self.user_id}")
+            db = get_session_for_user(self.user_id)
+            if not db:
+                return
+
+            from models.onboarding import SEOPageAudit
+
+            audits = db.query(SEOPageAudit).filter(
+                SEOPageAudit.user_id == self.user_id
+            ).all()
+
+            if not audits:
+                logger.info(f"No SEO page audits found for user {self.user_id}")
+                _sif_metrics_inc("sif_sync_total", "seo_audit_empty")
+                return
+
+            items_to_index = []
+
+            for audit in audits:
+                page_url = audit.page_url or "Unknown"
+                score = audit.overall_score or 0
+                status = audit.status or "unknown"
+
+                issues_list = audit.issues or []
+                warnings_list = audit.warnings or []
+
+                top_issues = [
+                    i.get("message", "")[:100]
+                    for i in issues_list[:3]
+                    if isinstance(i, dict)
+                ]
+
+                issues_summary = ", ".join(top_issues) if top_issues else "No critical issues"
+
+                category_scores = audit.category_scores or {}
+                meta_score = category_scores.get("meta", 0)
+                content_score = category_scores.get("content", 0)
+                technical_score = category_scores.get("technical", 0)
+                accessibility_score = category_scores.get("accessibility", 0)
+                ux_score = category_scores.get("ux", 0)
+
+                text_content = (
+                    f"SEO audit for {page_url}. "
+                    f"Overall score: {score}/100. Status: {status}. "
+                    f"Category scores - Meta: {meta_score}, Content: {content_score}, "
+                    f"Technical: {technical_score}, Accessibility: {accessibility_score}, UX: {ux_score}. "
+                    f"Critical issues: {len(issues_list)}. Warnings: {len(warnings_list)}. "
+                    f"Top issues: {issues_summary}."
+                )
+
+                metadata = {
+                    "type": "seo_page_audit",
+                    "url": page_url,
+                    "website_url": audit.website_url,
+                    "score": score,
+                    "status": status,
+                    "category_scores": category_scores,
+                    "issues_count": len(issues_list),
+                    "warnings_count": len(warnings_list),
+                    "last_analyzed_at": audit.last_analyzed_at.isoformat() if audit.last_analyzed_at else None,
+                    "full_report": audit.audit_data,
+                }
+
+                items_to_index.append((f"seo_audit:{self.user_id}:{audit.id}", text_content, metadata))
+
+            if items_to_index:
+                await self.intelligence_service.index_content(items_to_index)
+                logger.info(f"Successfully synced {len(items_to_index)} SEO page audits to SIF")
+            _sif_metrics_inc("sif_sync_total", "seo_audit_success")
+            return
+
+        except Exception as e:
+            logger.error(f"Failed to sync SEO audit data: {e}", exc_info=True)
+            from services.intelligence.sif_errors import SIFEmbeddingFailed
+            _sif_metrics_inc("sif_sync_total", "seo_audit_error")
+            raise SIFEmbeddingFailed(
+                f"Failed to sync SEO audit data: {e}",
+                user_id=self.user_id,
+                operation="sync_seo_audit_to_sif",
+                cause=e,
+            ) from e
+        finally:
+            if db:
+                db.close()
+
     def _get_sif_page_limit(self) -> int:
         """Return per-tier page limit for SIF indexing.
 

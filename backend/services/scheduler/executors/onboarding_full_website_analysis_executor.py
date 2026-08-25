@@ -317,12 +317,14 @@ class OnboardingFullWebsiteAnalysisExecutor(TaskExecutor):
 
         soup = BeautifulSoup(text, 'html.parser')
 
-        meta = MetaDataAnalyzer().analyze(soup)
-        content = ContentAnalyzer().analyze(soup)
-        technical = TechnicalSEOAnalyzer().analyze(page_url, soup)
+        meta = MetaDataAnalyzer().analyze(text, page_url, soup=soup)
+        content = ContentAnalyzer().analyze(text, page_url, soup=soup)
+        technical = await asyncio.to_thread(
+            TechnicalSEOAnalyzer().analyze, text, page_url, soup=soup
+        )
         url_structure = URLStructureAnalyzer().analyze(page_url)
-        accessibility = AccessibilityAnalyzer().analyze(text)
-        ux = UserExperienceAnalyzer().analyze(text, page_url)
+        accessibility = AccessibilityAnalyzer().analyze(text, soup=soup)
+        ux = UserExperienceAnalyzer().analyze(text, page_url, soup=soup)
 
         performance = self._performance_from_fetch(load_time, headers)
         security = self._security_from_headers(headers)
