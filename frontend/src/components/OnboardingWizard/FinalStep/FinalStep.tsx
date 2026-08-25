@@ -22,7 +22,7 @@ import { completeOnboarding, getOnboardingSummary, getWebsiteAnalysisData, getRe
 import { SetupSummary, AgentTeamSection, TaskSchedulingPanel, AgentTeamPreview } from './components';
 import { SifIndexingPanel } from '../common/SifIndexingPanel';
 import { FinalStepProps, OnboardingData, Capability, OnboardingCompletionResult } from './types';
-import { getAgentTeam, type AgentTeamCatalogEntry, type AgentTeamContextSummary } from '../../../api/agentsTeam';
+import { getAgentTeam, type AgentTeamCatalogEntry, type AgentTeamContextSummary, type TeamCertification } from '../../../api/agentsTeam';
 import { onboardingCache } from '../../../services/onboardingCache';
 
 const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, onboardingType }) => {
@@ -36,6 +36,7 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
   const [validationStatus, setValidationStatus] = useState<{isValid: boolean, missingSteps: string[]} | null>(null);
   const [agentTeam, setAgentTeam] = useState<AgentTeamCatalogEntry[]>([]);
   const [agentContextSummary, setAgentContextSummary] = useState<AgentTeamContextSummary>({});
+  const [agentCertification, setAgentCertification] = useState<TeamCertification | null>(null);
   const [agentTeamError, setAgentTeamError] = useState<string | null>(null);
   const [completionResult, setCompletionResult] = useState<OnboardingCompletionResult | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -106,14 +107,16 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
       const websiteAnalysis = await getWebsiteAnalysisData();
       const researchPreferences = await getResearchPreferencesData();
       try {
-        const { agents, contextSummary } = await getAgentTeam();
+        const { agents, contextSummary, certification } = await getAgentTeam();
         setAgentTeam(agents || []);
         setAgentContextSummary(contextSummary || {});
+        setAgentCertification(certification || null);
         onboardingCache.saveFinalStepData({ agentTeam: agents || [], agentContextSummary: contextSummary || {} });
         setAgentTeamError(null);
       } catch (e: any) {
         setAgentTeam([]);
         setAgentContextSummary({});
+        setAgentCertification(null);
         setAgentTeamError(e?.message || 'Failed to load agent team configuration');
       }
       // Frontend fallbacks to Step 2 cached data (ensures non-breaking UI)
@@ -555,7 +558,7 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
                   </Alert>
                 )}
                 {!agentTeamError && agentTeam.length > 0 && (
-                  <AgentTeamSection websiteName={websiteName} agents={agentTeam} contextCard={agentContextCard} contextSummary={agentContextSummary} />
+                  <AgentTeamSection websiteName={websiteName} agents={agentTeam} contextCard={agentContextCard} contextSummary={agentContextSummary} certification={agentCertification} />
                 )}
 
                 {/* Pre-launch team preview: dry-run the committee before launching */}

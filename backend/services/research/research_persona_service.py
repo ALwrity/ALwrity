@@ -9,7 +9,6 @@ from datetime import datetime, timedelta
 from loguru import logger
 from fastapi import HTTPException
 
-from sqlalchemy import text
 from services.database import get_db_session
 from models.onboarding import PersonaData, OnboardingSession
 from models.research_persona_models import ResearchPersona
@@ -29,7 +28,6 @@ class ResearchPersonaService:
         self.prompt_builder = ResearchPersonaPromptBuilder()
         # self.persona_data_service was initialized here but unused in this service
         self.integration_service = OnboardingDataIntegrationService()
-        self._research_persona_cols_checked = False
 
     def _get_session(self, user_id: str):
         """Helper to get a database session."""
@@ -37,51 +35,6 @@ class ResearchPersonaService:
             return self.db, False
         return get_db_session(user_id), True
 
-    def _ensure_research_persona_columns(self, session_db) -> None:
-        """Ensure research_persona columns exist in persona_data table (runtime migration)."""
-        if self._research_persona_cols_checked:
-            return
-        
-        try:
-            # Check if columns exist using PRAGMA (SQLite) or information_schema (PostgreSQL)
-            db_url = str(session_db.bind.url) if session_db.bind else ""
-            
-            if 'sqlite' in db_url.lower():
-                # SQLite: Use PRAGMA to check columns
-                result = session_db.execute(text("PRAGMA table_info(persona_data)"))
-                cols = {row[1] for row in result}  # Column name is at index 1
-                
-                if 'research_persona' not in cols:
-                    logger.info("Adding missing column research_persona to persona_data table")
-                    session_db.execute(text("ALTER TABLE persona_data ADD COLUMN research_persona JSON"))
-                    session_db.commit()
-                
-                if 'research_persona_generated_at' not in cols:
-                    logger.info("Adding missing column research_persona_generated_at to persona_data table")
-                    session_db.execute(text("ALTER TABLE persona_data ADD COLUMN research_persona_generated_at TIMESTAMP"))
-                    session_db.commit()
-            else:
-                # PostgreSQL: Try to query the columns (will fail if they don't exist)
-                try:
-                    session_db.execute(text("SELECT research_persona, research_persona_generated_at FROM persona_data LIMIT 0"))
-                except Exception:
-                    # Columns don't exist, add them
-                    logger.info("Adding missing columns research_persona and research_persona_generated_at to persona_data table")
-                    try:
-                        session_db.execute(text("ALTER TABLE persona_data ADD COLUMN research_persona JSONB"))
-                        session_db.execute(text("ALTER TABLE persona_data ADD COLUMN research_persona_generated_at TIMESTAMP"))
-                        session_db.commit()
-                    except Exception as alter_err:
-                        logger.error(f"Failed to add research_persona columns: {alter_err}")
-                        session_db.rollback()
-                        raise
-        except Exception as e:
-            logger.error(f"Error ensuring research_persona columns: {e}")
-            session_db.rollback()
-            raise
-        finally:
-            self._research_persona_cols_checked = True
-    
     def get_cached_only(
         self, 
         user_id: str
@@ -472,9 +425,6 @@ class ResearchPersonaService:
                 logger.error(f"No database session provided for _get_persona_data_record (user {user_id})")
                 return None
 
-            # Ensure research_persona columns exist before querying
-            self._ensure_research_persona_columns(session_db)
-            
             # Get onboarding session
             session = session_db.query(OnboardingSession).filter(
                 OnboardingSession.user_id == user_id

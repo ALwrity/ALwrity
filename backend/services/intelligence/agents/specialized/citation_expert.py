@@ -87,7 +87,8 @@ class CitationExpert(SIFBaseAgent):
                 source_agent="CitationExpert",
                 reasoning="Verified sources build audience trust and SEO authority.",
                 action_type="navigate",
-                action_url="/content-planning-dashboard"
+                action_url="/content-planning-dashboard",
+                synthesis_mode="data_derived",
             ))
         else:
             proposals.append(TaskProposal(
@@ -99,7 +100,8 @@ class CitationExpert(SIFBaseAgent):
                 source_agent="CitationExpert",
                 reasoning="Citing authoritative sources improves content credibility.",
                 action_type="navigate",
-                action_url="/content-planning-dashboard"
+                action_url="/content-planning-dashboard",
+                synthesis_mode="data_derived",
             ))
 
         return proposals

@@ -126,6 +126,7 @@ export interface TodayPlanPreview {
   committee_agent_count: number;
   fallback_used: boolean;
   proposals_by_agent: Record<string, any[]>;
+  template_fallback_count?: number;
 }
 
 export async function previewTodayPlan(): Promise<TodayPlanPreview> {

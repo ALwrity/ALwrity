@@ -41,22 +41,30 @@ def test_orchestrator_failure_does_not_return_silent_empty():
     """The previous behavior was to return ``{"date": date, "tasks": []}``
     with no flag. Ensure the orchestrator-failure branches no longer
     return an empty plan with no signal.
+
+    Both failure branches now route through ``finish_meeting(...)``, so
+    scan each branch's body directly instead of matching a bare
+    ``return {`` literal.
     """
     src = _read_backend("services/today_workflow_service.py")
-    # The two orchestrator-failure returns (orchestration_service is None
-    # AND get_or_create_orchestrator raises) must carry the flag.
-    or_none = re.search(
-        r"if orchestration_service is None:.*?return\s*\{[^}]+\}",
-        src, re.DOTALL,
+
+    def branch_body(anchor: str, window: int = 900) -> str:
+        index = src.find(anchor)
+        assert index != -1, f"anchor not found in today_workflow_service.py: {anchor!r}"
+        return src[index:index + window]
+
+    # Branch 1: orchestration_service is None.
+    none_branch = branch_body("if orchestration_service is None:")
+    assert "fallback_used" in none_branch, (
+        "orchestration_service-None branch must carry fallback_used=True"
     )
-    assert or_none is not None
-    assert "fallback_used" in or_none.group(0)
-    or_raise = re.search(
-        r"except Exception as e:\s*\n\s*logger\.error.*?return\s*\{[^}]+\}",
-        src, re.DOTALL,
+
+    # Branch 2: get_or_create_orchestrator raises.
+    raise_anchor = 'logger.error(f"Failed to get orchestrator: {e}")'
+    raise_branch = branch_body(raise_anchor)
+    assert "fallback_used" in raise_branch, (
+        "orchestrator-raise branch must carry fallback_used=True"
     )
-    assert or_raise is not None
-    assert "fallback_used" in or_raise.group(0)
 
 
 # ---------- Issue 2: Use index_content() not direct embeddings ----------
@@ -119,12 +127,9 @@ def test_pillar_backfill_resolves_tenant_provider():
     and pass it to llm_text_gen so the backfill model matches the
     rest of the workflow.
     """
-    src = _read_backend("services/today_workflow_service.py")
+    src = _read_backend("services/today_workflow_pillar.py")
     assert "_resolve_backfill_provider" in src
     lines = src.splitlines()
-    # Find the function definition and walk forward until the next
-    # top-level def. The line-walking approach avoids the regex
-    # capture bug that bit the SIF-5 tests.
     def_line = None
     for i, line in enumerate(lines):
         if line.startswith("def _build_single_task_for_missing_pillar("):
@@ -222,7 +227,7 @@ def test_calendar_pillar_resolver_exists():
     """A _resolve_calendar_pillar() function must exist and dispatch
     on content_type, then platform, then default.
     """
-    src = _read_backend("services/today_workflow_service.py")
+    src = _read_backend("services/today_workflow_calendar.py")
     assert "def _resolve_calendar_pillar(" in src
     lines = src.splitlines()
     def_line = None
@@ -246,7 +251,7 @@ def test_generate_calendar_event_plan_uses_resolver():
     """_generate_calendar_event_plan must call _resolve_calendar_pillar
     instead of the hardcoded constant.
     """
-    src = _read_backend("services/today_workflow_service.py")
+    src = _read_backend("services/today_workflow_calendar.py")
     lines = src.splitlines()
     def_line = None
     for i, line in enumerate(lines):

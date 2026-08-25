@@ -50,7 +50,10 @@
     "analyze": "npm run build && npx source-map-explorer 'build/static/js/*.js' --html bundle-report.html",
     "analyze:size": "npm run build && npx bundlesize",
     "sync-clerk": "node scripts/sync-clerk.js",
-    "postinstall": "node scripts/sync-clerk.js"
+    "postinstall": "node scripts/sync-clerk.js",
+    "dev": "vite",
+    "build:vite": "tsc --noEmit && vite build",
+    "preview": "vite preview"
   },
   "eslintConfig": {
     "extends": [
@@ -126,8 +129,11 @@
     "@types/jest": "^30.0.0",
     "@types/marked": "^5.0.2",
     "@types/node": "^25.0.10",
+    "@vitejs/plugin-react-swc": "^4.3.3",
     "source-map-explorer": "^2.5.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vite": "^8.2.2",
+    "vite-plugin-svgr": "^5.2.0"
   },
   "proxy": "http://localhost:8000",
   "homepage": "/",

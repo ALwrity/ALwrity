@@ -70,6 +70,10 @@ def normalize_proposal(proposal: Any, agent_key: Optional[str] = None) -> Dict[s
         "action_type": _text(_get(proposal, "action_type", "navigate")) or "navigate",
         "action_parameters": action_parameters,
         "confidence": _confidence(proposal),
+        # How the proposal text was produced ("llm", "data_derived",
+        # "template_fallback"); None when the source object predates or
+        # omits the field, so downstream consumers never guess.
+        "synthesis_mode": _text(_get(proposal, "synthesis_mode", "")) or None,
     }
 
 

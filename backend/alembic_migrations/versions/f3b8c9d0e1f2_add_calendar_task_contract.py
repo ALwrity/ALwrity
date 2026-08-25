@@ -15,6 +15,11 @@ depends_on = None
 
 
 def upgrade():
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing = {c["name"] for c in inspector.get_columns("calendar_events")}
+    if "owner_agent" in existing:
+        return
     with op.batch_alter_table("calendar_events", schema=None) as batch_op:
         batch_op.add_column(sa.Column("owner_agent", sa.String(length=100), nullable=True))
         batch_op.add_column(sa.Column("recommendation_id", sa.String(length=255), nullable=True))
@@ -40,6 +45,11 @@ def upgrade():
 
 
 def downgrade():
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing = {c["name"] for c in inspector.get_columns("calendar_events")}
+    if "owner_agent" not in existing:
+        return
     for name in (
         "ix_calendar_events_meeting_id",
         "ix_calendar_events_task_id",

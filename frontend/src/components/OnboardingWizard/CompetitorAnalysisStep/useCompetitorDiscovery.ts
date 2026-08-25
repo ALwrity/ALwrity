@@ -43,14 +43,16 @@ export function useCompetitorDiscovery({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [analysisStep, setAnalysisStep] = useState('');
-  const [competitors, setCompetitors] = useState<Competitor[]>([]);
-  const [socialMediaAccounts, setSocialMediaAccounts] = useState<any>({});
-  const [researchSummary, setResearchSummary] = useState<any>(null);
-  const [contentPillars, setContentPillars] = useState<ContentPillarData | null>(null);
+  // Seed from initialData so the component can render cached/DB results
+  // immediately and doesn't overwrite Wizard state with empty defaults.
+  const [competitors, setCompetitors] = useState<Competitor[]>(initialData?.competitors ?? []);
+  const [socialMediaAccounts, setSocialMediaAccounts] = useState<any>(initialData?.social_media_accounts ?? {});
+  const [researchSummary, setResearchSummary] = useState<any>(initialData?.researchSummary ?? null);
+  const [contentPillars, setContentPillars] = useState<ContentPillarData | null>(initialData?.content_pillars ?? null);
   const [isLoadingPillars, setIsLoadingPillars] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showProgressModal, setShowProgressModal] = useState(false);
-  const [usingCachedData, setUsingCachedData] = useState(false);
+  const [usingCachedData, setUsingCachedData] = useState(!!(initialData?.competitors?.length > 0));
 
   const initializationStarted = useRef(false);
   const crawlSocialMediaRef = useRef<Record<string, string>>({});
@@ -81,6 +83,7 @@ export function useCompetitorDiscovery({
             setCompetitors(parsedData.competitors || []);
             setSocialMediaAccounts(parsedData.social_media_accounts || {});
             setResearchSummary(parsedData.research_summary || null);
+            setContentPillars(parsedData.content_pillars || null);
             setUsingCachedData(true);
             return true;
           } else {
@@ -205,7 +208,11 @@ export function useCompetitorDiscovery({
         }
 
         try {
-          localStorage.setItem('competitor_analysis_data', JSON.stringify({ ...analysisData, social_media_accounts: mergedAccounts }));
+          localStorage.setItem('competitor_analysis_data', JSON.stringify({
+            ...analysisData,
+            social_media_accounts: mergedAccounts,
+            content_pillars: result.content_pillars || null,
+          }));
           localStorage.setItem('competitor_analysis_url', finalUserUrl);
           localStorage.setItem('competitor_analysis_timestamp', Date.now().toString());
         } catch (cacheErr) {
@@ -231,6 +238,12 @@ export function useCompetitorDiscovery({
   useEffect(() => {
     const initialize = async () => {
       if (initializationStarted.current) return;
+
+      // Wait until the Wizard has loaded the backend step data. On the first
+      // render initialData can be null, which would otherwise cause an
+      // unnecessary AI call. When it populates, the effect re-runs.
+      if (initialData === undefined || initialData === null) return;
+
       initializationStarted.current = true;
 
       const crawlData = initialData?.crawl_social_media || initialData?.crawlResult?.content?.social_media || {};
@@ -246,6 +259,7 @@ export function useCompetitorDiscovery({
       if (initialData?.competitors?.length > 0) {
         setCompetitors(initialData.competitors);
         if (initialData.researchSummary) setResearchSummary(initialData.researchSummary);
+        setContentPillars(initialData.content_pillars || null);
         setUsingCachedData(true);
 
         try {
@@ -254,7 +268,8 @@ export function useCompetitorDiscovery({
             social_media_accounts: initialData.social_media_accounts || {},
             social_media_citations: initialData.social_media_citations || [],
             research_summary: initialData.researchSummary || null,
-            sitemap_analysis: initialData.sitemapAnalysis || null
+            sitemap_analysis: initialData.sitemapAnalysis || null,
+            content_pillars: initialData.content_pillars || null
           };
           const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
           localStorage.setItem('competitor_analysis_data', JSON.stringify(analysisData));
@@ -276,8 +291,7 @@ export function useCompetitorDiscovery({
     };
 
     initialize();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialData, loadCachedAnalysis, startCompetitorDiscovery, mergeCrawlSocialMedia]);
 
   return {
     competitors,

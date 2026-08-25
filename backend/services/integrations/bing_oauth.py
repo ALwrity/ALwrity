@@ -49,38 +49,16 @@ class BingOAuthService(OAuthProviderBase):
             logger.warning("To get credentials: 1. Go to https://www.bing.com/webmasters/ 2. Sign in to Bing Webmaster Tools 3. Go to Settings > API Access 4. Create OAuth client")
 
     def _init_db(self, user_id: str):
-        """Initialize database tables for OAuth tokens."""
+        """Ensure the per-user schema exists (owned by Alembic migrations)."""
+        try:
+            from services.database import get_engine_for_user
+
+            get_engine_for_user(user_id)
+        except Exception as ensure_error:
+            logger.warning(f"Could not ensure Alembic schema for user {user_id}: {ensure_error}")
         db_path = self._get_db_path(user_id)
         # Ensure directory exists
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        
-        with sqlite3.connect(db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS bing_oauth_tokens (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT NOT NULL,
-                    access_token TEXT NOT NULL,
-                    refresh_token TEXT,
-                    token_type TEXT DEFAULT 'bearer',
-                    expires_at TIMESTAMP,
-                    scope TEXT,
-                    site_url TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    is_active BOOLEAN DEFAULT TRUE
-                )
-            ''')
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS bing_oauth_states (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    state TEXT NOT NULL UNIQUE,
-                    user_id TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    expires_at TIMESTAMP DEFAULT (datetime('now', '+20 minutes'))
-                )
-            ''')
-            conn.commit()
 
     
     def generate_authorization_url(self, user_id: str, scope: str = "webmaster.manage") -> Dict[str, Any]:

@@ -84,7 +84,9 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   const [showHighlightsModal, setShowHighlightsModal] = useState(false);
   const [selectedCompetitorHighlights, setSelectedCompetitorHighlights] = useState<string[]>([]);
   const [selectedCompetitorTitle, setSelectedCompetitorTitle] = useState<string>('');
-  const [sitemapAnalysis, setSitemapAnalysis] = useState<any>(null);
+  // Seed from initialData so the persisted sitemap/strategic insights render
+  // immediately and don't trigger an unnecessary AI call on back-navigation.
+  const [sitemapAnalysis, setSitemapAnalysis] = useState<any>(initialData?.sitemapAnalysis ?? null);
   const [isAnalyzingSitemap, setIsAnalyzingSitemap] = useState(false);
   const [isDiscoveringSocial, setIsDiscoveringSocial] = useState(false);
   const [showHeaderInfo, setShowHeaderInfo] = useState(false);
@@ -282,11 +284,14 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     }
   }, [competitors.length, sitemapAnalysis]);
 
-  // Auto-trigger sitemap analysis when competitors load and no data exists
+  // Auto-trigger sitemap analysis only when competitors load and there is no
+  // persisted data either in state or from the Wizard's initialData. Waiting on
+  // initialData prevents an unnecessary LLM call on back-navigation.
   useEffect(() => {
     if (
       competitors.length > 0 &&
       !sitemapAnalysis &&
+      !initialData?.sitemapAnalysis &&
       !isAnalyzing &&
       !isAnalyzingSitemap &&
       !sitemapAutoTriggered.current
@@ -297,7 +302,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         sitemapAutoTriggered.current = false;
       });
     }
-  }, [competitors.length, isAnalyzing, sitemapAnalysis, isAnalyzingSitemap, startSitemapAnalysis]);
+  }, [competitors.length, isAnalyzing, sitemapAnalysis, isAnalyzingSitemap, startSitemapAnalysis, initialData?.sitemapAnalysis]);
 
   // Fetch sitemap benchmark results (runs in background after competitor discovery)
   const [benchmarkReport, setBenchmarkReport] = useState<any>(null);

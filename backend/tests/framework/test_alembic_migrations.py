@@ -80,6 +80,31 @@ class TestBaselineMigration:
         assert "subscription_plans" in tables
         assert len(tables) >= 125, f"Expected >= 125 tables, got {len(tables)}"
 
+    def test_upgrade_head_creates_oauth_provider_tables(self, engine):
+        """f8d3e4f5a6b7 creates the raw-SQL-owned OAuth/GSC provider tables."""
+        cfg = _alembic_cfg(engine._db_path)
+        command.upgrade(cfg, "head")
+
+        tables = _table_names(engine)
+        expected = {
+            "gsc_credentials",
+            "gsc_data_cache",
+            "gsc_oauth_states",
+            "bing_oauth_tokens",
+            "bing_oauth_states",
+            "wordpress_oauth_tokens",
+            "wordpress_oauth_states",
+            "wix_oauth_tokens",
+            "wix_oauth_pkce_states",
+            "youtube_oauth_tokens",
+            "youtube_oauth_states",
+        }
+        missing = expected - tables
+        assert not missing, f"Missing OAuth provider tables: {sorted(missing)}"
+
+        indexes = {ix["name"] for ix in inspect(engine).get_indexes("wix_oauth_pkce_states")}
+        assert "idx_wix_oauth_pkce_user_state" in indexes
+
     def test_alembic_version_row_exists(self, engine):
         """After upgrade, alembic_version has the head revision."""
         cfg = _alembic_cfg(engine._db_path)
@@ -194,5 +219,121 @@ class TestAutoStampDetection:
             result = _auto_stamp_existing_db(eng, "test_existing")
             assert result is True
             assert "alembic_version" in _table_names(eng)
+        finally:
+            _cleanup(eng)
+
+    def test_partial_db_with_only_raw_tables_not_stamped(self):
+        """A DB holding only raw-SQL OAuth tables must NOT be stamped at head.
+
+        Stamping would pin it at head, `upgrade head` would no-op, and the
+        baseline schema would never land.
+        """
+        from services.database.init_db import _auto_stamp_existing_db
+
+        eng = _fresh_engine()
+        try:
+            with eng.connect() as conn:
+                conn.exec_driver_sql(
+                    "CREATE TABLE linkedin_oauth_tokens ("
+                    " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                    " user_id TEXT NOT NULL UNIQUE)"
+                )
+                conn.commit()
+
+            result = _auto_stamp_existing_db(eng, "test_partial")
+            assert result is False
+            assert "alembic_version" not in _table_names(eng)
+        finally:
+            _cleanup(eng)
+
+    def test_partial_db_upgrade_builds_baseline_and_keeps_raw_tables(self):
+        """After skipping the stamp, upgrade head adds baseline tables while
+        preserving pre-existing raw-SQL tables (no name collisions)."""
+        from services.database.init_db import _auto_stamp_existing_db
+
+        eng = _fresh_engine()
+        try:
+            with eng.connect() as conn:
+                conn.exec_driver_sql(
+                    "CREATE TABLE gsc_oauth_states ("
+                    " state TEXT PRIMARY KEY, user_id TEXT NOT NULL)"
+                )
+                conn.exec_driver_sql(
+                    "INSERT INTO gsc_oauth_states VALUES ('abc:xyz', 'u1')"
+                )
+                conn.commit()
+
+            assert _auto_stamp_existing_db(eng, "test_partial") is False
+
+            cfg = _alembic_cfg(eng._db_path)
+            command.upgrade(cfg, "head")
+
+            tables = _table_names(eng)
+            assert "onboarding_sessions" in tables
+            assert "subscription_plans" in tables
+            assert "gsc_oauth_states" in tables
+            rev = _alembic_version_row(eng)
+            assert rev is not None and len(rev) == 12
+
+            with eng.connect() as conn:
+                row = conn.exec_driver_sql(
+                    "SELECT user_id FROM gsc_oauth_states WHERE state = 'abc:xyz'"
+                ).fetchone()
+                assert row == ("u1",)
+        finally:
+            _cleanup(eng)
+
+
+class TestLinkedInHealMigration:
+    """Verify the LinkedIn OAuth heal migration repairs legacy schema."""
+
+    def test_heal_migration_adds_columns_and_normalizes_provider_mode(self):
+        """Legacy linkedin_oauth_tokens missing Unipile columns gets healed."""
+        eng = _fresh_engine()
+        try:
+            with eng.connect() as conn:
+                conn.exec_driver_sql(
+                    """
+                    CREATE TABLE linkedin_oauth_tokens (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id TEXT NOT NULL,
+                        provider_mode TEXT,
+                        linkedin_access_token TEXT,
+                        linkedin_refresh_token TEXT,
+                        expires_at TIMESTAMP,
+                        account_name TEXT,
+                        profile_urn TEXT,
+                        is_active BOOLEAN DEFAULT TRUE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        unipile_account_id TEXT
+                    )
+                    """
+                )
+                conn.exec_driver_sql(
+                    """
+                    INSERT INTO linkedin_oauth_tokens
+                        (user_id, provider_mode, unipile_account_id)
+                    VALUES ('u1', NULL, 'acc-1')
+                    """
+                )
+                conn.commit()
+
+            cfg = _alembic_cfg(eng._db_path)
+            command.upgrade(cfg, "head")
+
+            inspector = inspect(eng)
+            cols = {c["name"] for c in inspector.get_columns("linkedin_oauth_tokens")}
+            assert "unipile_org_account_id" in cols
+            assert "unipile_sync_status" in cols
+            assert "idx_linkedin_oauth_user_active" in {
+                ix["name"] for ix in inspector.get_indexes("linkedin_oauth_tokens")
+            }
+
+            with eng.connect() as conn:
+                row = conn.exec_driver_sql(
+                    "SELECT provider_mode FROM linkedin_oauth_tokens WHERE user_id = 'u1'"
+                ).fetchone()
+                assert row == ("unipile",)
         finally:
             _cleanup(eng)

@@ -103,11 +103,12 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Persona data
-  const [corePersona, setCorePersona] = useState<any>(null);
-  const [platformPersonas, setPlatformPersonas] = useState<Record<string, any>>({});
-  const [qualityMetrics, setQualityMetrics] = useState<QualityMetrics | null>(null);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['linkedin', 'blog']);
+  // Persona data — seed from stepData so the first onDataChange call writes
+  // valid data instead of nulls (prevents AI re-generation on back-navigation).
+  const [corePersona, setCorePersona] = useState<any>(stepData?.corePersona ?? null);
+  const [platformPersonas, setPlatformPersonas] = useState<Record<string, any>>(stepData?.platformPersonas ?? {});
+  const [qualityMetrics, setQualityMetrics] = useState<QualityMetrics | null>(stepData?.qualityMetrics ?? null);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(stepData?.selectedPlatforms ?? ['linkedin', 'blog']);
   // Phase 2: deterministic completeness + data-sufficiency scores.
   // Backed by the backend's `PersonaPromptBuilder.compute_completeness` +
   // `OnboardingDataCollector.calculate_data_sufficiency`. Optional — when

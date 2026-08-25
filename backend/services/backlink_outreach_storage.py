@@ -12,7 +12,7 @@ LEAD_VALID_STATUSES = frozenset({"discovered", "contacted", "replied", "placed",
 
 from services.database import get_session_for_user
 from models.backlink_outreach_models import (
-    Base, BacklinkCampaign, BacklinkLead,
+    BacklinkCampaign, BacklinkLead,
     OutreachAttempt, OutreachReply, FollowUpSchedule, EmailTemplate,
     SuppressedRecipient, SentIdempotencyKey, AuditLogEntry,
     SendCounterUser, SendCounterDomain,
@@ -28,40 +28,9 @@ DEFAULT_DOMAIN_DAILY_CAP = 20
 
 
 class BacklinkOutreachStorageService:
-    _NEW_LEAD_COLUMNS = [
-        "url", "page_title", "snippet", "confidence_score", "discovery_source", "notes"
-    ]
-
-    def _ensure_tables(self, user_id: str) -> None:
-        db = get_session_for_user(user_id)
-        if not db:
-            return
-        try:
-            Base.metadata.create_all(bind=db.get_bind(), checkfirst=True)
-            self._migrate_lead_columns(db)
-        finally:
-            db.close()
-
-    def _migrate_lead_columns(self, db) -> None:
-        """Add new columns to backlink_leads if they don't exist (dev migration)."""
-        try:
-            valid_columns = {"url", "page_title", "snippet", "confidence_score", "discovery_source", "notes"}
-            for col in self._NEW_LEAD_COLUMNS:
-                if col not in valid_columns:
-                    continue
-                safe_col = col.replace('"', "").replace(";", "")
-                db.execute(sql_text(
-                    f"ALTER TABLE backlink_leads ADD COLUMN IF NOT EXISTS \"{safe_col}\" TEXT"
-                ))
-            db.execute(sql_text(
-                "ALTER TABLE backlink_leads ADD COLUMN IF NOT EXISTS confidence_score FLOAT DEFAULT 0.0"
-            ))
-            db.commit()
-        except Exception:
-            db.rollback()
 
     def create_campaign(self, user_id: str, workspace_id: str, name: str) -> dict:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             raise RuntimeError("Database session unavailable")
@@ -81,7 +50,7 @@ class BacklinkOutreachStorageService:
             db.close()
 
     def list_campaigns(self, user_id: str, workspace_id: str, limit: int = 50) -> List[dict]:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return []
@@ -98,7 +67,7 @@ class BacklinkOutreachStorageService:
             db.close()
 
     def get_campaign(self, campaign_id: str, user_id: str) -> Optional[dict]:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return None
@@ -152,7 +121,7 @@ class BacklinkOutreachStorageService:
         discovery_source: str = "duckduckgo",
         notes: Optional[str] = None,
     ) -> dict:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             raise RuntimeError("Database session unavailable")
@@ -189,7 +158,7 @@ class BacklinkOutreachStorageService:
             db.close()
 
     def bulk_add_leads(self, campaign_id: str, user_id: str, leads_data: List[dict]) -> List[dict]:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             raise RuntimeError("Database session unavailable")
@@ -234,7 +203,7 @@ class BacklinkOutreachStorageService:
     def list_leads(
         self, campaign_id: str, user_id: str, status: Optional[str] = None, limit: int = 50
     ) -> List[dict]:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return []
@@ -258,7 +227,7 @@ class BacklinkOutreachStorageService:
         if status not in LEAD_VALID_STATUSES:
             raise ValueError(f"Invalid status '{status}'. Valid values: {sorted(LEAD_VALID_STATUSES)}")
 
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return None
@@ -289,7 +258,7 @@ class BacklinkOutreachStorageService:
     def get_lead_access_issues(
         self, lead_ids: List[str], user_id: str, campaign_id: Optional[str] = None
     ) -> dict:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return {"missing": list(dict.fromkeys(lead_ids)), "unauthorized": []}
@@ -346,7 +315,7 @@ class BacklinkOutreachStorageService:
 
     def get_attempt_by_idempotency_key(self, idempotency_key: str, user_id: str = "default") -> Optional[dict]:
         """Return the existing attempt for an idempotency key visible to the user."""
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return None
@@ -382,7 +351,7 @@ class BacklinkOutreachStorageService:
         database unique constraint so concurrent requests do not both proceed to
         policy approval or SMTP delivery.
         """
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             raise RuntimeError("Database session unavailable")
@@ -428,7 +397,7 @@ class BacklinkOutreachStorageService:
         decision_reason: Optional[str] = None,
         user_id: str = "default",
     ) -> dict:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             raise RuntimeError("Database session unavailable")
@@ -466,7 +435,7 @@ class BacklinkOutreachStorageService:
             db.close()
 
     def list_attempts(self, campaign_id: str, limit: int = 50, user_id: str = "default") -> List[dict]:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return []
@@ -483,7 +452,7 @@ class BacklinkOutreachStorageService:
             db.close()
 
     def update_attempt_status(self, attempt_id: str, status: str, decision_reason: Optional[str] = None, user_id: str = "default") -> Optional[dict]:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return None
@@ -519,7 +488,7 @@ class BacklinkOutreachStorageService:
 
     def find_attempt_by_from_email(self, from_email: str, user_id: str = "default") -> Optional[str]:
         """Find the most recent attempt_id for a given sender email (lead)."""
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return None
@@ -537,7 +506,7 @@ class BacklinkOutreachStorageService:
             db.close()
 
     def update_attempt_message_id(self, attempt_id: str, message_id: str, user_id: str = "default") -> Optional[dict]:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return None
@@ -552,7 +521,7 @@ class BacklinkOutreachStorageService:
             db.close()
 
     def find_attempt_by_message_id(self, message_id: str, user_id: str = "default") -> Optional[str]:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return None
@@ -593,7 +562,7 @@ class BacklinkOutreachStorageService:
         classification: str = "replied",
         user_id: str = "default",
     ) -> dict:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             raise RuntimeError("Database session unavailable")
@@ -615,7 +584,7 @@ class BacklinkOutreachStorageService:
 
     def list_replies(self, campaign_id: str, limit: int = 50, user_id: str = "default") -> List[dict]:
         """List replies by joining through attempts to filter by campaign."""
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return []
@@ -654,7 +623,7 @@ class BacklinkOutreachStorageService:
         body: str = "",
         user_id: str = "default",
     ) -> dict:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             raise RuntimeError("Database session unavailable")
@@ -675,7 +644,7 @@ class BacklinkOutreachStorageService:
 
     def list_followups(self, campaign_id: str, limit: int = 50, user_id: str = "default") -> List[dict]:
         """List follow-ups by joining through attempts to filter by campaign."""
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return []
@@ -726,7 +695,7 @@ class BacklinkOutreachStorageService:
         body_template: str,
         variables: Optional[List[str]] = None,
     ) -> dict:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             raise RuntimeError("Database session unavailable")
@@ -747,7 +716,7 @@ class BacklinkOutreachStorageService:
             db.close()
 
     def list_templates(self, user_id: str, limit: int = 50) -> List[dict]:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return []
@@ -812,7 +781,7 @@ class BacklinkOutreachStorageService:
     # -- Suppression List --
 
     def add_suppressed(self, email: str, user_id: str = "default", domain: str = "", reason: str = "") -> dict:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             raise RuntimeError("Database session unavailable")
@@ -832,7 +801,7 @@ class BacklinkOutreachStorageService:
             db.close()
 
     def is_suppressed(self, email: str, domain: str = "", user_id: str = "default") -> bool:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return False
@@ -870,7 +839,7 @@ class BacklinkOutreachStorageService:
 
     def check_idempotency(self, idempotency_key: str, user_id: str = "default") -> bool:
         """Returns True if key already exists (duplicate)."""
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return False
@@ -885,7 +854,7 @@ class BacklinkOutreachStorageService:
             db.close()
 
     def mark_idempotency(self, idempotency_key: str, user_id: str = "default") -> dict:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             raise RuntimeError("Database session unavailable")
@@ -942,7 +911,7 @@ class BacklinkOutreachStorageService:
 
     def try_increment_user_send_counter(self, user_id: str) -> tuple:
         """Atomically check cap and increment. Returns (within_cap, new_count)."""
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return True, 0
@@ -975,7 +944,7 @@ class BacklinkOutreachStorageService:
 
     def try_increment_domain_send_counter(self, domain: str, user_id: str = "default") -> tuple:
         """Atomically check cap and increment. Returns (within_cap, new_count)."""
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return True, 0
@@ -1019,7 +988,7 @@ class BacklinkOutreachStorageService:
         reasons: Optional[List[str]] = None,
         override: bool = False,
     ) -> dict:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             raise RuntimeError("Database session unavailable")
@@ -1068,7 +1037,7 @@ class BacklinkOutreachStorageService:
     # -- Analytics --
 
     def get_send_volume_by_day(self, campaign_id: str, days: int = 30, user_id: str = "default") -> List[dict]:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return []
@@ -1087,7 +1056,7 @@ class BacklinkOutreachStorageService:
             db.close()
 
     def get_lead_status_counts(self, campaign_id: str, user_id: str = "default") -> List[dict]:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return []
@@ -1104,7 +1073,7 @@ class BacklinkOutreachStorageService:
             db.close()
 
     def list_attempts_all(self, campaign_id: str, user_id: str = "default") -> List[dict]:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return []
@@ -1120,7 +1089,7 @@ class BacklinkOutreachStorageService:
             db.close()
 
     def list_replies_all(self, campaign_id: str, user_id: str = "default") -> List[dict]:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return []
@@ -1151,7 +1120,7 @@ class BacklinkOutreachStorageService:
             db.close()
 
     def list_leads_all(self, campaign_id: str, user_id: str = "default") -> List[dict]:
-        self._ensure_tables(user_id)
+
         db = get_session_for_user(user_id)
         if not db:
             return []

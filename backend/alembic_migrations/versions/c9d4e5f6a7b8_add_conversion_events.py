@@ -15,6 +15,10 @@ depends_on = None
 
 
 def upgrade():
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if "conversion_events" in inspector.get_table_names():
+        return
     op.create_table(
         "conversion_events",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -41,6 +45,10 @@ def upgrade():
 
 
 def downgrade():
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if "conversion_events" not in inspector.get_table_names():
+        return
     op.drop_index("ix_conversion_events_user_external", table_name="conversion_events")
     op.drop_index("ix_conversion_events_occurred_at", table_name="conversion_events")
     op.drop_index("ix_conversion_events_user_id", table_name="conversion_events")

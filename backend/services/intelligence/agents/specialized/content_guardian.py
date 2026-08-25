@@ -258,6 +258,15 @@ class ContentGuardianAgent(SIFBaseAgent):
                 if action_type in {"publish", "external", "create_content", "social_draft", "linkedin_draft"} and not proposal.get("action_parameters"):
                     outcome = "quarantined"
                     reasons.append("required action parameters are missing")
+                # Degraded synthesis must stay visible even when the proposal
+                # is otherwise releasable: it may pass, but never as a clean
+                # approval.
+                if str(proposal.get("synthesis_mode") or "") == "template_fallback":
+                    reasons.append(
+                        "task came from static fallback templates because LLM synthesis was unavailable"
+                    )
+                    if outcome == "approved":
+                        outcome = "approved_with_warning"
                 elif outcome == "approved" and reasons:
                     outcome = "approved_with_warning"
             decision["guardian_outcome"] = outcome

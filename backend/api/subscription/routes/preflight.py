@@ -10,7 +10,6 @@ from loguru import logger
 
 from services.database import get_db
 from services.subscription import PricingService
-from services.subscription.schema_utils import ensure_subscription_plan_columns, ensure_usage_summaries_columns
 from middleware.auth_middleware import get_current_user
 from models.subscription_models import APIProvider, UsageSummary
 from ..dependencies import get_user_id_from_token
@@ -38,13 +37,6 @@ async def preflight_check(
     start_time = time.time()
     try:
         user_id = get_user_id_from_token(current_user)
-        
-        # Ensure schema columns exist
-        try:
-            ensure_subscription_plan_columns(db)
-            ensure_usage_summaries_columns(db)
-        except Exception as schema_err:
-            logger.warning(f"Schema check failed: {schema_err}")
         
         pricing_service = PricingService(db)
         

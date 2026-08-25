@@ -32,46 +32,16 @@ class WixOAuthService(OAuthProviderBase):
         self._migration_done: set = set()
 
     def _init_db(self, user_id: str):
-        """Initialize database tables for OAuth tokens."""
+        """Ensure the per-user schema exists (owned by Alembic migrations)."""
+        try:
+            from services.database import get_engine_for_user
+
+            get_engine_for_user(user_id)
+        except Exception as ensure_error:
+            logger.warning(f"Could not ensure Alembic schema for user {user_id}: {ensure_error}")
         db_path = self._get_db_path(user_id)
         # Ensure directory exists
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        
-        with sqlite3.connect(db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS wix_oauth_tokens (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT NOT NULL,
-                    access_token TEXT NOT NULL,
-                    refresh_token TEXT,
-                    token_type TEXT DEFAULT 'bearer',
-                    expires_at TIMESTAMP,
-                    expires_in INTEGER,
-                    scope TEXT,
-                    site_id TEXT,
-                    member_id TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    is_active BOOLEAN DEFAULT TRUE
-                )
-            ''')
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS wix_oauth_pkce_states (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT NOT NULL,
-                    state TEXT NOT NULL UNIQUE,
-                    code_verifier TEXT NOT NULL,
-                    expires_at TIMESTAMP NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    used_at TIMESTAMP
-                )
-            ''')
-            cursor.execute('''
-                CREATE INDEX IF NOT EXISTS idx_wix_oauth_pkce_user_state
-                ON wix_oauth_pkce_states (user_id, state)
-            ''')
-            conn.commit()
 
     def cleanup_expired_pkce_states(self, user_id: str) -> int:
         """Delete expired or already-used PKCE state records."""

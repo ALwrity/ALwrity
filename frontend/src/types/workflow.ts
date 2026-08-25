@@ -45,6 +45,8 @@ export interface ProposalReviewDecision {
   review_reasons?: string[];
   selection_reason?: string[];
   selection_score?: number;
+  /** How the proposal text was produced: 'llm' | 'data_derived' | 'template_fallback' */
+  synthesis_mode?: string | null;
 }
 
 export interface MeetingPreflight {
@@ -98,6 +100,8 @@ export interface TodayTask {
     tool_action?: string;
     roi_score?: number;
     impact_label?: string;
+    /** How the task text was produced: 'llm' | 'data_derived' | 'template_fallback' */
+    synthesis_mode?: string;
     [key: string]: any;
   };
   icon?: string | React.ComponentType<any>; // icon name or component reference

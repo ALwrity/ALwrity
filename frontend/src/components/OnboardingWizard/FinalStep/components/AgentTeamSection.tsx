@@ -39,6 +39,8 @@ import {
   saveAgentProfile,
   type AgentTeamCatalogEntry,
   type AgentTeamContextSummary,
+  type TeamCertification,
+  type AgentCertification,
 } from "../../../../api/agentsTeam";
 import { BrandContextPanel } from "./BrandContextPanel";
 
@@ -47,7 +49,58 @@ type Props = {
   agents: AgentTeamCatalogEntry[];
   contextCard: Record<string, any>;
   contextSummary?: AgentTeamContextSummary;
+  certification?: TeamCertification | null;
 };
+
+type CertificationBadge = {
+  label: string;
+  color: string;
+  bgcolor: string;
+  tooltip: string;
+};
+
+const CERTIFICATION_BADGES: Record<string, CertificationBadge> = {
+  certified: {
+    label: "Production-real",
+    color: "#166534",
+    bgcolor: "#dcfce7",
+    tooltip:
+      "All certification gates passed: this agent's tools run on real integrations and refuse to fabricate data.",
+  },
+  certified_with_provider_dependency: {
+    label: "Provider-dependent",
+    color: "#1d4ed8",
+    bgcolor: "#dbeafe",
+    tooltip:
+      "Gates pass when the upstream provider is connected; behavior degrades honestly (no invented data) if it is not.",
+  },
+  degraded: {
+    label: "Degraded",
+    color: "#92400e",
+    bgcolor: "#fef3c7",
+    tooltip:
+      "Some gates failed: parts of this agent's output may be limited or unavailable rather than fully real-time.",
+  },
+  "not certified": {
+    label: "Not certified",
+    color: "#475569",
+    bgcolor: "#f1f5f9",
+    tooltip:
+      "This agent has not completed production-real certification. Its outputs are labeled as estimates or unavailable.",
+  },
+};
+
+function getAgentCertificationBadge(
+  agentKey: string,
+  certification?: TeamCertification | null
+): CertificationBadge | null {
+  const agentCert: AgentCertification | undefined = certification?.agents?.[agentKey];
+  const state = agentCert?.state;
+  if (!state) return null;
+  const badge = CERTIFICATION_BADGES[state];
+  if (!badge) return null;
+  return badge;
+}
 
 function resolveDisplayName(agent: AgentTeamCatalogEntry, websiteName: string) {
   const profileName = agent.profile?.display_name;
@@ -164,7 +217,7 @@ function lintDraft(agent: AgentTeamCatalogEntry, draft: Draft) {
   return warnings;
 }
 
-const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, contextSummary }) => {
+const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, contextSummary, certification }) => {
   const [drafts, setDrafts] = React.useState<Record<string, Draft>>({});
   const [savingKey, setSavingKey] = React.useState<string | null>(null);
   const [aiBusyKey, setAiBusyKey] = React.useState<string | null>(null);
@@ -587,6 +640,23 @@ const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, c
         </Stack>
       </Box>
 
+      {certification && certification.default_meeting_ready === false && (
+        <Alert
+          severity="info"
+          icon={<LockIcon fontSize="inherit" />}
+          sx={{ mb: 2, borderRadius: 2 }}
+        >
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            Agent team status: {certification.team_label || "not production-real"}
+          </Typography>
+          <Typography variant="caption" sx={{ color: "#475569" }}>
+            Some agents have not completed production-real certification. Their outputs are
+            honestly labeled as estimates or unavailable instead of being presented as verified
+            data — badges below show each agent's certification state.
+          </Typography>
+        </Alert>
+      )}
+
       <Stack spacing={2}>
         {agents.map((agent) => {
           const displayName = resolveDisplayName(agent, websiteName);
@@ -594,6 +664,7 @@ const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, c
           const draft = drafts[agent.agent_key];
           const warnings = draft ? lintDraft(agent, draft) : [];
           const contextHint = buildAgentContextHint(agent.agent_key, contextSummary || {});
+          const certBadge = getAgentCertificationBadge(agent.agent_key, certification);
 
           return (
             <Accordion
@@ -646,6 +717,19 @@ const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, c
                     )}
                   </Box>
                   <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+                    {certBadge && (
+                      <Tooltip title={certBadge.tooltip} arrow>
+                        <Chip
+                          size="small"
+                          label={certBadge.label}
+                          sx={{
+                            fontWeight: 600,
+                            bgcolor: certBadge.bgcolor,
+                            color: certBadge.color,
+                          }}
+                        />
+                      </Tooltip>
+                    )}
                     <Tooltip title="System tools this agent can call while executing your strategy." arrow>
                       <Chip
                         size="small"

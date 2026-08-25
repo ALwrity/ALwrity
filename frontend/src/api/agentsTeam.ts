@@ -44,14 +44,36 @@ export type AgentTeamContextSummary = {
   business_goals?: string[];
 };
 
+export type CertificationState =
+  | "certified"
+  | "certified_with_provider_dependency"
+  | "degraded"
+  | "not certified";
+
+export type AgentCertification = {
+  state?: CertificationState;
+  tools_total?: number;
+  tools_blocked?: number;
+  missing_gates?: string[];
+};
+
+export type TeamCertification = {
+  team_label?: "production-real" | "not production-real";
+  default_meeting_ready?: boolean;
+  summary?: Partial<Record<CertificationState, number>>;
+  agents?: Record<string, AgentCertification>;
+};
+
 export async function getAgentTeam(): Promise<{
   agents: AgentTeamCatalogEntry[];
   contextSummary: AgentTeamContextSummary;
+  certification: TeamCertification | null;
 }> {
   const res = await apiClient.get("/api/agents/team");
   return {
     agents: res.data?.data?.agents || [],
     contextSummary: res.data?.data?.context_summary || {},
+    certification: res.data?.data?.certification || null,
   };
 }
 

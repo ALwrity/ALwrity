@@ -32,6 +32,7 @@ import {
   GpsFixed as GapIcon,
   BarChart as VolumeIcon,
   CalendarMonth as CalendarIcon,
+  WarningAmber as FallbackIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useWorkflowStore } from '../../../stores/workflowStore';
@@ -604,6 +605,24 @@ const getTaskStatus = (task: TodayTask) => {
                               <Typography variant="caption" sx={{ fontWeight: 700, color: '#444' }}>
                                 Suggested by {task.metadata.source_agent.replace('Agent', '')}
                               </Typography>
+                              {task.metadata?.synthesis_mode === 'template_fallback' && (
+                                <Tooltip title="AI personalization was unavailable when this task was created, so it came from a standard template instead of your content strategy.">
+                                  <Chip
+                                    icon={<FallbackIcon sx={{ fontSize: 14 }} />}
+                                    label="Template fallback"
+                                    size="small"
+                                    sx={{
+                                      height: 20,
+                                      fontSize: '0.65rem',
+                                      fontWeight: 700,
+                                      bgcolor: '#fff3e0',
+                                      color: '#b45309',
+                                      border: '1px solid #fcd34d',
+                                      '& .MuiChip-icon': { color: '#b45309' },
+                                    }}
+                                  />
+                                </Tooltip>
+                              )}
                             </Box>
                             {task.metadata.reasoning && (
                               <Typography variant="caption" sx={{ color: '#666', display: 'block', lineHeight: 1.4 }}>

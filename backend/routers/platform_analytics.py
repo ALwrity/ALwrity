@@ -162,6 +162,33 @@ async def get_analytics_data(
                 'error_message': data.error_message
             }
         
+        # Persist fetched analytics to DB so subsequent loads (page reload, step
+        # navigation, or cache expiry) can be served from DB instead of re-hitting
+        # GSC/Bing every time. This is non-fatal: a persistence failure must never
+        # break the analytics response.
+        try:
+            from services.database import get_session_for_user
+            from services.platform_analytics_persistence import PlatformAnalyticsPersistence
+            persist_db = get_session_for_user(user_id)
+            if persist_db:
+                persistence = PlatformAnalyticsPersistence(persist_db)
+                for platform_name, data in analytics_data.items():
+                    try:
+                        persistence.save_analytics(
+                            user_id=user_id,
+                            platform=platform_name,
+                            metrics=data.metrics,
+                            summary=summary,
+                            site_url=site_url,
+                            status=data.status,
+                            error_message=data.error_message,
+                        )
+                    except Exception as perr:
+                        logger.warning(f"Failed to persist analytics for {platform_name}: {perr}")
+                persist_db.close()
+        except Exception as persist_err:
+            logger.warning(f"Analytics DB persistence skipped (non-fatal): {persist_err}")
+
         return AnalyticsResponse(
             success=True,
             data=data_dict,
@@ -618,7 +645,22 @@ async def get_analytics_from_db(
         if result["user_id"] != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
 
-        return result
+        # Reshape to the AnalyticsResponse shape the frontend expects:
+        # { data: { [platform]: PlatformAnalyticsType }, summary: {...} }
+        platform = result.get("platform")
+        analysis_date = result.get("analysis_date")
+        data_entry = {
+            "platform": platform,
+            "metrics": result.get("metrics"),
+            "date_range": {"start": analysis_date, "end": analysis_date},
+            "last_updated": analysis_date,
+            "status": result.get("status", "success"),
+            "error_message": result.get("error_message"),
+        }
+        return {
+            "data": {platform: data_entry},
+            "summary": result.get("summary") or {},
+        }
     except HTTPException:
         raise
     except Exception as e:

@@ -160,6 +160,14 @@ class TaskProposal:
     kpi: Optional[str] = None
     deadline: Optional[str] = None
     action_parameters: Optional[Dict[str, Any]] = None
+    # How this proposal's text was produced:
+    #   "llm"              -- personalized LLM generation grounded in context.
+    #   "data_derived"     -- deterministic rules over real measured data.
+    #   "template_fallback" -- static canned text substituted after LLM
+    #                          synthesis failed or returned nothing.
+    # Static constructions default to the fallback mode; every non-fallback
+    # producer must set its own value explicitly.
+    synthesis_mode: str = "template_fallback"
 
 @dataclass
 class MarketSignal:
@@ -620,6 +628,7 @@ class BaseALwrityAgent(ABC):
                     kpi=normalize_contract_text(t.get("kpi")),
                     deadline=normalize_contract_text(t.get("deadline"), 100),
                     action_parameters=t.get("action_parameters") if isinstance(t.get("action_parameters"), dict) else None,
+                    synthesis_mode="llm",
                 )
             )
         return proposals
@@ -637,6 +646,11 @@ class BaseALwrityAgent(ABC):
         already enriched with onboarding context) to generate personalized
         proposals. Falls back to ``default_proposals`` on any failure so the
         daily workflow never breaks.
+
+        Every returned proposal carries an explicit ``synthesis_mode``:
+        successfully parsed LLM output is tagged ``llm``; the fallback bundle
+        is tagged ``template_fallback`` so downstream review, persistence,
+        and the UI can surface degraded synthesis instead of hiding it.
         """
         try:
             role_guidance = get_role_contract(self.agent_key)
@@ -666,6 +680,8 @@ class BaseALwrityAgent(ABC):
                     f"[{self.__class__.__name__}] LLM synthesis returned no valid tasks; "
                     "using default proposals."
                 )
+                for proposal in default_proposals:
+                    proposal.synthesis_mode = "template_fallback"
                 return default_proposals
             return proposals
         except Exception as e:
@@ -673,6 +689,8 @@ class BaseALwrityAgent(ABC):
                 f"[{self.__class__.__name__}] LLM task synthesis failed, "
                 f"using default proposals: {e}"
             )
+            for proposal in default_proposals:
+                proposal.synthesis_mode = "template_fallback"
             return default_proposals
 
     @abstractmethod
@@ -1440,7 +1458,7 @@ class StrategyOrchestratorAgent(BaseALwrityAgent):
         try:
             perf_data: List[Dict[str, Any]] = []
             if self.performance_monitor:
-                perf_data = self.performance_monitor.get_all_agents_performance() or []
+                perf_data = await self.performance_monitor.get_all_agents_performance() or []
 
             return {
                 "overall_performance": perf_data,

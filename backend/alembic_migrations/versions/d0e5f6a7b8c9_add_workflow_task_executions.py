@@ -15,6 +15,10 @@ depends_on = None
 
 
 def upgrade():
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if "workflow_task_executions" in inspector.get_table_names():
+        return
     op.create_table(
         "workflow_task_executions",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -46,6 +50,10 @@ def upgrade():
 
 
 def downgrade():
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if "workflow_task_executions" not in inspector.get_table_names():
+        return
     op.drop_index("ix_workflow_execution_task_idempotency", table_name="workflow_task_executions")
     op.drop_index("ix_workflow_task_executions_status", table_name="workflow_task_executions")
     op.drop_index("ix_workflow_task_executions_user_id", table_name="workflow_task_executions")

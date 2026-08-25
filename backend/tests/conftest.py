@@ -479,7 +479,7 @@ def _init_linkedin_oauth_tokens(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS linkedin_oauth_tokens (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
-            provider_mode TEXT NOT NULL,
+            provider_mode TEXT NOT NULL DEFAULT 'unipile',
             linkedin_access_token TEXT,
             linkedin_refresh_token TEXT,
             expires_at TIMESTAMP,
@@ -489,8 +489,15 @@ def _init_linkedin_oauth_tokens(conn: sqlite3.Connection) -> None:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             unipile_account_id TEXT,
-            unipile_org_account_id TEXT
+            unipile_org_account_id TEXT,
+            unipile_sync_status TEXT
         )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_linkedin_oauth_user_active
+        ON linkedin_oauth_tokens (user_id, is_active)
         """
     )
 

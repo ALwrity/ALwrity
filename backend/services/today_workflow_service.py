@@ -89,56 +89,33 @@ PILLAR_IDS = _load_pillar_ids()
 MIN_TASK_EVIDENCE_LINKS = 1
 PLAN_CONTEXT_THRESHOLD = _load_plan_context_threshold()
 
-# Calendar → Workflow mapping. Previously every calendar event was
-# bucketed under the "generate" pillar regardless of content type,
-# which made LinkedIn posts look like generic content generation
-# and SEO audits look like content drafts. Each entry maps a
-# content_type (or platform) to the lifecycle pillar the task
-# actually belongs to.
-#
-# Resolution order in _resolve_calendar_pillar():
-#   1. content_type (e.g. "blog_post", "linkedin_post")
-#   2. platform fallback (e.g. "linkedin" → "engage")
-#   3. default ("generate") so unmapped events still get a pillar
-_CALENDAR_CONTENT_PILLAR = {
-    # Content creation → generate
-    "blog_post": "generate",
-    "video": "generate",
-    "podcast": "generate",
-    # Distribution → engage / publish
-    "linkedin_post": "engage",
-    "facebook_post": "engage",
-    "twitter_post": "engage",
-    "instagram_post": "engage",
-    "tiktok_post": "engage",
-    # SEO → analyze
-    "seo_page": "analyze",
-    # Direct publishing → publish
-    "youtube": "publish",
-}
-
-_CALENDAR_PLATFORM_PILLAR = {
-    "linkedin": "engage",
-    "facebook": "engage",
-    "twitter": "engage",
-    "instagram": "engage",
-    "tiktok": "engage",
-    "youtube": "publish",
-}
-
-CALENDAR_DEFAULT_PILLAR = "generate"
+# --- Calendar utilities (implementation in today_workflow_calendar.py) ---
+from services.today_workflow_calendar import (  # noqa: E402
+    _CALENDAR_CONTENT_PILLAR,
+    _CALENDAR_PLATFORM_PILLAR,
+    CALENDAR_DEFAULT_PILLAR,
+    _PLATFORM_ACTION_URL,
+    _CONTENT_ACTION_URL,
+    _CONTENT_ESTIMATED_TIME,
+    _GENERIC_FALLBACK_ACTION_URL,
+    _resolve_calendar_pillar,
+    _resolve_calendar_action_url,
+    _resolve_calendar_estimated_time,
+    _generate_calendar_event_plan,
+)
 
 # Kept for backwards-compat callers that read this constant.
 # New code should use _resolve_calendar_pillar() instead.
 CALENDAR_CONTENT_PILLAR = CALENDAR_DEFAULT_PILLAR
 
 
-def _resolve_recommendation_action_type(proposal: Any) -> str:
-    """Assign an explicit, user-triggered action to executable recommendations."""
+def _resolve_recommendation_action_type(proposal):
+    "Assign an explicit, user-triggered action to executable recommendations."
     return str(resolve_recommendation_action(proposal)["action_type"])
 
 
-def _recommendation_id(proposal: Any, date: str) -> str:
+def _recommendation_id(proposal, date):
+    import hashlib
     source = str(getattr(proposal, "source_agent", "") or "workflow")
     pillar = str(getattr(proposal, "pillar_id", "") or "")
     title = str(getattr(proposal, "title", "") or "")
@@ -146,208 +123,24 @@ def _recommendation_id(proposal: Any, date: str) -> str:
     return f"rec-{digest[:24]}"
 
 
-def _resolve_calendar_pillar(content_type: str, platform: str) -> str:
-    """Pick the right workflow pillar for a calendar event.
+def _stamp_synthesis_mode(tasks: List[Dict[str, Any]], mode: str) -> List[Dict[str, Any]]:
+    """Tag task dicts that lack a synthesis_mode with the producing path's mode.
 
-    Resolution order:
-      1. ``_CALENDAR_CONTENT_PILLAR`` by content_type
-      2. ``_CALENDAR_PLATFORM_PILLAR`` by platform
-      3. ``CALENDAR_DEFAULT_PILLAR`` (generate) as a safe fallback
+    Existing per-task values are never overwritten; only anonymous dicts
+    (e.g. raw LLM-generated tasks) get stamped.
     """
-    ct_lower = (content_type or "").strip().lower()
-    if ct_lower in _CALENDAR_CONTENT_PILLAR:
-        return _CALENDAR_CONTENT_PILLAR[ct_lower]
-    p_lower = (platform or "").strip().lower()
-    if p_lower in _CALENDAR_PLATFORM_PILLAR:
-        return _CALENDAR_PLATFORM_PILLAR[p_lower]
-    return CALENDAR_DEFAULT_PILLAR
-
-
-_PLATFORM_ACTION_URL = {
-    "linkedin": "/linkedin-studio",
-    "facebook": "/facebook-writer",
-    "twitter": "/twitter-writer",
-    "instagram": "/instagram-writer",
-    "youtube": "/youtube-writer",
-    "tiktok": "/tiktok-writer",
-}
-
-_CONTENT_ACTION_URL = {
-    "blog_post": "/blog-writer",
-    "linkedin_post": "/linkedin-studio",
-    "facebook_post": "/facebook-writer",
-    "seo_page": "/seo-dashboard",
-    "video": "/video-writer",
-}
-
-_CONTENT_ESTIMATED_TIME = {
-    "blog_post": 45, "linkedin_post": 20, "facebook_post": 15,
-    "twitter_post": 10, "instagram_post": 15, "seo_page": 30, "video": 60,
-}
-
-# Generic fallback URL for any calendar event whose content_type / platform
-# does not match a known writer. Prevents the event from being silently
-# dropped from the daily plan.
-_GENERIC_FALLBACK_ACTION_URL = "/content-planning"
-
-
-def _resolve_calendar_action_url(content_type: str, platform: str) -> str:
-    platform_lower = (platform or "").strip().lower()
-    if platform_lower in _PLATFORM_ACTION_URL:
-        return _PLATFORM_ACTION_URL[platform_lower]
-    ct_lower = (content_type or "").strip().lower()
-    if ct_lower in _CONTENT_ACTION_URL:
-        return _CONTENT_ACTION_URL[ct_lower]
-    logger.warning(
-        "No action_url mapping for calendar event content_type={!r} platform={!r} — falling back to {}",
-        content_type, platform, _GENERIC_FALLBACK_ACTION_URL,
-    )
-    return _GENERIC_FALLBACK_ACTION_URL
-
-
-def _resolve_calendar_estimated_time(content_type: str) -> int:
-    return _CONTENT_ESTIMATED_TIME.get((content_type or "").strip().lower(), 30)
-
-
-def _generate_calendar_event_plan(date: str, grounding: Dict[str, Any]) -> Dict[str, Any]:
-    calendar_events = grounding.get("calendar_events_today", [])
-    if not calendar_events:
-        return {"date": date, "tasks": []}
-
-    tasks = []
-    for event in calendar_events:
-        content_type = event.get("content_type", "")
-        platform = event.get("platform", "")
-        action_url = _resolve_calendar_action_url(content_type, platform)
-        pillar_id = _resolve_calendar_pillar(content_type, platform)
-
-        task = {
-            "pillarId": pillar_id,
-            "title": (event.get("title") or "Untitled").strip()[:255],
-            "description": (event.get("description") or "").strip(),
-            "priority": "high",
-            "estimatedTime": _resolve_calendar_estimated_time(content_type),
-            # Existing calendar entries are opened, never inserted again.
-            "actionType": "navigate",
-            "actionUrl": action_url,
-            "kpi": event.get("kpi"),
-            "deadline": event.get("deadline"),
-            "evidence": event.get("evidence") or [f"calendar_event:{event.get('id')}"],
-            "expectedImpact": event.get("expected_outcome") or event.get("description"),
-            "enabled": True,
-            "dependencies": [],
-            "metadata": {
-                "source": "calendar_event",
-                "source_event_id": event.get("id"),
-                "calendar_event_id": event.get("id"),
-                "calendar_title": event.get("title"),
-                "content_type": event.get("content_type"),
-                "platform": event.get("platform"),
-                "owner_agent": event.get("owner_agent") or "calendar",
-                "recommendation_id": event.get("recommendation_id") or f"calendar-event:{event.get('id')}",
-                "task_id": event.get("task_id"),
-                "meeting_id": event.get("meeting_id"),
-                "kpi": event.get("kpi"),
-                "deadline": event.get("deadline"),
-                "action_type": event.get("action_type") or "navigate",
-                "action_parameters": event.get("action_parameters") or {"calendar_event_id": event.get("id")},
-                "evidence": event.get("evidence") or [f"calendar_event:{event.get('id')}"],
-                "expected_outcome": event.get("expected_outcome") or event.get("description"),
-                "user_approval_state": event.get("user_approval_state") or "pending",
-                "user_timezone": event.get("user_timezone") or "UTC",
-            },
-        }
-        tasks.append(task)
-
-    return {"date": date, "tasks": tasks}
+    for task in tasks or []:
+        if not isinstance(task, dict):
+            continue
+        metadata = task.get("metadata") if isinstance(task.get("metadata"), dict) else {}
+        if not metadata.get("synthesis_mode"):
+            metadata["synthesis_mode"] = mode
+        task["metadata"] = metadata
+    return tasks
 
 
 def _today_date_str() -> str:
     return datetime.now(timezone.utc).date().isoformat()
-
-
-def _coerce_priority(value: Any) -> str:
-    v = str(value or "medium").lower().strip()
-    if v in {"high", "medium", "low"}:
-        return v
-    logger.warning(
-        f"Coercing invalid priority value {value!r} -> 'medium' "
-        f"(SIF-3 Issue #623 #16: expected one of high|medium|low)"
-    )
-    return "medium"
-
-
-def _coerce_status(value: Any) -> str:
-    v = str(value or "pending").lower().strip()
-    if v in {"pending", "in_progress", "awaiting_approval", "completed", "skipped", "dismissed"}:
-        return "skipped" if v == "dismissed" else v
-    return "pending"
-
-
-def _proposal_priority_rank(priority: str) -> int:
-    return {"low": 0, "medium": 1, "high": 2}.get(str(priority or "").lower(), 1)
-
-
-def _proposal_order_key(proposal: Any) -> tuple:
-    return (
-        str(getattr(proposal, "source_agent", "") or "").lower(),
-        str(getattr(proposal, "title", "") or "").lower(),
-        str(getattr(proposal, "description", "") or "").lower(),
-        str(getattr(proposal, "action_url", "") or "").lower(),
-    )
-
-
-
-def _is_coverage_guardrail_enabled(grounding: Dict[str, Any]) -> bool:
-    workflow_config = grounding.get("workflow_config", {}) if isinstance(grounding, dict) else {}
-    if not isinstance(workflow_config, dict):
-        return True
-    if workflow_config.get("disable_pillar_coverage_guardrail") is True:
-        return False
-    if workflow_config.get("enforce_pillar_coverage") is False:
-        return False
-    return True
-
-
-def _sanitize_task(task: Dict[str, Any], agent_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    if not isinstance(task, dict):
-        return None
-
-    pillar_id = str(task.get("pillarId") or "").lower().strip()
-    title = str(task.get("title") or "").strip()
-    if pillar_id not in PILLAR_IDS or not title:
-        reason = "empty title" if not title else f"invalid pillar_id={pillar_id!r}"
-        logger.warning(f"Rejected task from agent {agent_name or 'unknown'}: {reason}")
-        return None
-
-    sanitized = dict(task)
-    sanitized["pillarId"] = pillar_id
-    sanitized["title"] = title
-    sanitized["description"] = str(task.get("description") or "").strip()
-    sanitized["priority"] = _coerce_priority(task.get("priority"))
-    sanitized["estimatedTime"] = max(5, int(task.get("estimatedTime") or 15))
-    sanitized["actionType"] = str(task.get("actionType") or "navigate").strip() or "navigate"
-    sanitized["actionUrl"] = str(task.get("actionUrl") or "").strip() or None
-    sanitized["enabled"] = bool(task.get("enabled", True))
-    action_contract = resolve_recommendation_action(sanitized)
-    sanitized["actionType"] = action_contract["action_type"]
-    metadata = sanitized.get("metadata") if isinstance(sanitized.get("metadata"), dict) else {}
-    sanitized["recommendation"] = str(task.get("recommendation") or sanitized["description"]).strip()
-    sanitized["nextAction"] = str(
-        task.get("nextAction")
-        or task.get("next_action")
-        or (f"Open {sanitized['actionUrl']}" if sanitized["actionUrl"] else "Review and choose the next action")
-    ).strip()
-    sanitized["ownerAgent"] = str(
-        task.get("ownerAgent") or task.get("owner_agent") or metadata.get("source_agent") or agent_name or "workflow"
-    ).strip()
-    sanitized["kpi"] = task.get("kpi")
-    sanitized["deadline"] = task.get("deadline")
-    metadata["action_parameters"] = action_contract["parameters"]
-    metadata["action_contract"] = action_contract
-    sanitized["metadata"] = metadata
-    return sanitized
-
 
 def _derive_onboarding_evidence_links(onboarding_data: Dict[str, Any], limit: int = 2) -> List[str]:
     if not isinstance(onboarding_data, dict):
@@ -457,163 +250,6 @@ def validate_plan_contextuality(plan: Dict[str, Any], grounding: Dict[str, Any])
         "tasks_below_min_evidence": below_min_evidence,
         "min_evidence_links": MIN_TASK_EVIDENCE_LINKS,
     }
-
-
-def _resolve_backfill_provider(user_id: str) -> tuple:
-    """Resolve the (provider, model) the user's tenant config prefers.
-
-    The pillar backfill runs after the agent committee, so it should
-    use the same provider+model the rest of the workflow uses. This
-    is a thin wrapper around the same config the LLM committee
-    functions consult; if the config can't be resolved (e.g. tenant
-    provider not configured), returns ``(None, None)`` so the
-    underlying ``llm_text_gen`` falls back to its default selection.
-
-    Returning a tuple rather than an opaque dict keeps the call site
-    small and matches the ``llm_text_gen`` parameter shape.
-    """
-    try:
-        from services.llm_providers.tenant_provider_config import (
-            tenant_provider_config_resolver,
-        )
-        provider_cfg = tenant_provider_config_resolver.resolve(user_id)
-        provider = None
-        if provider_cfg.selected_providers:
-            first = provider_cfg.selected_providers[0]
-            if first in ("google", "gemini"):
-                provider = "google"
-            elif first in ("huggingface", "hf_response_api", "hf"):
-                provider = "huggingface"
-            elif first in ("wavespeed", "wave"):
-                provider = "wavespeed"
-            elif first in ("openai", "gpt"):
-                provider = "openai"
-        model = provider_cfg.model_policy.get("default_model") if provider_cfg.model_policy else None
-        return provider, model
-    except Exception as e:
-        logger.debug(
-            f"Could not resolve tenant provider config for user {user_id}: {e}"
-        )
-        return None, None
-
-
-def _build_single_task_for_missing_pillar(
-    user_id: str,
-    date: str,
-    pillar_id: str,
-    grounding: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
-    schema = {
-        "type": "object",
-        "properties": {
-            "pillarId": {"type": "string"},
-            "title": {"type": "string"},
-            "description": {"type": "string"},
-            "priority": {"type": "string"},
-            "estimatedTime": {"type": "number"},
-            "actionType": {"type": "string"},
-            "actionUrl": {"type": "string"},
-            "enabled": {"type": "boolean"},
-            "metadata": {"type": "object"},
-        },
-        "required": ["pillarId", "title", "description", "priority", "estimatedTime", "actionType", "enabled"],
-    }
-    prompt = (
-        "Generate exactly one actionable JSON task for today's workflow.\n"
-        f"Date: {date}\n"
-        f"Required pillarId: {pillar_id}\n"
-        "Constraints:\n"
-        "- Return a single JSON object only.\n"
-        "- Keep title concise and practical.\n"
-        "- Task must be completable today.\n"
-        "- Use actionType='navigate' and a valid ALwrity route when possible.\n"
-        f"User context: {json.dumps(grounding.get('onboarding_data', {}), indent=2)}\n"
-    )
-    # Resolve the (provider, model) the tenant's LLM committee uses,
-    # so backfill tasks don't silently use a different (possibly
-    # inferior) model than the rest of the workflow.
-    preferred_provider, preferred_model = _resolve_backfill_provider(user_id)
-    try:
-        raw = llm_text_gen(
-            prompt=prompt,
-            json_struct=schema,
-            user_id=user_id,
-            preferred_provider=preferred_provider,
-            model=preferred_model,
-        )
-        candidate = raw if isinstance(raw, dict) else json.loads(raw)
-    except Exception as e:
-        logger.warning(f"Failed to generate pillar backfill task for {pillar_id}: {e}")
-        return _controlled_pillar_fallback(pillar_id, str(e))
-
-    candidate = _sanitize_task(candidate)
-    if candidate:
-        candidate["pillarId"] = pillar_id
-        metadata = candidate.get("metadata") if isinstance(candidate.get("metadata"), dict) else {}
-        metadata["source"] = "llm_pillar_backfill"
-        # Mark the backfill as coming from the same provider the
-        # committee uses, for transparency in operator dashboards.
-        if preferred_provider or preferred_model:
-            metadata["backfill_provider"] = preferred_provider
-            metadata["backfill_model"] = preferred_model
-        candidate["metadata"] = metadata
-    return candidate or _controlled_pillar_fallback(pillar_id, "LLM returned an invalid task")
-
-
-def _controlled_pillar_fallback(pillar_id: str, error: str = "") -> Dict[str, Any]:
-    """Preserve lifecycle coverage without inventing an LLM recommendation."""
-    fallback = {
-        "plan": ("Review marketing goals", "/content-planning-dashboard"),
-        "generate": ("Create a content brief", "/blog-writer"),
-        "publish": ("Review the publishing queue", "/scheduler-dashboard"),
-        "analyze": ("Review marketing performance", "/analytics-dashboard"),
-        "engage": ("Plan audience engagement", "/linkedin-studio"),
-        "remarket": ("Review remarketing opportunities", "/remarketing-dashboard"),
-    }
-    title, action_url = fallback.get(
-        pillar_id,
-        (f"Review {pillar_id} workflow", "/content-planning-dashboard"),
-    )
-    return {
-        "pillarId": pillar_id,
-        "title": title,
-        "description": "Open the relevant workflow and define the next concrete action.",
-        "priority": "medium",
-        "estimatedTime": 15,
-        "actionType": "navigate",
-        "actionUrl": action_url,
-        "enabled": True,
-        "metadata": {
-            "source": "controlled_fallback",
-            "reasoning": "Pillar coverage was preserved without inventing an LLM recommendation.",
-            "generation_error": error[:300] if error else None,
-        },
-    }
-
-
-def _ensure_pillar_coverage(
-    tasks: List[Dict[str, Any]],
-    user_id: str,
-    date: str,
-    grounding: Dict[str, Any],
-) -> List[Dict[str, Any]]:
-    sanitized_tasks = [t for t in (_sanitize_task(task) for task in tasks) if t]
-    if not _is_coverage_guardrail_enabled(grounding):
-        return sanitized_tasks
-
-    covered_pillars = {task["pillarId"] for task in sanitized_tasks}
-
-    for pillar_id in PILLAR_IDS:
-        if pillar_id in covered_pillars:
-            continue
-
-        generated = _build_single_task_for_missing_pillar(user_id, date, pillar_id, grounding)
-        if generated:
-            sanitized_tasks.append(generated)
-            covered_pillars.add(pillar_id)
-
-    return sanitized_tasks
-
 
 def build_grounding_context(db: Session, user_id: str, date: str) -> Dict[str, Any]:
     # 1. Fetch unread alerts
@@ -1051,6 +687,7 @@ async def generate_agent_enhanced_plan(
                     "reasoning": p.reasoning,
                     "estimated_time": p.estimated_time,
                     "action_type": _resolve_recommendation_action_type(p),
+                    "synthesis_mode": getattr(p, "synthesis_mode", None),
                 })
                 if not valid:
                     logger.warning(
@@ -1213,10 +850,11 @@ async def generate_agent_enhanced_plan(
                     "confidence": selected_review.get("confidence", 0.0),
                     "required_action": prop.next_action or prop.action_url,
                     "evidence_links": _derive_onboarding_evidence_links(grounding.get("onboarding_data", {}), limit=2),
+                    "synthesis_mode": getattr(prop, "synthesis_mode", None),
                 }
             })
             
-        final_tasks = _ensure_pillar_coverage(final_tasks, user_id, date, grounding)
+        final_tasks = await _ensure_pillar_coverage(final_tasks, user_id, date, grounding)
         return finish_meeting({
             "date": date,
             "tasks": final_tasks,
@@ -1352,9 +990,12 @@ async def generate_agent_enhanced_plan(
     tasks = result.get("tasks") if isinstance(result, dict) else None
     if not isinstance(tasks, list):
         tasks = []
+    covered_tasks = await _ensure_pillar_coverage(
+        _stamp_synthesis_mode(tasks, "llm"), user_id, date, grounding
+    )
     result = {
         "date": date,
-        "tasks": _ensure_pillar_coverage(tasks, user_id, date, grounding),
+        "tasks": covered_tasks,
         # LLM-only fallback path: zero agents participated. The plan
         # row will see this and render "AI Personalized Guide" instead
         # of "Personalized by Agents".
@@ -1460,7 +1101,7 @@ async def get_or_create_daily_workflow_plan(
     calendar_source = bool(calendar_plan.get("tasks"))
 
     # Step 4: Pillar coverage — LLM backfill for any pillar still uncovered
-    all_tasks = _ensure_pillar_coverage(all_tasks, user_id, date_str, grounding)
+    all_tasks = await _ensure_pillar_coverage(all_tasks, user_id, date_str, grounding)
 
     # Step 5: Validation
     plan_data = {**agent_plan_data, "tasks": all_tasks}
@@ -1754,3 +1395,17 @@ def update_task_status(
                 logger.warning(f"Failed to update calendar event {source_event_id} on task completion: {e}")
 
     return task
+
+# --- Pillar coverage utilities (implementation in today_workflow_pillar.py) ---
+from services.today_workflow_pillar import (  # noqa: E402
+    _coerce_priority,
+    _coerce_status,
+    _is_coverage_guardrail_enabled,
+    _sanitize_task,
+    _resolve_backfill_provider,
+    _build_single_task_for_missing_pillar,
+    _controlled_pillar_fallback,
+    _ensure_pillar_coverage,
+)
+
+

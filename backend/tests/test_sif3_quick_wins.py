@@ -16,7 +16,7 @@ def test_coerce_priority_logs_invalid_values():
     """Issue #623 #16: _coerce_priority must log the invalid value
     before coercing to 'medium' (was: silent coercion).
     """
-    src = _read("services/today_workflow_service.py")
+    src = _read("services/today_workflow_pillar.py")
     match = re.search(
         r"def _coerce_priority\(value: Any\) -> str:(.*?)(?=\n\ndef |\nclass )",
         src, re.DOTALL,
