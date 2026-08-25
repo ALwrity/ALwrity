@@ -41,6 +41,39 @@ class TestPitchRequestSchema:
         )
         assert request.creative_angle == "Contrarian"
 
+    def test_accepts_optional_language_code(self):
+        from api.youtube.router import PitchRequest
+
+        request = PitchRequest(
+            user_idea="Budget travel",
+            duration_type="shorts",
+            creative_angle="Contrarian",
+            language="hi",
+        )
+        assert request.language == "hi"
+
+    def test_strips_blank_language_to_none(self):
+        from api.youtube.router import PitchRequest
+
+        request = PitchRequest(
+            user_idea="Budget travel",
+            duration_type="shorts",
+            creative_angle="Contrarian",
+            language="   ",
+        )
+        assert request.language is None
+
+    def test_strips_language_whitespace(self):
+        from api.youtube.router import PitchRequest
+
+        request = PitchRequest(
+            user_idea="Budget travel",
+            duration_type="shorts",
+            creative_angle="Contrarian",
+            language="  hi  ",
+        )
+        assert request.language == "hi"
+
 
 class TestCreateVideoPitch:
     def test_success_returns_pitch(self):
@@ -76,6 +109,36 @@ class TestCreateVideoPitch:
         assert result.success is True
         assert result.pitch == pitch
         assert result.pitch["generation"]["json_schema_applied"] is True
+
+    def test_forwards_language_to_generate_youtube_pitch(self):
+        from api.youtube.router import PitchRequest, create_video_pitch
+
+        request = PitchRequest(
+            user_idea="How to travel cheap",
+            duration_type="shorts",
+            creative_angle="Contrarian",
+            language="hi",
+        )
+        pitch = {
+            "selected_title": "Stop Overpacking",
+            "video_summary": "Pack three items.",
+            "hook_concept": "You do not need a suitcase.",
+            "main_content_beats": ["Rule one", "Rule two", "Rule three"],
+            "angle_used": "Contrarian",
+        }
+        generate = AsyncMock(return_value=pitch)
+
+        with patch(
+            "api.youtube.handlers.plan_pitch._load_plan_personalization",
+            return_value=_personalization(),
+        ), patch("api.youtube.handlers.plan_pitch.YouTubePlannerService"), patch(
+            "api.youtube.handlers.plan_pitch.generate_youtube_pitch",
+            generate,
+        ):
+            result = asyncio.run(create_video_pitch(request=request, current_user=_user()))
+
+        assert result.success is True
+        assert generate.await_args.kwargs["language"] == "hi"
 
     def test_http_exception_is_reraised(self):
         from api.youtube.router import PitchRequest, create_video_pitch
@@ -178,6 +241,34 @@ class TestExpandVideoPitch:
         assert result.success is True
         assert result.expansion == expansion
         assert result.full_script == "Hook spoken.\n\nBody."
+
+    def test_forwards_language_to_expand_pitch_to_script(self):
+        from api.youtube.router import ExpandRequest, expand_video_pitch
+
+        request = ExpandRequest(
+            user_idea="How to travel cheap",
+            duration_type="shorts",
+            language="hi",
+            approved_pitch={"selected_title": "Stop Overpacking"},
+        )
+        expansion = {
+            "hook": {"spoken_script": "Hook spoken."},
+            "main_content_outline": [{"section_title": "Beat 1", "spoken_script": "Body."}],
+            "full_script": "Hook spoken.\n\nBody.",
+        }
+        expand = AsyncMock(return_value=expansion)
+
+        with patch(
+            "api.youtube.handlers.plan_pitch._load_plan_personalization",
+            return_value=_personalization(),
+        ), patch("api.youtube.handlers.plan_pitch.YouTubePlannerService"), patch(
+            "api.youtube.handlers.plan_pitch.expand_pitch_to_script",
+            expand,
+        ):
+            result = asyncio.run(expand_video_pitch(request=request, current_user=_user()))
+
+        assert result.success is True
+        assert expand.await_args.kwargs["language"] == "hi"
 
     def test_failure_returns_error_response(self):
         from api.youtube.router import ExpandRequest, expand_video_pitch

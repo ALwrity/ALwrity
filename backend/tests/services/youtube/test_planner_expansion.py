@@ -79,6 +79,26 @@ class TestExpansionJsonStruct:
         assert "Do NOT output a separate full_script" in EXPANSION_SYSTEM_PROMPT
         assert '"hook"' not in EXPANSION_SYSTEM_PROMPT
         assert "full_script" in EXPANSION_SYSTEM_PROMPT.lower()
+        assert "Content language from the user message" in EXPANSION_SYSTEM_PROMPT
+
+    def test_user_prompt_uses_hindi_label_for_hi(self):
+        from services.youtube.planner_pitch_prompts import build_expansion_user_prompt
+
+        prompt = build_expansion_user_prompt(
+            user_idea="Budget travel",
+            approved_pitch={
+                "selected_title": "Stop Overpacking",
+                "video_summary": "Pack three items.",
+                "hook_concept": "Skip the suitcase.",
+                "main_content_beats": ["Rule one"],
+                "angle_used": "Contrarian",
+            },
+            duration_type="shorts",
+            language="hi",
+        )
+        assert "**Content language:** Hindi" in prompt
+        assert "Write every field in Hindi." in prompt
+        assert "spoken_script" in prompt.lower() or "hook" in prompt.lower()
 
 
 class TestAssembleFullScript:

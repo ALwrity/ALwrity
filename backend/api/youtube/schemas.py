@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class VideoPlanRequest(BaseModel):
@@ -63,6 +63,21 @@ class VideoPlanRequest(BaseModel):
         True,
         description="Enable Exa research to enhance plan with current information, trends, and better SEO keywords (default: True)"
     )
+    language: Optional[str] = Field(
+        None,
+        max_length=16,
+        description="Content language code from Plan Your Video (e.g. en, hi). Used by pitch/expand prompts.",
+    )
+
+    @field_validator("language", mode="before")
+    @classmethod
+    def normalize_language(cls, value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        return text[:16]
 
 
 class VideoPlanResponse(BaseModel):

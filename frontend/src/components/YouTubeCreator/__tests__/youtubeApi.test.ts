@@ -77,6 +77,34 @@ describe('youtubeApi', () => {
       expect(result.pitch?.selected_title).toBe('Stop Overpacking');
     });
 
+    it('forwards language on pitch and expand requests', async () => {
+      jest.mocked(longRunningApiClient.post).mockResolvedValue({
+        data: { success: true, pitch: { selected_title: 'Title' }, expansion: {}, full_script: 'Script' },
+      });
+
+      await youtubeApi.generatePitch({
+        user_idea: 'Budget travel',
+        duration_type: 'shorts',
+        creative_angle: 'Contrarian',
+        language: 'hi',
+      });
+      expect(longRunningApiClient.post).toHaveBeenCalledWith(
+        '/api/youtube/plan/pitch',
+        expect.objectContaining({ language: 'hi' }),
+      );
+
+      await youtubeApi.expandPitchToScript({
+        user_idea: 'Budget travel',
+        duration_type: 'shorts',
+        language: 'hi',
+        approved_pitch: { selected_title: 'Stop Overpacking' },
+      });
+      expect(longRunningApiClient.post).toHaveBeenCalledWith(
+        '/api/youtube/plan/expand',
+        expect.objectContaining({ language: 'hi' }),
+      );
+    });
+
     it('posts expand requests to /api/youtube/plan/expand', async () => {
       const mockResponse = {
         data: {
