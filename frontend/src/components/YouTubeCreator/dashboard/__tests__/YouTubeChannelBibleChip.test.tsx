@@ -1,14 +1,15 @@
+import type { Mock } from 'vitest';
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { YouTubeChannelBibleChip } from "../YouTubeChannelBibleChip";
 import { openYouTubeChannelBible } from "../youtubeStudioEvents";
 import { youtubeApi } from "../../../../services/youtubeApi";
 
-jest.mock("../../../../services/youtubeApi", () => ({
+vi.mock("../../../../services/youtubeApi", () => ({
   youtubeApi: {
-    getChannelBible: jest.fn(),
-    saveChannelBible: jest.fn(),
+    getChannelBible: vi.fn(),
+    saveChannelBible: vi.fn(),
   },
 }));
 
@@ -27,8 +28,8 @@ const bible = {
 
 describe("YouTubeChannelBibleChip", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    (youtubeApi.getChannelBible as jest.Mock).mockResolvedValue({
+    vi.clearAllMocks();
+    (youtubeApi.getChannelBible as Mock).mockResolvedValue({
       success: true,
       bible,
       source: "saved",

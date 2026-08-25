@@ -1,10 +1,8 @@
 import React from 'react';
 import { Stack, Box, Typography, Tooltip, IconButton, Chip, alpha } from '@mui/material';
-import {
-  AutoAwesome as AutoAwesomeIcon,
-  HelpOutline as HelpOutlineIcon,
-  AttachMoney as AttachMoneyIcon,
-} from '@mui/icons-material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import { Knobs } from '../types';
 
 interface CreateHeaderProps {

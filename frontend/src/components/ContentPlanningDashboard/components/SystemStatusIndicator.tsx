@@ -22,16 +22,14 @@ import {
 } from '@mui/material';
 import { apiClient } from '../../../api/client';
 import { isFeatureOnlyMode } from '../../../utils/demoMode';
-import {
-  CheckCircle as HealthyIcon,
-  Warning as WarningIcon,
-  Error as CriticalIcon,
-  Help as UnknownIcon,
-  Refresh as RefreshIcon,
-  Close as CloseIcon,
-  BugReport as BugReportIcon,
-  Analytics as AnalyticsIcon
-} from '@mui/icons-material';
+import HealthyIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import CriticalIcon from '@mui/icons-material/Error';
+import UnknownIcon from '@mui/icons-material/Help';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import CloseIcon from '@mui/icons-material/Close';
+import BugReportIcon from '@mui/icons-material/BugReport';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
 import { motion, AnimatePresence } from 'framer-motion';
 import MonitoringCharts from './MonitoringCharts';
 

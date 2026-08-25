@@ -15,12 +15,10 @@ import {
   DialogActions,
   DialogContentText
 } from '@mui/material';
-import {
-  Analytics as AnalyticsIcon,
-  History as HistoryIcon,
-  Business as BusinessIcon,
-  LinkedIn as LinkedInIcon
-} from '@mui/icons-material';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import HistoryIcon from '@mui/icons-material/History';
+import BusinessIcon from '@mui/icons-material/Business';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
 
 // Extracted components
 import { AnalysisResultsDisplay, AnalysisProgressDisplay, WebsiteIntegrationsSection } from './WebsiteStep/components';

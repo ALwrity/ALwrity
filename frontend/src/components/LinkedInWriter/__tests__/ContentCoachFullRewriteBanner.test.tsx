@@ -10,8 +10,8 @@ describe("ContentCoachFullRewriteBanner", () => {
   });
 
   it("opens engagement booster with draft and calls onBeforeOpen", () => {
-    const onBeforeOpen = jest.fn();
-    const handler = jest.fn();
+    const onBeforeOpen = vi.fn();
+    const handler = vi.fn();
     window.addEventListener(OPEN_ENGAGEMENT_BOOSTER_EVENT, handler);
 
     render(

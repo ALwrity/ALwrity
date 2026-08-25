@@ -36,22 +36,20 @@ import {
   AccordionDetails,
   Link,
 } from '@mui/material';
-import {
-  Search as SearchIcon,
-  Psychology as BrainIcon,
-  CheckCircle as CheckIcon,
-  Info as InfoIcon,
-  ExpandMore as ExpandMoreIcon,
-  TrendingUp as TrendIcon,
-  FormatQuote as QuoteIcon,
-  BarChart as StatsIcon,
-  School as CaseStudyIcon,
-  Compare as CompareIcon,
-  Lightbulb as IdeaIcon,
-  PlayArrow as PlayIcon,
-  Refresh as RefreshIcon,
-  OpenInNew as OpenIcon,
-} from '@mui/icons-material';
+import SearchIcon from '@mui/icons-material/Search';
+import BrainIcon from '@mui/icons-material/Psychology';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import InfoIcon from '@mui/icons-material/Info';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import TrendIcon from '@mui/icons-material/TrendingUp';
+import QuoteIcon from '@mui/icons-material/FormatQuote';
+import StatsIcon from '@mui/icons-material/BarChart';
+import CaseStudyIcon from '@mui/icons-material/School';
+import CompareIcon from '@mui/icons-material/Compare';
+import IdeaIcon from '@mui/icons-material/Lightbulb';
+import PlayIcon from '@mui/icons-material/PlayArrow';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import OpenIcon from '@mui/icons-material/OpenInNew';
 import { useIntentResearch } from './hooks/useIntentResearch';
 import {
   ResearchIntent,

@@ -16,15 +16,13 @@ import {
   ThemeProvider,
   createTheme
 } from '@mui/material';
-import {
-  Psychology as StrategyIcon,
-  CalendarToday as CalendarIcon,
-  Analytics as AnalyticsIcon,
-  Search as SearchIcon,
-  Lightbulb as AIInsightsIcon,
-  Close as CloseIcon,
-  Add as CreateIcon
-} from '@mui/icons-material';
+import StrategyIcon from '@mui/icons-material/Psychology';
+import CalendarIcon from '@mui/icons-material/CalendarToday';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import SearchIcon from '@mui/icons-material/Search';
+import AIInsightsIcon from '@mui/icons-material/Lightbulb';
+import CloseIcon from '@mui/icons-material/Close';
+import CreateIcon from '@mui/icons-material/Add';
 import { motion, AnimatePresence } from 'framer-motion';
 import ContentStrategyTab from './tabs/ContentStrategyTab';
 import CalendarTab from './tabs/CalendarTab';

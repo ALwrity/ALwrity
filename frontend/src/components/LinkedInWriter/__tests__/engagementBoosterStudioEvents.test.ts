@@ -31,7 +31,7 @@ describe("engagementBoosterStudioEvents", () => {
   });
 
   it("does nothing when src or target is blank", () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     window.addEventListener("linkedinwriter:applyEdit", handler);
 
     dispatchReviewOptimisedDraftInStudio(" ", "Optimised", "post");

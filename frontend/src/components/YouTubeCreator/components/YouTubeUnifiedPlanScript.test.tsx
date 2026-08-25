@@ -1,11 +1,11 @@
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { YouTubeUnifiedPlanScript } from "./YouTubeUnifiedPlanScript";
 
 describe("YouTubeUnifiedPlanScript", () => {
   it("fires onChange when editing script text", () => {
-    const onChange = jest.fn();
+    const onChange = vi.fn();
     render(<YouTubeUnifiedPlanScript value="Hello script" onChange={onChange} />);
 
     fireEvent.change(screen.getByLabelText("Full video script"), {

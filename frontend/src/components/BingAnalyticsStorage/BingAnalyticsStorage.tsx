@@ -27,14 +27,12 @@ import {
   ListItemText,
   ListItemIcon,
 } from '@mui/material';
-import {
-  Storage as StorageIcon,
-  TrendingUp as TrendingUpIcon,
-  Search as SearchIcon,
-  CalendarToday as CalendarIcon,
-  Assessment as AssessmentIcon,
-  Refresh as RefreshIcon,
-} from '@mui/icons-material';
+import StorageIcon from '@mui/icons-material/Storage';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SearchIcon from '@mui/icons-material/Search';
+import CalendarIcon from '@mui/icons-material/CalendarToday';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { apiClient } from '../../api/client';
 
 interface AnalyticsSummary {

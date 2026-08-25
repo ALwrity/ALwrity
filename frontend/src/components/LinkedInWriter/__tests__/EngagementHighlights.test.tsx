@@ -1,5 +1,5 @@
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import { EngagementHighlights } from "../components/PostAnalytics/EngagementHighlights";
 import type { EngagementStats } from "../components/PostAnalytics/useEngagementStats";
@@ -42,7 +42,7 @@ const baseStats: EngagementStats = {
 
 describe("EngagementHighlights", () => {
   it("renders best post and performance pulse cross-link in one row", () => {
-    const onOpenPerformancePulse = jest.fn();
+    const onOpenPerformancePulse = vi.fn();
 
     render(
       <EngagementHighlights

@@ -28,18 +28,16 @@ import {
   ListItemIcon,
   ListItemText,
 } from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  TrendingUp as TrendingUpIcon,
-  Lightbulb as LightbulbIcon,
-  CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  Flag as FlagIcon,
-  BookmarkAdd as BookmarkAddIcon,
-  Share as ShareIcon,
-  OpenInNew as OpenInNewIcon,
-  ArrowRight as ArrowRightIcon,
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import FlagIcon from '@mui/icons-material/Flag';
+import BookmarkAddIcon from '@mui/icons-material/BookmarkAdd';
+import ShareIcon from '@mui/icons-material/Share';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import ArrowRightIcon from '@mui/icons-material/ArrowRight';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ActionableInsight, TrafficImprovementStrategy } from '../../../api/llmInsightsGenerator';
 

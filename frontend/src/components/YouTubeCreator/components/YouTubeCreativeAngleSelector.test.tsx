@@ -1,11 +1,11 @@
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { YouTubeCreativeAngleSelector } from "./YouTubeCreativeAngleSelector";
 
 describe("YouTubeCreativeAngleSelector", () => {
   it("selects a preset chip", () => {
-    const onChange = jest.fn();
+    const onChange = vi.fn();
     render(<YouTubeCreativeAngleSelector value="" onChange={onChange} />);
 
     fireEvent.click(screen.getByText("Contrarian"));
@@ -13,7 +13,7 @@ describe("YouTubeCreativeAngleSelector", () => {
   });
 
   it("shows custom text field when Custom is selected", () => {
-    const onChange = jest.fn();
+    const onChange = vi.fn();
     render(<YouTubeCreativeAngleSelector value="" onChange={onChange} />);
 
     fireEvent.click(screen.getByText("Custom"));

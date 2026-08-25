@@ -12,14 +12,12 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
-import {
-  Download,
-  Share,
-  Favorite,
-  FavoriteBorder,
-  Refresh,
-  Image as ImageIcon,
-} from '@mui/icons-material';
+import Download from '@mui/icons-material/Download';
+import Share from '@mui/icons-material/Share';
+import Favorite from '@mui/icons-material/Favorite';
+import FavoriteBorder from '@mui/icons-material/FavoriteBorder';
+import Refresh from '@mui/icons-material/Refresh';
+import ImageIcon from '@mui/icons-material/Image';
 import { motion } from 'framer-motion';
 
 const MotionCard = motion.create(Card);

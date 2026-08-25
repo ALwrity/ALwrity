@@ -1,5 +1,5 @@
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { PlanOutlineEditor } from "./PlanOutlineEditor";
 import type { OutlineItem } from "../utils/planOutlineHelpers";
@@ -10,10 +10,10 @@ const baseItems: OutlineItem[] = [
 ];
 
 describe("PlanOutlineEditor", () => {
-  const onChange = jest.fn();
+  const onChange = vi.fn();
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it("updates a section name", () => {

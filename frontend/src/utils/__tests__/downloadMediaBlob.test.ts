@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 /**
  * Tests for downloadMediaBlob in fetchMediaBlobUrl.ts
  *
@@ -11,43 +12,43 @@ import {
   setMediaAuthTokenGetter,
 } from '../fetchMediaBlobUrl';
 
-jest.mock('../../api/client', () => ({
+vi.mock('../../api/client', () => ({
   aiApiClient: {
-    get: jest.fn(),
+    get: vi.fn(),
   },
 }));
 
 import { aiApiClient } from '../../api/client';
 
-const mockedGet = aiApiClient.get as jest.MockedFunction<typeof aiApiClient.get>;
+const mockedGet = vi.mocked(aiApiClient.get);
 
 describe('downloadMediaBlob', () => {
   const originalCreateObjectURL = URL.createObjectURL;
   const originalRevokeObjectURL = URL.revokeObjectURL;
   const originalFetch = global.fetch;
 
-  let createObjectURLMock: jest.Mock;
-  let revokeObjectURLMock: jest.Mock;
-  let fetchMock: jest.Mock;
+  let createObjectURLMock: Mock;
+  let revokeObjectURLMock: Mock;
+  let fetchMock: Mock;
 
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     clearMediaCache();
     setMediaAuthTokenGetter(null);
 
-    createObjectURLMock = jest
+    createObjectURLMock = vi
       .fn()
       .mockReturnValueOnce('blob:cached-preview')
       .mockReturnValueOnce('blob:download-clone');
-    revokeObjectURLMock = jest.fn();
+    revokeObjectURLMock = vi.fn();
 
     URL.createObjectURL = createObjectURLMock;
     URL.revokeObjectURL = revokeObjectURLMock;
 
-    fetchMock = jest.fn().mockResolvedValue({
+    fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      blob: jest.fn().mockResolvedValue(new Blob(['video-bytes'], { type: 'video/mp4' })),
+      blob: vi.fn().mockResolvedValue(new Blob(['video-bytes'], { type: 'video/mp4' })),
     });
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -57,13 +58,13 @@ describe('downloadMediaBlob', () => {
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
     clearMediaCache();
     setMediaAuthTokenGetter(null);
     URL.createObjectURL = originalCreateObjectURL;
     URL.revokeObjectURL = originalRevokeObjectURL;
     global.fetch = originalFetch;
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('creates a separate download URL and revokes only the clone', async () => {
@@ -71,8 +72,8 @@ describe('downloadMediaBlob', () => {
     const cachedPreviewUrl = await fetchMediaBlobUrl(mediaUrl);
     expect(cachedPreviewUrl).toBe('blob:cached-preview');
 
-    const clickSpy = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
-    const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
 
     await downloadMediaBlob(mediaUrl, 'scene-1.mp4');
 
@@ -80,7 +81,7 @@ describe('downloadMediaBlob', () => {
     expect(createObjectURLMock).toHaveBeenCalledTimes(2);
     expect(revokeObjectURLMock).not.toHaveBeenCalled();
 
-    jest.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1000);
     expect(revokeObjectURLMock).toHaveBeenCalledTimes(1);
     expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:download-clone');
     expect(revokeObjectURLMock).not.toHaveBeenCalledWith('blob:cached-preview');
@@ -97,17 +98,17 @@ describe('downloadMediaBlob', () => {
     const mediaUrl = '/api/youtube/videos/final.mp4';
     const cachedPreviewUrl = await fetchMediaBlobUrl(mediaUrl);
 
-    jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     await downloadMediaBlob(mediaUrl, 'final.mp4');
-    jest.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(1000);
 
     const previewAfterDownload = await fetchMediaBlobUrl(mediaUrl);
     expect(previewAfterDownload).toBe(cachedPreviewUrl);
   });
 
   it('returns early when cached blob URL is unavailable', async () => {
-    const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    const clickSpy = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
     clearMediaCache();
     mockedGet.mockRejectedValueOnce({ response: { status: 404 } });
@@ -131,11 +132,11 @@ describe('downloadMediaBlob', () => {
     fetchMock.mockResolvedValueOnce({
       ok: false,
       status: 500,
-      blob: jest.fn(),
+      blob: vi.fn(),
     });
 
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
     await expect(downloadMediaBlob(mediaUrl, 'scene-bad.mp4')).rejects.toThrow(
       'Failed to read cached blob for download (500)',
@@ -155,11 +156,11 @@ describe('downloadMediaBlob', () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      blob: jest.fn().mockResolvedValue(new Blob([], { type: 'video/mp4' })),
+      blob: vi.fn().mockResolvedValue(new Blob([], { type: 'video/mp4' })),
     });
 
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
     await expect(downloadMediaBlob(mediaUrl, 'scene-empty.mp4')).rejects.toThrow(
       'Cached media blob is empty',
@@ -179,17 +180,17 @@ describe('fetchMediaBlobUrl 401', () => {
   beforeEach(() => {
     clearMediaCache();
     setMediaAuthTokenGetter(null);
-    URL.createObjectURL = jest.fn().mockReturnValue('blob:preview');
+    URL.createObjectURL = vi.fn().mockReturnValue('blob:preview');
   });
 
   afterEach(() => {
     clearMediaCache();
     URL.createObjectURL = originalCreateObjectURL;
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('logs unauthorized status and rethrows so callers can use token fallback', async () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockedGet.mockRejectedValueOnce({ response: { status: 401 } });
 
     await expect(fetchMediaBlobUrl('/api/youtube/videos/scene.mp4')).rejects.toEqual({

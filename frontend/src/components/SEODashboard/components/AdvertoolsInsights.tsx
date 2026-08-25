@@ -11,25 +11,23 @@ import {
   TableCell,
   TableRow,
 } from '@mui/material';
-import {
-  Topic as TopicIcon,
-  HealthAndSafety as HealthIcon,
-  Update as UpdateIcon,
-  Timeline as VelocityIcon,
-  Warning as WarningIcon,
-  Link as LinkIcon,
-  AltRoute as RedirectIcon,
-  Image as ImageIcon,
-  Language as UrlIcon,
-  Dns as RobotsIcon,
-  AccountTree as BudgetIcon,
-  CheckCircle as CheckIcon,
-  Error as ErrorIcon,
-  Info as InfoIcon,
-  TrendingUp as TrendUpIcon,
-  TrendingDown as TrendDownIcon,
-  TrendingFlat as TrendFlatIcon,
-} from '@mui/icons-material';
+import TopicIcon from '@mui/icons-material/Topic';
+import HealthIcon from '@mui/icons-material/HealthAndSafety';
+import UpdateIcon from '@mui/icons-material/Update';
+import VelocityIcon from '@mui/icons-material/Timeline';
+import WarningIcon from '@mui/icons-material/Warning';
+import LinkIcon from '@mui/icons-material/Link';
+import RedirectIcon from '@mui/icons-material/AltRoute';
+import ImageIcon from '@mui/icons-material/Image';
+import UrlIcon from '@mui/icons-material/Language';
+import RobotsIcon from '@mui/icons-material/Dns';
+import BudgetIcon from '@mui/icons-material/AccountTree';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import InfoIcon from '@mui/icons-material/Info';
+import TrendUpIcon from '@mui/icons-material/TrendingUp';
+import TrendDownIcon from '@mui/icons-material/TrendingDown';
+import TrendFlatIcon from '@mui/icons-material/TrendingFlat';
 import { GlassCard } from '../../shared/styled';
 import MetricTooltip from '../../shared/MetricTooltip';
 import { getMetricTooltip } from '../../shared/metricTooltips';

@@ -18,17 +18,15 @@ import {
   Paper,
   Divider,
 } from '@mui/material';
-import {
-  Download,
-  Favorite,
-  FavoriteBorder,
-  ZoomIn,
-  Close,
-  Share,
-  Edit,
-  ContentCopy,
-  CheckCircle,
-} from '@mui/icons-material';
+import Download from '@mui/icons-material/Download';
+import Favorite from '@mui/icons-material/Favorite';
+import FavoriteBorder from '@mui/icons-material/FavoriteBorder';
+import ZoomIn from '@mui/icons-material/ZoomIn';
+import Close from '@mui/icons-material/Close';
+import Share from '@mui/icons-material/Share';
+import Edit from '@mui/icons-material/Edit';
+import ContentCopy from '@mui/icons-material/ContentCopy';
+import CheckCircle from '@mui/icons-material/CheckCircle';
 import { motion, AnimatePresence, type Variants, type Easing } from 'framer-motion';
 
 const MotionCard = motion.create(Card);

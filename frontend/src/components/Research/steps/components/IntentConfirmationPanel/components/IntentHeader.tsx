@@ -12,11 +12,9 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
-import {
-  Psychology as BrainIcon,
-  Close as CloseIcon,
-  Info as InfoIcon,
-} from '@mui/icons-material';
+import BrainIcon from '@mui/icons-material/Psychology';
+import CloseIcon from '@mui/icons-material/Close';
+import InfoIcon from '@mui/icons-material/Info';
 import { AnalyzeIntentResponse } from '../../../../types/intent.types';
 
 interface IntentHeaderProps {

@@ -12,28 +12,26 @@ import {
   Typography,
   Chip
 } from '@mui/material';
-import {
-  Psychology as PsychologyIcon,
-  TrendingUp as TrendingUpIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Schedule as ScheduleIcon,
-  CalendarToday as CalendarTodayIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Timeline as TimelineIcon,
-  Info as InfoIcon,
-  Analytics as AnalyticsIcon,
-  Assessment as AssessmentIcon,
-  Business as BusinessIcon,
-  ShowChart as ShowChartIcon,
-  Security as SecurityIcon,
-  ArrowForward as ArrowForwardIcon,
-  Star as StarIcon,
-  DataUsage as DataUsageIcon,
-  Input as InputIcon,
-  Storage as StorageIcon,
-  Person as PersonIcon
-} from '@mui/icons-material';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import InfoIcon from '@mui/icons-material/Info';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import BusinessIcon from '@mui/icons-material/Business';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import SecurityIcon from '@mui/icons-material/Security';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import StarIcon from '@mui/icons-material/Star';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
+import InputIcon from '@mui/icons-material/Input';
+import StorageIcon from '@mui/icons-material/Storage';
+import PersonIcon from '@mui/icons-material/Person';
 import { motion } from 'framer-motion';
 import { StrategyData } from '../types/strategy.types';
 import { getStrategyName, getStrategyGenerationDate } from '../utils/strategyTransformers';

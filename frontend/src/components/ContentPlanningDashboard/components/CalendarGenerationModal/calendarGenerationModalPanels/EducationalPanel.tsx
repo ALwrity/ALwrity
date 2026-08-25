@@ -9,16 +9,14 @@ import {
   AccordionSummary,
   AccordionDetails
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  School as SchoolIcon,
-  ExpandMore as ExpandMoreIcon,
-  Schedule as ScheduleIcon,
-  ViewModule as ViewModuleIcon,
-  Devices as DevicesIcon,
-  TrendingUp as TrendingUpIcon,
-  DataUsage as DataUsageIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import SchoolIcon from '@mui/icons-material/School';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import DevicesIcon from '@mui/icons-material/Devices';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
 
 interface EducationalPanelProps {
   content: any[];

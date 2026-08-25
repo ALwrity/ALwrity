@@ -11,12 +11,10 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import {
-  ArrowBack as ArrowBackIcon,
-  Check as CheckIcon,
-  RateReview as RateReviewIcon,
-  Save as SaveIcon,
-} from "@mui/icons-material";
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import CheckIcon from '@mui/icons-material/Check';
+import RateReviewIcon from '@mui/icons-material/RateReview';
+import SaveIcon from '@mui/icons-material/Save';
 import { EngagementBoosterLaunchButton } from "../dashboard/EngagementBoosterLaunchButton";
 
 export type EditorSaveStatus = "idle" | "saving" | "saved" | "error";

@@ -1,6 +1,6 @@
 import React from "react";
 import { Button, Tooltip } from "@mui/material";
-import { Bolt as BoltIcon } from "@mui/icons-material";
+import BoltIcon from '@mui/icons-material/Bolt';
 import { openEngagementBoosterModal } from "../../utils/linkedInDashboardEvents";
 
 export interface EngagementBoosterLaunchButtonProps {

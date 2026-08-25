@@ -8,25 +8,25 @@ import {
 import { aiApiClient } from "../../../api/client";
 import { checkPreflight } from "../../../services/billingService";
 
-jest.mock("../../../api/client", () => ({
+vi.mock("../../../api/client", () => ({
   aiApiClient: {
-    post: jest.fn(),
-    get: jest.fn(),
+    post: vi.fn(),
+    get: vi.fn(),
   },
 }));
 
-jest.mock("../../../services/billingService", () => ({
-  checkPreflight: jest.fn(),
+vi.mock("../../../services/billingService", () => ({
+  checkPreflight: vi.fn(),
 }));
 
-jest.mock("../../../utils/apiUrl", () => ({
+vi.mock("../../../utils/apiUrl", () => ({
   getApiBaseUrl: () => "http://localhost:8000",
 }));
 
 describe("linkedInVideoService", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    jest
+    vi.clearAllMocks();
+    vi
       .mocked(checkPreflight)
       .mockResolvedValue({
         can_proceed: true,
@@ -71,7 +71,7 @@ describe("linkedInVideoService", () => {
 
   describe("generateLinkedInVideo", () => {
     it("sends model in POST body when provided", async () => {
-      jest.mocked(aiApiClient.post).mockResolvedValue({
+      vi.mocked(aiApiClient.post).mockResolvedValue({
         data: { task_id: "task-model", status: "pending", message: "Started" },
       });
 
@@ -90,7 +90,7 @@ describe("linkedInVideoService", () => {
     });
 
     it("returns task_id on success", async () => {
-      jest.mocked(aiApiClient.post).mockResolvedValue({
+      vi.mocked(aiApiClient.post).mockResolvedValue({
         data: {
           task_id: "task-123",
           status: "pending",
@@ -124,7 +124,7 @@ describe("linkedInVideoService", () => {
 
   describe("pollLinkedInVideoTask", () => {
     it("maps completed status and video_url", async () => {
-      jest.mocked(aiApiClient.get).mockResolvedValue({
+      vi.mocked(aiApiClient.get).mockResolvedValue({
         data: {
           task_id: "task-123",
           status: "completed",
@@ -144,7 +144,7 @@ describe("linkedInVideoService", () => {
     });
 
     it("maps processing status to running", async () => {
-      jest.mocked(aiApiClient.get).mockResolvedValue({
+      vi.mocked(aiApiClient.get).mockResolvedValue({
         data: {
           task_id: "task-123",
           status: "processing",

@@ -31,18 +31,16 @@ import {
   CircularProgress,
   Tooltip,
 } from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-  Search as SearchIcon,
-  Visibility as VisibilityIcon,
-  Mouse as MouseIcon,
-  Psychology as PsychologyIcon,
-  LocalOffer as LocalOfferIcon,
-  Lightbulb as LightbulbIcon,
-  Speed as SpeedIcon
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import SearchIcon from '@mui/icons-material/Search';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import MouseIcon from '@mui/icons-material/Mouse';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import SpeedIcon from '@mui/icons-material/Speed';
 import { motion } from 'framer-motion';
 import { GSCAnalysisResult, KeywordAnalysis, ContentOpportunity, AIInsight } from '../../../api/enterpriseSeoApi';
 

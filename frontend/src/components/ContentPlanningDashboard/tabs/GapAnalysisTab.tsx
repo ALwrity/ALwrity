@@ -5,14 +5,12 @@ import {
   Tab,
   Typography
 } from '@mui/material';
-import {
-  Analytics as AnalyticsIcon,
-  TrendingUp as TrendingIcon,
-  Search as SearchIcon,
-  Assessment as AssessmentIcon,
-  BarChart as BarChartIcon,
-  PieChart as PieChartIcon
-} from '@mui/icons-material';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import TrendingIcon from '@mui/icons-material/TrendingUp';
+import SearchIcon from '@mui/icons-material/Search';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import PieChartIcon from '@mui/icons-material/PieChart';
 import RefineAnalysisTab from './RefineAnalysisTab';
 import ContentOptimizerTab from './ContentOptimizerTab';
 import TrendingTopicsTab from './TrendingTopicsTab';

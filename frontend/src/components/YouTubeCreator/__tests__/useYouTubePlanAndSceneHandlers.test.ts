@@ -7,14 +7,14 @@ import { renderHook } from "@testing-library/react";
 import { youtubeApi } from "../../../services/youtubeApi";
 import { useYouTubePlanAndSceneHandlers } from "../panel/useYouTubePlanAndSceneHandlers";
 
-jest.mock("../../../services/youtubeApi", () => ({
+vi.mock("../../../services/youtubeApi", () => ({
   youtubeApi: {
-    createPlan: jest.fn(),
-    uploadAvatar: jest.fn(),
-    regenerateCreatorAvatar: jest.fn(),
-    makeAvatarPresentable: jest.fn(),
-    buildScenes: jest.fn(),
-    updateScene: jest.fn(),
+    createPlan: vi.fn(),
+    uploadAvatar: vi.fn(),
+    regenerateCreatorAvatar: vi.fn(),
+    makeAvatarPresentable: vi.fn(),
+    buildScenes: vi.fn(),
+    updateScene: vi.fn(),
   },
 }));
 
@@ -31,20 +31,20 @@ function buildArgs() {
     editedScene: null,
     makingPresentable: false,
     fullScript: null,
-    updateState: jest.fn(),
-    setLoading: jest.fn(),
-    setError: jest.fn(),
-    setSuccess: jest.fn(),
-    setActiveStep: jest.fn(),
-    setUploadingAvatar: jest.fn(),
-    setMakingPresentable: jest.fn(),
-    setRegeneratingAvatar: jest.fn(),
+    updateState: vi.fn(),
+    setLoading: vi.fn(),
+    setError: vi.fn(),
+    setSuccess: vi.fn(),
+    setActiveStep: vi.fn(),
+    setUploadingAvatar: vi.fn(),
+    setMakingPresentable: vi.fn(),
+    setRegeneratingAvatar: vi.fn(),
   };
 }
 
 describe("useYouTubePlanAndSceneHandlers Phase 0", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it("does not expose handleGeneratePlan and never calls createPlan", () => {

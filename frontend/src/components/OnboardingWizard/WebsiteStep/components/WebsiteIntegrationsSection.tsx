@@ -13,14 +13,12 @@ import {
   FormControlLabel,
   FormControl,
 } from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  Google as GoogleIcon,
-  Analytics as AnalyticsIcon,
-  Web as WordPressIcon,
-  Web as WixIcon,
-  CheckCircle as CheckCircleIcon,
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import GoogleIcon from '@mui/icons-material/Google';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import WordPressIcon from '@mui/icons-material/Web';
+import WixIcon from '@mui/icons-material/Web';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PlatformSection from '../../common/PlatformSection';
 import { usePlatformConnections } from '../../common/usePlatformConnections';
 import { useGSCConnection } from '../../common/useGSCConnection';

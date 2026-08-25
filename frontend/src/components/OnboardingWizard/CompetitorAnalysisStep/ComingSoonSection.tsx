@@ -20,14 +20,12 @@ import {
   CircularProgress,
   LinearProgress
 } from '@mui/material';
-import {
-  Search as SearchIcon,
-  Analytics as AnalyticsIcon,
-  Check as CheckIcon,
-  Insights as InsightsIcon,
-  CheckCircleOutline as CheckCircleIcon,
-  AutoAwesome as AIIcon
-} from '@mui/icons-material';
+import SearchIcon from '@mui/icons-material/Search';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import CheckIcon from '@mui/icons-material/Check';
+import InsightsIcon from '@mui/icons-material/Insights';
+import CheckCircleIcon from '@mui/icons-material/CheckCircleOutline';
+import AIIcon from '@mui/icons-material/AutoAwesome';
 import { apiClient, longRunningApiClient } from '../../../api/client';
 import { SitemapBenchmarkResults } from './SitemapBenchmarkResults';
 import { StrategicInsightsResults } from './StrategicInsightsResults';

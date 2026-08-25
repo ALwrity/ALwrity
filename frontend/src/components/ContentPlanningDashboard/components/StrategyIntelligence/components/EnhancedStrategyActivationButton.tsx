@@ -7,12 +7,10 @@ import {
   Snackbar,
   Alert,
 } from '@mui/material';
-import {
-  Check as CheckIcon,
-  PlayArrow as PlayArrowIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Celebration as CelebrationIcon,
-} from '@mui/icons-material';
+import CheckIcon from '@mui/icons-material/Check';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CelebrationIcon from '@mui/icons-material/Celebration';
 import { motion, AnimatePresence, easeOut } from 'framer-motion';
 import StrategyActivationModal from '../../StrategyActivationModal';
 import { safeRenderText } from '../utils/defensiveRendering';

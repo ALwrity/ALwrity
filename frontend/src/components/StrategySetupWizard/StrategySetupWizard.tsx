@@ -11,15 +11,13 @@ import {
   Alert,
   CircularProgress,
 } from '@mui/material';
-import {
-  ArrowBack,
-  ArrowForward,
-  CheckCircle,
-  Refresh as RefreshIcon,
-  Psychology as BrainIcon,
-  AutoAwesome as StrategyIcon,
-  CalendarToday as CalendarIcon,
-} from '@mui/icons-material';
+import ArrowBack from '@mui/icons-material/ArrowBack';
+import ArrowForward from '@mui/icons-material/ArrowForward';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import BrainIcon from '@mui/icons-material/Psychology';
+import StrategyIcon from '@mui/icons-material/AutoAwesome';
+import CalendarIcon from '@mui/icons-material/CalendarToday';
 import { useStrategySetupState } from '../../hooks/useStrategySetupState';
 import BrandBrainView from './BrandBrainView';
 import AutofillPreview from './AutofillPreview';

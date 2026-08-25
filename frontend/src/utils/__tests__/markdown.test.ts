@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 /**
  * Regression tests for the renderMarkdown utility.
  *
@@ -8,14 +9,14 @@
  * - Passes through to marked.parse() with the right arguments
  */
 
-jest.mock('marked', () => ({
-  marked: { parse: jest.fn((input: string) => (input ? `<p>${input}</p>` : '')) },
+vi.mock('marked', () => ({
+  marked: { parse: vi.fn((input: string) => (input ? `<p>${input}</p>` : '')) },
 }));
 
 import { marked } from 'marked';
 import { renderMarkdown } from '../markdown';
 
-const mockParse = marked.parse as unknown as jest.Mock;
+const mockParse = marked.parse as unknown as Mock;
 
 describe('renderMarkdown — regression', () => {
   beforeEach(() => {

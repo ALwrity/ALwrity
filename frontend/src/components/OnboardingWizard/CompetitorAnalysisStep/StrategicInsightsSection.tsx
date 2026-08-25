@@ -15,15 +15,13 @@ import {
   ListItemText,
   Tooltip,
 } from '@mui/material';
-import {
-  Assessment as AssessmentIcon,
-  Refresh as RefreshIcon,
-  Info as InfoIcon,
-  Lightbulb as LightbulbIcon,
-  TrendingUp as TrendingUpIcon,
-  Search as SearchIcon,
-  AutoAwesome as AutoFixHighIcon,
-} from '@mui/icons-material';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import InfoIcon from '@mui/icons-material/Info';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SearchIcon from '@mui/icons-material/Search';
+import AutoFixHighIcon from '@mui/icons-material/AutoAwesome';
 
 const ACTION_VERBS = ['Target', 'Expand', 'Create', 'Build', 'Optimize', 'Capture', 'Scale', 'Launch'];
 

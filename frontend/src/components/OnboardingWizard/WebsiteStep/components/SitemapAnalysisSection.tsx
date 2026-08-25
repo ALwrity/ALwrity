@@ -18,15 +18,13 @@ import {
   Tooltip,
   IconButton
 } from '@mui/material';
-import {
-  Map as MapIcon,
-  TrendingUp as TrendingUpIcon,
-  Schedule as ScheduleIcon,
-  Lightbulb as LightbulbIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import MapIcon from '@mui/icons-material/Map';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import InfoIcon from '@mui/icons-material/Info';
 
 const safeStr = (val: any): string => {
   if (val == null) return '';

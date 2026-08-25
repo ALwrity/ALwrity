@@ -1,5 +1,5 @@
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
@@ -15,7 +15,7 @@ import {
   YT_Z_MODAL,
 } from "../youtubeStudioZIndex";
 
-jest.mock("../../YouTubeVideoCreatorPanel", () => ({
+vi.mock("../../YouTubeVideoCreatorPanel", () => ({
   YouTubeVideoCreatorPanel: () => (
     <div data-testid="yt-video-creator-panel">Video Creator Panel</div>
   ),
@@ -27,13 +27,13 @@ describe("YouTubeVideoCreatorModal — dedicated surface", () => {
   });
 
   it("renders nothing when closed", () => {
-    render(<YouTubeVideoCreatorModal open={false} onClose={jest.fn()} />);
+    render(<YouTubeVideoCreatorModal open={false} onClose={vi.fn()} />);
     expect(screen.queryByRole("dialog", { name: /Video Creator/i })).toBeNull();
     expect(screen.queryByTestId("yt-video-creator-panel")).toBeNull();
   });
 
   it("renders pipeline surface with panel when open, not the Hub modal z-index", () => {
-    render(<YouTubeVideoCreatorModal open onClose={jest.fn()} />);
+    render(<YouTubeVideoCreatorModal open onClose={vi.fn()} />);
     const dialog = screen.getByRole("dialog", { name: /Video Creator/i });
     expect(dialog).toBeTruthy();
     expect(dialog.className).toContain("yt-creator-surface");
@@ -46,7 +46,7 @@ describe("YouTubeVideoCreatorModal — dedicated surface", () => {
   });
 
   it("calls onClose from close button and Studio Hub back", () => {
-    const onClose = jest.fn();
+    const onClose = vi.fn();
     render(<YouTubeVideoCreatorModal open onClose={onClose} />);
 
     fireEvent.click(screen.getByRole("button", { name: /Close/i }));
@@ -59,7 +59,7 @@ describe("YouTubeVideoCreatorModal — dedicated surface", () => {
   it("lets a nested MUI dialog portal to document.body above the Creator surface", () => {
     render(
       <>
-        <YouTubeVideoCreatorModal open onClose={jest.fn()} />
+        <YouTubeVideoCreatorModal open onClose={vi.fn()} />
         <Dialog open aria-labelledby="yt-nested-asset-dialog">
           <DialogTitle id="yt-nested-asset-dialog">Generate Image</DialogTitle>
         </Dialog>
@@ -80,7 +80,7 @@ describe("YouTubeVideoCreatorModal — dedicated surface", () => {
   it("portals Select menus and Tooltips to document.body, not into the Creator surface", () => {
     render(
       <>
-        <YouTubeVideoCreatorModal open onClose={jest.fn()} />
+        <YouTubeVideoCreatorModal open onClose={vi.fn()} />
         <Select
           open
           value="short"

@@ -1,15 +1,15 @@
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { SceneVideoActions } from "./SceneVideoActions";
 import { Scene } from "../../../services/youtubeApi";
 import { downloadMediaBlob } from "../../../utils/fetchMediaBlobUrl";
 
-jest.mock("../../../utils/fetchMediaBlobUrl", () => ({
-  downloadMediaBlob: jest.fn(),
+vi.mock("../../../utils/fetchMediaBlobUrl", () => ({
+  downloadMediaBlob: vi.fn(),
 }));
 
-const mockedDownloadMediaBlob = downloadMediaBlob as jest.MockedFunction<typeof downloadMediaBlob>;
+const mockedDownloadMediaBlob = vi.mocked(downloadMediaBlob);
 
 const scene: Scene = {
   scene_number: 1,
@@ -27,7 +27,7 @@ const scene: Scene = {
 
 describe("SceneVideoActions", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockedDownloadMediaBlob.mockResolvedValue();
   });
 
@@ -40,8 +40,8 @@ describe("SceneVideoActions", () => {
         completed
         hasAssets
         progress={100}
-        onPreview={jest.fn()}
-        onGenerate={jest.fn()}
+        onPreview={vi.fn()}
+        onGenerate={vi.fn()}
       />,
     );
 
@@ -59,8 +59,8 @@ describe("SceneVideoActions", () => {
         completed={false}
         hasAssets
         progress={0}
-        onPreview={jest.fn()}
-        onGenerate={jest.fn()}
+        onPreview={vi.fn()}
+        onGenerate={vi.fn()}
       />,
     );
 
@@ -77,8 +77,8 @@ describe("SceneVideoActions", () => {
         completed
         hasAssets
         progress={100}
-        onPreview={jest.fn()}
-        onGenerate={jest.fn()}
+        onPreview={vi.fn()}
+        onGenerate={vi.fn()}
       />,
     );
 

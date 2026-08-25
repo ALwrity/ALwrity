@@ -6,8 +6,8 @@ import { OPEN_WORKFLOW_WEDGE_EVENT } from "../components/dashboard/workflowWedge
 
 describe("openConversationsToJoinQuickView", () => {
   it("closes Growth Engine and opens engagement opportunities sub-modal", () => {
-    const closeHandler = jest.fn();
-    const wedgeHandler = jest.fn();
+    const closeHandler = vi.fn();
+    const wedgeHandler = vi.fn();
     window.addEventListener(
       CLOSE_GROWTH_ENGINE_FOR_QUICK_VIEW_EVENT,
       closeHandler,

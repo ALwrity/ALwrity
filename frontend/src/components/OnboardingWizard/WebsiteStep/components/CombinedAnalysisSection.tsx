@@ -7,13 +7,11 @@ import {
   Fade,
   useTheme
 } from '@mui/material';
-import {
-  Analytics as AnalyticsIcon,
-  Group as GroupIcon,
-  Category as CategoryIcon,
-  Business as BusinessIcon,
-  Lightbulb as LightbulbIcon
-} from '@mui/icons-material';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import GroupIcon from '@mui/icons-material/Group';
+import CategoryIcon from '@mui/icons-material/Category';
+import BusinessIcon from '@mui/icons-material/Business';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
 
 import {
   ContentCharacteristicsSection,

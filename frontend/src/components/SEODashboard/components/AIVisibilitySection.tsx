@@ -11,18 +11,16 @@ import {
   TableContainer, TableHead, TableRow, Paper, CircularProgress,
   Tooltip, Collapse, IconButton,
 } from '@mui/material';
-import {
-  Psychology as PsychologyIcon,
-  Visibility as VisibilityIcon,
-  Mouse as MouseIcon,
-  TrendingDown as TrendingDownIcon,
-  TrendingUp as TrendingUpIcon,
-  Warning as WarningIcon,
-  Lightbulb as LightbulbIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  PlayArrow as PlayArrowIcon,
-} from '@mui/icons-material';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import MouseIcon from '@mui/icons-material/Mouse';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import WarningIcon from '@mui/icons-material/Warning';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { motion } from 'framer-motion';
 import { useAIVisibilityInsights } from '../../../hooks/useAIVisibilityInsights';
 import { AIOThresholdInput } from '../../../api/aiVisibility';

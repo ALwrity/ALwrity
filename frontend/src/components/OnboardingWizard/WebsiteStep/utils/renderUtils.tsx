@@ -20,20 +20,18 @@ import {
   Zoom
 } from '@mui/material';
 import { useTheme, alpha } from '@mui/material/styles';
-import {
-  ExpandMore as ExpandMoreIcon,
-  CheckCircle as CheckIcon,
-  Psychology as PsychologyIcon,
-  Analytics as AnalyticsIcon,
-  Business as BusinessIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Star as StarIcon,
-  Warning as WarningIcon,
-  Search as SearchIcon,
-  AccountTree as SitemapIcon,
-  Speed as SpeedIcon,
-  Devices as DevicesIcon
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import BusinessIcon from '@mui/icons-material/Business';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import StarIcon from '@mui/icons-material/Star';
+import WarningIcon from '@mui/icons-material/Warning';
+import SearchIcon from '@mui/icons-material/Search';
+import SitemapIcon from '@mui/icons-material/AccountTree';
+import SpeedIcon from '@mui/icons-material/Speed';
+import DevicesIcon from '@mui/icons-material/Devices';
 
 /**
  * Key Insight Card Component

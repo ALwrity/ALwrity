@@ -21,14 +21,12 @@ import {
   ListItemIcon,
   ListItemText
 } from '@mui/material';
-import {
-  Facebook as FacebookIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  TrendingUp as TrendingUpIcon,
-  Group as GroupIcon,
-  CheckCircle as CheckCircleIcon,
-  Close as CloseIcon
-} from '@mui/icons-material';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import GroupIcon from '@mui/icons-material/Group';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
 
 interface FacebookPersonaModalProps {
   open: boolean;

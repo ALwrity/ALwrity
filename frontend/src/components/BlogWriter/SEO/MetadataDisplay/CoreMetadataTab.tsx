@@ -30,16 +30,14 @@ import {
   OutlinedInput,
   Alert
 } from '@mui/material';
-import {
-  ContentCopy as CopyIcon,
-  Check as CheckIcon,
-  Search as SearchIcon,
-  Link as LinkIcon,
-  Tag as TagIcon,
-  Category as CategoryIcon,
-  Schedule as ScheduleIcon,
-  TrendingUp as TrendingUpIcon
-} from '@mui/icons-material';
+import CopyIcon from '@mui/icons-material/ContentCopy';
+import CheckIcon from '@mui/icons-material/Check';
+import SearchIcon from '@mui/icons-material/Search';
+import LinkIcon from '@mui/icons-material/Link';
+import TagIcon from '@mui/icons-material/Tag';
+import CategoryIcon from '@mui/icons-material/Category';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 interface CoreMetadataTabProps {
   metadata: any;

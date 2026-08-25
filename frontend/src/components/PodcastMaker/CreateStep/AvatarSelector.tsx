@@ -1,16 +1,14 @@
 import React from "react";
 import { Stack, Box, Typography, Tabs, Tab, CircularProgress, Button, IconButton, Tooltip, alpha, useTheme, useMediaQuery } from "@mui/material";
-import {
-  Person as PersonIcon,
-  Info as InfoIcon,
-  CheckCircle as CheckCircleIcon,
-  Refresh as RefreshIcon,
-  Collections as CollectionsIcon,
-  Delete as DeleteIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  CloudUpload as CloudUploadIcon,
-  PhotoCamera as PhotoCameraIcon,
-} from "@mui/icons-material";
+import PersonIcon from '@mui/icons-material/Person';
+import InfoIcon from '@mui/icons-material/Info';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import CollectionsIcon from '@mui/icons-material/Collections';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import { AvatarAssetBrowser } from "../AvatarAssetBrowser";
 import { CameraSelfie } from "../CameraSelfie";
 import { PodcastMode } from "../types";

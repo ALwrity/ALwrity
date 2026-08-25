@@ -26,23 +26,21 @@ import {
   Tabs,
   Tab
 } from '@mui/material';
-import {
-  AutoAwesome as AutoAwesomeIcon,
-  DataUsage as DataUsageIcon,
-  School as SchoolIcon,
-  Timeline as TimelineIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Info as InfoIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Refresh as RefreshIcon,
-  Schedule as ScheduleIcon,
-  TrendingUp as TrendingUpIcon,
-  Close as CloseIcon,
-  Assessment as AssessmentIcon,
-  Psychology as PsychologyIcon
-} from '@mui/icons-material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
+import SchoolIcon from '@mui/icons-material/School';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import InfoIcon from '@mui/icons-material/Info';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import CloseIcon from '@mui/icons-material/Close';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import PsychologyIcon from '@mui/icons-material/Psychology';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Import existing transparency components

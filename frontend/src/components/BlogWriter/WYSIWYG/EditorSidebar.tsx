@@ -1,10 +1,8 @@
 import React from 'react';
 import { Paper, Chip } from '@mui/material';
-import {
-  BarChart as BarChartIcon,
-  Hub as HubIcon,
-  GpsFixed as GpsFixedIcon,
-} from '@mui/icons-material';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import HubIcon from '@mui/icons-material/Hub';
+import GpsFixedIcon from '@mui/icons-material/GpsFixed';
 
 interface EditorSidebarProps {
   sections: any[];

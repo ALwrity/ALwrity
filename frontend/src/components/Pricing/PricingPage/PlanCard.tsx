@@ -19,22 +19,20 @@ import {
   CircularProgress,
   Tooltip,
 } from '@mui/material';
-import {
-  Check as CheckIcon,
-  Star as StarIcon,
-  WorkspacePremium as PremiumIcon,
-  Info as InfoIcon,
-  Psychology,
-  Search as SearchIcon,
-  Edit,
-  Assistant,
-  Verified,
-  Timeline,
-  Analytics,
-  Support,
-  Business,
-  Group,
-} from '@mui/icons-material';
+import CheckIcon from '@mui/icons-material/Check';
+import StarIcon from '@mui/icons-material/Star';
+import PremiumIcon from '@mui/icons-material/WorkspacePremium';
+import InfoIcon from '@mui/icons-material/Info';
+import Psychology from '@mui/icons-material/Psychology';
+import SearchIcon from '@mui/icons-material/Search';
+import Edit from '@mui/icons-material/Edit';
+import Assistant from '@mui/icons-material/Assistant';
+import Verified from '@mui/icons-material/Verified';
+import Timeline from '@mui/icons-material/Timeline';
+import Analytics from '@mui/icons-material/Analytics';
+import Support from '@mui/icons-material/Support';
+import Business from '@mui/icons-material/Business';
+import Group from '@mui/icons-material/Group';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import ImageIcon from '@mui/icons-material/Image';
 import VideoIcon from '@mui/icons-material/VideoLibrary';

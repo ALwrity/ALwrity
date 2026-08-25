@@ -13,11 +13,9 @@ import {
   Chip,
   IconButton,
 } from '@mui/material';
-import {
-  Lightbulb as LightbulbIcon,
-  Search as SearchIcon,
-  Close as CloseIcon,
-} from '@mui/icons-material';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import SearchIcon from '@mui/icons-material/Search';
+import CloseIcon from '@mui/icons-material/Close';
 
 function safeText(item: any): string {
   if (typeof item === 'string') return item;

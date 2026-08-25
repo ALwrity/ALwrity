@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { LinkedIn as LinkedInIcon } from "@mui/icons-material";
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import { getInitials } from "../utils/linkedInProfileSummary";
 import { buildAvatarProxyUrl } from "../../../api/linkedinSocial";
 import {

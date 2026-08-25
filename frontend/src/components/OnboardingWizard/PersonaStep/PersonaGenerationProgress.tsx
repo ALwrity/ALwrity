@@ -11,16 +11,14 @@ import {
   Stack,
   Divider
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Pending as PendingIcon,
-  RocketLaunch as RocketLaunchIcon,
-  Psychology as PsychologyIcon,
-  Tune as TuneIcon,
-  FactCheck as FactCheckIcon,
-  CloudDone as CloudDoneIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import PendingIcon from '@mui/icons-material/Pending';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import TuneIcon from '@mui/icons-material/Tune';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
+import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Fade } from '@mui/material';
 

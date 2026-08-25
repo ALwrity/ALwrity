@@ -7,11 +7,9 @@ import {
   Typography, 
   Tooltip 
 } from '@mui/material';
-import { 
-  Search as SearchIcon, 
-  Clear as ClearIcon, 
-  FilterList as FilterIcon 
-} from '@mui/icons-material';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
+import FilterIcon from '@mui/icons-material/FilterList';
 import { SearchContainer, CategoryChip } from './styled';
 import { SearchFilterProps } from './types';
 

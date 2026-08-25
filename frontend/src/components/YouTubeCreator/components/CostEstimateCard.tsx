@@ -14,12 +14,10 @@ import {
   Chip,
   Divider,
 } from '@mui/material';
-import {
-  MonetizationOn as MoneyIcon,
-  VideoLibrary as VideoIcon,
-  Image as ImageIcon,
-  Info as InfoIcon,
-} from '@mui/icons-material';
+import MoneyIcon from '@mui/icons-material/MonetizationOn';
+import VideoIcon from '@mui/icons-material/VideoLibrary';
+import ImageIcon from '@mui/icons-material/Image';
+import InfoIcon from '@mui/icons-material/Info';
 import { CostEstimate, Scene } from '../../../services/youtubeApi';
 
 interface CostEstimateCardProps {

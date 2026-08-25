@@ -1,7 +1,7 @@
 /**
  * LinkedInArticleLivePreview tests.
  * Run manually:
- *   npx react-scripts test --watchAll=false --testPathPattern=LinkedInArticleLivePreview
+ *   npx vitest run LinkedInArticleLivePreview
  */
 
 import React from "react";
@@ -9,7 +9,7 @@ import { render, screen } from "@testing-library/react";
 import { LinkedInArticleLivePreview } from "../components/LinkedInArticleLivePreview";
 import type { LinkedInArticleDraftState } from "../utils/linkedInArticleDraftUtils";
 
-jest.mock("../components/LinkedInAuthenticatedImage", () => ({
+vi.mock("../components/LinkedInAuthenticatedImage", () => ({
   LinkedInAuthenticatedImage: ({ alt }: { alt: string }) => (
     <img data-testid="auth-image" alt={alt} />
   ),

@@ -13,16 +13,14 @@ import {
   useMediaQuery,
   alpha,
 } from '@mui/material';
-import {
-  RocketLaunch,
-  Business,
-  ContentCopy,
-  TrendingUp,
-  People,
-  Code,
-  Security,
-  Speed,
-} from '@mui/icons-material';
+import RocketLaunch from '@mui/icons-material/RocketLaunch';
+import Business from '@mui/icons-material/Business';
+import ContentCopy from '@mui/icons-material/ContentCopy';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import People from '@mui/icons-material/People';
+import Code from '@mui/icons-material/Code';
+import Security from '@mui/icons-material/Security';
+import Speed from '@mui/icons-material/Speed';
 import { motion } from 'framer-motion';
 import { landingSectionTitleSx, landingSectionSubtitleSx, landingDesktopPromotedCopySx } from './landingStyles';
 import { scrollToLandingSection } from '../../utils/landingNavigation';

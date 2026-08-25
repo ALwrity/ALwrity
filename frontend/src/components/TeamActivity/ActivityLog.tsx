@@ -7,11 +7,9 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Terminal as TerminalIcon,
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import TerminalIcon from '@mui/icons-material/Terminal';
 import { AgentRunItem, AgentEventItem } from '../../hooks/useAgentHuddleFeed';
 
 interface ActivityLogProps {

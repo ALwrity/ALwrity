@@ -4,9 +4,7 @@ import {
   Typography, 
   Button 
 } from '@mui/material';
-import { 
-  Build as BuildIcon 
-} from '@mui/icons-material';
+import BuildIcon from '@mui/icons-material/Build';
 import { CriticalIssueCardProps } from '../../shared/types';
 import { formatMessage } from './seoUtils';
 

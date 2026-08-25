@@ -9,9 +9,7 @@ import {
   Box, 
   Paper 
 } from '@mui/material';
-import { 
-  Build as BuildIcon 
-} from '@mui/icons-material';
+import BuildIcon from '@mui/icons-material/Build';
 import { IssueDetailsDialogProps } from '../../shared/types';
 
 const IssueDetailsDialog: React.FC<IssueDetailsDialogProps> = ({

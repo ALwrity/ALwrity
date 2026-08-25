@@ -10,14 +10,12 @@ import {
   Chip,
   Tooltip,
 } from '@mui/material';
-import {
-  Brush,
-  DeleteOutline,
-  Clear,
-  ZoomIn,
-  ZoomOut,
-  Undo,
-} from '@mui/icons-material';
+import Brush from '@mui/icons-material/Brush';
+import DeleteOutline from '@mui/icons-material/DeleteOutline';
+import Clear from '@mui/icons-material/Clear';
+import ZoomIn from '@mui/icons-material/ZoomIn';
+import ZoomOut from '@mui/icons-material/ZoomOut';
+import Undo from '@mui/icons-material/Undo';
 import { alpha } from '@mui/material/styles';
 
 interface ImageMaskEditorProps {

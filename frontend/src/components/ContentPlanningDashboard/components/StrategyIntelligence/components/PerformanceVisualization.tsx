@@ -14,20 +14,18 @@ import {
   LinearProgress,
   Divider
 } from '@mui/material';
-import {
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-  Assessment as AssessmentIcon,
-  Speed as SpeedIcon,
-  Visibility as VisibilityIcon,
-  People as EngagementIcon,
-  MonetizationOn as MonetizationOnIcon,
-  Refresh as RefreshIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon
-} from '@mui/icons-material';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import SpeedIcon from '@mui/icons-material/Speed';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import EngagementIcon from '@mui/icons-material/People';
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
 import { motion } from 'framer-motion';
 import { strategyMonitoringApi } from '../../../../../services/strategyMonitoringApi';
 

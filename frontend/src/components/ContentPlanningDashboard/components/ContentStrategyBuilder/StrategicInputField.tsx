@@ -18,17 +18,15 @@ import {
   Button,
   Collapse
 } from '@mui/material';
-import {
-  Help as HelpIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
-  Edit as EditIcon,
-  Info as InfoIcon,
-  Person as PersonIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon
-} from '@mui/icons-material';
+import HelpIcon from '@mui/icons-material/Help';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import WarningIcon from '@mui/icons-material/Warning';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import EditIcon from '@mui/icons-material/Edit';
+import InfoIcon from '@mui/icons-material/Info';
+import PersonIcon from '@mui/icons-material/Person';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { useStrategyBuilderStore } from '../../../../stores/strategyBuilderStore';
 import StructuredJsonField from './components/StructuredJsonField';
 import { JSON_FIELD_SCHEMAS } from './utils/jsonFieldSchemas';

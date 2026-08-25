@@ -17,13 +17,11 @@ import {
   Select,
   MenuItem
 } from '@mui/material';
-import {
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  ExpandMore as ExpandMoreIcon,
-  Code as CodeIcon,
-  Edit as EditIcon
-} from '@mui/icons-material';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CodeIcon from '@mui/icons-material/Code';
+import EditIcon from '@mui/icons-material/Edit';
 import { JsonFieldSchema, FieldDefinition } from '../utils/jsonFieldSchemas';
 
 interface StructuredJsonFieldProps {

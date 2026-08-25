@@ -9,10 +9,8 @@ import {
   ListItemText,
   ListItemIcon
 } from '@mui/material';
-import {
-  Analytics as AnalyticsIcon,
-  Lightbulb as LightbulbIcon
-} from '@mui/icons-material';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import { useContentPlanningStore } from '../../../stores/contentPlanningStore';
 
 const ContentOptimizerTab: React.FC = () => {

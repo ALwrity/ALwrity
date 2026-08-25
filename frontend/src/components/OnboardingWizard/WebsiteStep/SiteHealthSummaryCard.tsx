@@ -8,15 +8,13 @@ import {
   Paper,
   IconButton,
 } from "@mui/material";
-import {
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  HealthAndSafety as HealthIcon,
-  Schedule as ScheduleIcon,
-  TrendingUp as TrendingUpIcon,
-  Warning as WarningIcon,
-  AccountTree as StructureIcon,
-} from "@mui/icons-material";
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import HealthIcon from '@mui/icons-material/HealthAndSafety';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import WarningIcon from '@mui/icons-material/Warning';
+import StructureIcon from '@mui/icons-material/AccountTree';
 import MetricTooltip from "../../shared/MetricTooltip";
 import { getMetricTooltip } from "../../shared/metricTooltips";
 

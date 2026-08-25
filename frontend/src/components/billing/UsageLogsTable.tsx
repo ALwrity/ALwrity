@@ -21,12 +21,10 @@ import {
   InputLabel,
   CircularProgress
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Refresh as RefreshIcon,
-  Receipt as ReceiptIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ReceiptIcon from '@mui/icons-material/Receipt';
 import { billingService } from '../../services/billingService';
 import { UsageLog, UsageLogsResponse } from '../../types/billing';
 import { 

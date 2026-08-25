@@ -14,14 +14,12 @@ import {
   Tab,
   Button
 } from '@mui/material';
-import {
-  TrendingUp as TrendingUpIcon,
-  Analytics as AnalyticsIcon,
-  ShowChart as ShowChartIcon,
-  Assessment as AssessmentIcon,
-  Visibility as VisibilityIcon,
-  Refresh as RefreshIcon
-} from '@mui/icons-material';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { useContentPlanningStore } from '../../../stores/contentPlanningStore';
 // import { contentPlanningApi } from '../../../services/contentPlanningApi';
 import EnhancedPerformanceVisualization from '../components/StrategyIntelligence/components/EnhancedPerformanceVisualization';

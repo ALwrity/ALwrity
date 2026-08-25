@@ -1,7 +1,7 @@
 /**
  * ArticleEditorLayout smoke tests.
  * Run manually:
- *   npx react-scripts test --watchAll=false --testPathPattern=ArticleEditorLayout
+ *   npx vitest run ArticleEditorLayout
  */
 
 import React from "react";
@@ -32,7 +32,7 @@ describe("ArticleEditorLayout", () => {
     render(
       <ArticleEditorLayout
         state={sampleState}
-        onChange={jest.fn()}
+        onChange={vi.fn()}
       />,
     );
 
@@ -48,7 +48,7 @@ describe("ArticleEditorLayout", () => {
   });
 
   test("does not render a separate intro field when legacy intro exists", () => {
-    const onChange = jest.fn();
+    const onChange = vi.fn();
     render(
       <ArticleEditorLayout
         state={{
@@ -81,7 +81,7 @@ describe("ArticleEditorLayout", () => {
     render(
       <ArticleEditorLayout
         state={sampleState}
-        onChange={jest.fn()}
+        onChange={vi.fn()}
       />,
     );
 
@@ -95,8 +95,8 @@ describe("ArticleEditorLayout", () => {
     render(
       <ArticleEditorLayout
         state={sampleState}
-        onChange={jest.fn()}
-        onGenerateImage={jest.fn()}
+        onChange={vi.fn()}
+        onGenerateImage={vi.fn()}
       />,
     );
 

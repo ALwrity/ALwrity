@@ -23,22 +23,20 @@ import {
   Tooltip,
   IconButton
 } from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  Info as InfoIcon,
-  DataUsage as DataUsageIcon,
-  Psychology as PsychologyIcon,
-  Person as PersonIcon,
-  Analytics as AnalyticsIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Close as CloseIcon,
-  Refresh as RefreshIcon,
-  TrendingUp as TrendingUpIcon,
-  Security as SecurityIcon,
-  Visibility as VisibilityIcon,
-  AutoAwesome as AutoAwesomeIcon
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import InfoIcon from '@mui/icons-material/Info';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import PersonIcon from '@mui/icons-material/Person';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import CloseIcon from '@mui/icons-material/Close';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SecurityIcon from '@mui/icons-material/Security';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { motion } from 'framer-motion';
 
 interface AutofillDataTransparencyProps {

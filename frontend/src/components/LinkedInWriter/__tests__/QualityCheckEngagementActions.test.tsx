@@ -24,7 +24,7 @@ describe("QualityCheckEngagementActions", () => {
   });
 
   it("dispatches booster open event with draft content", () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     window.addEventListener(OPEN_ENGAGEMENT_BOOSTER_EVENT, handler);
 
     render(<QualityCheckEngagementActions content="Quality draft" />);

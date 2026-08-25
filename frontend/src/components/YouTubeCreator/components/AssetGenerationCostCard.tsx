@@ -14,12 +14,10 @@ import {
   Alert,
   Divider,
 } from '@mui/material';
-import {
-  MonetizationOn as MoneyIcon,
-  Image as ImageIcon,
-  VolumeUp as AudioIcon,
-  Info as InfoIcon,
-} from '@mui/icons-material';
+import MoneyIcon from '@mui/icons-material/MonetizationOn';
+import ImageIcon from '@mui/icons-material/Image';
+import AudioIcon from '@mui/icons-material/VolumeUp';
+import InfoIcon from '@mui/icons-material/Info';
 import { Scene } from '../../../services/youtubeApi';
 
 interface AssetGenerationCostCardProps {

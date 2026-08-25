@@ -17,23 +17,21 @@ import {
   Paper,
   Grid
 } from '@mui/material';
-import {
-  PlayArrow,
-  Pause,
-  Stop,
-  Info,
-  ExpandMore,
-  ExpandLess,
-  CheckCircle,
-  Schedule,
-  TrendingUp,
-  NavigateNext,
-  NavigateBefore,
-  SkipNext,
-  TaskAlt,
-  Timer,
-  Assignment
-} from '@mui/icons-material';
+import PlayArrow from '@mui/icons-material/PlayArrow';
+import Pause from '@mui/icons-material/Pause';
+import Stop from '@mui/icons-material/Stop';
+import Info from '@mui/icons-material/Info';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Schedule from '@mui/icons-material/Schedule';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import NavigateNext from '@mui/icons-material/NavigateNext';
+import NavigateBefore from '@mui/icons-material/NavigateBefore';
+import SkipNext from '@mui/icons-material/SkipNext';
+import TaskAlt from '@mui/icons-material/TaskAlt';
+import Timer from '@mui/icons-material/Timer';
+import Assignment from '@mui/icons-material/Assignment';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 

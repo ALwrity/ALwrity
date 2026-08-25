@@ -12,14 +12,12 @@ import {
   Alert,
   Button
 } from '@mui/material';
-import { 
-  Speed as SpeedIcon,
-  Refresh as RefreshIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import SpeedIcon from '@mui/icons-material/Speed';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
+import InfoIcon from '@mui/icons-material/Info';
 import { motion } from 'framer-motion';
 import { GlassCard, ShimmerHeader } from '../../shared/styled';
 import { semanticDashboardAPI } from '../../../api/semanticDashboard';

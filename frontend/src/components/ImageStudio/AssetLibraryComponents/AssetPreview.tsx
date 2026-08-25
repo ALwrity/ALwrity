@@ -6,14 +6,11 @@ import {
   CircularProgress,
   // Button,
 } from '@mui/material';
-import {
-  // Image as ImageIcon,
-  VideoLibrary,
-  AudioFile,
-  TextFields,
-  ExpandLess,
-  ExpandMore,
-} from '@mui/icons-material';
+import VideoLibrary from '@mui/icons-material/VideoLibrary';
+import AudioFile from '@mui/icons-material/AudioFile';
+import TextFields from '@mui/icons-material/TextFields';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
 import { ContentAsset } from '../../../hooks/useContentAssets';
 
 interface AssetPreviewProps {

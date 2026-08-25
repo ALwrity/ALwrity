@@ -13,9 +13,7 @@ import {
   CardContent,
   Tooltip,
 } from '@mui/material';
-import {
-  Info as InfoIcon,
-} from '@mui/icons-material';
+import InfoIcon from '@mui/icons-material/Info';
 import {
   ResearchIntent,
   ResearchPurpose,

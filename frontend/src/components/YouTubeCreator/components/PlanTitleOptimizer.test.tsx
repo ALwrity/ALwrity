@@ -1,13 +1,13 @@
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { PlanTitleOptimizer } from "./PlanTitleOptimizer";
 
 describe("PlanTitleOptimizer", () => {
-  const onChange = jest.fn();
+  const onChange = vi.fn();
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it("selects a title chip", () => {

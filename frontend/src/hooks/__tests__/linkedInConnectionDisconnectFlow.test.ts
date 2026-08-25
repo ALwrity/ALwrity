@@ -58,17 +58,17 @@ describe('linkedInConnectionDisconnectFlow', () => {
       selectedOrgId: '',
     });
 
-    const setStatus = jest.fn();
-    const setAccounts = jest.fn();
-    const setOrganizations = jest.fn();
-    const setCachedAvatarUrl = jest.fn();
-    const setSelectedAccountId = jest.fn();
-    const setSelectedTarget = jest.fn();
-    const setSelectedOrgId = jest.fn();
-    const setError = jest.fn();
-    const setProfileLoadWarning = jest.fn();
-    const setIsLoading = jest.fn();
-    const setIsProfileLoading = jest.fn();
+    const setStatus = vi.fn();
+    const setAccounts = vi.fn();
+    const setOrganizations = vi.fn();
+    const setCachedAvatarUrl = vi.fn();
+    const setSelectedAccountId = vi.fn();
+    const setSelectedTarget = vi.fn();
+    const setSelectedOrgId = vi.fn();
+    const setError = vi.fn();
+    const setProfileLoadWarning = vi.fn();
+    const setIsLoading = vi.fn();
+    const setIsProfileLoading = vi.fn();
 
     applyConnectionSnapshot(snapshot, {
       setStatus,
@@ -82,7 +82,7 @@ describe('linkedInConnectionDisconnectFlow', () => {
       setProfileLoadWarning,
       setIsLoading,
       setIsProfileLoading,
-      setDisconnectError: jest.fn(),
+      setDisconnectError: vi.fn(),
     });
 
     expect(setStatus).toHaveBeenCalledWith(connectedStatus);

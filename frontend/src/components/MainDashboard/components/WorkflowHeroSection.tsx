@@ -7,13 +7,11 @@ import {
   useMediaQuery
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  PlayArrow, 
-  TrendingUp, 
-  Rocket,
-  ArrowRight,
-  Star
-} from '@mui/icons-material';
+import PlayArrow from '@mui/icons-material/PlayArrow';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import Rocket from '@mui/icons-material/Rocket';
+import ArrowRight from '@mui/icons-material/ArrowRight';
+import Star from '@mui/icons-material/Star';
 
 interface WorkflowHeroSectionProps {
   onStartWorkflow: () => void;

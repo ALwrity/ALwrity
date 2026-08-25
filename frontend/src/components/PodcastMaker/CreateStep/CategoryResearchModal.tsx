@@ -16,19 +16,17 @@ import {
   Tooltip,
   Checkbox,
 } from "@mui/material";
-import {
-  Newspaper as NewspaperIcon,
-  ShowChart as ShowChartIcon,
-  School as SchoolIcon,
-  Public as PublicIcon,
-  Close as CloseIcon,
-  OpenInNew as OpenInNewIcon,
-  Refresh as RefreshIcon,
-  CheckCircle as CheckCircleIcon,
-  Lightbulb as LightbulbIcon,
-  Search as SearchIcon,
-  Language as LanguageIcon,
-} from "@mui/icons-material";
+import NewspaperIcon from '@mui/icons-material/Newspaper';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import SchoolIcon from '@mui/icons-material/School';
+import PublicIcon from '@mui/icons-material/Public';
+import CloseIcon from '@mui/icons-material/Close';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import SearchIcon from '@mui/icons-material/Search';
+import LanguageIcon from '@mui/icons-material/Language';
 
 interface CategoryTopic {
   title: string;

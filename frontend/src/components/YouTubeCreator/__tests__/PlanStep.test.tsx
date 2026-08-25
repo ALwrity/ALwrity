@@ -4,23 +4,23 @@
  */
 
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import { PlanStep } from "../components/PlanStep";
 
-jest.mock("../components/ChannelBiblePanel", () => ({
+vi.mock("../components/ChannelBiblePanel", () => ({
   ChannelBiblePanel: () => null,
 }));
-jest.mock("../components/PlanPromptPreview", () => ({
+vi.mock("../components/PlanPromptPreview", () => ({
   PlanPromptPreview: () => null,
 }));
-jest.mock("../components/PlanDiscoveryShortcuts", () => ({
+vi.mock("../components/PlanDiscoveryShortcuts", () => ({
   PlanDiscoveryShortcuts: () => null,
 }));
-jest.mock("../../shared/AssetLibraryImageModal", () => ({
+vi.mock("../../shared/AssetLibraryImageModal", () => ({
   AssetLibraryImageModal: () => null,
 }));
-jest.mock("../hooks/useAvatarBlobUrl", () => ({
+vi.mock("../hooks/useAvatarBlobUrl", () => ({
   useAvatarBlobUrl: () => ({ avatarBlobUrl: null, avatarLoading: false }),
 }));
 
