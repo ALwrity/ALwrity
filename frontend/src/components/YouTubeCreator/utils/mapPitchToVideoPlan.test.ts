@@ -102,6 +102,19 @@ describe("mapPitchToVideoPlan", () => {
     expect(plan.generation?.json_schema_applied).toBe(true);
   });
 
+  it("threads form language onto VideoPlan for scene-builder fallback", () => {
+    const plan = mapPitchToVideoPlan({
+      pitch,
+      expansion,
+      form: {
+        duration_type: "shorts",
+        language: "hi",
+      },
+    });
+
+    expect(plan.language).toBe("hi");
+  });
+
   it("uses form fields for echoed Step-1 metadata instead of inventing them", () => {
     const plan = mapPitchToVideoPlan({
       pitch,

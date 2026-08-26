@@ -8,6 +8,9 @@ import type { VideoPlanGeneration, VideoPlanRequest, VideoPlanResearchSource } f
 
 const API_BASE = "/api/youtube";
 
+/** Expand can run two LLM attempts plus validation; keep this longer than the 5-minute default. */
+export const YOUTUBE_EXPAND_REQUEST_TIMEOUT_MS = 600000;
+
 export interface YouTubePitchRequest extends VideoPlanRequest {
   creative_angle: string;
 }
@@ -186,24 +189,45 @@ export async function generatePitch(request: YouTubePitchRequest): Promise<YouTu
 export async function expandPitchToScript(
   request: YouTubeExpandRequest,
 ): Promise<YouTubeExpandResponse> {
+  const language = (request.language || "en").trim() || "en";
   try {
     console.info("[youtubeApi] expandPitchToScript started", {
       durationType: request.duration_type,
       titleLen: request.approved_pitch?.selected_title?.trim().length ?? 0,
+      language,
+      timeoutMs: YOUTUBE_EXPAND_REQUEST_TIMEOUT_MS,
     });
-    const response = await longRunningApiClient.post(`${API_BASE}/plan/expand`, request);
-    console.info("[youtubeApi] expandPitchToScript succeeded");
-    return response.data;
+    const response = await longRunningApiClient.post(
+      `${API_BASE}/plan/expand`,
+      request,
+      { timeout: YOUTUBE_EXPAND_REQUEST_TIMEOUT_MS },
+    );
+    const data = response?.data as YouTubeExpandResponse | undefined;
+    if (!data || typeof data !== "object") {
+      console.error("[youtubeApi] expandPitchToScript empty response", { language });
+      throw new Error("Failed to expand pitch. Please try again.");
+    }
+    console.info("[youtubeApi] expandPitchToScript succeeded", {
+      language,
+      success: Boolean(data.success),
+      scriptLen: (data.full_script || "").length,
+    });
+    return data;
   } catch (error: unknown) {
+    if (error instanceof Error && error.message === "Failed to expand pitch. Please try again.") {
+      throw error;
+    }
     const err = error as { response?: { status?: number }; message?: string };
     console.error("[youtubeApi] expandPitchToScript failed", {
+      language,
       status: err?.response?.status,
       timedOut: Boolean(err?.message?.toLowerCase().includes("timeout")),
+      timeoutMs: YOUTUBE_EXPAND_REQUEST_TIMEOUT_MS,
     });
     throw new Error(
       pitchErrorMessage(
         error,
-        "Script expansion is taking longer than expected. Please check your internet connection and try again.",
+        "Script expansion is taking longer than expected. Please wait and try again.",
       ),
     );
   }
