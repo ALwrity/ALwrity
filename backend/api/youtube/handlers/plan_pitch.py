@@ -4,6 +4,7 @@ Thin routes: validation, personalization, then planner_pitch services.
 Does not change generate_plan / Build Scenes.
 """
 
+import time
 from typing import Any, Dict, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -316,6 +317,7 @@ async def expand_video_pitch(
 ) -> ExpandResponse:
     """Expand an approved pitch into a full production script."""
     try:
+        expand_started = time.perf_counter()
         user_id = require_authenticated_user(current_user)
         title = str((request.approved_pitch or {}).get("selected_title") or "")
         logger.info(
@@ -361,7 +363,16 @@ async def expand_video_pitch(
             language=request.language,
         )
         full_script = expansion.get("full_script") if isinstance(expansion, dict) else None
-        logger.info("[YouTubeAPI] Pitch expanded successfully language={}", _inbound_language_log(request.language))
+        logger.info(
+            "[YouTubeAPI] Pitch expanded successfully language={} duration_ms={} "
+            "script_len={} beats={}",
+            _inbound_language_log(request.language),
+            int((time.perf_counter() - expand_started) * 1000),
+            len(full_script or ""),
+            len((expansion or {}).get("main_content_outline") or [])
+            if isinstance(expansion, dict)
+            else 0,
+        )
         return ExpandResponse(
             success=True,
             expansion=expansion,
@@ -372,16 +383,18 @@ async def expand_video_pitch(
         raise
     except PitchValidationError as exc:
         logger.warning(
-            "[YouTubeAPI] Pitch expansion rejected: {} language={}",
+            "[YouTubeAPI] Pitch expansion rejected: {} language={} duration_ms={}",
             exc,
             _inbound_language_log(request.language),
+            int((time.perf_counter() - expand_started) * 1000),
         )
         return ExpandResponse(success=False, message=str(exc))
     except Exception as exc:
         logger.error(
-            "[YouTubeAPI] Error expanding pitch: {} language={}",
+            "[YouTubeAPI] Error expanding pitch: {} language={} duration_ms={}",
             exc,
             _inbound_language_log(request.language),
+            int((time.perf_counter() - expand_started) * 1000),
             exc_info=True,
         )
         return ExpandResponse(success=False, message="Failed to expand pitch. Please try again.")

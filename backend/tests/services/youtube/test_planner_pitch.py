@@ -51,7 +51,7 @@ class TestPitchJsonStruct:
         assert "backend JSON engine" in PITCH_SYSTEM_PROMPT
         assert "Do NOT write a full script" in PITCH_SYSTEM_PROMPT
         assert "≤70 characters" in PITCH_SYSTEM_PROMPT
-        assert "3–5 main beats" in PITCH_SYSTEM_PROMPT
+        assert "exactly the main-beat count from the user message" in PITCH_SYSTEM_PROMPT
         assert "never invent statistics" in PITCH_SYSTEM_PROMPT
         assert '"selected_title"' not in PITCH_SYSTEM_PROMPT
         assert '"video_summary"' not in PITCH_SYSTEM_PROMPT
@@ -66,6 +66,7 @@ class TestPitchJsonStruct:
         )
         assert "Budget travel" in prompt
         assert "Contrarian" in prompt
+        assert "exactly 4 short phrases" in prompt
         assert '"video_summary"' not in prompt
         assert "target_audience" not in prompt.lower() or "do not echo" in prompt.lower()
 
@@ -192,6 +193,7 @@ class TestValidatePitch:
         result = validate_pitch(
             _valid_pitch(target_audience="Travelers", tone="Fun"),
             creative_angle="Contrarian",
+            duration_type="shorts",
         )
         assert result["selected_title"] == "Stop Planning Trips Like This"
         assert "target_audience" not in result
@@ -204,11 +206,41 @@ class TestValidatePitch:
             validate_pitch,
         )
 
-        with pytest.raises(PitchValidationError, match="3–5"):
+        with pytest.raises(PitchValidationError, match="exactly 3"):
             validate_pitch(
                 _valid_pitch(main_content_beats=["Only one"]),
                 creative_angle="Contrarian",
+                duration_type="shorts",
             )
+
+    def test_medium_requires_exactly_four_beats(self):
+        from services.youtube.planner_pitch_validate import (
+            PitchValidationError,
+            validate_pitch,
+        )
+
+        with pytest.raises(PitchValidationError, match="exactly 4"):
+            validate_pitch(
+                _valid_pitch(),
+                creative_angle="Contrarian",
+                duration_type="medium",
+            )
+        result = validate_pitch(
+            _valid_pitch(main_content_beats=["One", "Two", "Three", "Four"]),
+            creative_angle="Contrarian",
+            duration_type="medium",
+        )
+        assert len(result["main_content_beats"]) == 4
+
+    def test_long_requires_exactly_five_beats(self):
+        from services.youtube.planner_pitch_validate import validate_pitch
+
+        result = validate_pitch(
+            _valid_pitch(main_content_beats=["One", "Two", "Three", "Four", "Five"]),
+            creative_angle="Contrarian",
+            duration_type="long",
+        )
+        assert len(result["main_content_beats"]) == 5
 
     def test_fills_angle_used_from_requested_angle(self):
         from services.youtube.planner_pitch_validate import validate_pitch
@@ -216,6 +248,7 @@ class TestValidatePitch:
         result = validate_pitch(
             _valid_pitch(angle_used=""),
             creative_angle="Storytelling",
+            duration_type="shorts",
         )
         assert result["angle_used"] == "Storytelling"
 

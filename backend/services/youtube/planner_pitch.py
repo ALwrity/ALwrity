@@ -316,7 +316,8 @@ async def generate_youtube_pitch(
     json_struct = build_pitch_json_struct()
 
     def _parse_and_validate(raw: Any) -> Dict[str, Any]:
-        return validate_pitch(_parse_llm_json(raw, label="pitch"), creative_angle=angle)
+        parsed = _parse_llm_json(raw, label="pitch")
+        return validate_pitch(parsed, creative_angle=angle, duration_type=duration_type)
 
     pitch = _generate_with_one_retry(
         label="pitch",
@@ -490,8 +491,9 @@ async def expand_pitch_to_script(
         )
 
     logger.info(
-        "[YouTubePlanner] Pitch expanded to script successfully language={} code={}",
+        "[YouTubePlanner] Pitch expanded ok language={} spoken_words={} beats={}",
         resolved_language.label,
-        resolved_language.code,
+        len(str(expansion.get("full_script") or "").split()),
+        len(expansion.get("main_content_outline") or []),
     )
     return expansion

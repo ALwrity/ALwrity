@@ -1,5 +1,6 @@
 import { youtubeApi } from '../../../services/youtubeApi';
 import { apiClient, longRunningApiClient } from '../../../api/client';
+import { YOUTUBE_EXPAND_REQUEST_TIMEOUT_MS } from '../../../services/youtubePitchApi';
 
 vi.mock('../../../api/client', () => ({
   apiClient: {
@@ -142,6 +143,7 @@ describe('youtubeApi', () => {
       expect(longRunningApiClient.post).toHaveBeenCalledWith(
         '/api/youtube/plan/expand',
         expect.objectContaining({ language: 'hi' }),
+        { timeout: YOUTUBE_EXPAND_REQUEST_TIMEOUT_MS },
       );
     });
 
@@ -163,8 +165,27 @@ describe('youtubeApi', () => {
       };
 
       const result = await youtubeApi.expandPitchToScript(request);
-      expect(longRunningApiClient.post).toHaveBeenCalledWith('/api/youtube/plan/expand', request);
+      expect(longRunningApiClient.post).toHaveBeenCalledWith(
+        '/api/youtube/plan/expand',
+        request,
+        { timeout: YOUTUBE_EXPAND_REQUEST_TIMEOUT_MS },
+      );
       expect(result.full_script).toBe('Hook.\n\nBody.');
+    });
+
+    it('maps timeout errors for script expansion', async () => {
+      const timeoutError = new Error('timeout of 600000ms exceeded');
+      jest.mocked(longRunningApiClient.post).mockRejectedValueOnce(timeoutError);
+
+      await expect(
+        youtubeApi.expandPitchToScript({
+          user_idea: 'Budget travel',
+          duration_type: 'shorts',
+          approved_pitch: { selected_title: 'Stop Overpacking' },
+        }),
+      ).rejects.toThrow(
+        'Script expansion is taking longer than expected. Please wait and try again.',
+      );
     });
 
     it('maps timeout errors for pitch generation', async () => {

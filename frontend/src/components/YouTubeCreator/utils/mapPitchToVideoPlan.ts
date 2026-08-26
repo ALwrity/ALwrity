@@ -15,6 +15,7 @@ export interface MapPitchToVideoPlanInput {
     target_audience?: string;
     video_goal?: string;
     brand_style?: string;
+    language?: string;
   };
 }
 
@@ -76,6 +77,7 @@ export function mapPitchToVideoPlan({
       title_suggestions: selectedTitle ? [selectedTitle] : [],
       duration_type: expansion.duration_type || form.duration_type,
       duration_metadata: expansion.duration_metadata,
+      language: (form.language || "").trim() || undefined,
       research_enabled: expansion.research_enabled,
       research_sources: expansion.research_sources,
       research_sources_count: expansion.research_sources_count,

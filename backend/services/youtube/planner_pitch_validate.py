@@ -2,13 +2,15 @@
 
 from typing import Any, Dict, List
 
-from services.youtube.planner_config import get_duration_context
+from services.youtube.planner_config import (
+    get_duration_context,
+    get_main_beat_count,
+    get_spoken_word_budget,
+)
 from utils.logger_utils import get_service_logger
 
 logger = get_service_logger("youtube.planner_pitch")
 
-PITCH_BEAT_MIN = 3
-PITCH_BEAT_MAX = 5
 DURATION_TOLERANCE = 0.2
 ECHOED_PITCH_KEYS = ("target_audience", "tone", "visual_style", "video_goal")
 HOOK_REQUIRED_KEYS = (
@@ -72,7 +74,21 @@ def assemble_full_script(expansion_result: Dict[str, Any]) -> str:
     return script
 
 
-def validate_pitch(pitch: Dict[str, Any], *, creative_angle: str) -> Dict[str, Any]:
+def count_spoken_words(text: str) -> int:
+    """Whitespace word count for the spoken-word duration budget."""
+    try:
+        return len((text or "").split())
+    except Exception:
+        logger.exception("[YouTubePlanner] Spoken word count failed")
+        return 0
+
+
+def validate_pitch(
+    pitch: Dict[str, Any],
+    *,
+    creative_angle: str,
+    duration_type: str,
+) -> Dict[str, Any]:
     """Require pitch assets only; strip echoed Step-1 fields. No mock fill-ins."""
     if not isinstance(pitch, dict):
         raise PitchValidationError("Pitch response must be a JSON object.")
@@ -83,11 +99,20 @@ def validate_pitch(pitch: Dict[str, Any], *, creative_angle: str) -> Dict[str, A
     hook = str(cleaned.get("hook_concept") or "").strip()
     raw_beats = cleaned.get("main_content_beats")
     if not isinstance(raw_beats, list):
-        raise PitchValidationError("Pitch main_content_beats must be a list of 3–5 phrases.")
+        raise PitchValidationError("Pitch main_content_beats must be a list of phrases.")
     beats = [str(item).strip() for item in raw_beats if str(item).strip()]
-    if not (PITCH_BEAT_MIN <= len(beats) <= PITCH_BEAT_MAX):
+    try:
+        expected_beats = get_main_beat_count(duration_type)
+    except Exception:
+        logger.exception(
+            "[YouTubePlanner] Pitch beat-count lookup failed duration={}",
+            duration_type,
+        )
+        raise PitchValidationError("Could not determine beat count for this duration.") from None
+    if len(beats) != expected_beats:
         raise PitchValidationError(
-            f"Pitch must include {PITCH_BEAT_MIN}–{PITCH_BEAT_MAX} main beats; got {len(beats)}."
+            f"Pitch must include exactly {expected_beats} main beats for {duration_type}; "
+            f"got {len(beats)}."
         )
     if not title or not summary or not hook:
         raise PitchValidationError(
@@ -99,9 +124,10 @@ def validate_pitch(pitch: Dict[str, Any], *, creative_angle: str) -> Dict[str, A
         raise PitchValidationError("Pitch is missing angle_used.")
 
     logger.info(
-        "[YouTubePlanner] Pitch validated: title_len={} beats={}",
+        "[YouTubePlanner] Pitch validated: title_len={} beats={} duration={}",
         len(title),
         len(beats),
+        duration_type,
     )
     return {
         "selected_title": title,
@@ -117,7 +143,7 @@ def validate_expansion(
     *,
     duration_type: str,
 ) -> Dict[str, Any]:
-    """Require script fields and duration sum ±20%. Does not invent missing copy."""
+    """Require script fields, exact beat count, duration ±20%, and spoken words ±20%."""
     if not isinstance(expansion, dict):
         raise PitchValidationError("Expansion response must be a JSON object.")
 
@@ -157,6 +183,26 @@ def validate_expansion(
         duration_sum += seconds
         cleaned_beats.append(beat)
 
+    try:
+        expected_beats = get_main_beat_count(duration_type)
+    except Exception:
+        logger.exception(
+            "[YouTubePlanner] Expansion beat-count lookup failed duration={}",
+            duration_type,
+        )
+        raise PitchValidationError("Could not determine beat count for this duration.") from None
+    if len(cleaned_beats) != expected_beats:
+        logger.warning(
+            "[YouTubePlanner] Expansion beat count mismatch duration={} expected={} got={}",
+            duration_type,
+            expected_beats,
+            len(cleaned_beats),
+        )
+        raise PitchValidationError(
+            f"Expansion must include exactly {expected_beats} outline beats for "
+            f"{duration_type}; got {len(cleaned_beats)}."
+        )
+
     duration_context = get_duration_context(duration_type)
     target = float(duration_context["target_seconds"])
     if abs(duration_sum - target) > target * DURATION_TOLERANCE:
@@ -170,16 +216,59 @@ def validate_expansion(
     if not outro or not cta or not key_message:
         raise PitchValidationError("Expansion is missing outro, call_to_action, or key_message.")
 
+    try:
+        assembled = assemble_full_script(
+            {
+                "hook": hook,
+                "main_content_outline": cleaned_beats,
+                "outro": outro,
+                "call_to_action": cta,
+            }
+        )
+        word_count = count_spoken_words(assembled)
+        budget = get_spoken_word_budget(duration_type)
+        max_words = int(budget["max_spoken_words"])
+    except PitchValidationError:
+        raise
+    except Exception:
+        logger.exception(
+            "[YouTubePlanner] Spoken-word budget check failed duration={}",
+            duration_type,
+        )
+        raise PitchValidationError(
+            "Could not validate spoken script length. Please try again."
+        ) from None
+    if word_count <= 0:
+        logger.warning(
+            "[YouTubePlanner] Spoken word count was empty duration={}",
+            duration_type,
+        )
+    if abs(word_count - max_words) > max_words * DURATION_TOLERANCE:
+        logger.warning(
+            "[YouTubePlanner] Spoken word budget missed duration={} words={} target={} "
+            "tolerance={}",
+            duration_type,
+            word_count,
+            max_words,
+            DURATION_TOLERANCE,
+        )
+        raise PitchValidationError(
+            f"Spoken script is {word_count} words; target is {max_words} words (±20%)."
+        )
+
     keywords = expansion.get("seo_keywords")
     if not isinstance(keywords, list):
         raise PitchValidationError("Expansion seo_keywords must be a list.")
     cleaned_keywords = [str(item).strip() for item in keywords if str(item).strip()]
 
     logger.info(
-        "[YouTubePlanner] Expansion validated: beats={} duration_sum={} target={}",
+        "[YouTubePlanner] Expansion validated: beats={} duration_sum={} target={} "
+        "spoken_words={} max_words={}",
         len(cleaned_beats),
         duration_sum,
         target,
+        word_count,
+        max_words,
     )
     return {
         "hook": hook,

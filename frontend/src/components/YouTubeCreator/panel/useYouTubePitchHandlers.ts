@@ -236,6 +236,7 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
             target_audience: targetAudience,
             video_goal: videoGoal,
             brand_style: brandStyle,
+            language: contentLanguage,
           },
         });
       } catch (mapErr: unknown) {

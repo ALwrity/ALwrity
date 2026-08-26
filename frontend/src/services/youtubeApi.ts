@@ -85,6 +85,8 @@ export interface VideoPlan {
     hook_seconds?: number;
   };
   duration_type: string;
+  /** Content language code for scene-builder LLM fallback (e.g. hi). */
+  language?: string;
   estimated_duration?: string;
   auto_generated_avatar_url?: string;
   avatar_reused?: boolean; // Flag indicating if avatar was reused from asset library

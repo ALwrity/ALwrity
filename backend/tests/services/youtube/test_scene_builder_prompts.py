@@ -39,6 +39,21 @@ class TestBuildSceneGenerationPrompts:
         assert "Open strong" in user_prompt
         assert "5-15 seconds" in user_prompt
 
+    def test_includes_hindi_language_and_spoken_word_budget(self):
+        from services.youtube.scene_builder_prompts import build_scene_generation_prompts
+
+        plan = _plan()
+        plan["language"] = "hi"
+        plan["duration_type"] = "shorts"
+        _, user_prompt = build_scene_generation_prompts(
+            plan,
+            {"scene_duration_range": (2, 8), "target_seconds": 30, "hook_seconds": 3},
+        )
+
+        assert "CONTENT LANGUAGE:** Hindi" in user_prompt
+        assert "Write every narration field in Hindi" in user_prompt
+        assert "Spoken word budget: 75 words" in user_prompt
+
     def test_normalizes_string_outline_items(self):
         from services.youtube.scene_builder_prompts import build_scene_generation_prompts
 
