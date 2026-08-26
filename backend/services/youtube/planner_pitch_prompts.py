@@ -148,6 +148,31 @@ def build_content_language_prompt_block(language_code: Optional[str] = None) -> 
     return f"**Content language:** {label}\n{instruction}"
 
 
+PITCH_RESEARCH_PLACEHOLDER = "{{EXA_RESEARCH}}"
+PITCH_RESEARCH_PROMPT_HEADING = "**Research (facts only — do not invent):**"
+
+
+def build_pitch_research_placeholder() -> str:
+    """Labeled research stand-in for preview. Does not call Exa."""
+    return (
+        f"{PITCH_RESEARCH_PLACEHOLDER}\n"
+        "Live web research is appended here when you generate a pitch. "
+        "It is not fetched for this preview."
+    )
+
+
+def pitch_user_prompt_non_research_prefix(user_prompt: str) -> str:
+    """Pitch user prompt before the research block (placeholder or live facts)."""
+    try:
+        text = user_prompt if isinstance(user_prompt, str) else str(user_prompt or "")
+    except Exception:
+        logger.exception("[YouTubePlanner] Failed to coerce pitch prompt for prefix split")
+        return ""
+    if PITCH_RESEARCH_PROMPT_HEADING in text:
+        return text.split(PITCH_RESEARCH_PROMPT_HEADING, 1)[0].rstrip()
+    return text.rstrip()
+
+
 def build_pitch_user_prompt(
     *,
     user_idea: str,
@@ -197,7 +222,13 @@ def build_pitch_user_prompt(
             ]
         )
     if research_context:
-        parts.extend(["", research_context.strip()])
+        parts.extend(
+            [
+                "",
+                PITCH_RESEARCH_PROMPT_HEADING,
+                research_context.strip(),
+            ]
+        )
     parts.extend(
         [
             "",
@@ -265,3 +296,61 @@ def build_expansion_user_prompt(
         ]
     )
     return "\n".join(parts)
+
+
+def build_pitch_preview_prompts(
+    *,
+    user_idea: str,
+    creative_angle: str,
+    duration_type: str,
+    video_type: Optional[str] = None,
+    target_audience: Optional[str] = None,
+    video_goal: Optional[str] = None,
+    brand_style: Optional[str] = None,
+    persona_context: str = "",
+    channel_bible_context: str = "",
+    source_article_title: Optional[str] = None,
+    source_article_summary: Optional[str] = None,
+    language: Optional[str] = None,
+    enable_research: bool = True,
+) -> Dict[str, str]:
+    """Same pitch system + user builder as generate. Research is a placeholder, never Exa."""
+    try:
+        research_context = build_pitch_research_placeholder() if enable_research else ""
+        user_prompt = build_pitch_user_prompt(
+            user_idea=user_idea,
+            creative_angle=creative_angle,
+            duration_type=duration_type,
+            video_type=video_type,
+            target_audience=target_audience,
+            video_goal=video_goal,
+            brand_style=brand_style,
+            persona_context=persona_context,
+            channel_bible_context=channel_bible_context,
+            research_context=research_context,
+            source_article_title=source_article_title,
+            source_article_summary=source_article_summary,
+            language=language,
+        )
+        if not (user_prompt or "").strip():
+            raise ValueError("Pitch preview user prompt was empty")
+        logger.info(
+            "[YouTubePlanner] Pitch preview prompts built duration={} research_placeholder={} "
+            "user_len={} system_len={} language_len={}",
+            duration_type,
+            bool(enable_research),
+            len(user_prompt),
+            len(PITCH_SYSTEM_PROMPT),
+            len((language or "").strip()),
+        )
+        return {
+            "system_prompt": PITCH_SYSTEM_PROMPT,
+            "user_prompt": user_prompt,
+        }
+    except Exception:
+        logger.exception(
+            "[YouTubePlanner] Failed to build pitch preview prompts duration={} research={}",
+            duration_type,
+            bool(enable_research),
+        )
+        raise

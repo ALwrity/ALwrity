@@ -77,6 +77,46 @@ describe('youtubeApi', () => {
       expect(result.pitch?.selected_title).toBe('Stop Overpacking');
     });
 
+    it('posts pitch preview requests to /api/youtube/plan/pitch/preview', async () => {
+      const mockResponse = {
+        data: {
+          success: true,
+          system_prompt: 'You are ALwrity\'s YouTube Script Architect.',
+          user_prompt: 'Create ONE short video pitch for: "Budget travel"',
+          message: 'Pitch prompt preview ready',
+        },
+      };
+      jest.mocked(apiClient.post).mockResolvedValueOnce(mockResponse);
+
+      const request = {
+        user_idea: 'Budget travel',
+        duration_type: 'shorts' as const,
+        creative_angle: 'Contrarian',
+        language: 'hi',
+        enable_research: true,
+      };
+
+      const result = await youtubeApi.previewPitchPrompt(request);
+      expect(apiClient.post).toHaveBeenCalledWith('/api/youtube/plan/pitch/preview', request);
+      expect(longRunningApiClient.post).not.toHaveBeenCalled();
+      expect(result.user_prompt).toContain('Create ONE short video pitch');
+    });
+
+    it('maps preview HTTP errors without leaking payloads', async () => {
+      jest.mocked(apiClient.post).mockRejectedValueOnce({
+        response: { status: 500, data: { detail: 'Failed to prepare the pitch prompt preview. Please try again.' } },
+        message: 'Request failed',
+      });
+
+      await expect(
+        youtubeApi.previewPitchPrompt({
+          user_idea: 'Budget travel',
+          duration_type: 'shorts',
+          creative_angle: 'Contrarian',
+        }),
+      ).rejects.toThrow('Failed to prepare the pitch prompt preview. Please try again.');
+    });
+
     it('forwards language on pitch and expand requests', async () => {
       jest.mocked(longRunningApiClient.post).mockResolvedValue({
         data: { success: true, pitch: { selected_title: 'Title' }, expansion: {}, full_script: 'Script' },

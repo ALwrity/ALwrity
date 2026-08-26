@@ -103,6 +103,14 @@ class PitchResponse(BaseModel):
     message: str
 
 
+class PitchPreviewResponse(BaseModel):
+    """Pitch prompt preview from the same builder used at generate. No LLM, no Exa."""
+    success: bool
+    system_prompt: Optional[str] = None
+    user_prompt: Optional[str] = None
+    message: str
+
+
 class ExpandRequest(VideoPlanRequest):
     """Phase 2: approved pitch → full production script."""
     approved_pitch: Dict[str, Any] = Field(

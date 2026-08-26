@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -186,6 +186,45 @@ class TestExpandPitchToScript:
         llm_mock.assert_called_once()
         assert llm_mock.call_args.kwargs["flow_type"] == "youtube_script_expand"
         assert "max_tokens" not in llm_mock.call_args.kwargs
+
+    def test_reuses_research_prompt_block_without_calling_exa(self):
+        from services.youtube.planner import YouTubePlannerService
+        from services.youtube.planner_pitch import expand_pitch_to_script
+
+        svc = YouTubePlannerService()
+        block = (
+            "Use only these facts. Do not invent statistics or numbers.\n\n"
+            "1. Carry-on packing\n   Pack three items."
+        )
+        approved = {
+            "selected_title": "Stop Planning Trips Like This",
+            "video_summary": "Pack less.",
+            "hook_concept": "Three-item rule",
+            "main_content_beats": ["One", "Two", "Three"],
+            "angle_used": "Contrarian",
+            "research_prompt_block": block,
+            "research_sources": [{"title": "Guide", "url": "https://example.com/a"}],
+        }
+        exa = AsyncMock(return_value=("", []))
+        with patch(
+            "services.youtube.planner_pitch.llm_text_gen",
+            return_value=_valid_expansion(),
+        ), patch.object(svc, "_perform_exa_research", exa):
+            result = asyncio.run(
+                expand_pitch_to_script(
+                    svc,
+                    user_idea="Budget travel",
+                    duration_type="shorts",
+                    approved_pitch=approved,
+                    user_id="user_expand",
+                    enable_research=True,
+                )
+            )
+
+        exa.assert_not_called()
+        assert block in result["generation"]["user_prompt"]
+        assert "https://example.com/a" not in result["generation"]["user_prompt"]
+        assert result["research_sources"][0]["url"] == "https://example.com/a"
 
     def test_missing_approved_pitch_returns_clear_error(self):
         from services.youtube.planner import YouTubePlannerService

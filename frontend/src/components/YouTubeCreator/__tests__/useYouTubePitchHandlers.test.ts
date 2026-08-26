@@ -34,6 +34,9 @@ function buildArgs() {
       video_summary: "Pack three items.",
       hook_concept: "Skip the suitcase.",
       main_content_beats: ["Rule one", "Rule two", "Rule three"],
+      research_prompt_block:
+        "Use only these facts. Do not invent statistics or numbers.\n\n1. Carry-on packing",
+      research_sources: [{ title: "Guide", url: "https://example.com/a" }],
     },
     pitchHistory: [],
     updateState: jest.fn(),
@@ -98,7 +101,14 @@ describe("useYouTubePitchHandlers language contract", () => {
     });
 
     expect(youtubeApi.expandPitchToScript).toHaveBeenCalledWith(
-      expect.objectContaining({ language: "hi" }),
+      expect.objectContaining({
+        language: "hi",
+        approved_pitch: expect.objectContaining({
+          research_prompt_block:
+            "Use only these facts. Do not invent statistics or numbers.\n\n1. Carry-on packing",
+          research_sources: [{ title: "Guide", url: "https://example.com/a" }],
+        }),
+      }),
     );
   });
 

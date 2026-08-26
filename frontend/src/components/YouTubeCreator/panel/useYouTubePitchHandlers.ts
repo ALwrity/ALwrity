@@ -190,6 +190,8 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
         enableResearch,
         beatCount: currentPitch.main_content_beats.length,
         language: contentLanguage,
+        hasResearchBlock: Boolean(currentPitch.research_prompt_block),
+        researchSourceCount: currentPitch.research_sources?.length ?? 0,
       });
       const response = await youtubeApi.expandPitchToScript({
         user_idea: userIdea,
@@ -209,6 +211,8 @@ export function useYouTubePitchHandlers(args: YouTubePitchHandlerArgs) {
           main_content_beats: currentPitch.main_content_beats,
           angle_used: currentPitch.creative_angle,
           creative_angle: currentPitch.creative_angle,
+          research_prompt_block: currentPitch.research_prompt_block,
+          research_sources: currentPitch.research_sources,
         },
       });
 

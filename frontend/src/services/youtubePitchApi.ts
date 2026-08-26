@@ -3,7 +3,7 @@
  * Lives here because youtubeApi.ts already exceeds 500 lines.
  */
 
-import { longRunningApiClient } from "../api/client";
+import { apiClient, longRunningApiClient } from "../api/client";
 import type { VideoPlanGeneration, VideoPlanRequest, VideoPlanResearchSource } from "./youtubeApi";
 
 const API_BASE = "/api/youtube";
@@ -23,6 +23,8 @@ export interface YouTubePitchPayload {
   research_enabled?: boolean;
   research_sources?: VideoPlanResearchSource[];
   research_sources_count?: number;
+  /** Compact facts block reused on expand so Exa is not called twice. */
+  research_prompt_block?: string;
 }
 
 export interface YouTubePitchResponse {
@@ -38,6 +40,8 @@ export interface YouTubeApprovedPitch {
   main_content_beats?: string[];
   angle_used?: string;
   creative_angle?: string;
+  research_prompt_block?: string;
+  research_sources?: VideoPlanResearchSource[];
 }
 
 export interface YouTubeExpandRequest extends VideoPlanRequest {
@@ -104,6 +108,54 @@ function pitchErrorMessage(error: unknown, fallback: string): string {
     return fallback;
   }
   return err?.response?.data?.message || err?.response?.data?.detail || err?.message || fallback;
+}
+
+export interface YouTubePitchPreviewResponse {
+  success: boolean;
+  system_prompt?: string;
+  user_prompt?: string;
+  message: string;
+}
+
+export async function previewPitchPrompt(
+  request: YouTubePitchRequest,
+): Promise<YouTubePitchPreviewResponse> {
+  const language = (request.language || "en").trim() || "en";
+  try {
+    console.info("[youtubeApi] previewPitchPrompt started", {
+      durationType: request.duration_type,
+      angleLen: request.creative_angle?.trim().length ?? 0,
+      ideaLen: request.user_idea?.trim().length ?? 0,
+      language,
+      enableResearch: Boolean(request.enable_research),
+    });
+    const response = await apiClient.post(`${API_BASE}/plan/pitch/preview`, request);
+    const data = response?.data as YouTubePitchPreviewResponse | undefined;
+    if (!data || typeof data !== "object") {
+      console.error("[youtubeApi] previewPitchPrompt empty response", { language });
+      throw new Error("Failed to load the pitch prompt preview. Please try again.");
+    }
+    console.info("[youtubeApi] previewPitchPrompt succeeded", {
+      language,
+      success: Boolean(data.success),
+      systemLen: (data.system_prompt || "").length,
+      userLen: (data.user_prompt || "").length,
+    });
+    return data;
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes("Failed to load the pitch prompt preview")) {
+      throw error;
+    }
+    const err = error as { response?: { status?: number }; message?: string };
+    console.error("[youtubeApi] previewPitchPrompt failed", {
+      language,
+      status: err?.response?.status,
+      timedOut: Boolean(err?.message?.toLowerCase().includes("timeout")),
+    });
+    throw new Error(
+      pitchErrorMessage(error, "Failed to load the pitch prompt preview. Please try again."),
+    );
+  }
 }
 
 export async function generatePitch(request: YouTubePitchRequest): Promise<YouTubePitchResponse> {

@@ -16,6 +16,8 @@ export interface YouTubeVideoPitch {
   generation?: VideoPlanGeneration;
   research_enabled?: boolean;
   research_sources?: VideoPlanResearchSource[];
+  /** Compact facts block from pitch generate; sent back on expand. */
+  research_prompt_block?: string;
 }
 
 export interface YouTubeCreatorState {

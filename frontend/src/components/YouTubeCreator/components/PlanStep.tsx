@@ -713,6 +713,12 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
             onChange={onEnableResearchChange}
           />
 
+          <YouTubeCreativeAngleSelector
+            value={creativeAngle}
+            disabled={loading}
+            onChange={onCreativeAngleChange}
+          />
+
           <PlanPromptPreview
             userIdea={userIdea}
             durationType={durationType}
@@ -722,13 +728,7 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
             brandStyle={brandStyle}
             language={language}
             enableResearch={enableResearch}
-            channelBible={channelBible}
-          />
-
-          <YouTubeCreativeAngleSelector
-            value={creativeAngle}
-            disabled={loading}
-            onChange={onCreativeAngleChange}
+            creativeAngle={creativeAngle}
           />
 
           {currentPitch && scriptPhase !== 'idle' ? (
