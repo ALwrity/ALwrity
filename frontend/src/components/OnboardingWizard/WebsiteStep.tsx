@@ -133,8 +133,8 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
   useEffect(() => {
     // Update header content when component mounts
     updateHeaderContent({
-      title: 'Analyze Your Website',
-      description: 'Let Alwrity analyze your website to understand your brand voice, writing style, and content characteristics. This helps us generate content that matches your existing tone and resonates with your audience.'
+      title: 'Let ALwrity Learn Your Brand',
+      description: ''
     });
   }, [updateHeaderContent]);
 
@@ -452,25 +452,13 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
       maxWidth: '100%',
       width: '100%',
       mx: 0,
-      p: 2,
+      p: { xs: 1.5, md: 2 },
       '@keyframes fadeIn': {
         '0%': { opacity: 0, transform: 'translateY(10px)' },
         '100%': { opacity: 1, transform: 'translateY(0)' }
       }
     }}>
       {/* Header */}
-      <Box sx={{ mb: 3, textAlign: 'center', animation: 'fadeIn 0.6s ease-out' }}>
-        <Typography variant="h4" sx={{
-          fontWeight: 700,
-          mb: 1,
-          background: 'linear-gradient(135deg, #60A5FA 0%, #3B82F6 50%, #1D4ED8 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-        }}>
-          Let ALwrity Learn Your Brand
-        </Typography>
-      </Box>
-
       {/* Email Section */}
       <EmailSection email={email} onEmailChange={setEmail} />
 
