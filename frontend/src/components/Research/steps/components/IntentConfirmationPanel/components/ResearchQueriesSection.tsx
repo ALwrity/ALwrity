@@ -24,11 +24,9 @@ import {
   Divider,
   Chip,
 } from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  Search as SearchIcon,
-  Delete as DeleteIcon,
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import SearchIcon from '@mui/icons-material/Search';
+import DeleteIcon from '@mui/icons-material/Delete';
 import {
   ResearchQuery,
   ExpectedDeliverable,

@@ -21,19 +21,17 @@ import {
   AccordionSummary,
   AccordionDetails,
 } from '@mui/material';
-import {
-  ArrowBack,
-  CheckCircle,
-  Close,
-  AutoAwesome,
-  Edit,
-  PlayArrow,
-  AttachMoney,
-  PhotoLibrary,
-  Description,
-  ExpandMore,
-  Info,
-} from '@mui/icons-material';
+import ArrowBack from '@mui/icons-material/ArrowBack';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Close from '@mui/icons-material/Close';
+import AutoAwesome from '@mui/icons-material/AutoAwesome';
+import Edit from '@mui/icons-material/Edit';
+import PlayArrow from '@mui/icons-material/PlayArrow';
+import AttachMoney from '@mui/icons-material/AttachMoney';
+import PhotoLibrary from '@mui/icons-material/PhotoLibrary';
+import Description from '@mui/icons-material/Description';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import Info from '@mui/icons-material/Info';
 import { motion } from 'framer-motion';
 import { ImageStudioLayout } from '../ImageStudio/ImageStudioLayout';
 import { GlassyCard } from '../ImageStudio/ui/GlassyCard';

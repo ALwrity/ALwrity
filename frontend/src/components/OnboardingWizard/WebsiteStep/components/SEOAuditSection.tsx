@@ -25,21 +25,18 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon,
-  Speed as SpeedIcon,
-  Security as SecurityIcon,
-  Code as CodeIcon,
-  Description as DescriptionIcon,
-  AccessibilityNew as AccessibilityIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  // Info as InfoIcon,
-  PlayArrow as PlayArrowIcon,
-  Schedule as ScheduleIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
+import SpeedIcon from '@mui/icons-material/Speed';
+import SecurityIcon from '@mui/icons-material/Security';
+import CodeIcon from '@mui/icons-material/Code';
+import DescriptionIcon from '@mui/icons-material/Description';
+import AccessibilityIcon from '@mui/icons-material/AccessibilityNew';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 
 const METRIC_TOOLTIPS: { [key: string]: string } = {
   // Meta Data

@@ -16,17 +16,15 @@ import {
   IconButton,
   Collapse
 } from '@mui/material';
-import {
-  AutoAwesome as AutoAwesomeIcon,
-  Lightbulb as LightbulbIcon,
-  TrendingUp as TrendingUpIcon,
-  Psychology as PsychologyIcon,
-  Analytics as AnalyticsIcon,
-  CalendarToday as CalendarIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Refresh as RefreshIcon
-} from '@mui/icons-material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import CalendarIcon from '@mui/icons-material/CalendarToday';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 interface AIRecommendationsPanelProps {
   aiGenerating: boolean;

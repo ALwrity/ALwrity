@@ -15,14 +15,12 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import {
-  Image as ImageIcon,
-  LinkedIn as LinkedInIcon,
-  OpenInNew as OpenInNewIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Close as CloseIcon,
-} from "@mui/icons-material";
+import ImageIcon from '@mui/icons-material/Image';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import CloseIcon from '@mui/icons-material/Close';
 import { useLinkedInSocialConnection } from "../../../hooks/useLinkedInSocialConnection";
 import { getLinkedInPublishErrorMessage } from "../../../api/linkedinSocial";
 import { useLinkedInPublishMedia } from "../hooks/useLinkedInPublishMedia";

@@ -1,20 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { Stack, Box, Typography, Divider, Chip, alpha, CircularProgress, LinearProgress, IconButton, Tooltip, Dialog, DialogContent } from "@mui/material";
-import {
-  EditNote as EditNoteIcon,
-  CheckCircle as CheckCircleIcon,
-  RadioButtonUnchecked as RadioButtonUncheckedIcon,
-  VolumeUp as VolumeUpIcon,
-  PlayArrow as PlayArrowIcon,
-  Image as ImageIcon,
-  Delete as DeleteIcon,
-  Fullscreen as FullscreenIcon,
-  Close as CloseIcon,
-  Refresh as RefreshIcon,
-  Info as InfoIcon,
-  Mic as MicIcon,
-  HelpOutline as HelpOutlineIcon,
-} from "@mui/icons-material";
+import EditNoteIcon from '@mui/icons-material/EditNote';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import ImageIcon from '@mui/icons-material/Image';
+import DeleteIcon from '@mui/icons-material/Delete';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
+import CloseIcon from '@mui/icons-material/Close';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import InfoIcon from '@mui/icons-material/Info';
+import MicIcon from '@mui/icons-material/Mic';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { Scene, Line, Knobs } from "../types";
 import { GlassyCard, glassyCardSx, PrimaryButton } from "../ui";
 import { OperationButton } from "../../shared/OperationButton";

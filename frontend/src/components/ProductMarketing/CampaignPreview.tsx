@@ -13,13 +13,11 @@ import {
   Grid,
   Divider,
 } from '@mui/material';
-import {
-  Campaign,
-  TrendingUp,
-  PhotoLibrary,
-  Description,
-  VideoLibrary,
-} from '@mui/icons-material';
+import Campaign from '@mui/icons-material/Campaign';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import PhotoLibrary from '@mui/icons-material/PhotoLibrary';
+import Description from '@mui/icons-material/Description';
+import VideoLibrary from '@mui/icons-material/VideoLibrary';
 
 interface CampaignPreviewProps {
   campaignName: string;

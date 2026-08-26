@@ -1,6 +1,6 @@
 /**
  * Tests for LinkedIn Gemini 3 Pro Image model option in shared presets.
- * Run: npx jest linkedInImageModels.test.tsx --watchAll=false
+ * Run: npx vitest run linkedInImageModels.test.tsx --watchAll=false
  */
 
 import {

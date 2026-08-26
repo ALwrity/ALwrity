@@ -3,9 +3,7 @@ import {
   Alert, 
   IconButton 
 } from '@mui/material';
-import { 
-  Close as CloseIcon 
-} from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
 import { SEOAnalysisErrorProps } from '../../shared/types';
 
 const SEOAnalysisError: React.FC<SEOAnalysisErrorProps> = ({ 

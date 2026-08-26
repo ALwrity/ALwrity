@@ -14,7 +14,8 @@ import {
   Paper,
   Tooltip,
 } from '@mui/material';
-import { Delete as DeleteIcon, DragHandle as DragIcon } from '@mui/icons-material';
+import DeleteIcon from '@mui/icons-material/Delete';
+import DragIcon from '@mui/icons-material/DragHandle';
 import {
   DndContext,
   closestCenter,

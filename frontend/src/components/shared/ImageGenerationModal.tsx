@@ -29,12 +29,10 @@ import {
   Paper,
   Button,
 } from "@mui/material";
-import {
-  Info as InfoIcon,
-  HelpOutline as HelpOutlineIcon,
-  Close as CloseIcon,
-  Palette as PaletteIcon,
-} from "@mui/icons-material";
+import InfoIcon from '@mui/icons-material/Info';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import CloseIcon from '@mui/icons-material/Close';
+import PaletteIcon from '@mui/icons-material/Palette';
 
 import {
   ImageGenerationModalProps,

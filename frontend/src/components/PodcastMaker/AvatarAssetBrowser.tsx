@@ -16,14 +16,12 @@ import {
   Button,
   IconButton
 } from '@mui/material';
-import { 
-  Search as SearchIcon, 
-  Collections as CollectionsIcon, 
-  CheckCircle as CheckCircleIcon,
-  ExpandMore as ExpandMoreIcon,
-  Favorite as FavoriteIcon,
-  FavoriteBorder as FavoriteBorderIcon
-} from '@mui/icons-material';
+import SearchIcon from '@mui/icons-material/Search';
+import CollectionsIcon from '@mui/icons-material/Collections';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import { useContentAssets } from '../../hooks/useContentAssets';
 import { fetchMediaBlobUrl } from '../../utils/fetchMediaBlobUrl';
 

@@ -15,15 +15,13 @@ import {
   Tooltip,
   CircularProgress
 } from '@mui/material';
-import {
-  Warning as WarningIcon,
-  Error as ErrorIcon,
-  Refresh as RefreshIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  PlayArrow as PlayArrowIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import InfoIcon from '@mui/icons-material/Info';
 import { styled } from '@mui/material/styles';
 import { apiClient } from '../../api/client';
 import { TerminalTypography, terminalColors } from './terminalTheme';

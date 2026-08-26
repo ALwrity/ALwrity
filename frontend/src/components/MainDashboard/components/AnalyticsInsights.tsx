@@ -13,15 +13,13 @@ import {
   Divider
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import {
-  CheckCircle as CheckIcon,
-  WarningAmber as WarningIcon,
-  Error as ErrorIcon,
-  Close as CloseIcon,
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/WarningAmber';
+import ErrorIcon from '@mui/icons-material/Error';
+import CloseIcon from '@mui/icons-material/Close';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import InfoIcon from '@mui/icons-material/Info';
 import { motion } from 'framer-motion';
 
 interface Insight {

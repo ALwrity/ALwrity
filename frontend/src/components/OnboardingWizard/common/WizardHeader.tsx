@@ -10,10 +10,8 @@ import {
   Fade,
   CircularProgress
 } from '@mui/material';
-import {
-  HelpOutline,
-  Close
-} from '@mui/icons-material';
+import HelpOutline from '@mui/icons-material/HelpOutline';
+import Close from '@mui/icons-material/Close';
 import UserBadge from '../../shared/UserBadge';
 
 interface WizardHeaderProps {

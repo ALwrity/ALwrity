@@ -7,11 +7,9 @@ import {
   Alert,
   CircularProgress
 } from '@mui/material';
-import {
-  PlayArrow as PlayArrowIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Edit as EditIcon
-} from '@mui/icons-material';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import EditIcon from '@mui/icons-material/Edit';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useContentPlanningStore } from '../../../stores/contentPlanningStore';
 import { contentPlanningApi } from '../../../services/contentPlanningApi';

@@ -15,10 +15,8 @@ import {
   AccordionDetails,
   Stack,
 } from '@mui/material';
-import {
-  Refresh as RefreshIcon,
-  ExpandMore as ExpandMoreIcon,
-} from '@mui/icons-material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useAgentHuddleFeed } from '../../../hooks/useAgentHuddleFeed';
 
 type EventPayload = {

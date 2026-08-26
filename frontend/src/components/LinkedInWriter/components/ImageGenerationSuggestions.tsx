@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from "react";
-import {
-  AutoAwesome as SparklesIcon,
-  PhotoCamera as PhotoIcon,
-  ArrowForward as ArrowRightIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as ExclamationTriangleIcon,
-} from "@mui/icons-material";
+import SparklesIcon from '@mui/icons-material/AutoAwesome';
+import PhotoIcon from '@mui/icons-material/PhotoCamera';
+import ArrowRightIcon from '@mui/icons-material/ArrowForward';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ExclamationTriangleIcon from '@mui/icons-material/Warning';
 import { useCopilotActionTyped } from "../../../hooks/useCopilotActionTyped";
 
 interface ImageGenerationSuggestionsProps {

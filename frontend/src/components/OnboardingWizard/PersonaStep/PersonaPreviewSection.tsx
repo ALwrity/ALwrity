@@ -7,7 +7,9 @@ import {
   Tab,
   Fade
 } from '@mui/material';
-import { CheckCircle, Cancel, Refresh } from '@mui/icons-material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Cancel from '@mui/icons-material/Cancel';
+import Refresh from '@mui/icons-material/Refresh';
 import { CorePersonaDisplay } from './sections/CorePersonaDisplay';
 import { PlatformPersonaDisplay } from './sections/PlatformPersonaDisplay';
 import { HowWeBuiltThisPersona } from './sections/HowWeBuiltThisPersona';

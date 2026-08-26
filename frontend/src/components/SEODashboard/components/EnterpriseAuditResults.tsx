@@ -29,18 +29,16 @@ import {
   Skeleton,
   CircularProgress,
 } from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon,
-  TrendingUp as TrendingUpIcon,
-  Lightbulb as LightbulbIcon,
-  Assessment as AssessmentIcon,
-  Speed as SpeedIcon,
-  Search as SearchIcon,
-  Gavel as GavelIcon,
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import SpeedIcon from '@mui/icons-material/Speed';
+import SearchIcon from '@mui/icons-material/Search';
+import GavelIcon from '@mui/icons-material/Gavel';
 import { motion } from 'framer-motion';
 import { EnterpriseAuditResult, AIInsight, AuditIssue } from '../../../api/enterpriseSeoApi';
 

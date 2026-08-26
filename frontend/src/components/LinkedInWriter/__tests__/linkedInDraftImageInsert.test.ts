@@ -2,12 +2,12 @@ import { insertImageIntoLinkedInDraft } from "../utils/linkedInDraftImageInsert"
 
 describe("linkedInDraftImageInsert", () => {
   beforeEach(() => {
-    jest.spyOn(console, "debug").mockImplementation(() => {});
-    jest.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "debug").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it("appends image markdown to the draft", () => {
@@ -23,7 +23,7 @@ describe("linkedInDraftImageInsert", () => {
   });
 
   it("flushes assistive editor draft before inserting", () => {
-    const flushDraft = jest.fn(() => "Flushed post body");
+    const flushDraft = vi.fn(() => "Flushed post body");
 
     const result = insertImageIntoLinkedInDraft(
       "stale draft",

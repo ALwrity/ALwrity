@@ -42,30 +42,28 @@ import {
   DialogActions,
   Autocomplete,
 } from '@mui/material';
-import {
-  Search,
-  GridView,
-  ViewList,
-  Favorite,
-  FavoriteBorder,
-  Download,
-  Share,
-  Delete,
-  VideoLibrary,
-  Collections,
-  Add,
-  Edit,
-  MoreVert,
-  CalendarToday,
-  CheckCircle,
-  HourglassEmpty,
-  Error as ErrorIcon,
-  Refresh,
-  Sort,
-  FilterList,
-  Folder,
-  FolderOpen,
-} from '@mui/icons-material';
+import Search from '@mui/icons-material/Search';
+import GridView from '@mui/icons-material/GridView';
+import ViewList from '@mui/icons-material/ViewList';
+import Favorite from '@mui/icons-material/Favorite';
+import FavoriteBorder from '@mui/icons-material/FavoriteBorder';
+import Download from '@mui/icons-material/Download';
+import Share from '@mui/icons-material/Share';
+import Delete from '@mui/icons-material/Delete';
+import VideoLibrary from '@mui/icons-material/VideoLibrary';
+import Collections from '@mui/icons-material/Collections';
+import Add from '@mui/icons-material/Add';
+import Edit from '@mui/icons-material/Edit';
+import MoreVert from '@mui/icons-material/MoreVert';
+import CalendarToday from '@mui/icons-material/CalendarToday';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import HourglassEmpty from '@mui/icons-material/HourglassEmpty';
+import ErrorIcon from '@mui/icons-material/Error';
+import Refresh from '@mui/icons-material/Refresh';
+import Sort from '@mui/icons-material/Sort';
+import FilterList from '@mui/icons-material/FilterList';
+import Folder from '@mui/icons-material/Folder';
+import FolderOpen from '@mui/icons-material/FolderOpen';
 import { VideoStudioLayout } from '../../VideoStudioLayout';
 import { useContentAssets, AssetFilters, ContentAsset } from '../../../../hooks/useContentAssets';
 import { useCollections, Collection } from '../../../../hooks/useCollections';

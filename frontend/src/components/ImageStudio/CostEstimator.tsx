@@ -8,10 +8,8 @@ import {
   alpha,
   Divider,
 } from '@mui/material';
-import {
-  AttachMoney,
-  Info,
-} from '@mui/icons-material';
+import AttachMoney from '@mui/icons-material/AttachMoney';
+import Info from '@mui/icons-material/Info';
 import { motion } from 'framer-motion';
 
 const MotionPaper = motion.create(Paper);

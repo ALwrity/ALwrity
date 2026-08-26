@@ -1,4 +1,4 @@
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { YouTubeActionModal } from "../YouTubeActionModal";
 import { YT_Z_KNOWLEDGE_CENTER, YT_Z_MODAL, YT_Z_MODAL_POPOVER, YT_Z_RAIL } from "../youtubeStudioZIndex";
@@ -7,7 +7,7 @@ import { selectMenuProps } from "../../styles";
 describe("YouTubeActionModal overlay", () => {
   it("does not render when closed", () => {
     render(
-      <YouTubeActionModal open={false} title="Plan" onClose={jest.fn()}>
+      <YouTubeActionModal open={false} title="Plan" onClose={vi.fn()}>
         Body
       </YouTubeActionModal>,
     );
@@ -15,7 +15,7 @@ describe("YouTubeActionModal overlay", () => {
   });
 
   it("portals the backdrop onto document.body above the Channel Pulse rail", () => {
-    const onClose = jest.fn();
+    const onClose = vi.fn();
     render(
       <YouTubeActionModal open title="Plan" onClose={onClose}>
         Body
@@ -39,7 +39,7 @@ describe("YouTubeActionModal overlay", () => {
     render(
       <>
         <div data-testid="hub-rail" className="yt-studio-right-rail" style={{ zIndex: YT_Z_RAIL }} />
-        <YouTubeActionModal open title="Plan" onClose={jest.fn()}>
+        <YouTubeActionModal open title="Plan" onClose={vi.fn()}>
           Body
         </YouTubeActionModal>
       </>,
@@ -56,7 +56,8 @@ describe("YouTubeActionModal overlay", () => {
   });
 
   it("does not raise plan-step select menus with a Studio +1 z-index patch", () => {
-    expect(selectMenuProps.style?.zIndex).toBeUndefined();
-    expect(selectMenuProps.sx?.zIndex).toBeUndefined();
+    const menuProps = selectMenuProps as Record<string, unknown>;
+    expect((menuProps.style as Record<string, unknown>)?.zIndex).toBeUndefined();
+    expect((menuProps.sx as Record<string, unknown>)?.zIndex).toBeUndefined();
   });
 });

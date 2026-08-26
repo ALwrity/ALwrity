@@ -15,12 +15,10 @@ import {
   Tooltip,
   Divider,
 } from '@mui/material';
-import {
-  HelpOutline as HelpIcon,
-  ExpandMore as ExpandMoreIcon,
-  Close as CloseIcon,
-  SmartToy as AgentIcon,
-} from '@mui/icons-material';
+import HelpIcon from '@mui/icons-material/HelpOutline';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CloseIcon from '@mui/icons-material/Close';
+import AgentIcon from '@mui/icons-material/SmartToy';
 import { getAgentTeam, type AgentTeamCatalogEntry } from '../../api/agentsTeam';
 
 const AGENT_DESCRIPTIONS: Record<string, { short: string; long: string }> = {

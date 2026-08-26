@@ -9,18 +9,16 @@ import {
   Collapse,
   Alert
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Refresh as RefreshIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Psychology as StrategyIcon,
-  Search as SearchIcon,
-  Analytics as AnalyticsIcon,
-  CalendarToday as CalendarIcon,
-  HealthAndSafety as HealthIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import StrategyIcon from '@mui/icons-material/Psychology';
+import SearchIcon from '@mui/icons-material/Search';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import CalendarIcon from '@mui/icons-material/CalendarToday';
+import HealthIcon from '@mui/icons-material/HealthAndSafety';
 
 interface ProgressIndicatorProps {
   expanded?: boolean;

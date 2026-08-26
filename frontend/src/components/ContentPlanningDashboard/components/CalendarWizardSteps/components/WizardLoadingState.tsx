@@ -9,12 +9,10 @@ import {
   Chip,
   Alert
 } from '@mui/material';
-import {
-  HourglassEmpty as HourglassIcon,
-  TrendingUp as TrendingIcon,
-  CheckCircle as CheckIcon,
-  Error as ErrorIcon
-} from '@mui/icons-material';
+import HourglassIcon from '@mui/icons-material/HourglassEmpty';
+import TrendingIcon from '@mui/icons-material/TrendingUp';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
 
 interface LoadingStep {
   id: string;

@@ -1,30 +1,30 @@
 import { youtubeApi } from '../../../services/youtubeApi';
 import { apiClient, longRunningApiClient } from '../../../api/client';
 
-jest.mock('../../../api/client', () => ({
+vi.mock('../../../api/client', () => ({
   apiClient: {
-    post: jest.fn(),
-    get: jest.fn(),
+    post: vi.fn(),
+    get: vi.fn(),
   },
   aiApiClient: {
-    post: jest.fn(),
-    get: jest.fn(),
+    post: vi.fn(),
+    get: vi.fn(),
   },
   longRunningApiClient: {
-    post: jest.fn(),
-    get: jest.fn(),
+    post: vi.fn(),
+    get: vi.fn(),
   },
 }));
 
 describe('youtubeApi', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('createPlan', () => {
     it('keeps POST /api/youtube/plan available (Plan step UI no longer calls it)', async () => {
       const mockResponse = { data: { success: true, plan: { video_summary: 'Test summary' } } };
-      jest.mocked(longRunningApiClient.post).mockResolvedValueOnce(mockResponse);
+      vi.mocked(longRunningApiClient.post).mockResolvedValueOnce(mockResponse);
 
       const request = {
         user_idea: 'AI coding assistant',
@@ -40,7 +40,7 @@ describe('youtubeApi', () => {
 
     it('handles timeout errors gracefully', async () => {
       const timeoutError = new Error('timeout of 60000ms exceeded');
-      jest.mocked(longRunningApiClient.post).mockRejectedValueOnce(timeoutError);
+      vi.mocked(longRunningApiClient.post).mockRejectedValueOnce(timeoutError);
 
       const request = {
         user_idea: 'AI coding assistant',
@@ -62,7 +62,7 @@ describe('youtubeApi', () => {
           message: 'Pitch generated successfully',
         },
       };
-      jest.mocked(longRunningApiClient.post).mockResolvedValueOnce(mockResponse);
+      vi.mocked(longRunningApiClient.post).mockResolvedValueOnce(mockResponse);
 
       const request = {
         user_idea: 'Budget travel',
@@ -154,7 +154,7 @@ describe('youtubeApi', () => {
           message: 'Pitch expanded to full script successfully',
         },
       };
-      jest.mocked(longRunningApiClient.post).mockResolvedValueOnce(mockResponse);
+      vi.mocked(longRunningApiClient.post).mockResolvedValueOnce(mockResponse);
 
       const request = {
         user_idea: 'Budget travel',
@@ -169,7 +169,7 @@ describe('youtubeApi', () => {
 
     it('maps timeout errors for pitch generation', async () => {
       const timeoutError = new Error('timeout of 60000ms exceeded');
-      jest.mocked(longRunningApiClient.post).mockRejectedValueOnce(timeoutError);
+      vi.mocked(longRunningApiClient.post).mockRejectedValueOnce(timeoutError);
 
       await expect(
         youtubeApi.generatePitch({
@@ -186,7 +186,7 @@ describe('youtubeApi', () => {
   describe('buildScenes', () => {
     it('uses longRunningApiClient to post to /api/youtube/scenes', async () => {
       const mockResponse = { data: { success: true, scenes: [] } };
-      jest.mocked(longRunningApiClient.post).mockResolvedValueOnce(mockResponse);
+      vi.mocked(longRunningApiClient.post).mockResolvedValueOnce(mockResponse);
 
       const videoPlan = {
         video_summary: 'Test summary',
@@ -208,7 +208,7 @@ describe('youtubeApi', () => {
 
     it('handles timeout errors gracefully', async () => {
       const timeoutError = new Error('timeout of 60000ms exceeded');
-      jest.mocked(longRunningApiClient.post).mockRejectedValueOnce(timeoutError);
+      vi.mocked(longRunningApiClient.post).mockRejectedValueOnce(timeoutError);
 
       const videoPlan = {
         video_summary: 'Test summary',
@@ -229,7 +229,7 @@ describe('youtubeApi', () => {
   describe('generateSceneImage and status polling', () => {
     it('posts image generation task request to /api/youtube/image', async () => {
       const mockResponse = { data: { success: true, task_id: 'task-123', message: 'Task started' } };
-      jest.mocked(apiClient.post).mockResolvedValueOnce(mockResponse);
+      vi.mocked(apiClient.post).mockResolvedValueOnce(mockResponse);
 
       const params = {
         sceneId: '1',
@@ -250,7 +250,7 @@ describe('youtubeApi', () => {
 
     it('fetches image generation status from /api/youtube/image/status/:taskId', async () => {
       const mockStatus = { status: 'completed', progress: 100, result: { image_url: '/api/youtube/images/scenes/1.png' } };
-      jest.mocked(apiClient.get).mockResolvedValueOnce({ data: mockStatus });
+      vi.mocked(apiClient.get).mockResolvedValueOnce({ data: mockStatus });
 
       const result = await youtubeApi.getImageGenerationStatus('task-123');
       expect(apiClient.get).toHaveBeenCalledWith('/api/youtube/image/status/task-123');
@@ -263,7 +263,7 @@ describe('youtubeApi', () => {
       const mockResponse = {
         data: { success: true, task_id: 'combine-1', message: 'Combining 2 videos...' },
       };
-      jest.mocked(apiClient.post).mockResolvedValueOnce(mockResponse);
+      vi.mocked(apiClient.post).mockResolvedValueOnce(mockResponse);
 
       const params = {
         scene_video_urls: [

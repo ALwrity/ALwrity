@@ -12,19 +12,17 @@ import {
   Divider,
   Tooltip
 } from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  VerifiedUser as VerifiedUserIcon,
-  Lightbulb as LightbulbIcon,
-  FormatQuote as FormatQuoteIcon,
-  WarningAmber as WarningAmberIcon,
-  CheckCircleOutline as CheckCircleOutlineIcon,
-  ChatBubbleOutline as ChatBubbleOutlineIcon,
-  Theaters as TheatersIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  MusicNote as MusicNoteIcon,
-  Assessment as AssessmentIcon
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import TheatersIcon from '@mui/icons-material/Theaters';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import MusicNoteIcon from '@mui/icons-material/MusicNote';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import { QualityMetricsDisplay } from '../QualityMetricsDisplay';
 
 /**

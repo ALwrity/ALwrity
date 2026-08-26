@@ -5,13 +5,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Box } from '@mui/material';
-import {
-  Schedule as ScheduleIcon,
-  Refresh as RefreshIcon,
-  Event as EventIcon,
-  Person as PersonIcon,
-  Storage as StorageIcon
-} from '@mui/icons-material';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import EventIcon from '@mui/icons-material/Event';
+import PersonIcon from '@mui/icons-material/Person';
+import StorageIcon from '@mui/icons-material/Storage';
 import { SchedulerJob } from '../../api/schedulerDashboard';
 import { TerminalPaper, TerminalTypography, TerminalChip, terminalColors } from './terminalTheme';
 

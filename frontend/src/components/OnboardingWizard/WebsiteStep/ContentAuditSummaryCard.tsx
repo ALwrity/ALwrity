@@ -8,14 +8,12 @@ import {
   Paper,
   IconButton,
 } from "@mui/material";
-import {
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Topic as TopicIcon,
-  Link as LinkIcon,
-  AccountTree as BudgetIcon,
-  CheckCircle as CheckIcon,
-} from "@mui/icons-material";
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import TopicIcon from '@mui/icons-material/Topic';
+import LinkIcon from '@mui/icons-material/Link';
+import BudgetIcon from '@mui/icons-material/AccountTree';
+import CheckIcon from '@mui/icons-material/CheckCircle';
 import MetricTooltip from "../../shared/MetricTooltip";
 import { getMetricTooltip } from "../../shared/metricTooltips";
 

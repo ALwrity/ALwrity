@@ -28,7 +28,7 @@ describe("engagementWedgeDraftUtils", () => {
 
   describe("pushDraftToStudio", () => {
     it("does nothing for blank content", () => {
-      const handler = jest.fn();
+      const handler = vi.fn();
       window.addEventListener("linkedinwriter:updateDraft", handler);
       pushDraftToStudio("   ");
       expect(handler).not.toHaveBeenCalled();
@@ -36,7 +36,7 @@ describe("engagementWedgeDraftUtils", () => {
     });
 
     it("dispatches updateDraft and syncs storage", () => {
-      const handler = jest.fn();
+      const handler = vi.fn();
       window.addEventListener("linkedinwriter:updateDraft", handler);
       pushDraftToStudio("Optimised post");
       expect(handler).toHaveBeenCalled();

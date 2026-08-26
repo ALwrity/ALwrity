@@ -30,15 +30,13 @@ import {
   Stack,
   LinearProgress,
 } from '@mui/material';
-import {
-  PlayArrow as PlayArrowIcon,
-  Refresh as RefreshIcon,
-  Settings as SettingsIcon,
-  Assessment as AssessmentIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  TrendingUp as TrendingUpIcon,
-  Download as DownloadIcon,
-} from '@mui/icons-material';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import SettingsIcon from '@mui/icons-material/Settings';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import DownloadIcon from '@mui/icons-material/Download';
 import { motion, AnimatePresence } from 'framer-motion';
 import { enterpriseSeoAPI, EnterpriseAuditResult, GSCAnalysisResult } from '../../api/enterpriseSeoApi';
 import { llmInsightsGenerator } from '../../api/llmInsightsGenerator';

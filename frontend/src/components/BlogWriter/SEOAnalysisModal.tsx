@@ -28,15 +28,13 @@ import {
 } from '@mui/material';
 import { hashContent, getSeoCacheKey } from '../../utils/contentHash';
 import { apiClient, triggerSubscriptionError } from '../../api/client';
-import { 
-  CheckCircle, 
-  Cancel, 
-  Warning, 
-  TrendingUp, 
-  Search,
-  Refresh,
-  Close
-} from '@mui/icons-material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Cancel from '@mui/icons-material/Cancel';
+import Warning from '@mui/icons-material/Warning';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import Search from '@mui/icons-material/Search';
+import Refresh from '@mui/icons-material/Refresh';
+import Close from '@mui/icons-material/Close';
 import { KeywordAnalysis, ReadabilityAnalysis, StructureAnalysis, Recommendations } from './SEO';
 import OverallScoreCard from './SEO/OverallScoreCard';
 

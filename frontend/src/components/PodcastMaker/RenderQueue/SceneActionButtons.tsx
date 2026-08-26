@@ -1,15 +1,13 @@
 import React from "react";
 import { Stack, alpha, Tooltip, IconButton } from "@mui/material";
-import {
-  VolumeUp as VolumeUpIcon,
-  Image as ImageIcon,
-  Videocam as VideocamIcon,
-  Download as DownloadIcon,
-  Share as ShareIcon,
-  PlayArrow as PlayArrowIcon,
-  Refresh as RefreshIcon,
-  Delete as DeleteIcon,
-} from "@mui/icons-material";
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import ImageIcon from '@mui/icons-material/Image';
+import VideocamIcon from '@mui/icons-material/Videocam';
+import DownloadIcon from '@mui/icons-material/Download';
+import ShareIcon from '@mui/icons-material/Share';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { Scene, Job } from "../types";
 import { PrimaryButton, SecondaryButton } from "../ui";
 import { Typography } from "@mui/material";

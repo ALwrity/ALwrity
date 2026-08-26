@@ -25,17 +25,15 @@ import {
   AccordionDetails,
   Button
 } from '@mui/material';
-import {
-  ContentCopy as CopyIcon,
-  Check as CheckIcon,
-  Code as CodeIcon,
-  Person as PersonIcon,
-  Business as BusinessIcon,
-  CalendarToday as CalendarIcon,
-  ExpandMore as ExpandMoreIcon,
-  Visibility as VisibilityIcon,
-  Edit as EditIcon
-} from '@mui/icons-material';
+import CopyIcon from '@mui/icons-material/ContentCopy';
+import CheckIcon from '@mui/icons-material/Check';
+import CodeIcon from '@mui/icons-material/Code';
+import PersonIcon from '@mui/icons-material/Person';
+import BusinessIcon from '@mui/icons-material/Business';
+import CalendarIcon from '@mui/icons-material/CalendarToday';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import EditIcon from '@mui/icons-material/Edit';
 
 interface StructuredDataTabProps {
   metadata: any;

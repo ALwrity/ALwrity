@@ -8,17 +8,15 @@ import {
   CircularProgress,
   Collapse,
 } from '@mui/material';
-import {
-  Refresh as RefreshIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  CheckCircle as SuccessIcon,
-  ErrorOutline as FailedIcon,
-  Schedule as ScheduleIcon,
-  PauseCircle as PausedIcon,
-  WarningAmber as InterventionIcon,
-  Autorenew as ActiveIcon,
-} from '@mui/icons-material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import SuccessIcon from '@mui/icons-material/CheckCircle';
+import FailedIcon from '@mui/icons-material/ErrorOutline';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import PausedIcon from '@mui/icons-material/PauseCircle';
+import InterventionIcon from '@mui/icons-material/WarningAmber';
+import ActiveIcon from '@mui/icons-material/Autorenew';
 import { useAuth } from '@clerk/clerk-react';
 import { getOnboardingTasks, type OnboardingTask } from '../../api/schedulerDashboard';
 import { TerminalPaper, terminalColors } from './terminalTheme';

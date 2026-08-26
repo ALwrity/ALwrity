@@ -9,7 +9,7 @@ import {
 
 describe("openGrowNetworkModal", () => {
   it("dispatches OPEN_GROW_NETWORK_EVENT with scroll detail", () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     window.addEventListener(OPEN_GROW_NETWORK_EVENT, handler);
 
     openGrowNetworkModal({ scrollToSection: "live-linkedin" });
@@ -22,7 +22,7 @@ describe("openGrowNetworkModal", () => {
   });
 
   it("dispatches empty detail when no scroll target", () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     window.addEventListener(OPEN_GROW_NETWORK_EVENT, handler);
 
     openGrowNetworkModal();
@@ -36,7 +36,7 @@ describe("openGrowNetworkModal", () => {
 
 describe("openPostAnalyticsModal", () => {
   it("dispatches fromAnalysisWedge detail when opened from Analysis wedge", () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     window.addEventListener(OPEN_POST_ANALYTICS_EVENT, handler);
 
     openPostAnalyticsModal({ fromAnalysisWedge: true });
@@ -51,7 +51,7 @@ describe("openPostAnalyticsModal", () => {
 
 describe("openGrowthEngineModal", () => {
   it("dispatches fromEngagementWedge detail when opened from Engagement wedge", () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     window.addEventListener(OPEN_GROWTH_ENGINE_EVENT, handler);
 
     openGrowthEngineModal({ fromEngagementWedge: true });

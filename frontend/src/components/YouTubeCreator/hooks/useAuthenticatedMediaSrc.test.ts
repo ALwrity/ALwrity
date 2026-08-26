@@ -2,17 +2,17 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { useAuthenticatedMediaSrc } from "./useAuthenticatedMediaSrc";
 import { appendAuthTokenToUrl, fetchMediaBlobUrl } from "../../../utils/fetchMediaBlobUrl";
 
-jest.mock("../../../utils/fetchMediaBlobUrl", () => ({
-  fetchMediaBlobUrl: jest.fn(),
-  appendAuthTokenToUrl: jest.fn(),
+vi.mock("../../../utils/fetchMediaBlobUrl", () => ({
+  fetchMediaBlobUrl: vi.fn(),
+  appendAuthTokenToUrl: vi.fn(),
 }));
 
-const mockedFetchMediaBlobUrl = jest.mocked(fetchMediaBlobUrl);
-const mockedAppendAuthTokenToUrl = jest.mocked(appendAuthTokenToUrl);
+const mockedFetchMediaBlobUrl = vi.mocked(fetchMediaBlobUrl);
+const mockedAppendAuthTokenToUrl = vi.mocked(appendAuthTokenToUrl);
 
 describe("useAuthenticatedMediaSrc", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it("prefers the blob URL when blob load succeeds", async () => {
@@ -37,7 +37,7 @@ describe("useAuthenticatedMediaSrc", () => {
     });
     mockedFetchMediaBlobUrl.mockRejectedValueOnce(unauthorized);
     mockedAppendAuthTokenToUrl.mockResolvedValueOnce("/api/youtube/videos/scene.mp4?token=abc");
-    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     const { result } = renderHook(() =>
       useAuthenticatedMediaSrc("/api/youtube/videos/scene.mp4"),

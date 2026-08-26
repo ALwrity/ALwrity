@@ -11,17 +11,15 @@ import {
   Divider,
   Button,
 } from '@mui/material';
-import {
-  Psychology as BrainIcon,
-  Store as IndustryIcon,
-  People as AudienceIcon,
-  Style as VoiceIcon,
-  Category as ContentIcon,
-  Palette as BrandIcon,
-  Cloud as PlatformIcon,
-  BarChart as SeoIcon,
-  Refresh as RefreshIcon,
-} from '@mui/icons-material';
+import BrainIcon from '@mui/icons-material/Psychology';
+import IndustryIcon from '@mui/icons-material/Store';
+import AudienceIcon from '@mui/icons-material/People';
+import VoiceIcon from '@mui/icons-material/Style';
+import ContentIcon from '@mui/icons-material/Category';
+import BrandIcon from '@mui/icons-material/Palette';
+import PlatformIcon from '@mui/icons-material/Cloud';
+import SeoIcon from '@mui/icons-material/BarChart';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { apiClient } from '../../api/client';
 
 interface BrandBrainViewProps {

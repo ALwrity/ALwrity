@@ -18,11 +18,9 @@ import {
   Button,
   Chip,
 } from '@mui/material';
-import {
-  AutoAwesome as AutoAwesomeIcon,
-  Analytics as AnalyticsIcon,
-  Save as SaveIcon
-} from '@mui/icons-material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import SaveIcon from '@mui/icons-material/Save';
 
 // Import extracted components
 import { 

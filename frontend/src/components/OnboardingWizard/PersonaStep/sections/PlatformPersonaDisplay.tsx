@@ -1,14 +1,12 @@
 import React from 'react';
 import { Box, Grid, Typography, Chip } from '@mui/material';
-import {
-  ContentPaste as ContentIcon,
-  TrendingUp as TrendingIcon,
-  Psychology as StrategyIcon,
-  EmojiEvents as FeaturesIcon,
-  Speed as AlgorithmIcon,
-  Business as ProfessionalIcon,
-  CheckCircle as BestPracticeIcon
-} from '@mui/icons-material';
+import ContentIcon from '@mui/icons-material/ContentPaste';
+import TrendingIcon from '@mui/icons-material/TrendingUp';
+import StrategyIcon from '@mui/icons-material/Psychology';
+import FeaturesIcon from '@mui/icons-material/EmojiEvents';
+import AlgorithmIcon from '@mui/icons-material/Speed';
+import ProfessionalIcon from '@mui/icons-material/Business';
+import BestPracticeIcon from '@mui/icons-material/CheckCircle';
 import { SectionAccordion } from '../components/SectionAccordion';
 import { EditableTextField } from '../components/EditableTextField';
 import { EditableChipArray } from '../components/EditableChipArray';

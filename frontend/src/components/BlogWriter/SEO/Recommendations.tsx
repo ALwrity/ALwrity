@@ -12,12 +12,10 @@ import {
   Paper,
   Chip
 } from '@mui/material';
-import {
-  Lightbulb,
-  CheckCircle,
-  Cancel,
-  Warning
-} from '@mui/icons-material';
+import Lightbulb from '@mui/icons-material/Lightbulb';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Cancel from '@mui/icons-material/Cancel';
+import Warning from '@mui/icons-material/Warning';
 
 interface Recommendation {
   category: string;

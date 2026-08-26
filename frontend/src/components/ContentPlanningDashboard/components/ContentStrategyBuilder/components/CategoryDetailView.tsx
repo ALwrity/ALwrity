@@ -16,13 +16,11 @@ import {
   Paper,
   Grid
 } from '@mui/material';
-import {
-  School as SchoolIcon,
-  Lightbulb as LightbulbIcon,
-  Timeline as TimelineIcon,
-  CheckCircle as CheckCircleIcon,
-  ExpandMore as ExpandMoreIcon
-} from '@mui/icons-material';
+import SchoolIcon from '@mui/icons-material/School';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { motion, AnimatePresence } from 'framer-motion';
 import StrategicInputField from '../StrategicInputField';
 import { CategoryDetailViewProps, EducationalInfoDialogProps } from '../types/contentStrategy.types';

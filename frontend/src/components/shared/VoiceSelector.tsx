@@ -22,23 +22,21 @@ import {
   DialogActions,
   Slider,
 } from "@mui/material";
-import {
-  Mic,
-  PlayArrow,
-  Pause,
-  HelpOutline,
-  AutoAwesome,
-  CheckCircle,
-  ExpandLess,
-  ExpandMore,
-  RestartAlt,
-  VolumeUp,
-  Tune,
-  Close,
-  Male,
-  Female,
-  Category,
-} from "@mui/icons-material";
+import Mic from '@mui/icons-material/Mic';
+import PlayArrow from '@mui/icons-material/PlayArrow';
+import Pause from '@mui/icons-material/Pause';
+import HelpOutline from '@mui/icons-material/HelpOutline';
+import AutoAwesome from '@mui/icons-material/AutoAwesome';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import RestartAlt from '@mui/icons-material/RestartAlt';
+import VolumeUp from '@mui/icons-material/VolumeUp';
+import Tune from '@mui/icons-material/Tune';
+import Close from '@mui/icons-material/Close';
+import Male from '@mui/icons-material/Male';
+import Female from '@mui/icons-material/Female';
+import Category from '@mui/icons-material/Category';
 import { getLatestVoiceClone, VoiceCloneResponse } from "../../api/brandAssets";
 import { getAuthTokenGetter, getApiUrl } from "../../api/client";
 import { VoiceAvatarPlaceholder } from "../OnboardingWizard/PersonalizationStep/components/VoiceAvatarPlaceholder";

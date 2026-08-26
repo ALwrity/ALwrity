@@ -9,19 +9,17 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import {
-  AutoAwesome as AutoAwesomeIcon,
-  CheckCircle as CheckCircleIcon,
-  Psychology as PsychologyIcon,
-  Insights as InsightsIcon,
-  Article as ArticleIcon,
-  Edit as EditIcon,
-  VolumeUp as VolumeUpIcon,
-  VideoLibrary as VideoLibraryIcon,
-  Lightbulb as LightbulbIcon,
-  Search as SearchIcon,
-  FactCheck as FactCheckIcon,
-} from "@mui/icons-material";
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import InsightsIcon from '@mui/icons-material/Insights';
+import ArticleIcon from '@mui/icons-material/Article';
+import EditIcon from '@mui/icons-material/Edit';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import SearchIcon from '@mui/icons-material/Search';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
 import { Research } from "../types";
 
 const SCRIPT_GENERATION_MESSAGES = [

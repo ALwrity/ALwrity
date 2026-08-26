@@ -1,7 +1,7 @@
 /**
  * ArticleEditorImageMenu tests.
  * Run manually:
- *   npx react-scripts test --watchAll=false --testPathPattern=ArticleEditorImageMenu
+ *   npx vitest run ArticleEditorImageMenu
  */
 
 import React from "react";
@@ -10,8 +10,8 @@ import { ArticleEditorImageMenu } from "../components/ArticleEditor/ArticleEdito
 
 describe("ArticleEditorImageMenu", () => {
   test("opens popover with generate and upload actions", () => {
-    const onUploadImage = jest.fn();
-    const onGenerateImage = jest.fn();
+    const onUploadImage = vi.fn();
+    const onGenerateImage = vi.fn();
 
     render(
       <ArticleEditorImageMenu

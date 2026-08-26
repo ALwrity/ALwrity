@@ -20,7 +20,7 @@ describe("YouTubeMobileWorkflowGrid", () => {
   });
 
   it("invokes onCardAction without mock data", () => {
-    const onCardAction = jest.fn();
+    const onCardAction = vi.fn();
     render(<YouTubeMobileWorkflowGrid onCardAction={onCardAction} />);
     fireEvent.click(screen.getByRole("button", { name: /Publish:/ }));
     expect(onCardAction).toHaveBeenCalledWith("publish");

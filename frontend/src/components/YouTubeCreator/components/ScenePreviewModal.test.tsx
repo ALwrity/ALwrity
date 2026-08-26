@@ -1,20 +1,20 @@
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { ScenePreviewModal } from "./ScenePreviewModal";
 import { appendAuthTokenToUrl, fetchMediaBlobUrl } from "../../../utils/fetchMediaBlobUrl";
 
-jest.mock("../../../utils/fetchMediaBlobUrl", () => ({
-  fetchMediaBlobUrl: jest.fn(),
-  appendAuthTokenToUrl: jest.fn(),
+vi.mock("../../../utils/fetchMediaBlobUrl", () => ({
+  fetchMediaBlobUrl: vi.fn(),
+  appendAuthTokenToUrl: vi.fn(),
 }));
 
-const mockedFetchMediaBlobUrl = fetchMediaBlobUrl as jest.MockedFunction<typeof fetchMediaBlobUrl>;
-const mockedAppendAuthTokenToUrl = appendAuthTokenToUrl as jest.MockedFunction<typeof appendAuthTokenToUrl>;
+const mockedFetchMediaBlobUrl = vi.mocked(fetchMediaBlobUrl);
+const mockedAppendAuthTokenToUrl = vi.mocked(appendAuthTokenToUrl);
 
 describe("ScenePreviewModal", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockedFetchMediaBlobUrl.mockResolvedValue(null);
     mockedAppendAuthTokenToUrl.mockImplementation(async (url) => `${url}?token=test`);
   });
@@ -25,7 +25,7 @@ describe("ScenePreviewModal", () => {
     render(
       <ScenePreviewModal
         open
-        onClose={jest.fn()}
+        onClose={vi.fn()}
         sceneTitle="Price Shock"
         sceneNumber={1}
         videoUrl="/api/youtube/videos/scene_1.mp4"
@@ -47,7 +47,7 @@ describe("ScenePreviewModal", () => {
     render(
       <ScenePreviewModal
         open
-        onClose={jest.fn()}
+        onClose={vi.fn()}
         sceneTitle="Price Shock"
         sceneNumber={2}
         videoUrl="/api/youtube/videos/scene_2.mp4"
@@ -64,7 +64,7 @@ describe("ScenePreviewModal", () => {
     render(
       <ScenePreviewModal
         open
-        onClose={jest.fn()}
+        onClose={vi.fn()}
         sceneTitle="No video yet"
         sceneNumber={3}
         imageUrl="/api/youtube/images/scenes/s3.png"

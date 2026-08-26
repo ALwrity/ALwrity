@@ -16,12 +16,10 @@ import {
   Button,
   Tooltip,
 } from '@mui/material';
-import {
-  Search as SearchIcon,
-  FileDownload as FileDownloadIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-} from '@mui/icons-material';
+import SearchIcon from '@mui/icons-material/Search';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { AgentEventItem } from '../../hooks/useAgentHuddleFeed';
 
 interface CommitteeProposal {

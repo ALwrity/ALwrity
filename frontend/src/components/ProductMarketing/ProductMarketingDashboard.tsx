@@ -13,16 +13,14 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
-import {
-  Campaign,
-  AutoAwesome,
-  PhotoLibrary,
-  Assessment,
-  TrendingUp,
-  CheckCircle,
-  RadioButtonUnchecked,
-  PhotoCamera,
-} from '@mui/icons-material';
+import Campaign from '@mui/icons-material/Campaign';
+import AutoAwesome from '@mui/icons-material/AutoAwesome';
+import PhotoLibrary from '@mui/icons-material/PhotoLibrary';
+import Assessment from '@mui/icons-material/Assessment';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import RadioButtonUnchecked from '@mui/icons-material/RadioButtonUnchecked';
+import PhotoCamera from '@mui/icons-material/PhotoCamera';
 import Joyride, { ACTIONS, CallBackProps, EVENTS, STATUS } from 'react-joyride';
 import { motion } from 'framer-motion';
 import { ImageStudioLayout } from '../ImageStudio/ImageStudioLayout';

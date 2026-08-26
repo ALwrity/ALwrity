@@ -1,5 +1,5 @@
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import { ScenesStep } from "./ScenesStep";
 import type { VideoPlan } from "../../../services/youtubeApi";

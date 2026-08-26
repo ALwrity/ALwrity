@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { ResearchAction } from '../ResearchAction';
@@ -5,30 +6,30 @@ import { KeywordInputForm } from '../KeywordInputForm';
 import { blogWriterApi } from '../../../services/blogWriterApi';
 
 // Mock the API
-jest.mock('../../../services/blogWriterApi', () => ({
+vi.mock('../../../services/blogWriterApi', () => ({
   blogWriterApi: {
-    startResearch: jest.fn(),
-    pollResearchStatus: jest.fn()
+    startResearch: vi.fn(),
+    pollResearchStatus: vi.fn()
   }
 }));
 
 // Mock CopilotKit
-jest.mock('@copilotkit/react-core', () => ({
-  useCopilotAction: jest.fn(() => ({
+vi.mock('@copilotkit/react-core', () => ({
+  useCopilotAction: vi.fn(() => ({
     name: 'testAction',
-    handler: jest.fn(),
-    render: jest.fn()
+    handler: vi.fn(),
+    render: vi.fn()
   }))
 }));
 
 describe('Polling Integration', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('should use async polling endpoints for research', async () => {
-    const mockStartResearch = blogWriterApi.startResearch as jest.Mock;
-    const mockPollStatus = blogWriterApi.pollResearchStatus as jest.Mock;
+    const mockStartResearch = blogWriterApi.startResearch as Mock;
+    const mockPollStatus = blogWriterApi.pollResearchStatus as Mock;
 
     // Mock successful research start
     mockStartResearch.mockResolvedValue({
@@ -57,7 +58,7 @@ describe('Polling Integration', () => {
         }
       });
 
-    const onResearchComplete = jest.fn();
+    const onResearchComplete = vi.fn();
     
     render(<ResearchAction onResearchComplete={onResearchComplete} />);
 
@@ -66,8 +67,8 @@ describe('Polling Integration', () => {
   });
 
   it('should handle polling errors gracefully', async () => {
-    const mockStartResearch = blogWriterApi.startResearch as jest.Mock;
-    const mockPollStatus = blogWriterApi.pollResearchStatus as jest.Mock;
+    const mockStartResearch = blogWriterApi.startResearch as Mock;
+    const mockPollStatus = blogWriterApi.pollResearchStatus as Mock;
 
     mockStartResearch.mockResolvedValue({
       task_id: 'test-task-123',
@@ -76,8 +77,8 @@ describe('Polling Integration', () => {
 
     mockPollStatus.mockRejectedValue(new Error('Polling failed'));
 
-    const onResearchComplete = jest.fn();
-    const onError = jest.fn();
+    const onResearchComplete = vi.fn();
+    const onError = vi.fn();
     
     render(<KeywordInputForm onResearchComplete={onResearchComplete} />);
 

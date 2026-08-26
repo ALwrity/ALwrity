@@ -13,15 +13,13 @@ import {
   Chip,
   TextField
 } from '@mui/material';
-import {
-  Group as GroupIcon,
-  Business as BusinessIcon,
-  Analytics as AnalyticsIcon,
-  Psychology as PsychologyIcon,
-  Warning as WarningIcon,
-  TrendingUp as TrendingUpIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import GroupIcon from '@mui/icons-material/Group';
+import BusinessIcon from '@mui/icons-material/Business';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import WarningIcon from '@mui/icons-material/Warning';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import InfoIcon from '@mui/icons-material/Info';
 import SectionHeader from './SectionHeader';
 
 interface TargetAudience {

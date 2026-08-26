@@ -1,11 +1,9 @@
 import React from 'react';
 import { Box, Typography, Chip, Button } from '@mui/material';
-import { 
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
+import InfoIcon from '@mui/icons-material/Info';
 import { GlassCard } from '../../shared/styled';
 import { PlatformStatus as PlatformStatusType } from '../../../api/seoDashboard';
 import { getStatusColor, getStatusIcon } from '../../shared/utils';

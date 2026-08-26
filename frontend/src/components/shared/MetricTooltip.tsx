@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Tooltip, Typography } from '@mui/material';
-import { Info as InfoIcon } from '@mui/icons-material';
+import InfoIcon from '@mui/icons-material/Info';
 
 interface MetricTooltipProps {
   title: string;

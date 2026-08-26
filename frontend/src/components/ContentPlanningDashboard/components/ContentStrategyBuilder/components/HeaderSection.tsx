@@ -11,19 +11,17 @@ import {
   Grid,
   LinearProgress
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Refresh as RefreshIcon,
-  PlayArrow as PlayArrowIcon,
-  Schedule as ScheduleIcon,
-  Info as InfoIcon,
-  ArrowDownward as ArrowDownwardIcon,
-  Visibility as VisibilityIcon,
-  DataUsage as DataUsageIcon,
-  TrendingUp as TrendingUpIcon,
-  Security as SecurityIcon,
-  AutoAwesome as AutoAwesomeIcon,
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import InfoIcon from '@mui/icons-material/Info';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SecurityIcon from '@mui/icons-material/Security';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { motion } from 'framer-motion';
 import AutofillDataTransparency from './AutofillDataTransparency';
 

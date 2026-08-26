@@ -5,7 +5,7 @@ import { OPEN_ENGAGEMENT_BOOSTER_EVENT } from "../utils/linkedInDashboardEvents"
 
 describe("EngagementBoosterLaunchButton", () => {
   it("panel variant dispatches open event with content", () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     window.addEventListener(OPEN_ENGAGEMENT_BOOSTER_EVENT, handler);
 
     render(
@@ -23,7 +23,7 @@ describe("EngagementBoosterLaunchButton", () => {
   });
 
   it("panel variant does not dispatch when disabled", () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     window.addEventListener(OPEN_ENGAGEMENT_BOOSTER_EVENT, handler);
 
     render(
@@ -40,7 +40,7 @@ describe("EngagementBoosterLaunchButton", () => {
   });
 
   it("toolbar variant dispatches open event", () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     window.addEventListener(OPEN_ENGAGEMENT_BOOSTER_EVENT, handler);
 
     render(
@@ -59,7 +59,7 @@ describe("EngagementBoosterLaunchButton", () => {
   });
 
   it("inline variant dispatches open event for draft library rows", () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     window.addEventListener(OPEN_ENGAGEMENT_BOOSTER_EVENT, handler);
 
     render(
@@ -78,8 +78,8 @@ describe("EngagementBoosterLaunchButton", () => {
   });
 
   it("calls onBeforeOpen before dispatching", () => {
-    const onBeforeOpen = jest.fn();
-    const handler = jest.fn();
+    const onBeforeOpen = vi.fn();
+    const handler = vi.fn();
     window.addEventListener(OPEN_ENGAGEMENT_BOOSTER_EVENT, handler);
 
     render(

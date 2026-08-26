@@ -1,8 +1,6 @@
 import React from "react";
-import {
-  LinkedIn as LinkedInIcon,
-  Business as BusinessIcon,
-} from "@mui/icons-material";
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import BusinessIcon from '@mui/icons-material/Business';
 import type { LinkedInOrganization } from "../../../api/linkedinSocial";
 import type { LinkedInPostTarget } from "../../../hooks/useLinkedInSocialConnection";
 import type { LinkedInProfileSummary } from "../utils/linkedInProfileSummary";

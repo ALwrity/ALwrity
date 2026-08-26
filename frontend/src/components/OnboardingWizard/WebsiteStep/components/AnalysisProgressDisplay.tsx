@@ -6,17 +6,15 @@ import {
   Paper,
   Chip
 } from '@mui/material';
-import {
-  CheckCircle as CheckIcon,
-  TravelExplore as CrawlIcon,
-  Psychology as VoiceIcon,
-  Translate as StyleIcon,
-  Group as AudienceIcon,
-  Analytics as StrategyIcon,
-  AutoAwesome as AIIcon,
-  Language as GlobeIcon,
-  Memory as ProcessIcon
-} from '@mui/icons-material';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import CrawlIcon from '@mui/icons-material/TravelExplore';
+import VoiceIcon from '@mui/icons-material/Psychology';
+import StyleIcon from '@mui/icons-material/Translate';
+import AudienceIcon from '@mui/icons-material/Group';
+import StrategyIcon from '@mui/icons-material/Analytics';
+import AIIcon from '@mui/icons-material/AutoAwesome';
+import GlobeIcon from '@mui/icons-material/Language';
+import ProcessIcon from '@mui/icons-material/Memory';
 
 interface AnalysisProgress {
   step: number;

@@ -13,16 +13,13 @@ import {
   Fade,
   TextField
 } from '@mui/material';
-import {
-  Business as BusinessIcon,
-  TrendingUp as TrendingUpIcon,
-  CalendarToday as CalendarIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Info as InfoIcon,
-  CheckCircle as CheckIcon,
-  Lightbulb as LightbulbIcon,
-  // Star as StarIcon
-} from '@mui/icons-material';
+import BusinessIcon from '@mui/icons-material/Business';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import CalendarIcon from '@mui/icons-material/CalendarToday';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import InfoIcon from '@mui/icons-material/Info';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import SectionHeader from './SectionHeader';
 
 interface StrategicInsightsSectionProps {

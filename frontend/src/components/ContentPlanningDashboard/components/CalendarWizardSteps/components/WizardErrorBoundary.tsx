@@ -10,12 +10,10 @@ import {
   Divider,
   Chip
 } from '@mui/material';
-import {
-  Error as ErrorIcon,
-  Refresh as RefreshIcon,
-  BugReport as BugReportIcon,
-  Home as HomeIcon
-} from '@mui/icons-material';
+import ErrorIcon from '@mui/icons-material/Error';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import BugReportIcon from '@mui/icons-material/BugReport';
+import HomeIcon from '@mui/icons-material/Home';
 
 interface Props {
   children: ReactNode;

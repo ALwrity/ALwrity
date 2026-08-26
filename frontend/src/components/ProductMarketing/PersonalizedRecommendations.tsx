@@ -17,13 +17,11 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
-import {
-  AutoAwesome,
-  PhotoLibrary,
-  VideoLibrary,
-  Campaign,
-  TrendingUp,
-} from '@mui/icons-material';
+import AutoAwesome from '@mui/icons-material/AutoAwesome';
+import PhotoLibrary from '@mui/icons-material/PhotoLibrary';
+import VideoLibrary from '@mui/icons-material/VideoLibrary';
+import Campaign from '@mui/icons-material/Campaign';
+import TrendingUp from '@mui/icons-material/TrendingUp';
 import { motion } from 'framer-motion';
 import { useProductMarketing } from '../../hooks/useProductMarketing';
 import { useCampaignCreator } from '../../hooks/useCampaignCreator';

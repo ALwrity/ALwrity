@@ -8,12 +8,10 @@ import {
   ListItemText, 
   Button 
 } from '@mui/material';
-import { 
-  Error as ErrorIcon, 
-  Warning as WarningIcon, 
-  Info as InfoIcon,
-  PlayArrow as PlayArrowIcon
-} from '@mui/icons-material';
+import ErrorIcon from '@mui/icons-material/Error';
+import WarningIcon from '@mui/icons-material/Warning';
+import InfoIcon from '@mui/icons-material/Info';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { IssueListProps } from '../../shared/types';
 
 const IssueList: React.FC<IssueListProps> = ({

@@ -14,11 +14,9 @@ import {
   Select,
   MenuItem,
 } from '@mui/material';
-import {
-  Edit as EditIcon,
-  Save as SaveIcon,
-  Cancel as CancelIcon,
-} from '@mui/icons-material';
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
+import CancelIcon from '@mui/icons-material/Cancel';
 
 interface EditableFieldProps {
   field: string;

@@ -22,8 +22,8 @@ describe("studioHubAccessConfig", () => {
 
 describe("studioHubWedgeNavigation", () => {
   it("opens any wedge without a connect gate", () => {
-    const onOpenWedge = jest.fn();
-    const onConnectGate = jest.fn();
+    const onOpenWedge = vi.fn();
+    const onConnectGate = vi.fn();
 
     resolveWedgeNavigation("analysis", false, onOpenWedge, onConnectGate);
 
@@ -35,8 +35,8 @@ describe("studioHubWedgeNavigation", () => {
 
 describe("studioHubTileActions", () => {
   it("runs tile actions without a hub-level connect gate", () => {
-    const onAction = jest.fn();
-    const onRequestConnect = jest.fn();
+    const onAction = vi.fn();
+    const onRequestConnect = vi.fn();
 
     resolveOAuthTileClick(false, "channel_pulse", onAction, onRequestConnect);
 

@@ -1,5 +1,5 @@
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { YouTubePitchPreviewCard } from "./YouTubePitchPreviewCard";
 
@@ -25,7 +25,7 @@ describe("YouTubePitchPreviewCard", () => {
   });
 
   it("selects a history pitch", () => {
-    const onSelectHistoryPitch = jest.fn();
+    const onSelectHistoryPitch = vi.fn();
     const older = { ...pitch, id: "p2", selected_title: "Second pitch" };
     render(
       <YouTubePitchPreviewCard

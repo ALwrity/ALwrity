@@ -1,9 +1,7 @@
 import React from "react";
 import { Stack, Typography, Paper, Box, alpha } from "@mui/material";
-import {
-  PlayArrow as PlayArrowIcon,
-  CheckCircle as CheckCircleIcon,
-} from "@mui/icons-material";
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { Script, Job } from "../types";
 
 interface RenderQueueStatusDashboardProps {

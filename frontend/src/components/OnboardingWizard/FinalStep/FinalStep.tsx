@@ -9,13 +9,9 @@ import {
   Zoom,
   CircularProgress
 } from '@mui/material';
-import { 
-  Rocket,
-  Star,
-  CheckCircle,
-  // CreditCard,
-  // Warning
-} from '@mui/icons-material';
+import Rocket from '@mui/icons-material/Rocket';
+import Star from '@mui/icons-material/Star';
+import CheckCircle from '@mui/icons-material/CheckCircle';
 // import OnboardingButton from '../common/OnboardingButton';
 import { useNavigate } from 'react-router-dom';
 import { completeOnboarding, getOnboardingSummary, getWebsiteAnalysisData, getResearchPreferencesData, setCurrentStep } from '../../../api/onboarding';

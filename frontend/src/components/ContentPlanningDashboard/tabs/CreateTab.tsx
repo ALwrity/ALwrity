@@ -6,10 +6,8 @@ import {
   Tabs,
   Tab
 } from '@mui/material';
-import {
-  AutoAwesome as AutoAwesomeIcon,
-  CalendarToday as CalendarIcon
-} from '@mui/icons-material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CalendarIcon from '@mui/icons-material/CalendarToday';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 // Import components

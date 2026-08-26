@@ -18,14 +18,12 @@ import {
   Tooltip,
   Button
 } from '@mui/material';
-import {
-  Web as WordPressIcon,
-  Delete as DeleteIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Link as LinkIcon,
-  OpenInNew as OpenInNewIcon
-} from '@mui/icons-material';
+import WordPressIcon from '@mui/icons-material/Web';
+import DeleteIcon from '@mui/icons-material/Delete';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import LinkIcon from '@mui/icons-material/Link';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { useWordPressOAuth } from '../../../hooks/useWordPressOAuth';
 
 interface WordPressOAuthPlatformCardProps {

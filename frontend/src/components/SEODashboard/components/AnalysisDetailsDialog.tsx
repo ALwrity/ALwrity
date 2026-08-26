@@ -13,9 +13,7 @@ import {
   ListItemIcon, 
   ListItemText 
 } from '@mui/material';
-import { 
-  CheckCircle as CheckCircleIcon 
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { AnalysisDetailsDialogProps } from '../../shared/types';
 import { getAnalysisDetails } from './seoUtils';
 

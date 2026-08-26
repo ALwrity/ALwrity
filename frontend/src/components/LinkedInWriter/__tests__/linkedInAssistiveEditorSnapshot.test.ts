@@ -1,7 +1,7 @@
 /**
  * linkedInAssistiveEditorSnapshot tests.
  * Run manually:
- *   npx react-scripts test --watchAll=false --testPathPattern=linkedInAssistiveEditorSnapshot
+ *   npx vitest run linkedInAssistiveEditorSnapshot
  */
 
 import { buildAssistiveEditorSnapshotFromDraft } from "../utils/linkedInAssistiveEditorSnapshot";

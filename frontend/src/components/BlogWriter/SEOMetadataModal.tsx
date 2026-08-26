@@ -26,16 +26,14 @@ import {
   Chip,
   Tooltip
 } from '@mui/material';
-import {
-  Close as CloseIcon,
-  Check as CheckIcon,
-  Preview as PreviewIcon,
-  Search as SearchIcon,
-  Share as ShareIcon,
-  Code as CodeIcon,
-  Tag as TagIcon,
-  Refresh as RefreshIcon
-} from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
+import PreviewIcon from '@mui/icons-material/Preview';
+import SearchIcon from '@mui/icons-material/Search';
+import ShareIcon from '@mui/icons-material/Share';
+import CodeIcon from '@mui/icons-material/Code';
+import TagIcon from '@mui/icons-material/Tag';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { aiApiClient, triggerSubscriptionError } from '../../api/client';
 
 // Import metadata display components

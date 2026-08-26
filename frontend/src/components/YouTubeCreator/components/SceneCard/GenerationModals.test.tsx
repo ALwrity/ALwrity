@@ -1,5 +1,5 @@
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import type { Scene } from "../../../../services/youtubeApi";
@@ -33,17 +33,17 @@ const audioSettings: AudioGenerationSettings = {
 
 describe("GenerationModals — Generate Assets overlay smoke", () => {
   it("opens the image modal on document.body and submits it", () => {
-    const onImageSettingsApply = jest.fn();
+    const onImageSettingsApply = vi.fn();
     render(
       <ThemeProvider theme={theme}>
         <GenerationModals
           scene={scene}
           showAudioSettingsModal={false}
-          setShowAudioSettingsModal={jest.fn()}
+          setShowAudioSettingsModal={vi.fn()}
           showImageSettingsModal
-          setShowImageSettingsModal={jest.fn()}
+          setShowImageSettingsModal={vi.fn()}
           currentAudioSettings={audioSettings}
-          onAudioSettingsApply={jest.fn()}
+          onAudioSettingsApply={vi.fn()}
           onImageSettingsApply={onImageSettingsApply}
         />
       </ThemeProvider>,
@@ -66,18 +66,18 @@ describe("GenerationModals — Generate Assets overlay smoke", () => {
   });
 
   it("opens the audio modal on document.body and submits it", () => {
-    const onAudioSettingsApply = jest.fn();
+    const onAudioSettingsApply = vi.fn();
     render(
       <ThemeProvider theme={theme}>
         <GenerationModals
           scene={scene}
           showAudioSettingsModal
-          setShowAudioSettingsModal={jest.fn()}
+          setShowAudioSettingsModal={vi.fn()}
           showImageSettingsModal={false}
-          setShowImageSettingsModal={jest.fn()}
+          setShowImageSettingsModal={vi.fn()}
           currentAudioSettings={audioSettings}
           onAudioSettingsApply={onAudioSettingsApply}
-          onImageSettingsApply={jest.fn()}
+          onImageSettingsApply={vi.fn()}
         />
       </ThemeProvider>,
     );

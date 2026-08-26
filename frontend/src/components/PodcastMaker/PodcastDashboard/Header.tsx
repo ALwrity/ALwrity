@@ -1,15 +1,13 @@
 import React, { useState } from "react";
 import { Stack, Typography, Box, IconButton, Menu, MenuItem, Divider, ListItemIcon, ListItemText, Collapse, Chip, Popover, ButtonBase, useMediaQuery } from "@mui/material";
-import {
-  Mic as MicIcon,
-  Menu as MenuIcon,
-  Close as CloseIcon,
-  AttachMoney as AttachMoneyIcon,
-  LibraryMusic as LibraryMusicIcon,
-  Folder as FolderIcon,
-  Help as HelpIcon,
-  Add as AddIcon,
-} from "@mui/icons-material";
+import MicIcon from '@mui/icons-material/Mic';
+import MenuIcon from '@mui/icons-material/Menu';
+import CloseIcon from '@mui/icons-material/Close';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import LibraryMusicIcon from '@mui/icons-material/LibraryMusic';
+import FolderIcon from '@mui/icons-material/Folder';
+import HelpIcon from '@mui/icons-material/Help';
+import AddIcon from '@mui/icons-material/Add';
 import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import { PodcastCostEst } from "../types";

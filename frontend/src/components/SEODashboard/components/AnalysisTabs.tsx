@@ -6,11 +6,9 @@ import {
   Tab, 
   Badge 
 } from '@mui/material';
-import { 
-  ThumbUp as ThumbUpIcon, 
-  ThumbDown as ThumbDownIcon, 
-  Warning as WarningIcon2 
-} from '@mui/icons-material';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import ThumbDownIcon from '@mui/icons-material/ThumbDown';
+import WarningIcon2 from '@mui/icons-material/Warning';
 import { AnalysisTabsProps } from '../../shared/types';
 import CategoryCard from './CategoryCard';
 import TabPanel from './TabPanel';

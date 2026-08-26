@@ -11,13 +11,11 @@ import {
   IconButton,
   CircularProgress
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  TrendingUp as TrendingUpIcon,
-  Warning as WarningIcon,
-  Visibility as VisibilityIcon,
-  School as SchoolIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import WarningIcon from '@mui/icons-material/Warning';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import SchoolIcon from '@mui/icons-material/School';
 import { motion } from 'framer-motion';
 import { getCategoryIcon, getCategoryName, getCategoryStatus } from '../utils/categoryHelpers';
 

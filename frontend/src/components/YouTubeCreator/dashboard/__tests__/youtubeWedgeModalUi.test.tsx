@@ -6,7 +6,7 @@ import {
 
 describe("youtubeWedgeModalUi", () => {
   it("builds Hub shell with Studio Hub back label", () => {
-    const onClose = jest.fn();
+    const onClose = vi.fn();
     const shell = youtubeWedgeShellProps(onClose);
     expect(shell.maxWidth).toBe(YOUTUBE_WEDGE_MODAL_MAX_WIDTH);
     expect(shell.backLabel).toBe("Studio Hub");
@@ -15,7 +15,7 @@ describe("youtubeWedgeModalUi", () => {
   });
 
   it("builds sub-modal shell with parent wedge back label", () => {
-    const onBack = jest.fn();
+    const onBack = vi.fn();
     const shell = youtubeSubModalShellProps("analysis", onBack);
     expect(shell.maxWidth).toBe(YOUTUBE_WEDGE_MODAL_MAX_WIDTH);
     expect(shell.backLabel).toBe("Analysis");

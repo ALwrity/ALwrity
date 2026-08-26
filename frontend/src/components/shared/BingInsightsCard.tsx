@@ -21,24 +21,22 @@ import {
   Tooltip,
   Badge,
 } from '@mui/material';
-import {
-  Visibility,
-  MouseOutlined,
-  Search,
-  TrendingUp,
-  TrendingDown,
-  Insights,
-  Lightbulb,
-  Assessment,
-  Refresh,
-  ExpandMore,
-  CheckCircle,
-  Error as ErrorIcon,
-  Warning,
-  Star,
-  Speed,
-  Analytics,
-} from '@mui/icons-material';
+import Visibility from '@mui/icons-material/Visibility';
+import MouseOutlined from '@mui/icons-material/MouseOutlined';
+import Search from '@mui/icons-material/Search';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import TrendingDown from '@mui/icons-material/TrendingDown';
+import Insights from '@mui/icons-material/Insights';
+import Lightbulb from '@mui/icons-material/Lightbulb';
+import Assessment from '@mui/icons-material/Assessment';
+import Refresh from '@mui/icons-material/Refresh';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import Warning from '@mui/icons-material/Warning';
+import Star from '@mui/icons-material/Star';
+import Speed from '@mui/icons-material/Speed';
+import Analytics from '@mui/icons-material/Analytics';
 import { apiClient } from '../../api/client';
 
 interface BingInsightsCardProps {

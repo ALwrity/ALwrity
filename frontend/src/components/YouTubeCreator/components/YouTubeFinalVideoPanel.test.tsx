@@ -3,24 +3,24 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { YouTubeFinalVideoPanel } from "./YouTubeFinalVideoPanel";
 import { downloadMediaBlob, fetchMediaBlobUrl, appendAuthTokenToUrl } from "../../../utils/fetchMediaBlobUrl";
 
-jest.mock("../../../utils/fetchMediaBlobUrl", () => ({
-  fetchMediaBlobUrl: jest.fn(),
-  downloadMediaBlob: jest.fn(),
-  appendAuthTokenToUrl: jest.fn(),
+vi.mock("../../../utils/fetchMediaBlobUrl", () => ({
+  fetchMediaBlobUrl: vi.fn(),
+  downloadMediaBlob: vi.fn(),
+  appendAuthTokenToUrl: vi.fn(),
 }));
 
-const mockedFetchMediaBlobUrl = fetchMediaBlobUrl as jest.MockedFunction<typeof fetchMediaBlobUrl>;
-const mockedDownloadMediaBlob = downloadMediaBlob as jest.MockedFunction<typeof downloadMediaBlob>;
-const mockedAppendAuthTokenToUrl = appendAuthTokenToUrl as jest.MockedFunction<typeof appendAuthTokenToUrl>;
+const mockedFetchMediaBlobUrl = vi.mocked(fetchMediaBlobUrl);
+const mockedDownloadMediaBlob = vi.mocked(downloadMediaBlob);
+const mockedAppendAuthTokenToUrl = vi.mocked(appendAuthTokenToUrl);
 
 describe("YouTubeFinalVideoPanel", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockedAppendAuthTokenToUrl.mockImplementation(async (url) => `${url}?token=test`);
   });
 
   it("shows combine action when final video is not ready", () => {
-    const onCombine = jest.fn();
+    const onCombine = vi.fn();
 
     render(
       <YouTubeFinalVideoPanel
@@ -45,7 +45,7 @@ describe("YouTubeFinalVideoPanel", () => {
         combining={false}
         combiningProgress={100}
         combiningMessage="Done"
-        onCombine={jest.fn()}
+        onCombine={vi.fn()}
       />,
     );
 
@@ -69,7 +69,7 @@ describe("YouTubeFinalVideoPanel", () => {
         combining={false}
         combiningProgress={100}
         combiningMessage="Done"
-        onCombine={jest.fn()}
+        onCombine={vi.fn()}
       />,
     );
 
@@ -91,7 +91,7 @@ describe("YouTubeFinalVideoPanel", () => {
         combining={false}
         combiningProgress={100}
         combiningMessage="Done"
-        onCombine={jest.fn()}
+        onCombine={vi.fn()}
       />,
     );
 

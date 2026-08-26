@@ -14,9 +14,7 @@ import {
   IconButton,
   Tooltip
 } from '@mui/material';
-import {
-  MenuBook
-} from '@mui/icons-material';
+import MenuBook from '@mui/icons-material/MenuBook';
 
 interface ReadabilityAnalysisProps {
   detailedAnalysis?: {

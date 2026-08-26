@@ -3,9 +3,9 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { YouTubePublishPanel } from "./YouTubePublishPanel";
 import { useYouTubePublish } from "../../../hooks/useYouTubePublish";
 
-jest.mock("../../../hooks/useYouTubePublish");
+vi.mock("../../../hooks/useYouTubePublish");
 
-const mockedUseYouTubePublish = useYouTubePublish as jest.MockedFunction<typeof useYouTubePublish>;
+const mockedUseYouTubePublish = vi.mocked(useYouTubePublish);
 
 function buildHookState(overrides: Partial<ReturnType<typeof useYouTubePublish>> = {}): ReturnType<typeof useYouTubePublish> {
   return {
@@ -14,9 +14,9 @@ function buildHookState(overrides: Partial<ReturnType<typeof useYouTubePublish>>
     loading: false,
     error: null,
     activeChannel: null,
-    connect: jest.fn(),
-    disconnect: jest.fn(),
-    checkStatus: jest.fn(),
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    checkStatus: vi.fn(),
     publishState: {
       publishing: false,
       taskId: null,
@@ -25,8 +25,8 @@ function buildHookState(overrides: Partial<ReturnType<typeof useYouTubePublish>>
       progress: "",
       error: null,
     },
-    publishToYouTube: jest.fn(),
-    resetPublishState: jest.fn(),
+    publishToYouTube: vi.fn(),
+    resetPublishState: vi.fn(),
     ...overrides,
   };
 }
@@ -58,7 +58,7 @@ describe("YouTubePublishPanel", () => {
   });
 
   it("connect button triggers OAuth connect flow", () => {
-    const connect = jest.fn();
+    const connect = vi.fn();
     mockedUseYouTubePublish.mockReturnValue(buildHookState({ connect }));
 
     render(<YouTubePublishPanel videoUrl={null} scenes={baseScenes} videoPlan={null} />);
@@ -68,7 +68,7 @@ describe("YouTubePublishPanel", () => {
   });
 
   it("shows connected channel and disconnect action", () => {
-    const disconnect = jest.fn();
+    const disconnect = vi.fn();
     mockedUseYouTubePublish.mockReturnValue(
       buildHookState({
         connected: true,
@@ -92,7 +92,7 @@ describe("YouTubePublishPanel", () => {
   });
 
   it("publishes with derived title and description from video plan", () => {
-    const publishToYouTube = jest.fn();
+    const publishToYouTube = vi.fn();
     mockedUseYouTubePublish.mockReturnValue(
       buildHookState({
         connected: true,
@@ -138,7 +138,7 @@ describe("YouTubePublishPanel", () => {
   });
 
   it("publishes with selected_title when present", () => {
-    const publishToYouTube = jest.fn();
+    const publishToYouTube = vi.fn();
     mockedUseYouTubePublish.mockReturnValue(
       buildHookState({
         connected: true,
@@ -185,7 +185,7 @@ describe("YouTubePublishPanel", () => {
   });
 
   it("forces private privacy when a schedule time is set", () => {
-    const publishToYouTube = jest.fn();
+    const publishToYouTube = vi.fn();
     mockedUseYouTubePublish.mockReturnValue(
       buildHookState({
         connected: true,

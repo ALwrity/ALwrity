@@ -10,18 +10,16 @@ import {
   AccordionSummary,
   AccordionDetails
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon,
-  Schedule as ScheduleIcon,
-  ViewModule as ViewModuleIcon,
-  Devices as DevicesIcon,
-  ExpandMore as ExpandMoreIcon,
-  TrendingUp as TrendingUpIcon,
-  DataUsage as DataUsageIcon,
-  School as SchoolIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import DevicesIcon from '@mui/icons-material/Devices';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
+import SchoolIcon from '@mui/icons-material/School';
 
 // Import styles
 import {
