@@ -13,14 +13,12 @@ import {
   Chip,
   TextField
 } from '@mui/material';
-import {
-  Analytics as AnalyticsIcon,
-  Language as LanguageIcon,
-  Speed as SpeedIcon,
-  Palette as PaletteIcon,
-  TrendingUp as TrendingUpIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import LanguageIcon from '@mui/icons-material/Language';
+import SpeedIcon from '@mui/icons-material/Speed';
+import PaletteIcon from '@mui/icons-material/Palette';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import InfoIcon from '@mui/icons-material/Info';
 import SectionHeader from './SectionHeader';
 
 interface ContentCharacteristics {

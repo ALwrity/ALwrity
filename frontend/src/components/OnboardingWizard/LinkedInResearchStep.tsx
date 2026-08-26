@@ -26,12 +26,10 @@ import {
   Divider,
   LinearProgress,
 } from '@mui/material';
-import {
-  TrendingUp as TrendingIcon,
-  Lightbulb as LightbulbIcon,
-  AccountCircle as AccountIcon,
-  Refresh as RefreshIcon,
-} from '@mui/icons-material';
+import TrendingIcon from '@mui/icons-material/TrendingUp';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import AccountIcon from '@mui/icons-material/AccountCircle';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { linkedInGrowthApi, type ConsolidatedGrowthResponse } from '../../services/linkedInGrowthApi';
 
 interface LinkedInResearchStepProps {

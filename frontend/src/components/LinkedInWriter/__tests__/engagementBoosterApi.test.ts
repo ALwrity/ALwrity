@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import {
   optimizeForEngagement,
   scoreDraftPair,
@@ -5,26 +6,26 @@ import {
 import { linkedInWriterApi } from "../../../services/linkedInWriterApi";
 import { linkedInGrowthApi } from "../../../services/linkedInGrowthApi";
 
-jest.mock("../../../services/linkedInWriterApi", () => ({
+vi.mock("../../../services/linkedInWriterApi", () => ({
   linkedInWriterApi: {
-    editContent: jest.fn(),
+    editContent: vi.fn(),
   },
 }));
 
-jest.mock("../../../services/linkedInGrowthApi", () => ({
+vi.mock("../../../services/linkedInGrowthApi", () => ({
   linkedInGrowthApi: {
-    getPostPreviewScore: jest.fn(),
+    getPostPreviewScore: vi.fn(),
   },
 }));
 
 describe("engagementBoosterApi", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe("optimizeForEngagement", () => {
     it("returns content when API succeeds", async () => {
-      (linkedInWriterApi.editContent as jest.Mock).mockResolvedValue({
+      (linkedInWriterApi.editContent as Mock).mockResolvedValue({
         success: true,
         content: "  Rewritten post  ",
       });
@@ -34,7 +35,7 @@ describe("engagementBoosterApi", () => {
     });
 
     it("returns error when API reports failure", async () => {
-      (linkedInWriterApi.editContent as jest.Mock).mockResolvedValue({
+      (linkedInWriterApi.editContent as Mock).mockResolvedValue({
         success: false,
         error: "Authentication required",
       });
@@ -45,7 +46,7 @@ describe("engagementBoosterApi", () => {
     });
 
     it("returns error when content is empty", async () => {
-      (linkedInWriterApi.editContent as jest.Mock).mockResolvedValue({
+      (linkedInWriterApi.editContent as Mock).mockResolvedValue({
         success: true,
         content: "   ",
       });
@@ -56,7 +57,7 @@ describe("engagementBoosterApi", () => {
     });
 
     it("passes persona and content-type context to the API", async () => {
-      (linkedInWriterApi.editContent as jest.Mock).mockResolvedValue({
+      (linkedInWriterApi.editContent as Mock).mockResolvedValue({
         success: true,
         content: "Rewritten",
       });
@@ -81,7 +82,7 @@ describe("engagementBoosterApi", () => {
 
   describe("scoreDraftPair", () => {
     it("returns scores when both calls succeed", async () => {
-      (linkedInGrowthApi.getPostPreviewScore as jest.Mock)
+      (linkedInGrowthApi.getPostPreviewScore as Mock)
         .mockResolvedValueOnce({ overall_score: 60 })
         .mockResolvedValueOnce({ overall_score: 80 });
 
@@ -92,7 +93,7 @@ describe("engagementBoosterApi", () => {
     });
 
     it("marks scoring unavailable when both calls fail", async () => {
-      (linkedInGrowthApi.getPostPreviewScore as jest.Mock).mockRejectedValue(
+      (linkedInGrowthApi.getPostPreviewScore as Mock).mockRejectedValue(
         new Error("network"),
       );
 

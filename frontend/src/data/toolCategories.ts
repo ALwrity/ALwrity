@@ -1,26 +1,24 @@
 import React from 'react';
-import {
-  Article as ArticleIcon,
-  Search as SearchIcon,
-  Analytics as AnalyticsIcon,
-  Psychology as PsychologyIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Speed as SpeedIcon,
-  Business as BusinessIcon,
-  SocialDistance as SocialIcon,
-  Dashboard as DashboardIcon,
-  Facebook as FacebookIcon,
-  LinkedIn as LinkedInIcon,
-  Twitter as TwitterIcon,
-  Instagram as InstagramIcon,
-  Web as WebIcon,
-  Timeline as StrategyIcon,
-  CalendarMonth as CalendarIcon,
-  AudioFile as AudioIcon,
-  Image as ImageIcon,
-  VideoLibrary as VideoIcon,
-  Link as LinkIcon
-} from '@mui/icons-material';
+import ArticleIcon from '@mui/icons-material/Article';
+import SearchIcon from '@mui/icons-material/Search';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import SpeedIcon from '@mui/icons-material/Speed';
+import BusinessIcon from '@mui/icons-material/Business';
+import SocialIcon from '@mui/icons-material/SocialDistance';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import TwitterIcon from '@mui/icons-material/Twitter';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import WebIcon from '@mui/icons-material/Web';
+import StrategyIcon from '@mui/icons-material/Timeline';
+import CalendarIcon from '@mui/icons-material/CalendarMonth';
+import AudioIcon from '@mui/icons-material/AudioFile';
+import ImageIcon from '@mui/icons-material/Image';
+import VideoIcon from '@mui/icons-material/VideoLibrary';
+import LinkIcon from '@mui/icons-material/Link';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import { ToolCategories } from '../components/shared/types';
 

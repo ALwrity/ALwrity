@@ -1,12 +1,10 @@
 import React from 'react';
 import { Box, Typography, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
-import { 
-  Accessibility, 
-  Keyboard, 
-  Visibility, 
-  Hearing, 
-  TouchApp 
-} from '@mui/icons-material';
+import Accessibility from '@mui/icons-material/Accessibility';
+import Keyboard from '@mui/icons-material/Keyboard';
+import Visibility from '@mui/icons-material/Visibility';
+import Hearing from '@mui/icons-material/Hearing';
+import TouchApp from '@mui/icons-material/TouchApp';
 
 const AccessibilityGuide: React.FC = () => {
   return (

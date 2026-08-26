@@ -7,10 +7,8 @@ import {
   Fade,
   useTheme
 } from '@mui/material';
-import {
-  TrendingUp as TrendingUpIcon,
-  Psychology as PsychologyIcon
-} from '@mui/icons-material';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import PsychologyIcon from '@mui/icons-material/Psychology';
 
 import {
   StrategicInsightsSection,

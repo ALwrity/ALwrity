@@ -18,16 +18,14 @@ import {
   ListItemIcon,
   ListItemText
 } from '@mui/material';
-import {
-  WifiOff as ConnectionIcon,
-  Refresh as RefreshIcon,
-  Home as HomeIcon,
-  Settings as SettingsIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Schedule as ScheduleIcon,
-  CloudQueue as CloudIcon
-} from '@mui/icons-material';
+import ConnectionIcon from '@mui/icons-material/WifiOff';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import HomeIcon from '@mui/icons-material/Home';
+import SettingsIcon from '@mui/icons-material/Settings';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import CloudIcon from '@mui/icons-material/CloudQueue';
 
 interface BackendConnectionErrorProps {
   error?: string;

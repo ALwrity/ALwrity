@@ -19,15 +19,13 @@ import {
   Skeleton,
 } from '@mui/material';
 import { keyframes } from '@mui/system';
-import {
-  Analytics,
-  CalendarToday,
-  Create,
-  Publish,
-  Chat,
-  Refresh,
-  OpenInNew
-} from '@mui/icons-material';
+import Analytics from '@mui/icons-material/Analytics';
+import CalendarToday from '@mui/icons-material/CalendarToday';
+import Create from '@mui/icons-material/Create';
+import Publish from '@mui/icons-material/Publish';
+import Chat from '@mui/icons-material/Chat';
+import Refresh from '@mui/icons-material/Refresh';
+import OpenInNew from '@mui/icons-material/OpenInNew';
 import Check from '@mui/icons-material/Check';
 import { motion } from 'framer-motion';
 import HeroSection from './HeroSection';

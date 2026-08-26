@@ -13,14 +13,12 @@ import {
   Chip
 } from '@mui/material';
 import { motion } from 'framer-motion';
-import {
-  Close as CloseIcon,
-  Settings as SettingsIcon,
-  PersonAdd as OnboardingIcon,
-  CheckCircle as CheckIcon,
-  TrendingUp as TrendingUpIcon,
-  Psychology as PsychologyIcon
-} from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import SettingsIcon from '@mui/icons-material/Settings';
+import OnboardingIcon from '@mui/icons-material/PersonAdd';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import PsychologyIcon from '@mui/icons-material/Psychology';
 
 // Onboarding Modal Component
 const OnboardingModal: React.FC<{

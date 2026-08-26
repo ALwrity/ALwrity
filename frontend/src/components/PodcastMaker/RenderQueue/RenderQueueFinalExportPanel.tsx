@@ -1,10 +1,8 @@
 import React from "react";
 import { Stack, Typography, Paper, Box, Button, CircularProgress, LinearProgress, Alert, alpha } from "@mui/material";
-import {
-  VideoLibrary as VideoLibraryIcon,
-  Download as DownloadIcon,
-  CheckCircle as CheckCircleIcon,
-} from "@mui/icons-material";
+import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
+import DownloadIcon from '@mui/icons-material/Download';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { Script } from "../types";
 
 interface RenderQueueFinalExportPanelProps {

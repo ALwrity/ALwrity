@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Paper, Typography, Box, Tooltip } from '@mui/material';
-import { Navigation as NavigationIcon } from '@mui/icons-material';
+import NavigationIcon from '@mui/icons-material/Navigation';
 
 interface Section {
   id: string | number;

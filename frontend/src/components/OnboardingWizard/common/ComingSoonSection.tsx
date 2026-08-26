@@ -8,11 +8,9 @@ import {
   Stack,
   Fade
 } from '@mui/material';
-import {
-  Schedule as ScheduleIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Instagram as InstagramIcon
-} from '@mui/icons-material';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import InstagramIcon from '@mui/icons-material/Instagram';
 
 interface ComingSoonSectionProps {
   title?: string;

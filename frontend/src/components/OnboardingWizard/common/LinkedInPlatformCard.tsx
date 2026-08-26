@@ -36,15 +36,9 @@ import {
 
 } from '@mui/material';
 
-import {
-
-  LinkedIn as LinkedInIcon,
-
-  CheckCircle as CheckCircleIcon,
-
-  Link as LinkIcon,
-
-} from '@mui/icons-material';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import LinkIcon from '@mui/icons-material/Link';
 
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
 

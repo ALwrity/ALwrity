@@ -8,11 +8,9 @@ import {
   IconButton, 
   Tooltip 
 } from '@mui/material';
-import { 
-  Star as StarIcon, 
-  StarBorder as StarBorderIcon, 
-  LockOutlined as LockIcon
-} from '@mui/icons-material';
+import StarIcon from '@mui/icons-material/Star';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
+import LockIcon from '@mui/icons-material/LockOutlined';
 import { ToolCardProps } from './types';
 import { getStatusConfig } from './utils';
 

@@ -21,14 +21,12 @@ import {
   CircularProgress,
   Tooltip,
 } from '@mui/material';
-import {
-  Close as CloseIcon,
-  Palette as PaletteIcon,
-  Verified as VerifiedIcon,
-  Analytics as AnalyticsIcon,
-  Link as LinkIcon,
-  OpenInNew as OpenInNewIcon,
-} from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import PaletteIcon from '@mui/icons-material/Palette';
+import VerifiedIcon from '@mui/icons-material/Verified';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import LinkIcon from '@mui/icons-material/Link';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 import { seoDashboardAPI, SavedWebsiteAnalysis } from '../../api/seoDashboard';
 import AnalysisResultsDisplay from '../OnboardingWizard/WebsiteStep/components/AnalysisResultsDisplay';

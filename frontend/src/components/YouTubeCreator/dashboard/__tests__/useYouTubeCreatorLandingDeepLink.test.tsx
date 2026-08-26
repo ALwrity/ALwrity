@@ -24,7 +24,7 @@ describe("useYouTubeCreatorLandingDeepLink", () => {
   });
 
   it("coerces ?tab=creator to Hub and queues Full Creator open", () => {
-    const setTab = jest.fn();
+    const setTab = vi.fn();
     renderHook(() => useYouTubeCreatorLandingDeepLink(setTab), {
       wrapper: wrapper("/youtube-creator?tab=creator"),
     });
@@ -35,7 +35,7 @@ describe("useYouTubeCreatorLandingDeepLink", () => {
   });
 
   it("does not queue when landing on Hub without creator tab", () => {
-    const setTab = jest.fn();
+    const setTab = vi.fn();
     renderHook(() => useYouTubeCreatorLandingDeepLink(setTab), {
       wrapper: wrapper("/youtube-creator"),
     });
@@ -49,7 +49,7 @@ describe("useYouTubeCreatorLandingDeepLink", () => {
       "yt_pending_open_creator",
       JSON.stringify({ step: 0, userIdea: "Blog idea", focusUrlImport: true }),
     );
-    const setTab = jest.fn();
+    const setTab = vi.fn();
     renderHook(() => useYouTubeCreatorLandingDeepLink(setTab), {
       wrapper: wrapper("/youtube-creator?tab=creator"),
     });

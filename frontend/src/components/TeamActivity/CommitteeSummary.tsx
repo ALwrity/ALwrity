@@ -7,15 +7,13 @@ import {
   Collapse,
   Button,
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  WarningAmber as WarningAmberIcon,
-  Error as ErrorIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  ArrowForward as ArrowForwardIcon,
-  InfoOutlined as InfoIcon,
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import ErrorIcon from '@mui/icons-material/Error';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import InfoIcon from '@mui/icons-material/InfoOutlined';
 import { AgentEventItem } from '../../hooks/useAgentHuddleFeed';
 
 interface CommitteeProposal {

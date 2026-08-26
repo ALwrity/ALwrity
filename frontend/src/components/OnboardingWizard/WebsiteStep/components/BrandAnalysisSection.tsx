@@ -13,16 +13,14 @@ import {
   Chip,
   TextField
 } from '@mui/material';
-import {
-  Business as BusinessIcon,
-  RecordVoiceOver as VoiceIcon,
-  GpsFixed as PositioningIcon,
-  Diamond as ValuesIcon,
-  CompareArrows as DifferentiationIcon,
-  VerifiedUser as TrustIcon,
-  School as AuthorityIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import BusinessIcon from '@mui/icons-material/Business';
+import VoiceIcon from '@mui/icons-material/RecordVoiceOver';
+import PositioningIcon from '@mui/icons-material/GpsFixed';
+import ValuesIcon from '@mui/icons-material/Diamond';
+import DifferentiationIcon from '@mui/icons-material/CompareArrows';
+import TrustIcon from '@mui/icons-material/VerifiedUser';
+import AuthorityIcon from '@mui/icons-material/School';
+import InfoIcon from '@mui/icons-material/Info';
 
 interface BrandAnalysis {
   brand_voice: string;

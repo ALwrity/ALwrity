@@ -12,14 +12,12 @@ import {
   AccordionSummary,
   AccordionDetails
 } from '@mui/material';
-import {
-  Security as SecurityIcon,
-  ExpandMore as ExpandMoreIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import SecurityIcon from '@mui/icons-material/Security';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import WarningIcon from '@mui/icons-material/Warning';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import InfoIcon from '@mui/icons-material/Info';
 import { StrategyData } from '../types/strategy.types';
 import {
   ANALYSIS_CARD_STYLES,

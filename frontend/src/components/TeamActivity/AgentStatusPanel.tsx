@@ -6,14 +6,12 @@ import {
   Collapse,
   LinearProgress,
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  WarningAmber as WarningAmberIcon,
-  Error as ErrorIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Schedule as ScheduleIcon,
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import ErrorIcon from '@mui/icons-material/Error';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 import { AgentEventItem, AgentRunItem, AgentAlertItem } from '../../hooks/useAgentHuddleFeed';
 
 interface CommitteeProposal {

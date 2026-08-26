@@ -9,26 +9,24 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import {
-  AutoAwesome as AutoAwesomeIcon,
-  CheckCircle as CheckCircleIcon,
-  Psychology as PsychologyIcon,
-  Insights as InsightsIcon,
-  Article as ArticleIcon,
-  Edit as EditIcon,
-  VolumeUp as VolumeUpIcon,
-  VideoLibrary as VideoLibraryIcon,
-  Lightbulb as LightbulbIcon,
-  Search as SearchIcon,
-  FactCheck as FactCheckIcon,
-  School as SchoolIcon,
-  Update as UpdateIcon,
-  Bolt as BoltIcon,
-  TheaterComedy as TheaterComedyIcon,
-  RecordVoiceOver as RecordVoiceOverIcon,
-  FormatListBulleted as FormatListBulletedIcon,
-  Chat as ChatIcon,
-} from "@mui/icons-material";
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import InsightsIcon from '@mui/icons-material/Insights';
+import ArticleIcon from '@mui/icons-material/Article';
+import EditIcon from '@mui/icons-material/Edit';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import SearchIcon from '@mui/icons-material/Search';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
+import SchoolIcon from '@mui/icons-material/School';
+import UpdateIcon from '@mui/icons-material/Update';
+import BoltIcon from '@mui/icons-material/Bolt';
+import TheaterComedyIcon from '@mui/icons-material/TheaterComedy';
+import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import ChatIcon from '@mui/icons-material/Chat';
 
 const SCRIPT_GENERATION_MESSAGES = [
   { title: "Analyzing Research Data", message: "Extracting key insights, facts, and statistics from your research..." },

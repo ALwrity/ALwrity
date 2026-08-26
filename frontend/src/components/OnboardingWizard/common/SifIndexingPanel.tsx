@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, Paper, CircularProgress } from '@mui/material';
-import { CloudDone as CloudDoneIcon, HourglassEmpty as HourglassEmptyIcon } from '@mui/icons-material';
+import CloudDoneIcon from '@mui/icons-material/CloudDone';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import { apiClient, longRunningApiClient } from '../../../api/client';
 
 const PHASE_MAP: Record<string, string> = {

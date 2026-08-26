@@ -6,11 +6,9 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import {
-  Image as ImageIcon,
-  Redo as RedoIcon,
-  Undo as UndoIcon,
-} from "@mui/icons-material";
+import ImageIcon from '@mui/icons-material/Image';
+import RedoIcon from '@mui/icons-material/Redo';
+import UndoIcon from '@mui/icons-material/Undo';
 import MarkdownToolbar from "../../TextEditor/MarkdownToolbar";
 import type { MarkdownFormatType } from "../../TextEditor/markdownFormatting";
 import { LinkedInEmojiPicker } from "./LinkedInEmojiPicker";

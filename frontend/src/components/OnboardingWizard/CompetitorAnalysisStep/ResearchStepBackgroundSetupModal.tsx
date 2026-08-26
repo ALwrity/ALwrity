@@ -15,10 +15,8 @@ import {
   Alert,
   Tooltip,
 } from '@mui/material';
-import {
-  Close as CloseIcon,
-  Refresh as RefreshIcon,
-} from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { longRunningApiClient, apiClient } from '../../../api/client';
 import { seoDashboardAPI } from '../../../api/seoDashboard';
 import type { OnboardingScheduledTaskHealthResponse, OnboardingScheduledTaskHealthItem } from '../../../api/seoDashboard';

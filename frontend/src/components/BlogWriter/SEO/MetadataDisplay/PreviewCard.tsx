@@ -20,14 +20,12 @@ import {
   Tooltip,
   IconButton
 } from '@mui/material';
-import {
-  Search as SearchIcon,
-  Code as CodeIcon,
-  Facebook as FacebookIcon,
-  Twitter as TwitterIcon,
-  Google as GoogleIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import SearchIcon from '@mui/icons-material/Search';
+import CodeIcon from '@mui/icons-material/Code';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import TwitterIcon from '@mui/icons-material/Twitter';
+import GoogleIcon from '@mui/icons-material/Google';
+import InfoIcon from '@mui/icons-material/Info';
 
 interface PreviewCardProps {
   metadata: any;

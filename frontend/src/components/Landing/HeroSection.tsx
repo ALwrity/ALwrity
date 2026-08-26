@@ -11,14 +11,12 @@ import {
   alpha,
 } from '@mui/material';
 import { useAuth, useClerk } from '@clerk/clerk-react';
-import {
-  RocketLaunch,
-  Lightbulb,
-  Verified,
-  Security,
-  Shield,
-  CloudDone,
-} from '@mui/icons-material';
+import RocketLaunch from '@mui/icons-material/RocketLaunch';
+import Lightbulb from '@mui/icons-material/Lightbulb';
+import Verified from '@mui/icons-material/Verified';
+import Security from '@mui/icons-material/Security';
+import Shield from '@mui/icons-material/Shield';
+import CloudDone from '@mui/icons-material/CloudDone';
 import { motion } from 'framer-motion';
 import { ScrambleText } from '../ScrambleText';
 import { scrollToLandingSection, scrollToLandingSectionWithRetry, type LandingSectionId } from '../../utils/landingNavigation';

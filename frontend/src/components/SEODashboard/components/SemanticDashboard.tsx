@@ -13,18 +13,16 @@ import {
   Skeleton,
   Button
 } from '@mui/material';
-import { 
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
-  Refresh as RefreshIcon,
-  Info as InfoIcon,
-  Speed as SpeedIcon,
-  Assessment as AssessmentIcon,
-  Group as GroupIcon,
-  Lightbulb as LightbulbIcon
-} from '@mui/icons-material';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import WarningIcon from '@mui/icons-material/Warning';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import InfoIcon from '@mui/icons-material/Info';
+import SpeedIcon from '@mui/icons-material/Speed';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import GroupIcon from '@mui/icons-material/Group';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCard, ShimmerHeader } from '../../shared/styled';
 import { useSemanticDashboardStore } from '../../../stores/semanticDashboardStore';

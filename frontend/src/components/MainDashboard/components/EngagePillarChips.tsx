@@ -2,15 +2,13 @@ import React from 'react';
 import { Box, Chip } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Facebook, 
-  LinkedIn, 
-  Twitter, 
-  Forum,
-  Comment,
-  Chat,
-  Groups
-} from '@mui/icons-material';
+import Facebook from '@mui/icons-material/Facebook';
+import LinkedIn from '@mui/icons-material/LinkedIn';
+import Twitter from '@mui/icons-material/Twitter';
+import Forum from '@mui/icons-material/Forum';
+import Comment from '@mui/icons-material/Comment';
+import Chat from '@mui/icons-material/Chat';
+import Groups from '@mui/icons-material/Groups';
 import EnhancedTodayChip from './EnhancedTodayChip';
 import { TodayTask } from '../../../types/workflow';
 

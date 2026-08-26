@@ -13,13 +13,11 @@ import {
   DialogContent,
   DialogActions
 } from '@mui/material';
-import {
-  Google as GoogleIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Link as LinkIcon,
-  LinkOff as LinkOffIcon
-} from '@mui/icons-material';
+import GoogleIcon from '@mui/icons-material/Google';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import LinkIcon from '@mui/icons-material/Link';
+import LinkOffIcon from '@mui/icons-material/LinkOff';
 import { useAuth } from '@clerk/clerk-react';
 import { gscAPI, GSCStatusResponse } from '../../../api/gsc';
 import { apiClient } from '../../../api/client';

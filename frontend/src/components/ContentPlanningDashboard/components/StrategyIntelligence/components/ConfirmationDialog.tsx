@@ -9,9 +9,7 @@ import {
   Alert,
   Box
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { ConfirmationDialogProps } from '../types/strategy.types';
 
 const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({

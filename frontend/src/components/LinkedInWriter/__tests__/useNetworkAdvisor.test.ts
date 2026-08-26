@@ -1,15 +1,16 @@
+import type { Mock } from 'vitest';
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useNetworkAdvisor } from "../components/dashboard/useNetworkAdvisor";
 import { linkedInGrowthApi } from "../../../services/linkedInGrowthApi";
 
-jest.mock("../../../services/linkedInGrowthApi", () => ({
+vi.mock("../../../services/linkedInGrowthApi", () => ({
   linkedInGrowthApi: {
-    getNetworkSuggestions: jest.fn(),
+    getNetworkSuggestions: vi.fn(),
   },
 }));
 
 const mockGetNetworkSuggestions =
-  linkedInGrowthApi.getNetworkSuggestions as jest.Mock;
+  linkedInGrowthApi.getNetworkSuggestions as Mock;
 
 describe("useNetworkAdvisor", () => {
   beforeEach(() => {

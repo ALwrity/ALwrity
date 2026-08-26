@@ -17,15 +17,13 @@ import {
   ListItemText,
   LinearProgress,
 } from '@mui/material';
-import {
-  Upload,
-  CheckCircle,
-  Warning,
-  Error as ErrorIcon,
-  PhotoLibrary,
-  ArrowBack,
-  AutoAwesome,
-} from '@mui/icons-material';
+import Upload from '@mui/icons-material/Upload';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Warning from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
+import PhotoLibrary from '@mui/icons-material/PhotoLibrary';
+import ArrowBack from '@mui/icons-material/ArrowBack';
+import AutoAwesome from '@mui/icons-material/AutoAwesome';
 import { motion } from 'framer-motion';
 import { ImageStudioLayout } from '../ImageStudio/ImageStudioLayout';
 import { GlassyCard } from '../ImageStudio/ui/GlassyCard';

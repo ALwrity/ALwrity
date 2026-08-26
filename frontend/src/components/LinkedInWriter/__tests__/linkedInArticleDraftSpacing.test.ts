@@ -1,7 +1,7 @@
 /**
  * Article section body spacing preservation in markdown round-trip.
  * Run manually:
- *   npx react-scripts test --watchAll=false --testPathPattern=linkedInArticleDraftSpacing
+ *   npx vitest run linkedInArticleDraftSpacing
  */
 
 import {

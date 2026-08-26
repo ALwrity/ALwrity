@@ -20,23 +20,21 @@ import {
   IconButton,
   Paper
 } from '@mui/material';
-import {
-  AutoAwesome as AutoAwesomeIcon,
-  TrendingUp as TrendingUpIcon,
-  Business as BusinessIcon,
-  Analytics as AnalyticsIcon,
-  Schedule as ScheduleIcon,
-  Group as GroupIcon,
-  Build as BuildIcon,
-  Palette as BrandingIcon,
-  Storage as StorageIcon,
-  CheckCircle as CheckCircleIcon,
-  ArrowForward as ArrowForwardIcon,
-  Close as CloseIcon,
-  Star as StarIcon,
-  Speed as SpeedIcon,
-  Security as SecurityIcon
-} from '@mui/icons-material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import BusinessIcon from '@mui/icons-material/Business';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import GroupIcon from '@mui/icons-material/Group';
+import BuildIcon from '@mui/icons-material/Build';
+import BrandingIcon from '@mui/icons-material/Palette';
+import StorageIcon from '@mui/icons-material/Storage';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import CloseIcon from '@mui/icons-material/Close';
+import StarIcon from '@mui/icons-material/Star';
+import SpeedIcon from '@mui/icons-material/Speed';
+import SecurityIcon from '@mui/icons-material/Security';
 import { motion } from 'framer-motion';
 
 interface EnterpriseDatapointsModalProps {

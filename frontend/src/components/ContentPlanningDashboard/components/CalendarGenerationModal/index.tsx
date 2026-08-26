@@ -15,16 +15,14 @@ import {
   Alert,
   CircularProgress
 } from '@mui/material';
-import {
-  Close as CloseIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Refresh as RefreshIcon,
-  Schedule as ScheduleIcon,
-  TrendingUp as TrendingUpIcon,
-  School as SchoolIcon,
-  DataUsage as DataUsageIcon
-} from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SchoolIcon from '@mui/icons-material/School';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Import existing components for reuse

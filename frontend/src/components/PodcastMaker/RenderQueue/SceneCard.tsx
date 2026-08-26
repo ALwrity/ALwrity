@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Box, Stack, Typography, Alert, Paper, Chip, Divider, LinearProgress, CircularProgress, alpha, Modal, IconButton, Tooltip, Button } from "@mui/material";
-import {
-  CheckCircle as CheckCircleIcon,
-  RadioButtonUnchecked as RadioButtonUncheckedIcon,
-  Info as InfoIcon,
-  OpenInNew as OpenInNewIcon,
-  Videocam as VideocamIcon,
-  Close as CloseIcon,
-  ZoomIn as ZoomInIcon,
-} from "@mui/icons-material";
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+import InfoIcon from '@mui/icons-material/Info';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import VideocamIcon from '@mui/icons-material/Videocam';
+import CloseIcon from '@mui/icons-material/Close';
+import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import { Scene, Job, VideoGenerationSettings } from "../types";
 import { GlassyCard, glassyCardSx } from "../ui";
 import { InlineAudioPlayer } from "../InlineAudioPlayer";

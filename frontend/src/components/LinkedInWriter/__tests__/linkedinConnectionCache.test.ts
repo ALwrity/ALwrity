@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 /**
  * Regression tests for LinkedIn connection status request deduplication.
  *
@@ -5,11 +6,11 @@
  * when multiple components mount simultaneously.
  */
 
-jest.mock('../../../api/client', () => ({
-  apiClient: { get: jest.fn() },
-  aiApiClient: { get: jest.fn() },
-  getAuthTokenGetter: jest.fn(() => null),
-  getApiBaseUrl: jest.fn(() => 'http://localhost:8000'),
+vi.mock('../../../api/client', () => ({
+  apiClient: { get: vi.fn() },
+  aiApiClient: { get: vi.fn() },
+  getAuthTokenGetter: vi.fn(() => null),
+  getApiBaseUrl: vi.fn(() => 'http://localhost:8000'),
 }));
 
 import { apiClient } from '../../../api/client';
@@ -22,7 +23,7 @@ import { invalidateSharedConnectionStatus } from '../../../hooks/linkedInConnect
 
 describe('Connection Status Caching — regression', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     invalidateLinkedInConnectionStatusCache();
     invalidateSharedConnectionStatus();
   });
@@ -36,7 +37,7 @@ describe('Connection Status Caching — regression', () => {
   });
 
   it('deduplicates 3 concurrent calls into 1 HTTP request', async () => {
-    const mockGet = apiClient.get as jest.Mock;
+    const mockGet = apiClient.get as Mock;
     const mockData = linkedinStatusResult(true);
 
     mockGet.mockReturnValue(Promise.resolve({ data: mockData }));
@@ -55,7 +56,7 @@ describe('Connection Status Caching — regression', () => {
   });
 
   it('invalidateLinkedInConnectionStatusCache forces next fetch to hit network', async () => {
-    const mockGet = apiClient.get as jest.Mock;
+    const mockGet = apiClient.get as Mock;
     const connected = linkedinStatusResult(true);
     const disconnected = linkedinStatusResult(false);
 
@@ -73,7 +74,7 @@ describe('Connection Status Caching — regression', () => {
   });
 
   it('bypassCache skips TTL and always fetches fresh', async () => {
-    const mockGet = apiClient.get as jest.Mock;
+    const mockGet = apiClient.get as Mock;
     mockGet.mockResolvedValue({ data: linkedinStatusResult(true) });
 
     await getLinkedInConnectionStatus();
@@ -83,7 +84,7 @@ describe('Connection Status Caching — regression', () => {
   });
 
   it('invalidateSharedConnectionStatus clears API-layer cache too', async () => {
-    const mockGet = apiClient.get as jest.Mock;
+    const mockGet = apiClient.get as Mock;
     mockGet.mockResolvedValue({ data: linkedinStatusResult(true) });
 
     await getLinkedInConnectionStatus();

@@ -20,19 +20,17 @@ import {
   Chip,
   LinearProgress
 } from '@mui/material';
-import {
-  CalendarToday as CalendarIcon,
-  Schedule as ScheduleIcon,
-  Help as HelpIcon,
-  TrendingUp as TrendingUpIcon,
-  Public as PublicIcon,
-  AccessTime as AccessTimeIcon,
-  ContentPaste as ContentPasteIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Lightbulb as LightbulbIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon
-} from '@mui/icons-material';
+import CalendarIcon from '@mui/icons-material/CalendarToday';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import HelpIcon from '@mui/icons-material/Help';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import PublicIcon from '@mui/icons-material/Public';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import ContentPasteIcon from '@mui/icons-material/ContentPaste';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import WarningIcon from '@mui/icons-material/Warning';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 // Import calendar-specific types
 import { type CalendarConfig } from './types';

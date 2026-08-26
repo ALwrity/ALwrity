@@ -20,12 +20,10 @@ import {
   Chip,
   Tooltip,
 } from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  TrendingUp as TrendIcon,
-  CheckCircle as CheckIcon,
-  Info as InfoIcon,
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import TrendIcon from '@mui/icons-material/TrendingUp';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import InfoIcon from '@mui/icons-material/Info';
 import { AnalyzeIntentResponse } from '../../../../types/intent.types';
 
 interface TrendsConfigSectionProps {

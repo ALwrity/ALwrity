@@ -10,11 +10,9 @@ import {
   Alert,
   Chip
 } from '@mui/material';
-import {
-  DataUsage as DataUsageIcon,
-  CalendarToday as CalendarIcon,
-  Campaign as CampaignIcon
-} from '@mui/icons-material';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
+import CalendarIcon from '@mui/icons-material/CalendarToday';
+import CampaignIcon from '@mui/icons-material/Campaign';
 
 // Import modular step components
 import {

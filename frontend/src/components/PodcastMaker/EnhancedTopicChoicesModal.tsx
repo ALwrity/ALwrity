@@ -13,13 +13,11 @@ import {
   alpha,
   CircularProgress,
 } from "@mui/material";
-import {
-  Close as CloseIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Edit as EditIcon,
-  CheckCircle as CheckCircleIcon,
-  Lightbulb as LightbulbIcon,
-} from "@mui/icons-material";
+import CloseIcon from '@mui/icons-material/Close';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import EditIcon from '@mui/icons-material/Edit';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
 
 interface EnhancedTopicChoicesModalProps {
   open: boolean;

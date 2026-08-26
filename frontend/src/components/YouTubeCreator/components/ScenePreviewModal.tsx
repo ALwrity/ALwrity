@@ -15,12 +15,10 @@ import {
   Stack,
   CircularProgress,
 } from '@mui/material';
-import {
-  Close as CloseIcon,
-  PlayArrow,
-  Pause,
-  VolumeUp,
-} from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import PlayArrow from '@mui/icons-material/PlayArrow';
+import Pause from '@mui/icons-material/Pause';
+import VolumeUp from '@mui/icons-material/VolumeUp';
 import { fetchMediaBlobUrl } from '../../../utils/fetchMediaBlobUrl';
 import { useAuthenticatedMediaSrc } from '../hooks/useAuthenticatedMediaSrc';
 

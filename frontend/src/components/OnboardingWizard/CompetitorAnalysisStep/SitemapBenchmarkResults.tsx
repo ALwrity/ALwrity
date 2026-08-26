@@ -20,14 +20,12 @@ import {
   ListItem,
   ListItemText
 } from '@mui/material';
-import {
-  Speed as SpeedIcon,
-  Description as DescriptionIcon,
-  AccountTree as TreeIcon,
-  TrendingUp as TrendingUpIcon,
-  Lightbulb as LightbulbIcon,
-  CheckCircle as CheckIcon
-} from '@mui/icons-material';
+import SpeedIcon from '@mui/icons-material/Speed';
+import DescriptionIcon from '@mui/icons-material/Description';
+import TreeIcon from '@mui/icons-material/AccountTree';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import CheckIcon from '@mui/icons-material/CheckCircle';
 
 export interface BenchmarkMetrics {
   total_urls: number;

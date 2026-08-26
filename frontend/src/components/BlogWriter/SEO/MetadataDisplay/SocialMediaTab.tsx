@@ -23,16 +23,14 @@ import {
   Divider,
   Chip
 } from '@mui/material';
-import {
-  ContentCopy as CopyIcon,
-  Check as CheckIcon,
-  Share as ShareIcon,
-  Facebook as FacebookIcon,
-  Twitter as TwitterIcon,
-  LinkedIn as LinkedInIcon,
-  Image as ImageIcon,
-  Link as LinkIcon
-} from '@mui/icons-material';
+import CopyIcon from '@mui/icons-material/ContentCopy';
+import CheckIcon from '@mui/icons-material/Check';
+import ShareIcon from '@mui/icons-material/Share';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import TwitterIcon from '@mui/icons-material/Twitter';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import ImageIcon from '@mui/icons-material/Image';
+import LinkIcon from '@mui/icons-material/Link';
 
 interface SocialMediaTabProps {
   metadata: any;

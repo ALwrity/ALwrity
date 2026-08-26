@@ -1,7 +1,7 @@
 /**
  * articleLivePreviewUtils tests.
  * Run manually:
- *   npx react-scripts test --watchAll=false --testPathPattern=articleLivePreviewUtils
+ *   npx vitest run articleLivePreviewUtils
  */
 
 import {

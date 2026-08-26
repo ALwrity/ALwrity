@@ -20,13 +20,11 @@ import {
   InputLabel,
   CircularProgress
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Schedule as ScheduleIcon,
-  Refresh as RefreshIcon,
-  Visibility as VisibilityIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { getExecutionLogs, getRecentSchedulerLogs, ExecutionLog, ExecutionLogsResponse } from '../../api/schedulerDashboard';
 import { 
   TerminalPaper, 

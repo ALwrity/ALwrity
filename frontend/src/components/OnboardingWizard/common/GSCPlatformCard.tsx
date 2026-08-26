@@ -9,9 +9,7 @@ import {
   IconButton,
   Tooltip
 } from '@mui/material';
-import {
-  Refresh as RefreshIcon
-} from '@mui/icons-material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { type GSCSite } from '../../../api/gsc';
 
 interface GSCPlatformCardProps {

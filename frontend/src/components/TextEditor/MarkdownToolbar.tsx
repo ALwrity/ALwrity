@@ -1,16 +1,14 @@
 import React from 'react';
 import { Box, Tooltip, IconButton, Divider } from '@mui/material';
-import {
-  FormatBold as BoldIcon,
-  FormatItalic as ItalicIcon,
-  Link as LinkIcon,
-  FormatListBulleted as BulletListIcon,
-  FormatListNumbered as NumberedListIcon,
-  FormatQuote as QuoteIcon,
-  Code as CodeIcon,
-  HorizontalRule as HrIcon,
-  Title as TitleIcon,
-} from '@mui/icons-material';
+import BoldIcon from '@mui/icons-material/FormatBold';
+import ItalicIcon from '@mui/icons-material/FormatItalic';
+import LinkIcon from '@mui/icons-material/Link';
+import BulletListIcon from '@mui/icons-material/FormatListBulleted';
+import NumberedListIcon from '@mui/icons-material/FormatListNumbered';
+import QuoteIcon from '@mui/icons-material/FormatQuote';
+import CodeIcon from '@mui/icons-material/Code';
+import HrIcon from '@mui/icons-material/HorizontalRule';
+import TitleIcon from '@mui/icons-material/Title';
 import {
   type MarkdownFormatType,
   DEFAULT_MARKDOWN_TOOLBAR_BUTTONS,

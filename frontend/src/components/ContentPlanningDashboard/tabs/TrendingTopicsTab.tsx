@@ -6,9 +6,7 @@ import {
   Typography,
   Chip
 } from '@mui/material';
-import {
-  TrendingUp as TrendingIcon
-} from '@mui/icons-material';
+import TrendingIcon from '@mui/icons-material/TrendingUp';
 import { useContentPlanningStore } from '../../../stores/contentPlanningStore';
 
 const TrendingTopicsTab: React.FC = () => {

@@ -16,14 +16,12 @@ import {
   Alert,
   CircularProgress
 } from '@mui/material';
-import {
-  Close as CloseIcon,
-  Business as BusinessIcon,
-  Assessment as AssessmentIcon,
-  OpenInNew as OpenInNewIcon,
-  Link as LinkIcon,
-  Refresh as RefreshIcon
-} from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import BusinessIcon from '@mui/icons-material/Business';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import LinkIcon from '@mui/icons-material/Link';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { CompetitorAnalysisResponse, refreshCompetitorAnalysis } from '../../api/researchConfig';
 
 interface OnboardingCompetitorModalProps {

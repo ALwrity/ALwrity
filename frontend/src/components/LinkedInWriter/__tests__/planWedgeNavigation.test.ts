@@ -18,7 +18,7 @@ describe("planWedgeNavigation", () => {
   });
 
   it("signalReopenPlanSavedIdeas dispatches plan saved ideas event", () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     window.addEventListener(OPEN_PLAN_SAVED_IDEAS_EVENT, handler);
 
     signalReopenPlanSavedIdeas();

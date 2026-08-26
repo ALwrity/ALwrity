@@ -11,14 +11,12 @@ import {
   IconButton,
   Tooltip
 } from '@mui/material';
-import { 
-  ExpandMore as ExpandMoreIcon, 
-  AutoFixHigh as AutoFixHighIcon,
-  Psychology as PsychologyIcon,
-  Groups as GroupsIcon,
-  BrandingWatermark as BrandIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import GroupsIcon from '@mui/icons-material/Groups';
+import BrandIcon from '@mui/icons-material/BrandingWatermark';
+import InfoIcon from '@mui/icons-material/Info';
 
 interface PodcastBiblePanelProps {
   bible: any;

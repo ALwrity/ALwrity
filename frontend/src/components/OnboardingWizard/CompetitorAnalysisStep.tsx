@@ -15,16 +15,14 @@ import {
   Collapse,
   Chip,
 } from '@mui/material';
-import {
-  Assessment as AssessmentIcon,
-  Refresh as RefreshIcon,
-  CheckCircle as CheckCircleIcon,
-  Info as InfoIcon,
-  ExpandLess as ExpandLessIcon,
-  Search as SearchIcon,
-  TrendingUp as TrendingUpIcon,
-  AutoAwesome as AutoFixHighIcon,
-} from '@mui/icons-material';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import InfoIcon from '@mui/icons-material/Info';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import SearchIcon from '@mui/icons-material/Search';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import AutoFixHighIcon from '@mui/icons-material/AutoAwesome';
 import { aiApiClient, longRunningApiClient } from '../../api/client';
 import { useOnboardingStyles } from './common/useOnboardingStyles';
 import { SocialMediaPresenceSection, CompetitorsGrid } from './WebsiteStep/components';

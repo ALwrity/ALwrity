@@ -19,14 +19,12 @@ import {
   Tooltip,
   Stack,
 } from '@mui/material';
-import {
-  Search,
-  Close,
-  CheckCircle,
-  Favorite,
-  FavoriteBorder,
-  Collections,
-} from '@mui/icons-material';
+import Search from '@mui/icons-material/Search';
+import Close from '@mui/icons-material/Close';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Favorite from '@mui/icons-material/Favorite';
+import FavoriteBorder from '@mui/icons-material/FavoriteBorder';
+import Collections from '@mui/icons-material/Collections';
 import { useContentAssets, ContentAsset } from '../../hooks/useContentAssets';
 import { isAuthenticatedAssetUrl, useAssetAuthUrls } from '../../hooks/useAssetAuthUrls';
 import { getLatestBrandAvatar, AssetResponse as BrandAvatarResponse } from '../../api/brandAssets';

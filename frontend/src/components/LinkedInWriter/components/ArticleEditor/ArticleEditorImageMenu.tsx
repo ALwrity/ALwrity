@@ -12,11 +12,9 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import {
-  AutoAwesome as GenerateIcon,
-  CloudUpload as UploadIcon,
-  Image as ImageIcon,
-} from "@mui/icons-material";
+import GenerateIcon from '@mui/icons-material/AutoAwesome';
+import UploadIcon from '@mui/icons-material/CloudUpload';
+import ImageIcon from '@mui/icons-material/Image';
 
 export interface ArticleEditorImageMenuProps {
   onUploadImage: () => void;

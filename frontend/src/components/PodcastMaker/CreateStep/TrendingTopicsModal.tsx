@@ -17,13 +17,11 @@ import {
   IconButton,
   alpha,
 } from "@mui/material";
-import {
-  TrendingUp as TrendingUpIcon,
-  Close as CloseIcon,
-  Public as PublicIcon,
-  Search as SearchIcon,
-  AutoAwesome as AutoAwesomeIcon,
-} from "@mui/icons-material";
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import CloseIcon from '@mui/icons-material/Close';
+import PublicIcon from '@mui/icons-material/Public';
+import SearchIcon from '@mui/icons-material/Search';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { TrendsChart } from "../../Research/steps/components/TrendsChart";
 import { GoogleTrendsData } from "../../Research/types/intent.types";
 import { podcastApi } from "../../../services/podcastApi";

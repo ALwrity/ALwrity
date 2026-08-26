@@ -68,8 +68,8 @@ describe("YouTube Studio overlay contract (Phase 5 quality gates)", () => {
   });
 
   it("does not apply +1 z-index patches on Plan Select or Tooltip", () => {
-    expect(selectMenuProps.style?.zIndex).toBeUndefined();
-    expect(selectMenuProps.sx?.zIndex).toBeUndefined();
+    expect((selectMenuProps as any).style?.zIndex).toBeUndefined();
+    expect((selectMenuProps as any).sx?.zIndex).toBeUndefined();
     expect(selectMenuProps.PaperProps?.sx).not.toEqual(
       expect.objectContaining({ zIndex: YT_Z_MODAL_POPOVER }),
     );

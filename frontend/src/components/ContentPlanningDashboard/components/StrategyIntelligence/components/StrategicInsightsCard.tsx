@@ -12,14 +12,12 @@ import {
   AccordionSummary,
   AccordionDetails
 } from '@mui/material';
-import {
-  Lightbulb as LightbulbIcon,
-  ExpandMore as ExpandMoreIcon,
-  TrendingUp as TrendingUpIcon,
-  Psychology as PsychologyIcon,
-  Business as BusinessIcon,
-  Analytics as AnalyticsIcon
-} from '@mui/icons-material';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import BusinessIcon from '@mui/icons-material/Business';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
 import { StrategyData } from '../types/strategy.types';
 import {
   ANALYSIS_CARD_STYLES,

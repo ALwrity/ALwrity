@@ -1,7 +1,7 @@
 /**
  * PublishLinkedInLimitCaption — post char vs article word labels.
  * Run manually:
- *   npx react-scripts test --watchAll=false --testPathPattern=PublishLinkedInLimitCaption
+ *   npx vitest run PublishLinkedInLimitCaption
  */
 
 import React from "react";
@@ -11,8 +11,8 @@ import {
   resolvePublishLimitHeaderLabel,
 } from "../components/PublishLinkedInLimitCaption";
 
-jest.mock("../utils/linkedInWriterUtils", () => ({
-  readPrefs: jest.fn(() => ({ word_count: 1500 })),
+vi.mock("../utils/linkedInWriterUtils", () => ({
+  readPrefs: vi.fn(() => ({ word_count: 1500 })),
 }));
 
 describe("PublishLinkedInLimitCaption", () => {

@@ -10,15 +10,13 @@ import {
   Chip,
   Divider
 } from '@mui/material';
-import {
-  CheckCircle,
-  TrendingUp,
-  Settings,
-  Web,
-  Psychology,
-  LockOpen,
-  Lock
-} from '@mui/icons-material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import Settings from '@mui/icons-material/Settings';
+import Web from '@mui/icons-material/Web';
+import Psychology from '@mui/icons-material/Psychology';
+import LockOpen from '@mui/icons-material/LockOpen';
+import Lock from '@mui/icons-material/Lock';
 import { OnboardingData, Capability } from '../types';
 
 interface SetupSummaryProps {

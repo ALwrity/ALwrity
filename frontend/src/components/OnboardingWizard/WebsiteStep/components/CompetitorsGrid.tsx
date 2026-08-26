@@ -23,14 +23,12 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
   ToggleButtonGroup, ToggleButton,
 } from '@mui/material';
-import {
-  Business as BusinessIcon,
-  OpenInNew as OpenInNewIcon,
-  Delete as DeleteIcon,
-  Add as AddIcon,
-  ViewModule as CardViewIcon,
-  ViewList as ListViewIcon,
-} from '@mui/icons-material';
+import BusinessIcon from '@mui/icons-material/Business';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
+import CardViewIcon from '@mui/icons-material/ViewModule';
+import ListViewIcon from '@mui/icons-material/ViewList';
 
 export interface Competitor {
   url: string;

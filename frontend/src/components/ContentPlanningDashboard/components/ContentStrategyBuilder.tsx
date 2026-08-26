@@ -12,10 +12,8 @@ import {
   DialogContent,
   DialogActions
 } from '@mui/material';
-import {
-  AutoAwesome as AutoAwesomeIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import InfoIcon from '@mui/icons-material/Info';
 import { useStrategyBuilderStore, STRATEGIC_INPUT_FIELDS } from '../../../stores/strategyBuilderStore';
 import { useEnhancedStrategyStore } from '../../../stores/enhancedStrategyStore';
 import EnhancedTooltip from './ContentStrategyBuilder/EnhancedTooltip';

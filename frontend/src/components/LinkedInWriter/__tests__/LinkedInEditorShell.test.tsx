@@ -1,26 +1,26 @@
 /**
  * LinkedInEditorShell routing smoke tests.
  * Run manually:
- *   npx react-scripts test --watchAll=false --testPathPattern=LinkedInEditorShell
+ *   npx vitest run LinkedInEditorShell
  */
 
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { LinkedInEditorShell } from "../components/editorShell/LinkedInEditorShell";
 
-jest.mock("../components/PublishLinkedInPanel", () => ({
+vi.mock("../components/PublishLinkedInPanel", () => ({
   __esModule: true,
   default: () => <div data-testid="publish-linkedin-panel">Publish</div>,
 }));
 
 const baseProps = {
   draft: "Sample draft content for testing.",
-  onBackToDashboard: jest.fn(),
+  onBackToDashboard: vi.fn(),
   saveStatus: "idle" as const,
-  onSave: jest.fn(),
-  onOpenQualityCheck: jest.fn(),
+  onSave: vi.fn(),
+  onOpenQualityCheck: vi.fn(),
   previewMode: "studio" as const,
-  onPreviewModeChange: jest.fn(),
+  onPreviewModeChange: vi.fn(),
 };
 
 describe("LinkedInEditorShell", () => {

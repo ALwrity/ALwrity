@@ -16,18 +16,16 @@ import {
   ListItemIcon,
   ListItemText,
 } from '@mui/material';
-import {
-  CalendarToday as CalendarIcon,
-  CheckCircle as DoneIcon,
-  RadioButtonUnchecked as PendingIcon,
-  PlayArrow as StartIcon,
-  Schedule as StepIcon,
-  TrendingUp as ConfidenceIcon,
-  Timer as TimeIcon,
-  Category as PillarIcon,
-  Devices as PlatformIcon,
-  Refresh as RefreshIcon,
-} from '@mui/icons-material';
+import CalendarIcon from '@mui/icons-material/CalendarToday';
+import DoneIcon from '@mui/icons-material/CheckCircle';
+import PendingIcon from '@mui/icons-material/RadioButtonUnchecked';
+import StartIcon from '@mui/icons-material/PlayArrow';
+import StepIcon from '@mui/icons-material/Schedule';
+import ConfidenceIcon from '@mui/icons-material/TrendingUp';
+import TimeIcon from '@mui/icons-material/Timer';
+import PillarIcon from '@mui/icons-material/Category';
+import PlatformIcon from '@mui/icons-material/Devices';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { apiClient } from '../../api/client';
 
 interface CalendarProgressViewProps {

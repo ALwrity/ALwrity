@@ -3,7 +3,8 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, Typography, Box, Chip, IconButton, Checkbox, FormControlLabel, Divider
 } from '@mui/material';
-import { Close as CloseIcon, Check as CheckIcon } from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/Check';
 import type { DiffPreviewData, DiffSegment } from '../../../utils/getSectionDiffs';
 
 interface DiffPreviewModalProps {

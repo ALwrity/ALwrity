@@ -1,13 +1,11 @@
 import React from 'react';
-import {
-  CheckCircle,
-  HourglassEmpty,
-  Error as ErrorIcon,
-  Image as ImageIcon,
-  VideoLibrary,
-  AudioFile,
-  TextFields,
-} from '@mui/icons-material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import HourglassEmpty from '@mui/icons-material/HourglassEmpty';
+import ErrorIcon from '@mui/icons-material/Error';
+import ImageIcon from '@mui/icons-material/Image';
+import VideoLibrary from '@mui/icons-material/VideoLibrary';
+import AudioFile from '@mui/icons-material/AudioFile';
+import TextFields from '@mui/icons-material/TextFields';
 import { Chip } from '@mui/material';
 
 export const getStatusIcon = (status: string) => {

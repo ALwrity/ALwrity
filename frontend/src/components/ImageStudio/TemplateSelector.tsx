@@ -16,20 +16,18 @@ import {
   Tooltip,
   Badge,
 } from '@mui/material';
-import {
-  Search,
-  Instagram,
-  Facebook,
-  Twitter,
-  LinkedIn,
-  YouTube,
-  Pinterest,
-  TrendingUp,
-  PhotoLibrary,
-  Star,
-  Close,
-  Check,
-} from '@mui/icons-material';
+import Search from '@mui/icons-material/Search';
+import Instagram from '@mui/icons-material/Instagram';
+import Facebook from '@mui/icons-material/Facebook';
+import Twitter from '@mui/icons-material/Twitter';
+import LinkedIn from '@mui/icons-material/LinkedIn';
+import YouTube from '@mui/icons-material/YouTube';
+import Pinterest from '@mui/icons-material/Pinterest';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import PhotoLibrary from '@mui/icons-material/PhotoLibrary';
+import Star from '@mui/icons-material/Star';
+import Close from '@mui/icons-material/Close';
+import Check from '@mui/icons-material/Check';
 import { motion, AnimatePresence, type Variants, type Easing } from 'framer-motion';
 
 const MotionCard = motion.create(Card);

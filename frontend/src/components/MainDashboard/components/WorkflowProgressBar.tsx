@@ -9,14 +9,12 @@ import {
   useTheme
 } from '@mui/material';
 import { motion } from 'framer-motion';
-import { 
-  PlayArrow, 
-  Pause, 
-  CheckCircle, 
-  Schedule,
-  TrendingUp,
-  CloudOff
-} from '@mui/icons-material';
+import PlayArrow from '@mui/icons-material/PlayArrow';
+import Pause from '@mui/icons-material/Pause';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Schedule from '@mui/icons-material/Schedule';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import CloudOff from '@mui/icons-material/CloudOff';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 
 interface WorkflowProgressBarProps {

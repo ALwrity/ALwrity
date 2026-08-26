@@ -14,13 +14,11 @@ import {
   CardContent,
   LinearProgress
 } from '@mui/material';
-import {
-  Assessment as AssessmentIcon,
-  TrendingUp as TrendingUpIcon,
-  Lightbulb as LightbulbIcon,
-  Business as BusinessIcon,
-  Analytics as AnalyticsIcon
-} from '@mui/icons-material';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import BusinessIcon from '@mui/icons-material/Business';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
 import MetricTooltip from '../../../shared/MetricTooltip';
 import { getMetricTooltip } from '../../../shared/metricTooltips';
 

@@ -7,12 +7,10 @@ import {
   Badge,
   Tooltip as MuiTooltip
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Info as InfoIcon,
-  Refresh as RefreshIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import InfoIcon from '@mui/icons-material/Info';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { motion } from 'framer-motion';
 
 interface ProgressTrackerProps {

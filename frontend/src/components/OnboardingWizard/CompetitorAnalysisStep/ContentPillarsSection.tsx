@@ -1,6 +1,10 @@
 import React from 'react';
 import { Box, Typography, Paper, Chip, CircularProgress, Collapse, IconButton } from '@mui/material';
-import { Lightbulb as LightbulbIcon, Business as BusinessIcon, ExpandMore, ExpandLess, Error as ErrorIcon } from '@mui/icons-material';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import BusinessIcon from '@mui/icons-material/Business';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ErrorIcon from '@mui/icons-material/Error';
 
 export interface ContentPillarData {
   target_company?: {

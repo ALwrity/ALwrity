@@ -1,12 +1,10 @@
 import React from 'react';
 import { Box, Grid, Typography } from '@mui/material';
-import {
-  Psychology as PsychologyIcon,
-  RecordVoiceOver as VoiceIcon,
-  Tune as TuneIcon,
-  FormatPaint as FormatIcon,
-  Assessment as AssessmentIcon
-} from '@mui/icons-material';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import VoiceIcon from '@mui/icons-material/RecordVoiceOver';
+import TuneIcon from '@mui/icons-material/Tune';
+import FormatIcon from '@mui/icons-material/FormatPaint';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import { SectionAccordion } from '../components/SectionAccordion';
 import { EditableTextField } from '../components/EditableTextField';
 import { EditableChipArray } from '../components/EditableChipArray';

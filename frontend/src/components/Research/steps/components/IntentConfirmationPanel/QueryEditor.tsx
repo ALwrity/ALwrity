@@ -21,15 +21,13 @@ import {
   Chip,
   InputAdornment,
 } from '@mui/material';
-import {
-  Delete as DeleteIcon,
-  Info as InfoIcon,
-  Search as SearchIcon,
-  Storage as ProviderIcon,
-  Category as PurposeIcon,
-  PriorityHigh as PriorityIcon,
-  ExpandMore as ExpandMoreIcon,
-} from '@mui/icons-material';
+import DeleteIcon from '@mui/icons-material/Delete';
+import InfoIcon from '@mui/icons-material/Info';
+import SearchIcon from '@mui/icons-material/Search';
+import ProviderIcon from '@mui/icons-material/Storage';
+import PurposeIcon from '@mui/icons-material/Category';
+import PriorityIcon from '@mui/icons-material/PriorityHigh';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import {
   ResearchQuery,
   ExpectedDeliverable,

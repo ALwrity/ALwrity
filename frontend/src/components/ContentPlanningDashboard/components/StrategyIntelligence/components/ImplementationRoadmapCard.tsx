@@ -12,13 +12,11 @@ import {
   AccordionSummary,
   AccordionDetails
 } from '@mui/material';
-import {
-  Timeline as TimelineIcon,
-  ExpandMore as ExpandMoreIcon,
-  Group as GroupIcon,
-  AttachMoney as MoneyIcon,
-  CheckCircle as CheckCircleIcon
-} from '@mui/icons-material';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import GroupIcon from '@mui/icons-material/Group';
+import MoneyIcon from '@mui/icons-material/AttachMoney';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { StrategyData } from '../types/strategy.types';
 import {
   ANALYSIS_CARD_STYLES,

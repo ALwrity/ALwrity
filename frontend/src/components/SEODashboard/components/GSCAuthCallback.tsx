@@ -8,10 +8,8 @@ import {
   Alert,
   Paper
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
 import { gscAPI } from '../../../api/gsc';
 import { useAuth } from '@clerk/clerk-react';
 

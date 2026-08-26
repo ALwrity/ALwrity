@@ -20,24 +20,22 @@ import {
   ListItemText,
   Badge
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Warning as WarningIcon,
-  Info as InfoIcon,
-  ExpandMore as ExpandMoreIcon,
-  TrendingUp as TrendingUpIcon,
-  Schedule as ScheduleIcon,
-  DataUsage as DataUsageIcon,
-  Lightbulb as LightbulbIcon,
-  Recommend as RecommendIcon,
-  Timeline as TimelineIcon,
-  Assessment as AssessmentIcon,
-  Speed as SpeedIcon,
-  Security as SecurityIcon,
-  Build as BuildIcon,
-  AutoAwesome as AutoAwesomeIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import WarningIcon from '@mui/icons-material/Warning';
+import InfoIcon from '@mui/icons-material/Info';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import RecommendIcon from '@mui/icons-material/Recommend';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import SpeedIcon from '@mui/icons-material/Speed';
+import SecurityIcon from '@mui/icons-material/Security';
+import BuildIcon from '@mui/icons-material/Build';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Import enhanced types and STEP_INFO from the updated polling hook

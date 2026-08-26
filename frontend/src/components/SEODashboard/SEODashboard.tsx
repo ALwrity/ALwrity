@@ -23,20 +23,18 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth, useUser, SignOutButton, useClerk } from '@clerk/clerk-react';
 import { apiClient, longRunningApiClient } from '../../api/client';
-import {
-  Refresh as RefreshIcon,
-  Person as PersonIcon,
-  ExitToApp as ExitIcon,
-  ArrowBack as ArrowBackIcon,
-  MoreVert as MoreVertIcon,
-  CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  Info as InfoIcon,
-  ExpandMore as ExpandMoreIcon,
-  AutoAwesome as AIIcon,
-  Tab as TabIcon,
-  Visibility as VisibilityIcon,
-} from '@mui/icons-material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import PersonIcon from '@mui/icons-material/Person';
+import ExitIcon from '@mui/icons-material/ExitToApp';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import InfoIcon from '@mui/icons-material/Info';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import AIIcon from '@mui/icons-material/AutoAwesome';
+import TabIcon from '@mui/icons-material/Tab';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { Tabs, Tab as MuiTab } from '@mui/material';
 
 // Shared components

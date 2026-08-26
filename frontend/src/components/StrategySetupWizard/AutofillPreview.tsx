@@ -11,15 +11,13 @@ import {
   Button,
   CircularProgress,
 } from '@mui/material';
-import {
-  AutoAwesome as AiIcon,
-  Business as BusinessIcon,
-  People as AudienceIcon,
-  EmojiObjects as CompetitiveIcon,
-  Article as ContentIcon,
-  Analytics as PerformanceIcon,
-  Refresh as RefreshIcon,
-} from '@mui/icons-material';
+import AiIcon from '@mui/icons-material/AutoAwesome';
+import BusinessIcon from '@mui/icons-material/Business';
+import AudienceIcon from '@mui/icons-material/People';
+import CompetitiveIcon from '@mui/icons-material/EmojiObjects';
+import ContentIcon from '@mui/icons-material/Article';
+import PerformanceIcon from '@mui/icons-material/Analytics';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { apiClient } from '../../api/client';
 
 interface AutofillPreviewProps {
