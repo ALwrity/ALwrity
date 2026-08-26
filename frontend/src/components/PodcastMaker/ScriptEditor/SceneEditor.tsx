@@ -703,7 +703,11 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
               {/* Active Voice indicator */}
               <Chip
                 icon={<MicIcon sx={{ fontSize: '0.875rem !important' }} />}
-                label={`Voice: ${knobs.voice_id === "Wise_Woman" ? "Wise Woman" : knobs.voice_id?.replace(/_/g, " ") || "Default"}`}
+                label={`Voice: ${
+                  (knobs.is_voice_clone || (knobs.custom_voice_id && (knobs.custom_voice_id.startsWith("vc_") || knobs.custom_voice_id === "MY_VOICE_CLONE")))
+                    ? "My Voice Clone"
+                    : knobs.voice_id === "Wise_Woman" ? "Wise Woman" : knobs.voice_id?.replace(/_/g, " ") || "Default"
+                }`}
                 size="small"
                 sx={{
                   background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",

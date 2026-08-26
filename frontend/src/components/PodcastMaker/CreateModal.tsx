@@ -602,7 +602,12 @@ useEffect(() => {
     
     const finalKnobs: Knobs = {
       ...knobs,
-      voice_id: isVoiceClone ? "Wise_Woman" : selectedVoiceId,
+      // When a voice clone is active, use the real clone ID (e.g. "vc_abc123") so that
+      // downstream consumers (toPodcastEstimate, ScriptEditorLayout, AnalysisPanel) can
+      // correctly identify it as a custom voice and display "My Voice Clone".
+      // The actual TTS rendering always reads custom_voice_id — voice_id is used only for
+      // display-name resolution and the "is custom voice?" guard in toPodcastEstimate.
+      voice_id: isVoiceClone ? (customVoiceId || selectedVoiceId) : selectedVoiceId,
       custom_voice_id: customVoiceId,
       is_voice_clone: isVoiceClone,
       voice_sample_url: voiceSampleUrl,

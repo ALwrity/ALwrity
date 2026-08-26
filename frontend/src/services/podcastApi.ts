@@ -127,14 +127,28 @@ const deriveSegments = (option?: OptionLike): string[] => {
   return segments.slice(0, 5);
 };
 
-const toPodcastEstimate = (raw: any, voiceId?: string): PodcastEstimate | null => {
+const toPodcastEstimate = (raw: any, knobsOrVoiceId?: string | { voice_id?: string; is_voice_clone?: boolean; custom_voice_id?: string }): PodcastEstimate | null => {
   if (!raw || typeof raw !== "object") return null;
   const numeric = ["analysisCost", "researchCost", "scriptCost", "ttsCost", "voiceCloneCost", "avatarCost", "videoCost", "total"] as const;
   if (numeric.some((key) => typeof raw[key] !== "number" || Number.isNaN(raw[key]))) {
     return null;
   }
+
+  // Accept either a plain voice_id string (legacy callers) or the full knobs object.
+  // Using the full knobs object is preferred: it lets us detect a clone via
+  // is_voice_clone / custom_voice_id even when voice_id has been normalised to
+  // "Wise_Woman" by the backend TTS fallback path.
+  const knobs = typeof knobsOrVoiceId === "object" ? knobsOrVoiceId : null;
+  const voiceId = knobs?.voice_id ?? (typeof knobsOrVoiceId === "string" ? knobsOrVoiceId : undefined);
+
   const isCustomVoice = Boolean(
-    voiceId &&
+    // Explicit clone flags take priority over the voice_id string check
+    knobs?.is_voice_clone ||
+    (knobs?.custom_voice_id && (knobs.custom_voice_id.startsWith("vc_") || knobs.custom_voice_id === "MY_VOICE_CLONE")) ||
+    // Fallback: detect by voice_id prefix when no knobs object is passed
+    (voiceId && (voiceId.startsWith("vc_") || voiceId === "MY_VOICE_CLONE")) ||
+    // Fallback: voice_id is not one of the known system voices
+    (voiceId &&
       ![
         "Wise_Woman",
         "Friendly_Person",
@@ -153,7 +167,7 @@ const toPodcastEstimate = (raw: any, voiceId?: string): PodcastEstimate | null =
         "Abbess",
         "Sweet_Girl_2",
         "Exuberant_Girl",
-      ].includes(voiceId)
+      ].includes(voiceId))
   );
   return {
     analysisCost: raw.analysisCost,
@@ -386,7 +400,7 @@ export const podcastApi = {
     // so users can manually choose which queries to run
 
     const projectId = createId("podcast");
-    const estimate = toPodcastEstimate(analysisResp.data?.estimate, payload.knobs.voice_id);
+    const estimate = toPodcastEstimate(analysisResp.data?.estimate, payload.knobs);
 
     return {
       projectId,
