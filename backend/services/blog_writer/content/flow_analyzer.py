@@ -18,7 +18,7 @@ class FlowAnalyzer:
         self._cache: Dict[str, Dict[str, float]] = {}
         # Cache for rule-based fallback when LLM analysis isn't needed
         self._rule_cache: Dict[str, Dict[str, float]] = {}
-        logger.info("✅ FlowAnalyzer initialized with LLM-based analysis")
+        logger.debug("✅ FlowAnalyzer initialized with LLM-based analysis")
 
     def assess_flow(self, previous_text: str, current_text: str, use_llm: bool = True, user_id: str = None) -> Dict[str, float]:
         """

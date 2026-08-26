@@ -97,9 +97,24 @@ def _configure_uvicorn_loggers(log_level):
         uvicorn_logger.setLevel(log_level)
 
 
+_logging_configured = False
+
+
 def setup_clean_logging():
-    """Set up clean logging for end users."""
+    """Set up clean logging for end users.
+
+    Idempotent: only the first call configures handlers. Subsequent calls
+    (``main.py``, ``app.py``, ``start_alwrity_backend.py``, and the uvicorn
+    worker all call this) return early so ``logger.remove()``/``logger.add()``
+    never run more than once per process.
+    """
+    global _logging_configured
+
     verbose_mode = os.getenv("ALWRITY_VERBOSE", "false").lower() == "true"
+
+    if _logging_configured:
+        return verbose_mode
+    _logging_configured = True
 
     logger.remove()
     logger.configure(patcher=_patch_record_context)
@@ -169,62 +184,25 @@ def setup_clean_logging():
         for logger_name in noisy_loggers:
             logging.getLogger(logger_name).setLevel(logging.WARNING)
 
-        def warning_only_filter(record):
-            return record["level"].name in ["WARNING", "ERROR", "CRITICAL"]
+        def info_and_above_filter(record):
+            return record["level"].name in ["INFO", "WARNING", "ERROR", "CRITICAL"]
 
         logger.add(
-            sys.stdout.write,
-            level="WARNING",
-            format=common_format,
-            filter=warning_only_filter,
-            backtrace=True,
-            diagnose=True,
-        )
-
-        def video_generation_filter(record):
-            msg = record.get("message", "")
-            name = record.get("name", "")
-            service = record.get("extra", {}).get("service")
-            return (
-                "[StoryVideoGeneration]" in msg
-                or "services.story_writer.video_generation_service" in name
-                or "[video_gen]" in msg
-                or service == "video_generation_service"
-                or "services.llm_providers.main_video_generation" in name
-            )
-
-        logger.add(
-            sys.stdout.write,
+            sys.stdout,
             level="INFO",
             format=common_format,
-            filter=video_generation_filter,
+            filter=info_and_above_filter,
+            colorize=True,
             backtrace=True,
             diagnose=True,
         )
-
-        def linkedin_image_filter(record):
-            msg = record.get("message", "")
-            name = record.get("name", "")
-            return (
-                "[LinkedInImageGen]" in msg
-                or "api.linkedin_image_generation" in name
-                or "services.linkedin.image_generation" in name
-            )
-
-        logger.add(
-            sys.stdout.write,
-            level="INFO",
-            format=common_format,
-            filter=linkedin_image_filter,
-            backtrace=True,
-            diagnose=True,
-        )
-        uvicorn_level = logging.WARNING
+        uvicorn_level = logging.INFO
     else:
         logger.add(
-            sys.stdout.write,
+            sys.stdout,
             level="DEBUG",
             format=common_format,
+            colorize=True,
             backtrace=True,
             diagnose=True,
         )
@@ -239,4 +217,4 @@ def setup_clean_logging():
 def get_uvicorn_log_level():
     """Get appropriate uvicorn log level based on verbose mode."""
     verbose_mode = os.getenv("ALWRITY_VERBOSE", "false").lower() == "true"
-    return "debug" if verbose_mode else "warning"
+    return "debug" if verbose_mode else "info"

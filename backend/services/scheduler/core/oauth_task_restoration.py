@@ -30,7 +30,7 @@ async def restore_oauth_monitoring_tasks(scheduler):
         scheduler: TaskScheduler instance
     """
     try:
-        logger.warning("[OAuth Task Restoration] Starting OAuth monitoring task restoration...")
+        logger.debug("[OAuth Task Restoration] Starting OAuth monitoring task restoration...")
         
         user_ids = get_all_user_ids()
         total_created = 0
@@ -101,7 +101,7 @@ async def restore_oauth_monitoring_tasks(scheduler):
             if len(restoration_summary) > 5:
                 summary_lines += f"\n  └─ ... and {len(restoration_summary) - 5} more users"
             
-            logger.warning(
+            logger.info(
                 f"[OAuth Task Restoration] ✅ OAuth Monitoring Tasks Restored\n"
                 f"   ├─ Users Processed: {users_processed}\n"
                 f"   ├─ Existing Tasks: {total_existing_tasks}\n"
@@ -109,7 +109,7 @@ async def restore_oauth_monitoring_tasks(scheduler):
                 + summary_lines
             )
         else:
-            logger.warning(
+            logger.info(
                 f"[OAuth Task Restoration] ✅ All users have required OAuth monitoring tasks. "
                 f"Processed {users_processed} users."
             )

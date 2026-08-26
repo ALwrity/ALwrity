@@ -58,7 +58,7 @@ class SitemapService:
     def __init__(self):
         """Initialize the sitemap service"""
         self.service_name = "sitemap_analyzer"
-        logger.info(f"Initialized {self.service_name}")
+        logger.debug(f"Initialized {self.service_name}")
         
         # Common sitemap paths to check
         self.common_sitemap_paths = [

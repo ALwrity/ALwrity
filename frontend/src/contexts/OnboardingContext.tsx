@@ -302,6 +302,10 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     // Clear all cached data
     sessionStorage.removeItem('onboarding_init');
     localStorage.removeItem('onboarding_step');
+    localStorage.removeItem('alwrity_sitemap_state');
+    localStorage.removeItem('competitor_analysis_data');
+    localStorage.removeItem('competitor_analysis_url');
+    localStorage.removeItem('competitor_analysis_timestamp');
     
     // Reset state
     setData(null);
@@ -311,7 +315,6 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     // Re-fetch fresh data
     fetchOnboardingData();
   }, [fetchOnboardingData]);
-
   /**
    * Computed properties
    */

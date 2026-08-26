@@ -306,7 +306,7 @@ python -m pytest tests/
 ### **2. Run the Service**
 ```bash
 # Start the development server
-uvicorn main:app --reload
+uvicorn app:app --reload
 
 # Access the API
 curl http://localhost:8000/api/content-planning/strategies/

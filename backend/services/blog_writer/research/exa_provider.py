@@ -22,7 +22,7 @@ class ExaResearchProvider(BaseProvider):
         self._provider = SharedExaProvider()
         self.api_key = self._provider.api_key
         self.exa = self._provider.exa
-        logger.info("Blog Writer ExaResearchProvider initialized (shared backend)")
+        logger.debug("Blog Writer ExaResearchProvider initialized (shared backend)")
 
     async def search(
         self, prompt, topic, industry, target_audience, config, user_id

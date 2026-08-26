@@ -34,7 +34,7 @@ class StyleDetectionLogic:
     
     def __init__(self):
         """Initialize the Style Detection Logic service."""
-        logger.info("[StyleDetectionLogic.__init__] Initializing style detection service")
+        logger.debug("[StyleDetectionLogic.__init__] Initializing style detection service")
         
     def _clean_json_response(self, text: str) -> str:
         """
