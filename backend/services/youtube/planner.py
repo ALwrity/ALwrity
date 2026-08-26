@@ -436,7 +436,8 @@ class YouTubePlannerService:
         user_idea: str,
         video_type: Optional[str],
         target_audience: str,
-        user_id: str
+        user_id: str,
+        language: Optional[str] = None,
     ) -> tuple[str, List[Dict[str, Any]]]:
         """Delegate Exa research to the shared helper (keeps patch.object compatible)."""
         return await perform_exa_research(
@@ -444,4 +445,5 @@ class YouTubePlannerService:
             video_type=video_type,
             target_audience=target_audience,
             user_id=user_id,
+            language=language,
         )

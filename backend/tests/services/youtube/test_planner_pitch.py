@@ -249,6 +249,42 @@ class TestGeneratePitch:
         assert llm_mock.call_args.kwargs["flow_type"] == "youtube_pitch"
         assert "max_tokens" not in llm_mock.call_args.kwargs
 
+    def test_persists_research_prompt_block_without_urls_in_prompt(self):
+        from services.youtube.planner import YouTubePlannerService
+        from services.youtube.planner_pitch import generate_youtube_pitch
+
+        svc = YouTubePlannerService()
+        block = (
+            "Use only these facts. Do not invent statistics or numbers.\n\n"
+            "1. Carry-on packing\n   Pack three items."
+        )
+        sources = [{"title": f"S{i}", "url": f"https://example.com/{i}"} for i in range(10)]
+        with patch(
+            "services.youtube.planner_pitch.llm_text_gen",
+            return_value=_valid_pitch(),
+        ), patch.object(
+            svc,
+            "_perform_exa_research",
+            new=AsyncMock(return_value=(block, sources)),
+        ) as exa:
+            result = asyncio.run(
+                generate_youtube_pitch(
+                    svc,
+                    user_idea="Budget travel",
+                    duration_type="shorts",
+                    creative_angle="Contrarian",
+                    user_id="user_pitch",
+                    enable_research=True,
+                    language="hi",
+                )
+            )
+
+        assert exa.await_args.kwargs.get("language") == "hi"
+        assert result["research_prompt_block"] == block
+        assert len(result["research_sources"]) == 10
+        assert "http" not in result["generation"]["user_prompt"].lower()
+        assert block in result["generation"]["user_prompt"]
+
     def test_accepts_wavespeed_error_wrapper_with_valid_raw_json(self):
         from services.youtube.planner import YouTubePlannerService
         from services.youtube.planner_pitch import generate_youtube_pitch

@@ -41,6 +41,7 @@ export function toYouTubeVideoPitch(
     generation: pitch.generation,
     research_enabled: pitch.research_enabled,
     research_sources: pitch.research_sources,
+    research_prompt_block: (pitch.research_prompt_block || "").trim() || undefined,
   };
 }
 

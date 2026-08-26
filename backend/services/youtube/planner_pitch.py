@@ -202,6 +202,7 @@ async def _optional_research(
     target_audience: str,
     user_id: Optional[str],
     enable_research: bool,
+    language: Optional[str] = None,
 ) -> tuple[str, List[Dict[str, Any]], bool]:
     if not enable_research:
         logger.info("[YouTubePlanner] Research disabled for pitch/expand")
@@ -214,6 +215,7 @@ async def _optional_research(
             video_type=video_type,
             target_audience=target_audience,
             user_id=user_id or "",
+            language=language,
         )
         logger.info(
             "[YouTubePlanner] Research complete source_count={} context_len={}",
@@ -283,6 +285,7 @@ async def generate_youtube_pitch(
         target_audience=default_audience,
         user_id=user_id,
         enable_research=enable_research,
+        language=resolved_language.code,
     )
 
     try:
@@ -332,6 +335,7 @@ async def generate_youtube_pitch(
     pitch["research_enabled"] = research_enabled
     pitch["research_sources"] = research_sources
     pitch["research_sources_count"] = len(research_sources)
+    pitch["research_prompt_block"] = research_context
     if video_type_config:
         pitch["video_type"] = video_type
 
@@ -394,14 +398,31 @@ async def expand_pitch_to_script(
 
     persona_context = planner._build_persona_context(persona_data)
     default_audience = target_audience or "General YouTube audience"
-    research_context, research_sources, research_enabled = await _optional_research(
-        planner,
-        user_idea=idea,
-        video_type=video_type,
-        target_audience=default_audience,
-        user_id=user_id,
-        enable_research=enable_research,
-    )
+    reused_block = str(approved_pitch.get("research_prompt_block") or "").strip()
+    if reused_block:
+        reused_sources = approved_pitch.get("research_sources")
+        research_context = reused_block
+        research_sources = reused_sources if isinstance(reused_sources, list) else []
+        research_enabled = True
+        logger.info(
+            "[YouTubePlanner] Expand reusing pitch research_prompt_block len={} source_count={} skip_exa=True",
+            len(research_context),
+            len(research_sources),
+        )
+    else:
+        if enable_research:
+            logger.info(
+                "[YouTubePlanner] Expand missing research_prompt_block; running one compact Exa pass"
+            )
+        research_context, research_sources, research_enabled = await _optional_research(
+            planner,
+            user_idea=idea,
+            video_type=video_type,
+            target_audience=default_audience,
+            user_id=user_id,
+            enable_research=enable_research,
+            language=resolved_language.code,
+        )
 
     try:
         user_prompt = build_expansion_user_prompt(

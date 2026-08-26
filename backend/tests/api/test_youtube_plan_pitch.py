@@ -270,6 +270,38 @@ class TestExpandVideoPitch:
         assert result.success is True
         assert expand.await_args.kwargs["language"] == "hi"
 
+    def test_forwards_research_prompt_block_on_approved_pitch(self):
+        from api.youtube.router import ExpandRequest, expand_video_pitch
+
+        block = "Use only these facts.\n\n1. Carry-on packing"
+        request = ExpandRequest(
+            user_idea="How to travel cheap",
+            duration_type="shorts",
+            approved_pitch={
+                "selected_title": "Stop Overpacking",
+                "research_prompt_block": block,
+                "research_sources": [{"url": "https://example.com/a"}],
+            },
+        )
+        expand = AsyncMock(
+            return_value={
+                "hook": {"spoken_script": "Hook spoken."},
+                "main_content_outline": [{"section_title": "Beat 1", "spoken_script": "Body."}],
+                "full_script": "Hook spoken.\n\nBody.",
+            }
+        )
+        with patch(
+            "api.youtube.handlers.plan_pitch._load_plan_personalization",
+            return_value=_personalization(),
+        ), patch("api.youtube.handlers.plan_pitch.YouTubePlannerService"), patch(
+            "api.youtube.handlers.plan_pitch.expand_pitch_to_script",
+            expand,
+        ):
+            result = asyncio.run(expand_video_pitch(request=request, current_user=_user()))
+
+        assert result.success is True
+        assert expand.await_args.kwargs["approved_pitch"]["research_prompt_block"] == block
+
     def test_failure_returns_error_response(self):
         from api.youtube.router import ExpandRequest, expand_video_pitch
 

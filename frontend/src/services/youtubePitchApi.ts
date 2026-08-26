@@ -23,6 +23,8 @@ export interface YouTubePitchPayload {
   research_enabled?: boolean;
   research_sources?: VideoPlanResearchSource[];
   research_sources_count?: number;
+  /** Compact facts block reused on expand so Exa is not called twice. */
+  research_prompt_block?: string;
 }
 
 export interface YouTubePitchResponse {
@@ -38,6 +40,8 @@ export interface YouTubeApprovedPitch {
   main_content_beats?: string[];
   angle_used?: string;
   creative_angle?: string;
+  research_prompt_block?: string;
+  research_sources?: VideoPlanResearchSource[];
 }
 
 export interface YouTubeExpandRequest extends VideoPlanRequest {
