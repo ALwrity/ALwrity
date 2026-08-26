@@ -89,6 +89,7 @@ export const YouTubeTodayGrowth: React.FC<{
         intro="Your 6-pillar YouTube authority routine — AI helps, you approve (HITL)."
         onClose={() => setOpen(false)}
         maxWidth={520}
+        titleSize="xl"
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {tasks.map((task) => {

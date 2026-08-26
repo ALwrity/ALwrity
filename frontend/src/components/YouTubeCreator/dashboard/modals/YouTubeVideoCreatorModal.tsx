@@ -62,14 +62,12 @@ export const YouTubeVideoCreatorModal: React.FC<YouTubeVideoCreatorModalProps> =
       }}
     >
       <header className="yt-creator-surface-header">
+        <YouTubeModalBackButton label="Studio Hub" onClick={onClose} />
         <div className="yt-creator-surface-header-main">
-          <YouTubeModalBackButton label="Studio Hub" onClick={onClose} />
-          <div>
-            <h2>Video Creator</h2>
-            <p className="yt-creator-surface-intro">
-              Plan → scenes → assets → render. Close to return to Studio Hub — your draft stays saved.
-            </p>
-          </div>
+          <h2>Video Creator</h2>
+          <p className="yt-creator-surface-intro">
+            Plan → scenes → assets → render. Close to return to Studio Hub — your draft stays saved.
+          </p>
         </div>
         <button
           type="button"

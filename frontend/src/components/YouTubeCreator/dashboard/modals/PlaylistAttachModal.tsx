@@ -55,6 +55,8 @@ export const PlaylistAttachModal: React.FC<{
       maxWidth={shell?.maxWidth ?? YOUTUBE_WEDGE_MODAL_MAX_WIDTH}
       onBack={shell?.onBack}
       backLabel={shell?.backLabel}
+      titleSize={shell?.titleSize}
+      headerLayout={shell?.headerLayout}
     >
       {status && <p className="yt-modal-intro">{status}</p>}
       <label style={{ fontSize: 12, fontWeight: 700 }}>Playlist</label>

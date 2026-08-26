@@ -159,6 +159,8 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
         intro={WEDGE_MODAL_INTROS.plan}
         onClose={onClose}
         maxWidth={1100}
+        titleSize="xl"
+        headerLayout="centeredRow"
       >
         <div className="yt-plan-wedge">
           <div className="yt-plan-wedge-main">

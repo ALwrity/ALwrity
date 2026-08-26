@@ -17,7 +17,15 @@ export const PublishWedgeModal: React.FC<PublishWedgeProps> = ({
   onOpenSchedule,
   onOpenPlaylist,
 }) => (
-  <YouTubeActionModal open={open} title="Publish" intro={WEDGE_MODAL_INTROS.publish} onClose={onClose}>
+  <YouTubeActionModal
+    open={open}
+    title="Publish"
+    intro={WEDGE_MODAL_INTROS.publish}
+    onClose={onClose}
+    maxWidth={1100}
+    titleSize="xl"
+    headerLayout="centeredRow"
+  >
     <div className="yt-tool-tile-grid">
       <YouTubeToolTile
         icon="📁"

@@ -12,7 +12,10 @@
  */
 import React from "react";
 import { createPortal } from "react-dom";
-import { YouTubeModalBackButton } from "./YouTubeModalBackButton";
+import {
+  YouTubeActionModalHeader,
+  type YouTubeModalHeaderLayout,
+} from "./YouTubeActionModalHeader";
 import { YT_Z_MODAL } from "./youtubeStudioZIndex";
 
 interface YouTubeActionModalProps {
@@ -27,6 +30,10 @@ interface YouTubeActionModalProps {
   maxWidth?: number;
   /** Extra card class (e.g. yt-modal-card--wedge). */
   cardClassName?: string;
+  /** Title scale: default 15px, lg 18px, xl 24px (wedge modals use xl). */
+  titleSize?: "default" | "lg" | "xl";
+  /** default: title left + close right; centeredRow: back left, title center, close right */
+  headerLayout?: YouTubeModalHeaderLayout;
 }
 
 export const YouTubeActionModal: React.FC<YouTubeActionModalProps> = ({
@@ -39,6 +46,8 @@ export const YouTubeActionModal: React.FC<YouTubeActionModalProps> = ({
   children,
   maxWidth = 720,
   cardClassName,
+  titleSize = "default",
+  headerLayout = "default",
 }) => {
   if (!open) return null;
 
@@ -77,24 +86,20 @@ export const YouTubeActionModal: React.FC<YouTubeActionModalProps> = ({
         style={{ width: `min(${maxWidth}px, 100%)`, maxWidth: "97vw" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="yt-modal-header">
-          <div className="yt-modal-header-main">
-            {onBack ? (
-              <YouTubeModalBackButton label={backLabel} onClick={onBack} />
-            ) : null}
-            <h2>{title}</h2>
-          </div>
-          <button
-            type="button"
-            className="yt-modal-close"
-            aria-label="Close"
-            onClick={onClose}
-          >
-            ×
-          </button>
+        <div className="yt-modal-header-container">
+          <YouTubeActionModalHeader
+            title={title}
+            titleSize={titleSize}
+            onClose={onClose}
+            onBack={onBack}
+            backLabel={backLabel}
+            headerLayout={headerLayout}
+          />
         </div>
-        {intro && <p className="yt-modal-intro">{intro}</p>}
-        {children}
+        <div className="yt-modal-body">
+          {intro && <p className="yt-modal-intro">{intro}</p>}
+          {children}
+        </div>
       </div>
     </div>,
     document.body,

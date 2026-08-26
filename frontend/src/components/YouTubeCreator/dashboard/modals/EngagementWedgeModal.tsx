@@ -19,6 +19,9 @@ export const EngagementWedgeModal: React.FC<EngagementWedgeProps> = ({
     title="Engagement"
     intro={WEDGE_MODAL_INTROS.engagement}
     onClose={onClose}
+    maxWidth={1100}
+    titleSize="xl"
+    headerLayout="centeredRow"
   >
     <div className="yt-tool-tile-grid">
       <YouTubeToolTile

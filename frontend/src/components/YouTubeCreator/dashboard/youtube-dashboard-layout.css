@@ -512,7 +512,8 @@ body.youtube-studio-view #root {
   border-radius: 16px;
   border: 1px solid #e5e5e5;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
-  padding: 20px;
+  display: flex;
+  flex-direction: column;
 }
 
 .yt-modal-card--wedge {
@@ -571,9 +572,11 @@ body.youtube-studio-view #root {
   line-height: 1.2;
   cursor: pointer;
   color: #64748b;
-  padding: 2px 0;
+  padding: 4px 0 4px 0;
+  margin: 0;
   font-weight: 600;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .yt-modal-back:hover {
@@ -589,14 +592,106 @@ body.youtube-studio-view #root {
 
 .yt-modal-close {
   border: none;
-  background: #f1f5f9;
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
+  background: #f0f0f0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
   cursor: pointer;
-  font-size: 1.1rem;
+  font-size: 20px;
   line-height: 1;
   flex-shrink: 0;
+  color: #666666;
+  transition: background 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.yt-modal-close:hover {
+  background: #e8e8e8;
+}
+
+/* YouTube wedge modal header — centered title layout with YouTube branding */
+.yt-modal-header-container {
+  padding: 16px 20px;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+/* Modal body with content padding */
+.yt-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px;
+}
+
+.yt-modal-header-title {
+  margin: 0;
+  font-weight: 700;
+  color: #ff0000;
+  letter-spacing: -0.01em;
+}
+
+.yt-modal-header-title--default {
+  font-size: 15px;
+}
+
+.yt-modal-header-title--lg {
+  font-size: 18px;
+}
+
+.yt-modal-header-title--xl {
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+
+/* Centered row layout: back left, title center, close right */
+.yt-modal-header-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: 12px;
+  min-height: 44px;
+}
+
+.yt-modal-header-side {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.yt-modal-header-side--start {
+  grid-column: 1;
+  justify-self: start;
+  padding-left: 0;
+}
+
+.yt-modal-header-side--end {
+  grid-column: 3;
+  justify-self: end;
+  padding-right: 0;
+}
+
+.yt-modal-header-title--centered {
+  grid-column: 2;
+  justify-self: center;
+  align-self: center;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .yt-modal-header-title--centered {
+    max-width: min(100%, 240px);
+    font-size: 20px !important;
+  }
 }
 
 @media (max-width: 600px) {
@@ -794,25 +889,39 @@ body.youtube-studio-view #root {
 
 .yt-creator-surface-header {
   flex: 0 0 auto;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
   gap: 12px;
   padding: 12px 16px 8px;
-  border-bottom: 1px solid #e5e5e5;
+  width: 100%;
 }
 
 .yt-creator-surface-header-main {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
   min-width: 0;
+  grid-column: 2;
+  justify-self: center;
+}
+
+.yt-creator-surface-header .yt-modal-back {
+  grid-column: 1;
+  justify-self: start;
+}
+
+.yt-creator-surface-header .yt-modal-close {
+  grid-column: 3;
+  justify-self: end;
 }
 
 .yt-creator-surface-header-main h2 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 24px;
   font-weight: 700;
+  color: #ff0000;
 }
 
 .yt-creator-surface-intro {
