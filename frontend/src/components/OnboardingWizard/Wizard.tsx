@@ -21,6 +21,7 @@ import { WizardNavigation } from './common/WizardNavigation';
 import { WizardLoadingState } from './common/WizardLoadingState';
 import SystemStatusChip from './common/SystemStatusChip';
 
+
 // Set to true in dev to restore verbose per-action tracing
 const DEV_DEBUG = false;
 const trace = DEV_DEBUG ? console.log : (..._args: any[]) => {};
@@ -66,7 +67,15 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   });
   const [validationMessage, setValidationMessage] = useState<string>('');
   const [backgroundTasks, setBackgroundTasks] = useState<{
-    tasks: Record<string, { status: string; started_at: string | null; progress_pct: number }>;
+    tasks: Record<string, {
+      status: string;
+      started_at: string | null;
+      progress_pct: number;
+      failure_reason?: string | null;
+      recurring?: boolean;
+      last_success?: string | null;
+      next_execution?: string | null;
+    }>;
     total: number;
     completed_count: number;
     failed_count: number;
@@ -597,6 +606,16 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     }
   };
 
+  // "View Results" from the background-tasks banner: navigate back to the
+  // Website step and scroll to the Smart Background Setup section.
+  const handleViewBackgroundResults = (taskKey: string) => {
+    handleStepClick(0);
+    // Wait for the step to mount before scrolling.
+    setTimeout(() => {
+      document.getElementById('smart-background-setup')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+  };
+
   const updateHeaderContent = useCallback((content: StepHeaderContent) => {
     setStepHeaderContent(prev => {
       if (prev.title === content.title && prev.description === content.description) {
@@ -812,12 +831,13 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           </div>
         )}
 
-        {/* Background tasks status chip (visible after Step 2) */}
-        {backgroundTasks && (!backgroundTasks.all_done || backgroundTasks.failed_count > 0) && (
+        {/* Background tasks status banner (visible after Step 2) */}
+        {backgroundTasks && backgroundTasks.tasks && Object.keys(backgroundTasks.tasks).length > 0 && (
           <SystemStatusChip
             activeTasks={backgroundTasks.total - backgroundTasks.completed_count - backgroundTasks.failed_count}
             totalTasks={backgroundTasks.total}
             tasks={backgroundTasks.tasks}
+            onViewResults={handleViewBackgroundResults}
           />
         )}
 

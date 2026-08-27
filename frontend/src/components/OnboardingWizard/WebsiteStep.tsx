@@ -654,7 +654,9 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
                   onSave={() => saveAnalysis(analysis)}
                 />
               </Box>
-              <BackgroundSetupCard websiteUrl={website} brandAnalysis={analysis.brand_analysis} seoAudit={analysis.seo_audit} />
+              <Box id="smart-background-setup">
+                <BackgroundSetupCard websiteUrl={website} brandAnalysis={analysis.brand_analysis} seoAudit={analysis.seo_audit} />
+              </Box>
             </>
           )}
 

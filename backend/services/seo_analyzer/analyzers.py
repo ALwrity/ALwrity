@@ -267,8 +267,11 @@ class ContentAnalyzer(BaseAnalyzer):
         warnings = []
         recommendations = []
         
-        # Get all text content
-        text_content = soup.get_text()
+        # Get all text content (exclude boilerplate so nav/footer links don't
+        # concatenate into one giant "word" and trip the spelling check).
+        for tag in soup(["script", "style", "nav", "header", "footer", "noscript"]):
+            tag.decompose()
+        text_content = soup.get_text(separator=" ", strip=True)
         words = text_content.split()
         word_count = len(words)
         
@@ -323,13 +326,20 @@ class ContentAnalyzer(BaseAnalyzer):
             })
         
         # Check for spelling errors (basic check)
-        common_words = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']
         potential_errors = []
-        for word in words[:100]:  # Check first 100 words
-            if len(word) > 3 and word.lower() not in common_words:
-                # Basic spell check (this is simplified - in production you'd use a proper spell checker)
-                if re.search(r'[a-z]{15,}', word.lower()):  # Very long words might be misspelled
-                    potential_errors.append(word)
+        for word in words[:200]:  # Check first 200 words
+            w = word.lower().strip(".,;:!?()[]{}\"'")
+            # Skip short words, hyphenated/compound terms, and any token with
+            # digits or internal capitals (URLs, nav labels, code, brand names).
+            if len(w) <= 3 or not w.isalpha():
+                continue
+            if any(c.isupper() for c in word):
+                continue
+            # Only flag unusually long lowercase runs (likely misspelled), and
+            # require a suspicious consonant-heavy pattern rather than flagging
+            # every legitimately long word (e.g. "personalization").
+            if len(w) >= 20 and re.search(r'(.)\1{2,}', w):
+                potential_errors.append(word)
         
         if potential_errors:
             issues.append({
