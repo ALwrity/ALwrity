@@ -13,6 +13,7 @@ import {
 import HelpOutline from '@mui/icons-material/HelpOutline';
 import Close from '@mui/icons-material/Close';
 import UserBadge from '../../shared/UserBadge';
+import { EmailBadgePopover } from './EmailBadgePopover';
 
 interface WizardHeaderProps {
   activeStep: number;
@@ -33,6 +34,8 @@ interface WizardHeaderProps {
   }>;
   onStepClick: (stepIndex: number) => void;
   onHelpToggle: () => void;
+  email: string;
+  onEmailChange: (email: string) => void;
 }
 
 export const WizardHeader: React.FC<WizardHeaderProps> = ({
@@ -46,12 +49,14 @@ export const WizardHeader: React.FC<WizardHeaderProps> = ({
   isMobile,
   steps,
   onStepClick,
-  onHelpToggle
+  onHelpToggle,
+  email,
+  onEmailChange
 }) => {
   return (
     <Box
       sx={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
         color: 'white',
         p: { xs: 2, md: 3 },
         position: 'relative',
@@ -97,6 +102,7 @@ export const WizardHeader: React.FC<WizardHeaderProps> = ({
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, position: 'relative', zIndex: 1 }}>
         <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <UserBadge colorMode="dark" />
+          <EmailBadgePopover email={email} onEmailChange={onEmailChange} />
         </Box>
         <Box sx={{ flex: 2, textAlign: 'center' }}>
           <Typography variant="h4" sx={{ fontWeight: 700, letterSpacing: '-0.025em' }}>
