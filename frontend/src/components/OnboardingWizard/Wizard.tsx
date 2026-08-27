@@ -10,6 +10,7 @@ import {
 import { getCurrentStep, setCurrentStep } from '../../api/onboarding';
 import { apiClient, longRunningApiClient } from '../../api/client';
 import { useOnboarding } from '../../contexts/OnboardingContext';
+import { useUser } from '@clerk/clerk-react';
 import WebsiteStep from './WebsiteStep';
 import LinkedInConnectStep from './LinkedInConnectStep';
 import CompetitorAnalysisStep from './CompetitorAnalysisStep';
@@ -57,6 +58,39 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   const [retryNextStep, setRetryNextStep] = useState<number>(0);
   // sessionId removed - backend uses Clerk user ID from auth token
   const [stepData, setStepData] = useState<any>(null);
+  const { user } = useUser();
+  const [email, setEmail] = useState<string>('');
+
+  // Sync email from backend onboarding step data or Clerk fallback
+  useEffect(() => {
+    if (data?.onboarding?.steps) {
+      const step1Data = getBackendStep(data.onboarding.steps, 0);
+      if (step1Data?.data?.email) {
+        setEmail(step1Data.data.email);
+        return;
+      }
+    }
+    if (stepData?.email) {
+      setEmail(stepData.email);
+      return;
+    }
+    if (user) {
+      const primaryEmail = user.primaryEmailAddress?.emailAddress;
+      const firstEmail = user.emailAddresses?.[0]?.emailAddress;
+      const resolvedEmail = primaryEmail || firstEmail || '';
+      if (resolvedEmail) {
+        setEmail(resolvedEmail);
+      }
+    }
+  }, [data, stepData?.email, user]);
+
+  const handleEmailChange = useCallback((newEmail: string) => {
+    setEmail(newEmail);
+    setStepData((prev: any) => ({
+      ...prev,
+      email: newEmail
+    }));
+  }, []);
   const [competitorDataCollector, setCompetitorDataCollector] = useState<(() => any) | null>(null);
   const [isCurrentStepValid, setIsCurrentStepValid] = useState<boolean>(false);
   const [stepValidationStates, setStepValidationStates] = useState<Record<number, boolean>>({});
@@ -656,6 +690,8 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         updateHeaderContent={updateHeaderContent}
         onValidationChange={onStep0Valid}
         onDataReady={handleWebsiteDataReady}
+        email={email}
+        onEmailChange={handleEmailChange}
       />
     );
 
@@ -761,6 +797,8 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           steps={steps}
           onStepClick={handleStepClick}
           onHelpToggle={() => setShowHelp(!showHelp)}
+          email={email}
+          onEmailChange={handleEmailChange}
         />
 
         {/* Retry bar for step completion failures */}

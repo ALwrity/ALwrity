@@ -27,7 +27,6 @@ import { BackgroundSetupCard } from './WebsiteStep/BackgroundSetupCard';
 import { ContentAuditSummaryCard } from './WebsiteStep/ContentAuditSummaryCard';
 import { SiteHealthSummaryCard } from './WebsiteStep/SiteHealthSummaryCard';
 import PlatformSection from './common/PlatformSection';
-import EmailSection from './common/EmailSection';
 import PlatformAnalytics from '../shared/PlatformAnalytics';
 
 // Import API client for saving
@@ -48,6 +47,8 @@ interface WebsiteStepProps {
   onValidationChange?: (isValid: boolean) => void;
   onDataReady?: (getData: () => any) => void;
   initialData?: any;
+  email?: string;
+  onEmailChange?: (email: string) => void;
 }
 
 interface AnalysisProgress {
@@ -73,7 +74,15 @@ interface ExistingAnalysis {
 // MAIN COMPONENT
 // =============================================================================
 
-const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderContent, onValidationChange, onDataReady, initialData }) => {
+const WebsiteStep: React.FC<WebsiteStepProps> = ({ 
+  onContinue, 
+  updateHeaderContent, 
+  onValidationChange, 
+  onDataReady, 
+  initialData,
+  email: propEmail,
+  onEmailChange
+}) => {
   const [website, setWebsite] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -140,13 +149,27 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
 
   // Get user email from Clerk
   useEffect(() => {
-    if (user) {
+    if (user && !propEmail) {
       const primaryEmail = user.primaryEmailAddress?.emailAddress;
       const firstEmail = user.emailAddresses?.[0]?.emailAddress;
       const resolvedEmail = primaryEmail || firstEmail || '';
       if (resolvedEmail) setEmail(resolvedEmail);
     }
-  }, [user]);
+  }, [user, propEmail]);
+
+  // Sync email from parent prop when it changes
+  useEffect(() => {
+    if (propEmail !== undefined && propEmail !== '') {
+      setEmail(propEmail);
+    }
+  }, [propEmail]);
+
+  const handleEmailChange = (newEmail: string) => {
+    setEmail(newEmail);
+    if (onEmailChange) {
+      onEmailChange(newEmail);
+    }
+  };
 
   // Notify parent when validation state changes (guard against infinite loops)
   const prevValidRef = useRef<boolean | null>(null);
@@ -459,8 +482,6 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
       }
     }}>
       {/* Header */}
-      {/* Email Section */}
-      <EmailSection email={email} onEmailChange={setEmail} />
 
       {/* Tab Bar */}
       <Box sx={{ display: 'flex', gap: 1.5, mb: 3 }}>
