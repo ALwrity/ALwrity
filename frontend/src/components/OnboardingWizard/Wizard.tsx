@@ -717,7 +717,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        p: { xs: 2, md: 4 },
+        p: 0,
         position: 'relative',
         '&::before': {
           content: '""',
@@ -732,17 +732,20 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       }}
     >
       <Paper
-        elevation={24}
+        elevation={0}
         sx={{
           maxWidth: '100%',
           width: '100%',
-          borderRadius: 4,
+          minHeight: '100vh',
+          borderRadius: 0,
           overflow: 'visible',
           background: 'rgba(255, 255, 255, 0.98)',
           backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
+          border: 'none',
           position: 'relative',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          boxShadow: 'none',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
         {/* Header with Stepper */}
@@ -819,7 +822,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         )}
 
         {/* Content */}
-        <Box sx={{ p: { xs: 1, md: 2 }, pt: 1, width: '100%', overflow: 'visible' }}>
+        <Box sx={{ p: { xs: 2, md: 4 }, pt: { xs: 2, md: 3 }, flexGrow: 1, width: '100%', overflow: 'visible' }}>
           <Fade in={true} timeout={400}>
             <Box sx={{ width: '100%', overflow: 'visible' }}>
               {renderStepContent(activeStep)}

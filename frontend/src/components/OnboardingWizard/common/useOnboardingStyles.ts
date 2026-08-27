@@ -7,8 +7,10 @@ export const useOnboardingStyles = () => {
     // Layout styles
     container: {
       maxWidth: '100%', // Use full width for maximum data display
+      width: '100%',
       mx: 0, // Remove auto margins to use full width
-      px: { xs: 1, md: 2 }, // Minimal padding to maximize content area
+      px: { xs: 1.5, md: 2 }, // Responsive padding for better mobile spacing
+      py: { xs: 1.5, md: 2 }, // Add responsive vertical padding
     },
     
     // Header styles
@@ -246,7 +248,8 @@ export const useOnboardingStyles = () => {
       width: '100%',
       maxWidth: '100%',  // Use full width for maximum data display
       mx: 0, // Remove auto margins to use full width
-      px: { xs: 1, md: 2 }, // Minimal padding to maximize content area
+      px: { xs: 1.5, md: 2 }, // Responsive padding for better mobile spacing
+      py: { xs: 1.5, md: 2 }, // Add responsive vertical padding
     },
 
     analysisHeaderCard: {

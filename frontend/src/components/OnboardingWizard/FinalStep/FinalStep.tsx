@@ -4,7 +4,6 @@ import {
   Button, 
   Typography, 
   Alert, 
-  Container,
   Fade,
   Zoom,
   CircularProgress
@@ -467,7 +466,7 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
 
   return (
     <Fade in={true} timeout={500}>
-      <Container maxWidth="lg" sx={{ py: 2 }}>
+      <Box sx={{ width: '100%', py: { xs: 1.5, md: 2 }, px: 0 }}>
         {/* Loading State */}
         {dataLoading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
@@ -691,7 +690,7 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
             )}
           </React.Fragment>
         )}
-      </Container>
+      </Box>
     </Fade>
   );
 };
