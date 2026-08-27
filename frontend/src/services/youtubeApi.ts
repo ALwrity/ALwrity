@@ -69,8 +69,12 @@ export interface VideoPlan {
     section: string;
     description: string;
     duration_estimate: number;
+    /** Expand beat visual; used when parsing fullScript into scenes. */
+    visual?: string;
   }>;
   hook_strategy: string;
+  /** Expand spoken outro; used to align parsed scenes (hook / beats / outro / CTA). */
+  outro?: string;
   call_to_action?: string;
   cta_ideas?: string[];
   visual_style: string;
@@ -83,6 +87,8 @@ export interface VideoPlan {
     max_scenes?: number;
     scene_duration_range?: [number, number];
     hook_seconds?: number;
+    cta_seconds?: number;
+    main_seconds?: number;
   };
   duration_type: string;
   /** Content language code for scene-builder LLM fallback (e.g. hi). */
@@ -121,6 +127,8 @@ export interface YouTubeSceneAudioGeneration {
   emotion?: string;
   language_boost?: string;
   instructions_stripped?: boolean;
+  target_clip_seconds?: number;
+  estimated_speech_seconds?: number;
 }
 
 export interface YouTubeSceneVideoGeneration {
@@ -297,6 +305,8 @@ export interface SceneAudioRequest {
   sceneId: string;
   sceneTitle: string;
   text: string;
+  /** Scene duration_estimate; backend maps to WAN 5s/10s clip for speech-clock logs. */
+  durationEstimate?: number;
   voiceId?: string;
   language?: string;
   speed?: number;
@@ -668,7 +678,6 @@ export const youtubeApi = {
         scene_id: params.sceneId,
         scene_title: params.sceneTitle,
         text: params.text,
-        // Only send voice_id if explicitly set; otherwise backend will auto-select
         speed: params.speed ?? 1.0,
         volume: params.volume ?? 1.0,
         pitch: params.pitch ?? 0.0,
@@ -676,6 +685,10 @@ export const youtubeApi = {
         english_normalization: params.englishNormalization ?? false,
         enable_sync_mode: params.enableSyncMode !== false,
       };
+
+      if (params.durationEstimate !== undefined && params.durationEstimate !== null) {
+        requestBody.duration_estimate = params.durationEstimate;
+      }
 
       if (params.voiceId !== undefined && params.voiceId !== null && String(params.voiceId).trim() !== '') {
         requestBody.voice_id = params.voiceId;
@@ -711,8 +724,28 @@ export const youtubeApi = {
 
       const response = await aiApiClient.post(`${API_BASE}/audio`, requestBody);
       return response.data;
-    } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.response?.data?.detail || error.message || 'Failed to generate scene audio';
+    } catch (error: unknown) {
+      const err = error as {
+        response?: { data?: { message?: string; detail?: unknown } };
+        message?: string;
+      };
+      const detail = err.response?.data?.detail;
+      let errorMessage = err.response?.data?.message || err.message || "Failed to generate scene audio";
+      if (typeof detail === "string" && detail.trim()) {
+        errorMessage = detail;
+      } else if (detail && typeof detail === "object") {
+        const nested = detail as { message?: string; error?: string };
+        errorMessage = nested.message || nested.error || errorMessage;
+      }
+      if (typeof errorMessage !== "string" || !errorMessage.trim()) {
+        errorMessage = "Failed to generate scene audio";
+      }
+      console.error("[youtubeApi] generateSceneAudio failed", {
+        sceneId: params.sceneId,
+        textLen: params.text?.length ?? 0,
+        durationEstimate: params.durationEstimate,
+        error: errorMessage,
+      });
       throw new Error(errorMessage);
     }
   },

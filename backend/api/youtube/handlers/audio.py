@@ -15,6 +15,7 @@ from services.story_writer.audio_generation_service import StoryAudioGenerationS
 from services.youtube.youtube_scene_audio_prompts import (
     build_youtube_scene_audio_generation_metadata,
     preprocess_youtube_narration_text,
+    youtube_scene_speech_clock,
 )
 from utils.logger_utils import get_service_logger
 
@@ -240,6 +241,7 @@ class YouTubeAudioRequest(BaseModel):
     enable_sync_mode: bool = True
     # Context for intelligent voice/emotion selection
     video_plan_context: Optional[Dict[str, Any]] = None  # Optional video plan for context-aware voice selection
+    duration_estimate: Optional[float] = None  # Maps to WAN 5s/10s clip for speech-clock validation
 
 
 class YouTubeAudioResponse(BaseModel):
@@ -268,17 +270,41 @@ async def generate_youtube_scene_audio(
     """
     user_id = require_authenticated_user(current_user)
     ensure_youtube_media_dirs(user_id)
+    logger.info(
+        "[YouTubeAudio] Scene audio request scene_id={} text_len={} duration_estimate={}",
+        request.scene_id,
+        len(request.text or ""),
+        request.duration_estimate,
+    )
 
     if not request.text or not request.text.strip():
+        logger.warning("[YouTubeAudio] Empty text scene_id={}", request.scene_id)
         raise HTTPException(status_code=400, detail="Text is required")
 
     try:
-        processed_text = preprocess_youtube_narration_text(request.text)
+        processed_text = preprocess_youtube_narration_text(
+            request.text,
+            scene_title=request.scene_title,
+        )
 
         if not processed_text:
+            logger.warning(
+                "[YouTubeAudio] Narration empty after preprocess scene_id={} input_len={}",
+                request.scene_id,
+                len(request.text),
+            )
             raise HTTPException(status_code=400, detail="Text became empty after removing instructions. Please provide clean narration text.")
 
-        logger.info(f"[YouTubeAudio] Text preprocessing: {len(request.text)} -> {len(processed_text)} characters")
+        logger.info(
+            "[YouTubeAudio] Text preprocessing scene_id={} input_len={} output_len={}",
+            request.scene_id,
+            len(request.text),
+            len(processed_text),
+        )
+        clip_seconds, speech_seconds = youtube_scene_speech_clock(
+            processed_text,
+            request.duration_estimate,
+        )
 
         effective_language_boost = _resolve_language_boost(request.language, request.language_boost)
 
@@ -312,8 +338,15 @@ async def generate_youtube_scene_audio(
             selected_emotion = request.emotion
 
         logger.info(
-            f"[YouTubeAudio] Voice selection: {selected_voice}, Emotion: {selected_emotion}, "
-            f"language={request.language}, language_boost={effective_language_boost}"
+            "[YouTubeAudio] Voice and clip clock scene_id={} voice={} emotion={} "
+            "language={} language_boost={} clip_seconds={} speech_seconds={}",
+            request.scene_id,
+            selected_voice,
+            selected_emotion,
+            request.language,
+            effective_language_boost,
+            clip_seconds,
+            speech_seconds,
         )
 
         # Build kwargs for optional parameters - use defaults if None
@@ -375,9 +408,17 @@ async def generate_youtube_scene_audio(
         if result.get("audio_url") and "/api/story/audio/" in result.get("audio_url", ""):
             audio_filename = result.get("audio_filename", "")
             result["audio_url"] = f"/api/youtube/audio/{audio_filename}"
+    except HTTPException:
+        raise
     except Exception as exc:
-        logger.error(f"[YouTube] Audio generation failed: {exc}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Audio generation failed: {exc}")
+        logger.exception(
+            "[YouTubeAudio] Audio generation failed scene_id={}",
+            request.scene_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Audio generation failed: {exc}",
+        ) from exc
 
     # Save to asset library (youtube_creator module)
     try:
@@ -426,6 +467,8 @@ async def generate_youtube_scene_audio(
             language_boost=effective_language_boost,
             provider=result.get("provider", "wavespeed"),
             model=result.get("model", "minimax/speech-02-hd"),
+            target_clip_seconds=clip_seconds,
+            estimated_speech_seconds=speech_seconds,
         ),
     )
 

@@ -58,6 +58,7 @@ export function mapPitchToVideoPlan({
       section: (beat.section_title || "").trim(),
       description: (beat.spoken_script || "").trim(),
       duration_estimate: Number(beat.estimated_duration_seconds) || 0,
+      visual: (beat.visual || "").trim() || undefined,
     }));
 
     const plan: VideoPlan = {
@@ -67,6 +68,7 @@ export function mapPitchToVideoPlan({
       key_message: (expansion.key_message || "").trim() || undefined,
       content_outline: outline,
       hook_strategy: hookSpoken,
+      outro: (expansion.outro || "").trim() || undefined,
       call_to_action: (expansion.call_to_action || "").trim() || undefined,
       visual_style: (form.brand_style || "").trim(),
       tone: (form.brand_style || "").trim() || undefined,
@@ -88,6 +90,8 @@ export function mapPitchToVideoPlan({
       outlineCount: outline.length,
       hasSelectedTitle: Boolean(selectedTitle),
       hasHook: Boolean(hookSpoken),
+      hasOutro: Boolean(plan.outro),
+      outlineVisuals: outline.filter((item) => Boolean(item.visual)).length,
       hasGeneration: Boolean(expansion.generation),
     });
 

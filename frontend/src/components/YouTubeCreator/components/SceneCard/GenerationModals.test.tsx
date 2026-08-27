@@ -5,6 +5,7 @@ import { ThemeProvider, createTheme } from "@mui/material/styles";
 import type { Scene } from "../../../../services/youtubeApi";
 import type { AudioGenerationSettings } from "../../../shared/AudioSettingsModal";
 import { GenerationModals } from "./GenerationModals";
+import { buildYoutubeSceneSpeechText } from "../../panel/buildEnrichedSceneText";
 
 const theme = createTheme();
 
@@ -94,5 +95,11 @@ describe("GenerationModals — Generate Assets overlay smoke", () => {
     expect(onAudioSettingsApply).toHaveBeenCalledWith(
       expect.objectContaining({ voiceId: "Casual_Guy" }),
     );
+
+    const speechPayload = buildYoutubeSceneSpeechText(scene);
+    expect(speechPayload).toBe(scene.narration);
+    expect(speechPayload).not.toContain(scene.title);
+    expect(speechPayload).not.toMatch(/\[Speak at/i);
+    expect(speechPayload).not.toMatch(/\[Pacing:/i);
   });
 });

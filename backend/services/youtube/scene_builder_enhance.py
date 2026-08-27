@@ -4,6 +4,7 @@ from typing import Dict, Any, List, Callable
 import json
 
 from services.llm_providers.main_text_generation import llm_text_gen
+from services.youtube.scene_builder_parse import scene_needs_visual_enhance
 from utils.logger_utils import get_service_logger
 
 logger = get_service_logger("youtube.scene_builder_enhance")
@@ -20,21 +21,29 @@ def enhance_visual_prompts_batch(
     Efficiently enhance visual prompts based on video duration type.
     
     Strategy:
-    - Shorts: Skip enhancement (use original descriptions) - 0 AI calls
+    - Shorts: Skip only when each scene already has a visual distinct from narration.
+      Otherwise one batch call (product-correct, not a workaround).
     - Medium: Batch enhance all scenes in 1 call - 1 AI call
     - Long: Batch enhance in 2 calls (split scenes) - 2 AI calls max
     """
-    # For shorts, skip enhancement to save API calls
     if duration_type == "shorts":
-        logger.info(
-            f"[YouTubeSceneBuilder] Skipping prompt enhancement for shorts "
-            f"({len(scenes)} scenes) to save API calls"
-        )
-        for scene in scenes:
-            scene["enhanced_visual_prompt"] = scene.get(
-                "visual_prompt", scene.get("visual_description", "")
+        if not any(scene_needs_visual_enhance(scene) for scene in scenes):
+            logger.info(
+                "[YouTubeSceneBuilder] Skipping prompt enhancement for shorts "
+                "({} scenes); visuals already distinct from narration",
+                len(scenes),
             )
-        return scenes
+            for scene in scenes:
+                scene["enhanced_visual_prompt"] = scene.get(
+                    "visual_prompt", scene.get("visual_description", "")
+                )
+            return scenes
+        logger.info(
+            "[YouTubeSceneBuilder] Batch enhancing {} shorts scenes in 1 AI call "
+            "(empty visual or visual copied narration)",
+            len(scenes),
+        )
+        duration_type = "medium"
     
     # Build story context for prompt enhancer
     story_context = {

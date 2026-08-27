@@ -87,6 +87,8 @@ export interface YouTubeExpansionPayload {
     max_scenes?: number;
     scene_duration_range?: [number, number];
     hook_seconds?: number;
+    cta_seconds?: number;
+    main_seconds?: number;
   };
   generation?: VideoPlanGeneration;
   research_enabled?: boolean;

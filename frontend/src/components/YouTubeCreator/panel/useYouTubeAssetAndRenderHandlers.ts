@@ -5,9 +5,23 @@ import type { YouTubeContentLanguage } from "../constants";
 import type { YouTubeImageGenerationSettings } from "../shared";
 import { AudioGenerationSettings } from "../../shared/AudioSettingsModal";
 import { useImageGenerationPolling } from "../hooks/useImageGenerationPolling";
-import { buildEnrichedSceneText } from "./buildEnrichedSceneText";
+import {
+  buildYoutubeSceneSpeechText,
+  warnIfYoutubeSpeechExceedsClip,
+} from "./buildEnrichedSceneText";
 
 type StartImagePolling = ReturnType<typeof useImageGenerationPolling>["startPolling"];
+
+function youtubeSceneAudioErrorMessage(err: unknown): string {
+  if (err instanceof Error && err.message.trim()) {
+    return err.message;
+  }
+  const maybe = err as { message?: string };
+  if (typeof maybe?.message === "string" && maybe.message.trim()) {
+    return maybe.message;
+  }
+  return "Failed to generate audio";
+}
 
 interface AssetRenderHandlerArgs {
   scenes: Scene[];
@@ -172,11 +186,27 @@ export function useYouTubeAssetAndRenderHandlers(args: AssetRenderHandlerArgs) {
           languageBoost: languageBoost || "auto",
           enableSyncMode: true,
         };
-        const enrichedText = buildEnrichedSceneText(scene);
+        const speechText = buildYoutubeSceneSpeechText(scene);
+        if (!speechText) {
+          console.warn("[YouTubeCreator] Skipping audio: empty narration", {
+            sceneNumber: scene.scene_number,
+          });
+          setError("This scene has no narration to speak.");
+          return;
+        }
+        const clock = warnIfYoutubeSpeechExceedsClip(speechText, scene.duration_estimate);
+        console.info("[YouTubeCreator] Generating scene audio", {
+          sceneNumber: scene.scene_number,
+          speechLen: speechText.length,
+          durationEstimate: scene.duration_estimate,
+          clipSeconds: clock.clipSeconds,
+          speechSeconds: clock.speechSeconds,
+        });
         const result = await youtubeApi.generateSceneAudio({
           sceneId: `scene_${scene.scene_number}`,
           sceneTitle: scene.title,
-          text: enrichedText,
+          text: speechText,
+          durationEstimate: scene.duration_estimate,
           voiceId: settings.voiceId || undefined,
           language,
           speed: settings.speed,
@@ -211,15 +241,20 @@ export function useYouTubeAssetAndRenderHandlers(args: AssetRenderHandlerArgs) {
           ),
         });
         setSuccess(`Audio generated for Scene ${scene.scene_number}!`);
-      } catch (err: any) {
-        const errorMessage =
-          err?.response?.data?.detail?.message ||
-          err?.response?.data?.detail?.error ||
-          err?.response?.data?.detail ||
-          err?.message ||
-          "Failed to generate audio";
+        console.info("[YouTubeCreator] Scene audio generated", {
+          sceneNumber: scene.scene_number,
+          hasAudioUrl: Boolean(result.audio_url),
+          clipSeconds: result.generation?.target_clip_seconds,
+          speechSeconds: result.generation?.estimated_speech_seconds,
+        });
+      } catch (err: unknown) {
+        const errorMessage = youtubeSceneAudioErrorMessage(err);
+        console.error("[YouTubeCreator] Scene audio generation failed", {
+          sceneNumber: scene.scene_number,
+          error: errorMessage,
+        });
         setError(errorMessage);
-        throw err;
+        throw err instanceof Error ? err : new Error(errorMessage);
       } finally {
         setGeneratingAudioSceneId(null);
       }
