@@ -247,7 +247,12 @@ class Step3ResearchService:
             "competitive_strengths": [],
             "competitive_weaknesses": [],
             "market_share_estimate": "unknown",
-            "differentiation_opportunities": []
+            "differentiation_opportunities": [],
+            # business_model/target_audience satisfy the frontend `Competitor`
+            # contract under the `competitive_insights` alias (`business_model`,
+            # `target_audience`). Kept alongside the richer analysis fields.
+            "business_model": "unknown",
+            "target_audience": "unknown"
         }
         
         # Analyze threat level based on relevance score
@@ -259,7 +264,9 @@ class Step3ResearchService:
         
         # Analyze competitive strengths from content
         summary = competitor.get("summary", "").lower()
+        title = competitor.get("title", "").lower()
         highlights = competitor.get("highlights", [])
+        highlight_blob = " ".join(h.lower() for h in highlights)
         
         # Extract strengths from content analysis
         if "innovative" in summary or "cutting-edge" in summary:
@@ -268,12 +275,35 @@ class Step3ResearchService:
         if "comprehensive" in summary or "complete" in summary:
             analysis["competitive_strengths"].append("Comprehensive solution")
         
-        if any("enterprise" in highlight.lower() for highlight in highlights):
+        if "enterprise" in highlight_blob:
             analysis["competitive_strengths"].append("Enterprise focus")
         
         # Generate differentiation opportunities
-        if not any("saas" in summary for summary in [summary]):
+        if "saas" not in summary:
             analysis["differentiation_opportunities"].append("SaaS platform differentiation")
+        
+        # Infer business model from the site's description
+        blob = f"{title} {summary} {highlight_blob}"
+        if "saas" in blob or "software" in blob or "platform" in blob:
+            analysis["business_model"] = "SaaS / platform"
+        elif "subscription" in blob or "membership" in blob or "recurring" in blob:
+            analysis["business_model"] = "Subscription"
+        elif "marketplace" in blob or "e-commerce" in blob or "ecommerce" in blob or "shop" in blob:
+            analysis["business_model"] = "E-commerce / marketplace"
+        elif "agency" in blob or "services" in blob or "consulting" in blob:
+            analysis["business_model"] = "Agency / services"
+        elif "advertis" in blob:
+            analysis["business_model"] = "Ad-supported"
+        
+        # Infer target audience from the same descriptive blob
+        if "enterprise" in blob or "for business" in blob:
+            analysis["target_audience"] = "Enterprise"
+        elif "developer" in blob or "technical" in blob:
+            analysis["target_audience"] = "Developers"
+        elif "startup" in blob or "small business" in blob or "sme" in blob:
+            analysis["target_audience"] = "Startups / SMBs"
+        elif "consumer" in blob or "individuals" in blob or "personal" in blob:
+            analysis["target_audience"] = "Consumers"
         
         return analysis
     
