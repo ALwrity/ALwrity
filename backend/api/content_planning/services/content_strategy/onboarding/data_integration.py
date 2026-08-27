@@ -651,7 +651,9 @@ class OnboardingDataIntegrationService:
                     competitor_dict['analysis_data'] = record.analysis_data
                 competitor_dict['data_freshness'] = self._calculate_freshness(record.updated_at)
                 competitor_dict['confidence_level'] = 0.9 if record.status == 'completed' else 0.5
-                # Add frontend-friendly aliases (url/domain/title/summary/relevance_score)
+                # Add frontend-friendly aliases (url/domain/title/summary/relevance_score
+                # plus the rich fields the CompetitorsGrid renders: highlights,
+                # published_date, favicon, image, author, content/competitive insights).
                 competitor_dict['url'] = competitor_dict.get('competitor_url', '')
                 competitor_dict['domain'] = competitor_dict.get('competitor_domain', '')
                 ad = competitor_dict.get('analysis_data') or {}
@@ -659,6 +661,16 @@ class OnboardingDataIntegrationService:
                     competitor_dict['title'] = ad.get('title', '') or competitor_dict.get('competitor_domain', '')
                     competitor_dict['summary'] = ad.get('summary', '')
                     competitor_dict['relevance_score'] = ad.get('relevance_score', 0.5)
+                    competitor_dict['highlights'] = ad.get('highlights', [])
+                    competitor_dict['subpages'] = ad.get('subpages', [])
+                    competitor_dict['favicon'] = ad.get('favicon')
+                    competitor_dict['image'] = ad.get('image')
+                    competitor_dict['published_date'] = ad.get('published_date')
+                    competitor_dict['author'] = ad.get('author')
+                    competitor_dict['content_insights'] = ad.get('content_insights', {})
+                    # The persisted field is `competitive_analysis`; expose it under
+                    # both keys so consumers can rely on `competitive_insights`.
+                    competitor_dict['competitive_insights'] = ad.get('competitive_analysis') or ad.get('competitive_insights', {})
                 competitors.append(competitor_dict)
             
             logger.info(f"[CompetitorAnalysis] retrieved={len(competitors)} user={user_id}")

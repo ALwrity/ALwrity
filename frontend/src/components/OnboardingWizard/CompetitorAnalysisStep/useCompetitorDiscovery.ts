@@ -136,13 +136,23 @@ export function useCompetitorDiscovery({
       try {
         const dbResult = await longRunningApiClient.get('/api/onboarding/competitor-analysis');
         if (dbResult?.data?.competitors?.length > 0) {
-          const comps = dbResult.data.competitors.map((c: any) => ({
-            url: c.url || '', domain: c.domain || '', title: c.url || '',
-            summary: '', relevance_score: 0.8,
-            highlights: [], favicon: null, image: null, published_date: null, author: null,
-            competitive_insights: { business_model: '', target_audience: '' },
-            content_insights: { content_focus: '', content_quality: '' },
-          }));
+          const comps = dbResult.data.competitors.map((c: any) => {
+            const ad = c.analysis_data && typeof c.analysis_data === 'object' ? c.analysis_data : {};
+            return {
+              url: c.url || c.competitor_url || '',
+              domain: c.domain || c.competitor_domain || '',
+              title: ad.title || c.title || c.url || '',
+              summary: ad.summary || '',
+              relevance_score: ad.relevance_score ?? 0.8,
+              highlights: ad.highlights || [],
+              favicon: ad.favicon ?? null,
+              image: ad.image ?? null,
+              published_date: ad.published_date ?? null,
+              author: ad.author ?? null,
+              competitive_insights: ad.competitive_analysis || ad.competitive_insights || { business_model: '', target_audience: '' },
+              content_insights: ad.content_insights || { content_focus: '', content_quality: '' },
+            };
+          });
           setCompetitors(comps);
           setUsingCachedData(true);
         }
