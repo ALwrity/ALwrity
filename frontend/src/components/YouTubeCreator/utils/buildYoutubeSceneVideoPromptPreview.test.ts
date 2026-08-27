@@ -1,4 +1,4 @@
-import { buildYoutubeSceneVideoPromptPreview } from "./buildYoutubeSceneVideoPromptPreview";
+import { buildYoutubeSceneVideoPromptPreview, resolveYoutubeSceneVideoDuration } from "./buildYoutubeSceneVideoPromptPreview";
 
 describe("buildYoutubeSceneVideoPromptPreview", () => {
   it("prefers enhanced visual prompt and i2v when image exists", () => {
@@ -28,6 +28,12 @@ describe("buildYoutubeSceneVideoPromptPreview", () => {
     expect(preview.generationMode).toBe("t2v");
     expect(preview.imageAttached).toBe(false);
     expect(preview.audioAttached).toBe(false);
+  });
+
+  it("resolveYoutubeSceneVideoDuration matches WAN 5s or 10s", () => {
+    expect(resolveYoutubeSceneVideoDuration(5)).toBe(5);
+    expect(resolveYoutubeSceneVideoDuration(8)).toBe(10);
+    expect(resolveYoutubeSceneVideoDuration(undefined)).toBe(5);
   });
 
   it("records attached audio path without query tokens", () => {

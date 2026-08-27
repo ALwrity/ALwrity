@@ -42,6 +42,29 @@ describe("SceneGenerationMeta", () => {
     ).toBeInTheDocument();
   });
 
+  it("does not imply the LLM user prompt produced parsed custom-script scenes", () => {
+    render(
+      <SceneGenerationMeta
+        generation={{
+          ...generation,
+          llm_called: false,
+          custom_script_used: true,
+          user_prompt: "**VIDEO PLAN:**\nThis viral prompt did not generate the cards",
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByText("Scenes parsed from expanded script (scene LLM was not used)"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Exact prompt sent to the LLM (scene build)")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/parsed from the expanded full script/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/did not produce these scenes/i)).toBeInTheDocument();
+    expect(screen.getByText("Copy reference prompt (not used on this run)")).toBeInTheDocument();
+  });
+
   it("renders nothing without generation metadata", () => {
     const { container } = render(<SceneGenerationMeta generation={null} />);
     expect(container).toBeEmptyDOMElement();

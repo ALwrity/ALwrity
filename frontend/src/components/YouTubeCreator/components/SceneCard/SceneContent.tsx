@@ -22,7 +22,7 @@ import { Scene } from '../../../../services/youtubeApi';
 import { YouTubeSceneAssetPromptMeta } from '../YouTubeSceneAssetPromptMeta';
 import { YouTubeSceneImagePromptPreview } from '../YouTubeSceneImagePromptPreview';
 import { YouTubeSceneAudioPromptPreview } from '../YouTubeSceneAudioPromptPreview';
-import { buildEnrichedSceneText } from '../../panel/buildEnrichedSceneText';
+import { buildYoutubeSceneSpeechText, buildEnrichedSceneText } from '../../panel/buildEnrichedSceneText';
 
 interface SceneContentProps {
   scene: Scene;
@@ -268,7 +268,9 @@ export const SceneContent: React.FC<SceneContentProps> = ({
   const imagePreviewPrompt =
     `${scene.visual_prompt || ''}\n${scene.enhanced_visual_prompt || ''}`.trim() ||
     `Create a YouTube scene image for: ${scene.title}`;
-  const audioPreviewText = buildEnrichedSceneText(scene);
+  const audioPreviewText = buildYoutubeSceneSpeechText(scene);
+  const deliveryNotes = buildEnrichedSceneText(scene);
+  const showDeliveryNotes = deliveryNotes !== audioPreviewText;
 
   return (
     <Stack spacing={2.5}>
@@ -404,7 +406,10 @@ export const SceneContent: React.FC<SceneContentProps> = ({
             </Typography>
           </AccordionSummary>
           <AccordionDetails>
-            <YouTubeSceneAudioPromptPreview inputText={audioPreviewText} />
+            <YouTubeSceneAudioPromptPreview
+              inputText={audioPreviewText}
+              deliveryNotes={showDeliveryNotes ? deliveryNotes : undefined}
+            />
           </AccordionDetails>
         </Accordion>
       ) : null}
