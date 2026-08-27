@@ -16,7 +16,7 @@ class TransitionGenerator:
     def __init__(self):
         # Simple cache to avoid redundant LLM calls for similar transitions
         self._cache: Dict[str, str] = {}
-        logger.info("✅ TransitionGenerator initialized with LLM-based generation")
+        logger.debug("✅ TransitionGenerator initialized with LLM-based generation")
 
     def generate_transition(self, previous_text: str, current_heading: str, use_llm: bool = True) -> str:
         """

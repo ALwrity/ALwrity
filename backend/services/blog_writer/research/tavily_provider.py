@@ -19,7 +19,7 @@ class TavilyResearchProvider(BaseProvider):
         if not self.api_key:
             raise RuntimeError("TAVILY_API_KEY not configured")
         self.tavily_service = TavilyService()
-        logger.info("✅ Tavily Research Provider initialized")
+        logger.debug("✅ Tavily Research Provider initialized")
     
     async def search(self, prompt, topic, industry, target_audience, config, user_id):
         """Execute Tavily search and return standardized results."""

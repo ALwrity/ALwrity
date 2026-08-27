@@ -70,7 +70,7 @@ class SourceToSectionMapper:
             'vp': ['vice president'],
         }
         
-        logger.info("✅ SourceToSectionMapper initialized with intelligent mapping algorithms")
+        logger.debug("✅ SourceToSectionMapper initialized with intelligent mapping algorithms")
     
     def map_sources_to_sections(
         self, 

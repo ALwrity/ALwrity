@@ -48,7 +48,7 @@ class GroundingContextEngine:
             'evergreen': ['fundamental', 'basic', 'principles', 'foundation', 'core']
         }
         
-        logger.info("✅ GroundingContextEngine initialized with contextual analysis capabilities")
+        logger.debug("✅ GroundingContextEngine initialized with contextual analysis capabilities")
     
     def extract_contextual_insights(self, grounding_metadata: Optional[GroundingMetadata]) -> Dict[str, Any]:
         """

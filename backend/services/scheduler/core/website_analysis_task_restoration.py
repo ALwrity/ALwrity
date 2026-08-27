@@ -29,7 +29,7 @@ async def restore_website_analysis_tasks(scheduler):
         scheduler: TaskScheduler instance
     """
     try:
-        logger.warning("[Website Analysis Restoration] Starting website analysis task restoration...")
+        logger.debug("[Website Analysis Restoration] Starting website analysis task restoration...")
         
         user_ids = get_all_user_ids()
         total_created = 0
@@ -114,7 +114,7 @@ async def restore_website_analysis_tasks(scheduler):
             except Exception as e:
                 logger.warning(f"[Website Analysis Restoration] Error processing user {user_id}: {e}")
         
-        logger.warning(
+        logger.info(
             f"[Website Analysis Restoration] ✅ Completed. "
             f"Processed {users_processed} users. "
             f"Found {total_existing_tasks} existing tasks. "

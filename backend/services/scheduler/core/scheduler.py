@@ -171,7 +171,7 @@ class TaskScheduler:
             task_loader: Function that loads due tasks from database
         """
         self.registry.register(task_type, executor, task_loader)
-        logger.info(f"Registered executor for task type: {task_type}")
+        logger.debug(f"Registered executor for task type: {task_type}")
     
     def _configure_apscheduler_logging(self):
         """Configure APScheduler to use unified logging system."""
@@ -229,7 +229,7 @@ class TaskScheduler:
         apscheduler_executors_logger.propagate = False
         apscheduler_jobstores_logger.propagate = False
         
-        logger.info("APScheduler logging configured to use unified logging system")
+        logger.debug("APScheduler logging configured to use unified logging system")
     
 
     def _scheduler_identity(self) -> str:
@@ -485,7 +485,7 @@ class TaskScheduler:
                     logger.debug(f"Could not get Advertools task details: {e}")
 
             # Log comprehensive startup information in single message
-            logger.warning("\n".join(startup_lines))
+            logger.info("\n".join(startup_lines))
             
             # Save scheduler start event to database
             # Disabled in multi-tenant mode as there is no global DB
@@ -536,7 +536,7 @@ class TaskScheduler:
             self.scheduler.shutdown(wait=True)
             self._running = False
             
-            # Log comprehensive shutdown information (use WARNING level for visibility)
+            # Log comprehensive shutdown information
             total_checks = self.stats.get('total_checks', 0)
             total_executed = self.stats.get('tasks_executed', 0)
             total_failed = self.stats.get('tasks_failed', 0)
@@ -549,7 +549,7 @@ class TaskScheduler:
                 f"   ├─ Jobs Cancelled: {len(all_jobs_before)}\n"
                 f"   └─ Shutdown: Graceful"
             )
-            logger.warning(shutdown_message)
+            logger.info(shutdown_message)
             
             # Save scheduler stop event to database
             # Disabled in multi-tenant mode as there is no global DB

@@ -366,6 +366,44 @@ class StepManagementService:
             db.rollback()
             raise e
 
+    def save_content_pillars(self, user_id: str, content_pillars: Optional[Dict[str, Any]], db: Session) -> bool:
+        """Persist discovered content pillars independently of competitor discovery.
+
+        Used by the content-pillar refresh endpoint so pillars can be re-fetched
+        without re-running the full (expensive) competitor discovery.
+        """
+        if not content_pillars:
+            logger.warning(f"save_content_pillars: no pillars to save for user {user_id}")
+            return False
+
+        try:
+            session = self._get_or_create_session(user_id, db)
+            research_prefs = db.query(ResearchPreferences).filter(
+                ResearchPreferences.session_id == session.id
+            ).first()
+
+            if research_prefs:
+                research_prefs.content_pillars = content_pillars
+                research_prefs.updated_at = datetime.utcnow()
+            else:
+                research_prefs = ResearchPreferences(
+                    session_id=session.id,
+                    research_depth='Comprehensive',
+                    content_types=["Blog Posts", "Social Media", "Newsletters"],
+                    auto_research=True,
+                    factual_content=True,
+                    content_pillars=content_pillars,
+                )
+                db.add(research_prefs)
+
+            db.commit()
+            logger.info(f"Saved content_pillars for session {session.id} (user {user_id})")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving content pillars for user {user_id}: {e}")
+            db.rollback()
+            return False
+
     def _delete_competitor_by_url(self, user_id: str, competitor_url: str, db: Session) -> bool:
         """Delete a single competitor by URL (or domain) across all user sessions."""
         try:
