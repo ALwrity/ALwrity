@@ -355,7 +355,6 @@ class StepManagementService:
                     failed_count += 1
                     logger.error(f"   Failed to save competitor {idx + 1}: {str(e)}")
             
-            db.commit()
             logger.info(f" Saved {saved_count} competitors ({failed_count} failed)")
 
             # Persist discovered content pillars, research summary, and social media citations
@@ -385,14 +384,22 @@ class StepManagementService:
                             social_media_citations=social_media_citations,
                         )
                         db.add(research_prefs)
-                    db.commit()
-                    logger.info(f" Saved research data for session {session.id}: "
+                    logger.info(f" Prepared research data for session {session.id}: "
                                 f"content_pillars={bool(content_pillars)}, "
                                 f"research_summary={bool(research_summary)}, "
                                 f"social_media_citations={bool(social_media_citations)}")
                 except Exception as pillars_err:
-                    logger.warning(f"Failed to save research data for user {user_id}: {pillars_err}")
+                    logger.warning(f"Failed to prepare research data for user {user_id}: {pillars_err}")
                     db.rollback()
+            
+            # Single atomic commit for all competitor + research data
+            try:
+                db.commit()
+                logger.info(f" Atomic commit complete for session {session.id}")
+            except Exception as commit_err:
+                logger.error(f"Failed to commit competitor analysis for user {user_id}: {commit_err}")
+                db.rollback()
+                raise commit_err
 
             # Refresh Step 3 flat context with competitor details saved by this flow
             try:

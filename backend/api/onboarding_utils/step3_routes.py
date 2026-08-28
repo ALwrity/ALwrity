@@ -789,6 +789,9 @@ async def get_persisted_sitemap_analysis(
     this before auto-triggering an LLM analysis so the Strategic Content
     Opportunities section restores from DB on navigation/refresh instead of
     paying for a fresh LLM call every time.
+    
+    Validates that the persisted user_url matches the requested user_url
+    to prevent returning stale data from a previous website analysis.
     """
     try:
         user_id = str(current_user.get('id'))
@@ -817,6 +820,15 @@ async def get_persisted_sitemap_analysis(
             if not isinstance(cached, dict) or not cached.get("success", True):
                 logger.info(f"[sitemap_get] MISS: no sitemap_analysis in seo_audit (keys={list(seo_audit.keys())}) user={user_id}")
                 return {"success": False, "sitemap_analysis": None, "discovery_method": "none"}
+
+            # Validate URL match to prevent returning stale data from different website
+            if user_url:
+                cached_url = cached.get("user_url") or ""
+                norm_requested = _normalize_site_url(user_url)
+                norm_cached = _normalize_site_url(cached_url)
+                if norm_cached and norm_requested != norm_cached:
+                    logger.info(f"[sitemap_get] URL mismatch: requested={norm_requested}, cached={norm_cached}, returning none")
+                    return {"success": False, "sitemap_analysis": None, "discovery_method": "none"}
 
             logger.info(f"[sitemap_get] HIT for user={user_id}")
             return {"success": True, "sitemap_analysis": cached, "discovery_method": "db"}
