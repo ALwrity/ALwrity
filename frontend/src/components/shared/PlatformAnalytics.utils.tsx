@@ -1,12 +1,10 @@
 import React from 'react';
-import {
-  Search,
-  Web,
-  Info,
-  CheckCircle,
-  Error as ErrorIcon,
-  Warning,
-} from '@mui/icons-material';
+import Search from '@mui/icons-material/Search';
+import Web from '@mui/icons-material/Web';
+import Info from '@mui/icons-material/Info';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import Warning from '@mui/icons-material/Warning';
 
 export const getPlatformIcon = (platform: string) => {
   switch (platform.toLowerCase()) {

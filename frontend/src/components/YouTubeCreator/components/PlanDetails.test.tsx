@@ -1,10 +1,10 @@
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { PlanDetails } from "./PlanDetails";
 import type { VideoPlan } from "../../../services/youtubeApi";
 
-jest.mock("../hooks/useAvatarBlobUrl", () => ({
+vi.mock("../hooks/useAvatarBlobUrl", () => ({
   useAvatarBlobUrl: () => ({ avatarBlobUrl: null, avatarLoading: false }),
 }));
 
@@ -28,7 +28,7 @@ const basePlan: VideoPlan = {
 
 describe("PlanDetails", () => {
   it("blocks save when a section name is empty", () => {
-    const onPlanChange = jest.fn();
+    const onPlanChange = vi.fn();
     render(<PlanDetails plan={basePlan} onPlanChange={onPlanChange} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));
@@ -41,7 +41,7 @@ describe("PlanDetails", () => {
   });
 
   it("saves edited audience and keywords", () => {
-    const onPlanChange = jest.fn();
+    const onPlanChange = vi.fn();
     render(<PlanDetails plan={basePlan} onPlanChange={onPlanChange} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Edit plan" }));

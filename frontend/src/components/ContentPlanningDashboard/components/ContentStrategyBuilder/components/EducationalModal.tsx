@@ -14,16 +14,14 @@ import {
   ListItemText,
   CircularProgress
 } from '@mui/material';
-import {
-  School as SchoolIcon,
-  Lightbulb as LightbulbIcon,
-  Timeline as TimelineIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  TrendingUp as TrendingUpIcon,
-  FiberManualRecord as FiberManualRecordIcon
-} from '@mui/icons-material';
+import SchoolIcon from '@mui/icons-material/School';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 import { motion } from 'framer-motion';
 import { EducationalModalProps } from '../types/contentStrategy.types';
 

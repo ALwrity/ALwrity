@@ -81,6 +81,8 @@ export const WorkflowHelperModals: React.FC<WorkflowHelperModalsProps> = ({
           maxWidth: YOUTUBE_WEDGE_MODAL_MAX_WIDTH,
           onBack,
           backLabel: "Studio Hub",
+          titleSize: "xl" as const,
+          headerLayout: "centeredRow" as const,
         };
 
   return (

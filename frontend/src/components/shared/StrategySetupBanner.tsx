@@ -8,11 +8,9 @@ import {
   LinearProgress,
   Chip,
 } from '@mui/material';
-import {
-  AutoAwesome as WizardIcon,
-  Close as CloseIcon,
-  ArrowForward as ArrowIcon,
-} from '@mui/icons-material';
+import WizardIcon from '@mui/icons-material/AutoAwesome';
+import CloseIcon from '@mui/icons-material/Close';
+import ArrowIcon from '@mui/icons-material/ArrowForward';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 

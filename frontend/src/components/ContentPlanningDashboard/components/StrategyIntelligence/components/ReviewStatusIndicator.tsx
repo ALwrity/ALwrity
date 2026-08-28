@@ -7,14 +7,12 @@ import {
   Typography,
   Button
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  Warning as WarningIcon,
-  Edit as EditIcon,
-  Undo as UndoIcon,
-  PlayArrow as PlayArrowIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import WarningIcon from '@mui/icons-material/Warning';
+import EditIcon from '@mui/icons-material/Edit';
+import UndoIcon from '@mui/icons-material/Undo';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { motion } from 'framer-motion';
 import { ReviewStatus } from '../../../../../stores/strategyReviewStore';
 import { ANALYSIS_CARD_STYLES } from '../styles';

@@ -13,18 +13,16 @@ import {
   Stack
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Today as TodayIcon,
-  TextFields as TextIcon,
-  Image as ImageIcon,
-  AudioFile as AudioIcon,
-  VideoFile as VideoIcon,
-  Close as CloseIcon,
-  Facebook as FacebookIcon,
-  LinkedIn as LinkedInIcon,
-  Language as WebsiteIcon,
-  AutoAwesome as AlwrityIcon
-} from '@mui/icons-material';
+import TodayIcon from '@mui/icons-material/Today';
+import TextIcon from '@mui/icons-material/TextFields';
+import ImageIcon from '@mui/icons-material/Image';
+import AudioIcon from '@mui/icons-material/AudioFile';
+import VideoIcon from '@mui/icons-material/VideoFile';
+import CloseIcon from '@mui/icons-material/Close';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import WebsiteIcon from '@mui/icons-material/Language';
+import AlwrityIcon from '@mui/icons-material/AutoAwesome';
 import { useNavigate } from 'react-router-dom';
 import EnhancedTodayChip from './EnhancedTodayChip';
   import { TodayTask } from '../../../types/workflow';

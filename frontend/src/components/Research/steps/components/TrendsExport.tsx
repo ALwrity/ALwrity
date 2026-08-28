@@ -16,12 +16,10 @@ import {
   Tooltip,
   CircularProgress,
 } from '@mui/material';
-import {
-  Download as DownloadIcon,
-  FileDownload as FileDownloadIcon,
-  Image as ImageIcon,
-  TableChart as TableChartIcon,
-} from '@mui/icons-material';
+import DownloadIcon from '@mui/icons-material/Download';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import ImageIcon from '@mui/icons-material/Image';
+import TableChartIcon from '@mui/icons-material/TableChart';
 import { GoogleTrendsData, TrendAnalysis } from '../../types/intent.types';
 
 interface TrendsExportProps {

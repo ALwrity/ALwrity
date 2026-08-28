@@ -26,18 +26,16 @@ import {
   MenuItem,
   InputAdornment,
 } from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  TrendingUp as TrendIcon,
-  CheckCircle as CheckIcon,
-  Info as InfoIcon,
-  Edit as EditIcon,
-  Save as SaveIcon,
-  Cancel as CancelIcon,
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  HelpOutline as HelpIcon,
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import TrendIcon from '@mui/icons-material/TrendingUp';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import InfoIcon from '@mui/icons-material/Info';
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
+import CancelIcon from '@mui/icons-material/Cancel';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import HelpIcon from '@mui/icons-material/HelpOutline';
 import { TrendsConfig } from '../../../types/intent.types';
 import { TrendsKnowMoreModal } from './TrendsKnowMoreModal';
 

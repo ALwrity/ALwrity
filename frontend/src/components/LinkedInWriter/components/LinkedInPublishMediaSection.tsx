@@ -1,9 +1,7 @@
 import React, { useCallback, useRef, useState } from "react";
 import { Alert, Box, Button, Typography } from "@mui/material";
-import {
-  AutoAwesome as GenerateIcon,
-  CloudUpload as UploadIcon,
-} from "@mui/icons-material";
+import GenerateIcon from '@mui/icons-material/AutoAwesome';
+import UploadIcon from '@mui/icons-material/CloudUpload';
 import { useLinkedInPublishMedia } from "../hooks/useLinkedInPublishMedia";
 import {
   useLinkedInSelectionImage,

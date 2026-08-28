@@ -17,17 +17,15 @@ import {
   Divider,
   Avatar
 } from '@mui/material';
-import {
-  TrendingUp as TrendingUpIcon,
-  Lightbulb as LightbulbIcon,
-  Warning as WarningIcon,
-  Speed as SpeedIcon,
-  CheckCircle as CheckIcon,
-  ArrowForward as ArrowIcon,
-  Star as StarIcon,
-  Bolt as BoltIcon,
-  AutoAwesome as AIIcon
-} from '@mui/icons-material';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import WarningIcon from '@mui/icons-material/Warning';
+import SpeedIcon from '@mui/icons-material/Speed';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import ArrowIcon from '@mui/icons-material/ArrowForward';
+import StarIcon from '@mui/icons-material/Star';
+import BoltIcon from '@mui/icons-material/Bolt';
+import AIIcon from '@mui/icons-material/AutoAwesome';
 
 export interface StrategicInsight {
   type: string;

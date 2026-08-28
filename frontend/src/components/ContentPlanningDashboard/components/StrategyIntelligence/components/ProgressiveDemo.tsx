@@ -5,13 +5,11 @@ import {
   Box,
   Chip
 } from '@mui/material';
-import {
-  Lightbulb as LightbulbIcon,
-  TrendingUp as TrendingUpIcon,
-  Security as SecurityIcon,
-  Schedule as ScheduleIcon,
-  Assessment as AssessmentIcon
-} from '@mui/icons-material';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SecurityIcon from '@mui/icons-material/Security';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import ProgressiveCard from './ProgressiveCard';
 import { ANALYSIS_CARD_STYLES, getEnhancedChipStyles } from '../styles';
 

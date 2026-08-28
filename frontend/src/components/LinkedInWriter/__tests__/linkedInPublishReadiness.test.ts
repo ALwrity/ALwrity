@@ -1,7 +1,7 @@
 /**
  * Unit tests for LinkedIn publish readiness helpers.
  * Run manually:
- *   npx react-scripts test --watchAll=false --testPathPattern=linkedInPublishReadiness
+ *   npx vitest run linkedInPublishReadiness
  *
  * Kept under __tests__/ and excluded from CRA app typecheck (see tsconfig exclude).
  */

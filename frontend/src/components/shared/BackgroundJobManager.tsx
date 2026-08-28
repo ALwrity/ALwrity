@@ -22,17 +22,15 @@ import {
   AccordionSummary,
   AccordionDetails,
 } from '@mui/material';
-import {
-  PlayArrow,
-  Stop,
-  Refresh,
-  CheckCircle,
-  Error as ErrorIcon,
-  Schedule,
-  ExpandMore,
-  Analytics,
-  DataUsage,
-} from '@mui/icons-material';
+import PlayArrow from '@mui/icons-material/PlayArrow';
+import Stop from '@mui/icons-material/Stop';
+import Refresh from '@mui/icons-material/Refresh';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import Schedule from '@mui/icons-material/Schedule';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import Analytics from '@mui/icons-material/Analytics';
+import DataUsage from '@mui/icons-material/DataUsage';
 import { apiClient } from '../../api/client';
 
 interface Job {

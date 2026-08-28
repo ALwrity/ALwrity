@@ -8,10 +8,7 @@ import {
   // Fade,
   // Paper
 } from '@mui/material';
-import {
-  Info as InfoIcon,
-  // HelpOutline as HelpIcon
-} from '@mui/icons-material';
+import InfoIcon from '@mui/icons-material/Info';
 
 interface SectionHeaderProps {
   title: string;

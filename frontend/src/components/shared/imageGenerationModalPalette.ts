@@ -4,7 +4,6 @@
 
 import { alpha } from '@mui/material';
 import type { ImageModalTheme } from './ImageGenerationModal.types';
-import { IMAGE_GENERATION_SELECT_MENU_Z_INDEX } from './imageGenerationModalZIndex';
 import type { ImageGenerationSelectMenuProps } from './imageGenerationSelectMenuProps';
 
 export type ImageModalColorScheme = 'dark' | 'light';
@@ -121,7 +120,7 @@ export function resolveImageModalPalette(theme: ImageModalTheme): ImageModalPale
   };
 }
 
-/** Build Select menu props for the modal color scheme (keeps z-index stacking fix). */
+/** Build Select menu props for the modal color scheme (MUI stacking, no local z-index). */
 export function buildImageGenerationSelectMenuProps(
   palette: ImageModalPalette,
 ): ImageGenerationSelectMenuProps {
@@ -130,7 +129,6 @@ export function buildImageGenerationSelectMenuProps(
     disableScrollLock: true,
     anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
     transformOrigin: { vertical: 'top', horizontal: 'left' },
-    sx: { zIndex: IMAGE_GENERATION_SELECT_MENU_Z_INDEX },
     PaperProps: {
       sx: {
         bgcolor: palette.menuPaperBg,
@@ -166,7 +164,6 @@ export function buildImageGenerationSelectMenuProps(
           options: { altAxis: true, tether: true, rootBoundary: 'viewport' },
         },
       ],
-      sx: { zIndex: IMAGE_GENERATION_SELECT_MENU_Z_INDEX },
     },
   };
 }

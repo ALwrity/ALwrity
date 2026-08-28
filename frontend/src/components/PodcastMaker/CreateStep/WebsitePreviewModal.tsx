@@ -11,12 +11,10 @@ import {
   Divider,
   IconButton,
 } from "@mui/material";
-import {
-  Language as LanguageIcon,
-  PsychologyAlt as AnalyzeIcon,
-  CheckCircle as UseTextIcon,
-  Close as CloseIcon,
-} from "@mui/icons-material";
+import LanguageIcon from '@mui/icons-material/Language';
+import AnalyzeIcon from '@mui/icons-material/PsychologyAlt';
+import UseTextIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
 
 const extractRootDomain = (url: string): string => {
   try {

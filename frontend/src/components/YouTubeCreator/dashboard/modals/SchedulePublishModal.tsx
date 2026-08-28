@@ -20,6 +20,8 @@ export const SchedulePublishModal: React.FC<{
       maxWidth={shell?.maxWidth ?? YOUTUBE_WEDGE_MODAL_MAX_WIDTH}
       onBack={shell?.onBack}
       backLabel={shell?.backLabel}
+      titleSize={shell?.titleSize}
+      headerLayout={shell?.headerLayout}
     >
       <button
         type="button"

@@ -12,16 +12,14 @@ import {
   FormControlLabel,
   Checkbox,
 } from '@mui/material';
-import {
-  Email as EmailIcon,
-  Business as BusinessIcon,
-  TrendingUp as TrendingUpIcon,
-  Notifications as NotificationsIcon,
-  Security as SecurityIcon,
-  Verified as VerifiedIcon,
-  Check as CheckIcon,
-  Close as CloseIcon
-} from '@mui/icons-material';
+import EmailIcon from '@mui/icons-material/Email';
+import BusinessIcon from '@mui/icons-material/Business';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import SecurityIcon from '@mui/icons-material/Security';
+import VerifiedIcon from '@mui/icons-material/Verified';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
 
 interface EmailSectionProps {
   email: string;

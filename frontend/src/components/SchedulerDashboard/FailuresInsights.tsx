@@ -15,13 +15,11 @@ import {
   Divider,
   CircularProgress
 } from '@mui/material';
-import {
-  Error as ErrorIcon,
-  Warning as WarningIcon,
-  Info as InfoIcon,
-  ExpandMore as ExpandMoreIcon,
-  CheckCircle as CheckCircleIcon
-} from '@mui/icons-material';
+import ErrorIcon from '@mui/icons-material/Error';
+import WarningIcon from '@mui/icons-material/Warning';
+import InfoIcon from '@mui/icons-material/Info';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { getExecutionLogs, getRecentSchedulerLogs, ExecutionLog } from '../../api/schedulerDashboard';
 import { SchedulerStats } from '../../api/schedulerDashboard';
 import { 

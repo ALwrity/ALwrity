@@ -9,13 +9,11 @@ import {
   AccordionSummary,
   AccordionDetails,
 } from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  TrendingUp as TrendingUpIcon,
-  Speed as SpeedIcon,
-  Lightbulb as LightbulbIcon,
-  Description as DescriptionIcon,
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SpeedIcon from '@mui/icons-material/Speed';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import DescriptionIcon from '@mui/icons-material/Description';
 import { GlassCard } from '../../shared/styled';
 import { apiClient } from '../../../api/client';
 

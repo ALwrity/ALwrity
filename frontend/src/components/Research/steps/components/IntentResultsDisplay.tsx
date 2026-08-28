@@ -33,21 +33,19 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
-import {
-  CheckCircle as CheckIcon,
-  TrendingUp as TrendIcon,
-  FormatQuote as QuoteIcon,
-  BarChart as StatsIcon,
-  School as CaseStudyIcon,
-  Lightbulb as IdeaIcon,
-  OpenInNew as OpenIcon,
-  ExpandMore as ExpandMoreIcon,
-  Warning as WarningIcon,
-  Public as PublicIcon,
-  Search as SearchIcon,
-  ArrowUpward as ArrowUpIcon,
-  ArrowDownward as ArrowDownIcon,
-} from '@mui/icons-material';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import TrendIcon from '@mui/icons-material/TrendingUp';
+import QuoteIcon from '@mui/icons-material/FormatQuote';
+import StatsIcon from '@mui/icons-material/BarChart';
+import CaseStudyIcon from '@mui/icons-material/School';
+import IdeaIcon from '@mui/icons-material/Lightbulb';
+import OpenIcon from '@mui/icons-material/OpenInNew';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import WarningIcon from '@mui/icons-material/Warning';
+import PublicIcon from '@mui/icons-material/Public';
+import SearchIcon from '@mui/icons-material/Search';
+import ArrowUpIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownIcon from '@mui/icons-material/ArrowDownward';
 import {
   IntentDrivenResearchResponse,
   DELIVERABLE_DISPLAY,

@@ -10,20 +10,20 @@ import {
 } from "../../../services/linkedInImageService";
 import { aiApiClient } from "../../../api/client";
 
-jest.mock("../../../api/client", () => ({
+vi.mock("../../../api/client", () => ({
   aiApiClient: {
-    post: jest.fn(),
-    get: jest.fn(),
+    post: vi.fn(),
+    get: vi.fn(),
   },
 }));
 
-jest.mock("../../../utils/apiUrl", () => ({
+vi.mock("../../../utils/apiUrl", () => ({
   getApiBaseUrl: () => "http://localhost:8000",
 }));
 
 describe("linkedInImageService", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe("buildPromptFromSelection", () => {
@@ -90,15 +90,15 @@ describe("linkedInImageService", () => {
 
   describe("downloadLinkedInImageBlob", () => {
     it("triggers an anchor download for a blob URL", () => {
-      const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
-      const click = jest.fn();
-      const append = jest.spyOn(document.body, "appendChild").mockImplementation(
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const click = vi.fn();
+      const append = vi.spyOn(document.body, "appendChild").mockImplementation(
         (node) => node,
       );
-      const removeChild = jest
+      const removeChild = vi
         .spyOn(document.body, "removeChild")
         .mockImplementation((node) => node);
-      const createElementSpy = jest
+      const createElementSpy = vi
         .spyOn(document, "createElement")
         .mockImplementation((tag: string) => {
           if (tag === "a") {
@@ -128,7 +128,7 @@ describe("linkedInImageService", () => {
     });
 
     it("throws when blobUrl is missing", () => {
-      const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       expect(() => downloadLinkedInImageBlob("", "x.png")).toThrow(
         "missing blob URL",
       );
@@ -136,7 +136,7 @@ describe("linkedInImageService", () => {
     });
 
     it("throws when filename is blank", () => {
-      const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       expect(() =>
         downloadLinkedInImageBlob("blob:http://localhost/img", "   "),
       ).toThrow("missing filename");
@@ -146,7 +146,7 @@ describe("linkedInImageService", () => {
 
   describe("generateLinkedInImage", () => {
     it("sends model in POST body when provided", async () => {
-      jest.mocked(aiApiClient.post).mockResolvedValue({
+      vi.mocked(aiApiClient.post).mockResolvedValue({
         data: { success: true, image_id: "model-test-id" },
       });
 
@@ -168,7 +168,7 @@ describe("linkedInImageService", () => {
     });
 
     it("sends gemini-3-pro-image model in POST body", async () => {
-      jest.mocked(aiApiClient.post).mockResolvedValue({
+      vi.mocked(aiApiClient.post).mockResolvedValue({
         data: { success: true, image_id: "gemini-img-id" },
       });
 
@@ -193,11 +193,11 @@ describe("linkedInImageService", () => {
     });
 
     it("logs URL on success", async () => {
-      const consoleSpy = jest
+      const consoleSpy = vi
         .spyOn(console, "log")
         .mockImplementation(() => {});
 
-      jest.mocked(aiApiClient.post).mockResolvedValue({
+      vi.mocked(aiApiClient.post).mockResolvedValue({
         data: {
           success: true,
           image_id: "test-id-123",
@@ -228,7 +228,7 @@ describe("linkedInImageService", () => {
     });
 
     it("returns error when API reports failure", async () => {
-      jest.mocked(aiApiClient.post).mockResolvedValue({
+      vi.mocked(aiApiClient.post).mockResolvedValue({
         data: {
           success: false,
           error: "Provider unavailable",

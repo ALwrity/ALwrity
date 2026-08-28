@@ -1,12 +1,10 @@
 import React, { useCallback, useState, useEffect } from "react";
 import { Box, Stack, Typography, Alert, Paper, alpha, Button, CircularProgress, LinearProgress } from "@mui/material";
-import {
-  PlayArrow as PlayArrowIcon,
-  ArrowBack as ArrowBackIcon,
-  VideoLibrary as VideoLibraryIcon,
-  Download as DownloadIcon,
-  CheckCircle as CheckCircleIcon,
-} from "@mui/icons-material";
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
+import DownloadIcon from '@mui/icons-material/Download';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { Script, Knobs, Job } from "./types";
 import { SecondaryButton } from "./ui";
 import { SceneCard } from "./RenderQueue/SceneCard";

@@ -18,15 +18,13 @@ import {
   Alert,
   LinearProgress
 } from '@mui/material';
-import {
-  Help as HelpIcon,
-  Lightbulb as LightbulbIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  DataUsage as DataUsageIcon,
-  Close as CloseIcon
-} from '@mui/icons-material';
+import HelpIcon from '@mui/icons-material/Help';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
+import CloseIcon from '@mui/icons-material/Close';
 import { useStrategyBuilderStore } from '../../../../stores/strategyBuilderStore';
 
 interface EnhancedTooltipProps {

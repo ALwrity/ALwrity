@@ -4,18 +4,13 @@ import {
   Button, 
   Typography, 
   Alert, 
-  Container,
   Fade,
   Zoom,
   CircularProgress
 } from '@mui/material';
-import { 
-  Rocket,
-  Star,
-  CheckCircle,
-  // CreditCard,
-  // Warning
-} from '@mui/icons-material';
+import Rocket from '@mui/icons-material/Rocket';
+import Star from '@mui/icons-material/Star';
+import CheckCircle from '@mui/icons-material/CheckCircle';
 // import OnboardingButton from '../common/OnboardingButton';
 import { useNavigate } from 'react-router-dom';
 import { completeOnboarding, getOnboardingSummary, getWebsiteAnalysisData, getResearchPreferencesData, setCurrentStep } from '../../../api/onboarding';
@@ -471,7 +466,7 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
 
   return (
     <Fade in={true} timeout={500}>
-      <Container maxWidth="lg" sx={{ py: 2 }}>
+      <Box sx={{ width: '100%', py: { xs: 1.5, md: 2 }, px: 0 }}>
         {/* Loading State */}
         {dataLoading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
@@ -695,7 +690,7 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
             )}
           </React.Fragment>
         )}
-      </Container>
+      </Box>
     </Fade>
   );
 };

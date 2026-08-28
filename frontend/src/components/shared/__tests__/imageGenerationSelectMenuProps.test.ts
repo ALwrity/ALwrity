@@ -1,24 +1,9 @@
-import {
-  IMAGE_GENERATION_DIALOG_Z_INDEX,
-  IMAGE_GENERATION_SELECT_MENU_Z_INDEX,
-  imageGenerationSelectMenuProps,
-} from "../imageGenerationSelectMenuProps";
+import { imageGenerationSelectMenuProps } from "../imageGenerationSelectMenuProps";
 
 describe("imageGenerationSelectMenuProps", () => {
-  it("uses z-index above default MUI Popover/Dialog layers", () => {
-    expect(IMAGE_GENERATION_DIALOG_Z_INDEX).toBeGreaterThan(1300);
-    expect(IMAGE_GENERATION_SELECT_MENU_Z_INDEX).toBeGreaterThan(
-      IMAGE_GENERATION_DIALOG_Z_INDEX,
-    );
-  });
-
-  it("sets z-index on Menu and Popper roots, not only Paper", () => {
-    expect(imageGenerationSelectMenuProps.sx).toMatchObject({
-      zIndex: IMAGE_GENERATION_SELECT_MENU_Z_INDEX,
-    });
-    expect(imageGenerationSelectMenuProps.PopperProps?.sx).toMatchObject({
-      zIndex: IMAGE_GENERATION_SELECT_MENU_Z_INDEX,
-    });
+  it("does not hardcode Menu or Popper z-index (MUI modal manager)", () => {
+    expect(imageGenerationSelectMenuProps.sx).toBeUndefined();
+    expect(imageGenerationSelectMenuProps.PopperProps?.sx).toBeUndefined();
     expect(imageGenerationSelectMenuProps.PaperProps?.sx).toMatchObject({
       bgcolor: "#1e293b",
     });

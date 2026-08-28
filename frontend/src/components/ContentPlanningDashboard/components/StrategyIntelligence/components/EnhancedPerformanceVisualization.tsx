@@ -21,17 +21,15 @@ import {
   ListItemText,
   ListItemIcon
 } from '@mui/material';
-import {
-  Assessment as AssessmentIcon,
-  Refresh as RefreshIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon,
-  Analytics as AnalyticsIcon,
-  Lightbulb as LightbulbIcon,
-  Close as CloseIcon
-} from '@mui/icons-material';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import CloseIcon from '@mui/icons-material/Close';
 import { motion } from 'framer-motion';
 import { safeRenderText } from '../utils/defensiveRendering';
 

@@ -175,9 +175,18 @@ class SIFIndexingExecutor(TaskExecutor):
             # 1. Sync Step 2 Metadata (WebsiteAnalysis, CompetitorAnalysis)
             _log("Indexing site metadata...")
             metadata_synced = await sif_service.sync_onboarding_data_to_sif()
-            
+
             _update_phase("indexing_metadata", items_indexed=metadata_synced or 0)
             _log(f"Indexed {metadata_synced or 0} metadata item(s)")
+
+            # 1.5. Sync SEO Page Audits (per-page audit data for semantic search)
+            _log("Indexing SEO page audits...")
+            try:
+                seo_audit_synced = await sif_service.sync_seo_audit_to_sif()
+                _log(f"Indexed SEO page audits")
+            except Exception as e:
+                logger.warning(f"SEO audit sync failed (continuing): {e}")
+                _log(f"SEO audit sync skipped: {e}")
 
             # 2. Sync User Website Content (Deep Crawl / Snapshot)
             _log("Harvesting website pages...")

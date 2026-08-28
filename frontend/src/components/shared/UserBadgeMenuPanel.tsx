@@ -2,12 +2,10 @@ import React from 'react';
 import {
   Box, Typography, Tooltip, Chip, Divider, IconButton, CircularProgress,
 } from '@mui/material';
-import {
-  DeleteForever as DeleteForeverIcon,
-  ExpandMore as ExpandMoreIcon,
-  ChevronRight as ChevronRightIcon,
-  Refresh as RefreshIcon,
-} from '@mui/icons-material';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import SystemStatusIndicator from '../ContentPlanningDashboard/components/SystemStatusIndicator';
 import UsageDashboard from './UsageDashboard';
 import AlertsBadge from './AlertsBadge';

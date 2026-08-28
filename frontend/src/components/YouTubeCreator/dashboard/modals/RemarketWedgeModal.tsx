@@ -37,6 +37,9 @@ export const RemarketWedgeModal: React.FC<RemarketWedgeProps> = ({
       title="Remarket"
       intro={WEDGE_MODAL_INTROS.remarket}
       onClose={onClose}
+      maxWidth={1100}
+      titleSize="xl"
+      headerLayout="centeredRow"
     >
       <div className="yt-tool-tile-grid">
         <YouTubeToolTile

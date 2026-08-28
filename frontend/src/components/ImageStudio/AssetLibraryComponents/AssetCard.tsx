@@ -12,15 +12,13 @@ import {
   CircularProgress,
   Button,
 } from '@mui/material';
-import {
-  Download,
-  Share,
-  Delete,
-  Favorite,
-  FavoriteBorder,
-  TextFields,
-  ExpandLess,
-} from '@mui/icons-material';
+import Download from '@mui/icons-material/Download';
+import Share from '@mui/icons-material/Share';
+import Delete from '@mui/icons-material/Delete';
+import Favorite from '@mui/icons-material/Favorite';
+import FavoriteBorder from '@mui/icons-material/FavoriteBorder';
+import TextFields from '@mui/icons-material/TextFields';
+import ExpandLess from '@mui/icons-material/ExpandLess';
 import { ContentAsset } from '../../../hooks/useContentAssets';
 import { getStatusChip, formatDate, getAssetIcon } from './utils';
 

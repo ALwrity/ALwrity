@@ -14,19 +14,17 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
     "jsxImportSource": "react",
-    "incremental": true,
-    "tsBuildInfoFile": ".tsbuildinfo",
     "typeRoots": [
       "./node_modules/@types",
       "./src/types"
     ],
-    "types": ["node", "jest", "vite/client"]
+    "types": ["node"]
   },
   "include": [
     "src"

@@ -15,14 +15,12 @@ import {
   Alert,
   AlertTitle
 } from '@mui/material';
-import {
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-  Timeline as TimelineIcon,
-  CalendarToday as CalendarIcon,
-  Refresh as RefreshIcon,
-  AutoAwesome as AutoAwesomeIcon
-} from '@mui/icons-material';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import CalendarIcon from '@mui/icons-material/CalendarToday';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { motion } from 'framer-motion';
 import { strategyMonitoringApi } from '../../../../../services/strategyMonitoringApi';
 

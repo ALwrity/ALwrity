@@ -14,9 +14,7 @@ import {
   Chip,
   Tooltip
 } from '@mui/material';
-import {
-  BarChart
-} from '@mui/icons-material';
+import BarChart from '@mui/icons-material/BarChart';
 
 interface StructureAnalysisProps {
   detailedAnalysis?: {

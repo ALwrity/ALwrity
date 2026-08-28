@@ -4,10 +4,8 @@ import {
   Button,
   Tooltip as MuiTooltip
 } from '@mui/material';
-import {
-  AutoAwesome as AutoAwesomeIcon,
-  Save as SaveIcon
-} from '@mui/icons-material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import SaveIcon from '@mui/icons-material/Save';
 import { useUser } from '@clerk/clerk-react';
 import { ActionButtonsProps, ActionButtonsBusinessLogicProps } from '../types/contentStrategy.types';
 import { useContentPlanningStore } from '../../../../../stores/contentPlanningStore';

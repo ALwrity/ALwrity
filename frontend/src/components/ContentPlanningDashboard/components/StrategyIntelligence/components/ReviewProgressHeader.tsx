@@ -11,14 +11,12 @@ import {
   Button,
   CircularProgress
 } from '@mui/material';
-import {
-  Refresh as RefreshIcon,
-  CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  Warning as WarningIcon,
-  PlayArrow as PlayArrowIcon,
-  AutoAwesome as AutoAwesomeIcon
-} from '@mui/icons-material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import WarningIcon from '@mui/icons-material/Warning';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { motion } from 'framer-motion';
 import { useStrategyReviewStore, StrategyComponent } from '../../../../../stores/strategyReviewStore';
 import { ANALYSIS_CARD_STYLES } from '../styles';

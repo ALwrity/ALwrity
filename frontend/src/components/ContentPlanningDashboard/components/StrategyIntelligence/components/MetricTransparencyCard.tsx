@@ -17,22 +17,20 @@ import {
   Alert,
   AlertTitle
 } from '@mui/material';
-import {
-  Info as InfoIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Schedule as ScheduleIcon,
-  Assessment as AssessmentIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  TrendingUp as TrendingUpIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon,
-  DataUsage as DataUsageIcon,
-  Psychology as PsychologyIcon,
-  Timeline as TimelineIcon,
-  Refresh as RefreshIcon
-} from '@mui/icons-material';
+import InfoIcon from '@mui/icons-material/Info';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { motion } from 'framer-motion';
 import { safeRenderText, safeRenderArray, hasValidData, getFallbackValue } from '../utils/defensiveRendering';
 

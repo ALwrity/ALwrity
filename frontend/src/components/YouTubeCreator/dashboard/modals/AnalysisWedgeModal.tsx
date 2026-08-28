@@ -20,6 +20,9 @@ export const AnalysisWedgeModal: React.FC<AnalysisWedgeProps> = ({
     title="Analysis"
     intro={WEDGE_MODAL_INTROS.analysis}
     onClose={onClose}
+    maxWidth={1100}
+    titleSize="xl"
+    headerLayout="centeredRow"
   >
     <div className="yt-tool-tile-grid">
       <YouTubeToolTile

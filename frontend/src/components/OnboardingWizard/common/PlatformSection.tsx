@@ -9,13 +9,11 @@ import {
   Chip,
   Button
 } from '@mui/material';
-import {
-  CheckCircle as CheckIcon,
-  Error as ErrorIcon,
-  Info as InfoIcon,
-  Launch as LaunchIcon,
-  Schedule as ScheduleIcon
-} from '@mui/icons-material';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import InfoIcon from '@mui/icons-material/Info';
+import LaunchIcon from '@mui/icons-material/Launch';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 import PlatformCard from './PlatformCard';
 import GSCPlatformCard from './GSCPlatformCard';
 import WordPressOAuthPlatformCard from './WordPressOAuthPlatformCard';

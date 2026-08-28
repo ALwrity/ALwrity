@@ -4,6 +4,12 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
 
+from services.youtube.planner_research_compact import (
+    PROMPT_SOURCE_LIMIT,
+    build_compact_research_prompt_block,
+    format_youtube_research_sources_for_ui,
+    select_top_youtube_research_sources,
+)
 from utils.logger_utils import get_service_logger
 
 logger = get_service_logger("youtube.planner_research")
@@ -14,13 +20,16 @@ async def perform_exa_research(
     video_type: Optional[str],
     target_audience: str,
     user_id: str,
+    language: Optional[str] = None,
 ) -> tuple[str, List[Dict[str, Any]]]:
     """
     Perform Exa research directly using ExaResearchProvider (common module).
     Uses the same pattern as podcast research with proper subscription checks.
 
-    Returns:
-        Tuple of (research_context_string, research_sources_list)
+        Returns:
+        Tuple of (compact research prompt block, research_sources_list with URLs).
+        Exa queries stay English-only (no content-language label). `language` is
+        logged for debugging; pitch/expand still use it for LLM output elsewhere.
     """
     try:
         # Pre-flight validation for Exa search only (not full blog writer workflow)
@@ -83,7 +92,7 @@ async def perform_exa_research(
         from services.blog_writer.research.exa_provider import ExaResearchProvider
         from types import SimpleNamespace
 
-        # Build research query
+        # Build research query (English-only: do not append content-language labels)
         query_parts = [user_idea]
         if video_type:
             query_parts.append(f"{video_type} video")
@@ -91,15 +100,23 @@ async def perform_exa_research(
             query_parts.append(target_audience)
 
         research_query = " ".join(query_parts)
+        logger.info(
+            "[YouTubePlanner] Exa research query idea_len={} video_type={} requested_language={} english_only=True",
+            len((user_idea or "").strip()),
+            video_type or "",
+            language or "",
+        )
 
-        # Configure Exa research (same pattern as podcast)
         cfg = SimpleNamespace(
             exa_search_type="neural",
-            exa_category="web",  # Focus on web content for YouTube
+            exa_category="web",
             exa_include_domains=[],
             exa_exclude_domains=[],
-            max_sources=10,  # Limit sources for cost efficiency
+            max_sources=10,
             source_types=[],
+            exa_highlights=True,
+            exa_highlights_num_sentences=2,
+            exa_highlights_per_url=2,
         )
 
         # Perform research
@@ -121,49 +138,27 @@ async def perform_exa_research(
 
         # Extract sources and content
         sources = result.get("sources", []) or []
-        research_content = result.get("content", "")
+        try:
+            formatted_sources = format_youtube_research_sources_for_ui(sources)
+            selected = select_top_youtube_research_sources(
+                sources,
+                user_idea,
+                limit=PROMPT_SOURCE_LIMIT,
+            )
+            research_context = build_compact_research_prompt_block(selected)
+        except Exception:
+            logger.exception(
+                "[YouTubePlanner] Compact research block failed; continuing without prompt facts"
+            )
+            formatted_sources = format_youtube_research_sources_for_ui(sources)
+            research_context = ""
 
-        # Build research context for prompt
-        research_context = ""
-        if research_content and sources:
-            # Limit content to 2000 chars to avoid token bloat
-            limited_content = research_content[:2000]
-            research_context = f"""
-**Research & Current Information:**
-Based on current web research, here are relevant insights and trends:
-
-{limited_content}
-
-**Key Research Sources ({len(sources)} sources):**
-"""
-            # Add top 5 sources for context
-            for idx, source in enumerate(sources[:5], 1):
-                title = source.get("title", "Untitled") or "Untitled"
-                url = source.get("url", "") or ""
-                excerpt = (source.get("excerpt", "") or "")[:200]
-                if not excerpt:
-                    excerpt = (source.get("summary", "") or "")[:200]
-                research_context += f"\n{idx}. {title}\n   {excerpt}\n   Source: {url}\n"
-
-            research_context += "\n**Use this research to:**\n"
-            research_context += "- Identify current trends and popular angles\n"
-            research_context += "- Enhance SEO keywords with real search data\n"
-            research_context += "- Ensure content is relevant and up-to-date\n"
-            research_context += "- Reference credible sources in the plan\n"
-            research_context += "- Identify gaps or unique angles not covered by competitors\n"
-
-        # Format sources for response
-        formatted_sources = []
-        for source in sources:
-            formatted_sources.append({
-                "title": source.get("title", "") or "",
-                "url": source.get("url", "") or "",
-                "excerpt": (source.get("excerpt", "") or "")[:300],
-                "published_at": source.get("published_at"),
-                "credibility_score": source.get("credibility_score", 0.85) or 0.85,
-            })
-
-        logger.info(f"[YouTubePlanner] Exa research completed: {len(formatted_sources)} sources found")
+        logger.info(
+            "[YouTubePlanner] Exa research completed source_count={} compact_block_len={} highlights={}",
+            len(formatted_sources),
+            len(research_context),
+            bool(getattr(cfg, "exa_highlights", False)),
+        )
         return research_context, formatted_sources
 
     except HTTPException:

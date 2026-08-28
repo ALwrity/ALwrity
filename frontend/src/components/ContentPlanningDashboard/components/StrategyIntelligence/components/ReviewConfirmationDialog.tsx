@@ -15,15 +15,13 @@ import {
   ListItemText,
   CircularProgress
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Lightbulb as LightbulbIcon,
-  TrendingUp as TrendingUpIcon,
-  ShowChart as ShowChartIcon,
-  Timeline as TimelineIcon,
-  Warning as WarningIcon,
-  Close as CloseIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import WarningIcon from '@mui/icons-material/Warning';
+import CloseIcon from '@mui/icons-material/Close';
 import { motion } from 'framer-motion';
 import { ANALYSIS_CARD_STYLES } from '../styles';
 import { safeRenderText, safeRenderArray, hasValidData, getFallbackValue } from '../utils/defensiveRendering';

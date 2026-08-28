@@ -1,6 +1,7 @@
 import React from 'react';
 import { Dialog, DialogContent, IconButton, Typography, Box, Tooltip } from '@mui/material';
-import { Close as CloseIcon, Print as PrintIcon } from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import PrintIcon from '@mui/icons-material/Print';
 
 interface BlogPreviewModalProps {
   isOpen: boolean;

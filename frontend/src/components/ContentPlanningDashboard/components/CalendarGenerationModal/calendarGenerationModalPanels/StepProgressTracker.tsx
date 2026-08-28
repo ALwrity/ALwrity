@@ -20,30 +20,28 @@ import {
   Badge,
   CircularProgress
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Warning as WarningIcon,
-  Info as InfoIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  TrendingUp as TrendingUpIcon,
-  Schedule as ScheduleIcon,
-  Speed as SpeedIcon,
-  DataUsage as DataUsageIcon,
-  Lightbulb as LightbulbIcon,
-  Recommend as RecommendIcon,
-  Timeline as TimelineIcon,
-  Assessment as AssessmentIcon,
-  Security as SecurityIcon,
-  Build as BuildIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  PlayArrow as PlayArrowIcon,
-  Pause as PauseIcon,
-  Stop as StopIcon,
-  Refresh as RefreshIcon,
-  SkipNext as SkipNextIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import WarningIcon from '@mui/icons-material/Warning';
+import InfoIcon from '@mui/icons-material/Info';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import SpeedIcon from '@mui/icons-material/Speed';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import RecommendIcon from '@mui/icons-material/Recommend';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import SecurityIcon from '@mui/icons-material/Security';
+import BuildIcon from '@mui/icons-material/Build';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
+import StopIcon from '@mui/icons-material/Stop';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import SkipNextIcon from '@mui/icons-material/SkipNext';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Import enhanced types and STEP_INFO from the updated polling hook

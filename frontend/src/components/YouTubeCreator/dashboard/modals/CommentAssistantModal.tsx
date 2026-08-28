@@ -92,6 +92,8 @@ export const CommentAssistantModal: React.FC<
       maxWidth={shell?.maxWidth ?? YOUTUBE_WEDGE_MODAL_MAX_WIDTH}
       onBack={shell?.onBack}
       backLabel={shell?.backLabel}
+      titleSize={shell?.titleSize}
+      headerLayout={shell?.headerLayout}
     >
       {loading && <p className="yt-modal-intro">Loading inbox…</p>}
       {error && <p className="yt-modal-intro">{error}</p>}

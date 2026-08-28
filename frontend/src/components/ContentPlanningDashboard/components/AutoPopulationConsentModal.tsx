@@ -18,15 +18,13 @@ import {
   IconButton,
   Grid
 } from '@mui/material';
-import {
-  Close as CloseIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  CheckCircle as CheckCircleIcon,
-  Speed as SpeedIcon,
-  Insights as InsightsIcon,
-  Security as SecurityIcon,
-  Refresh as RefreshIcon
-} from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import SpeedIcon from '@mui/icons-material/Speed';
+import InsightsIcon from '@mui/icons-material/Insights';
+import SecurityIcon from '@mui/icons-material/Security';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 interface AutoPopulationConsentModalProps {
   open: boolean;

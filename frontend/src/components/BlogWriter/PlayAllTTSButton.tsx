@@ -1,6 +1,9 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { IconButton, Tooltip, Box, Typography, LinearProgress } from '@mui/material';
-import { PlayArrow, Pause, Stop, VolumeUp } from '@mui/icons-material';
+import PlayArrow from '@mui/icons-material/PlayArrow';
+import Pause from '@mui/icons-material/Pause';
+import Stop from '@mui/icons-material/Stop';
+import VolumeUp from '@mui/icons-material/VolumeUp';
 import { useTextToSpeech } from '../../hooks/useTextToSpeech';
 
 interface PlayAllTTSButtonProps {

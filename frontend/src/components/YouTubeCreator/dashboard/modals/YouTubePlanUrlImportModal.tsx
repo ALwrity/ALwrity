@@ -73,8 +73,10 @@ export const YouTubePlanUrlImportModal: React.FC<YouTubePlanUrlImportModalProps>
       title="Blog / URL → Video"
       onClose={onClose}
       onBack={shell.onBack}
-      backLabel={YOUTUBE_WEDGE_BACK_LABELS.plan}
+      backLabel={shell.backLabel}
       maxWidth={shell.maxWidth}
+      titleSize={shell.titleSize}
+      headerLayout={shell.headerLayout}
       cardClassName="yt-plan-url-import-modal"
     >
       {actionError ? (

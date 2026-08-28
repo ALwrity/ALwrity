@@ -18,17 +18,15 @@ import {
   DialogActions,
   TextField,
 } from "@mui/material";
-import {
-  Mic as MicIcon,
-  PlayArrow as PlayArrowIcon,
-  Delete as DeleteIcon,
-  Edit as EditIcon,
-  Star as StarIcon,
-  StarBorder as StarBorderIcon,
-  Refresh as RefreshIcon,
-  Search as SearchIcon,
-  ArrowBack as ArrowBackIcon,
-} from "@mui/icons-material";
+import MicIcon from '@mui/icons-material/Mic';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import StarIcon from '@mui/icons-material/Star';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import SearchIcon from '@mui/icons-material/Search';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { podcastApi } from "../../services/podcastApi";
 import { GlassyCard, glassyCardSx, PrimaryButton, SecondaryButton } from "./ui";
 

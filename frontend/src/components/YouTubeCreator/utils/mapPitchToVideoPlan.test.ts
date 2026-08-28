@@ -88,18 +88,34 @@ describe("mapPitchToVideoPlan", () => {
         section: "The three-item rule",
         description: "Choose one outfit, one layer, one tool.",
         duration_estimate: 40,
+        visual: "Lay clothes on a bed",
       },
       {
         section: "Wear the bulky piece",
         description: "Put the jacket on, not in the bag.",
         duration_estimate: 50,
+        visual: "Put on a jacket",
       },
     ]);
+    expect(plan.outro).toBe("You packed less and still had everything.");
     expect(plan.call_to_action).toBe("Try it on your next weekend trip.");
     expect(plan.key_message).toBe("Pack less, enjoy more.");
     expect(plan.seo_keywords).toEqual(["packing", "travel"]);
     expect(plan.duration_type).toBe("medium");
     expect(plan.generation?.json_schema_applied).toBe(true);
+  });
+
+  it("threads form language onto VideoPlan for scene-builder fallback", () => {
+    const plan = mapPitchToVideoPlan({
+      pitch,
+      expansion,
+      form: {
+        duration_type: "shorts",
+        language: "hi",
+      },
+    });
+
+    expect(plan.language).toBe("hi");
   });
 
   it("uses form fields for echoed Step-1 metadata instead of inventing them", () => {

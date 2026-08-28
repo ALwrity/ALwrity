@@ -15,15 +15,13 @@ import {
   InputLabel,
   SelectChangeEvent
 } from '@mui/material';
-import {
-  TrendingUp,
-  Warning,
-  CheckCircle,
-  Refresh,
-  MoreVert,
-  Dashboard,
-  CalendarMonth
-} from '@mui/icons-material';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import Warning from '@mui/icons-material/Warning';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Refresh from '@mui/icons-material/Refresh';
+import MoreVert from '@mui/icons-material/MoreVert';
+import Dashboard from '@mui/icons-material/Dashboard';
+import CalendarMonth from '@mui/icons-material/CalendarMonth';
 import { useUser } from '@clerk/clerk-react';
 import { apiClient } from '../../api/client';
 import { useSubscription } from '../../contexts/SubscriptionContext';

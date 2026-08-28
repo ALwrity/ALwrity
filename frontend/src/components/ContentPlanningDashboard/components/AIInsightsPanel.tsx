@@ -14,15 +14,13 @@ import {
   Alert,
   CircularProgress
 } from '@mui/material';
-import {
-  Lightbulb as LightbulbIcon,
-  Refresh as RefreshIcon,
-  ExpandMore as ExpandMoreIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  TrendingUp as TrendingUpIcon,
-  Assessment as AssessmentIcon
-} from '@mui/icons-material';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useContentPlanningStore } from '../../../stores/contentPlanningStore';
 import { contentPlanningApi } from '../../../services/contentPlanningApi';

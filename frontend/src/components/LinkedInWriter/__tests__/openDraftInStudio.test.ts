@@ -5,8 +5,8 @@ import {
 } from "../utils/openDraftInStudio";
 import type { LinkedInDraftAsset } from "../utils/linkedInDraftLibraryUtils";
 
-jest.mock("../utils/linkedInDraftContentTypeStorage", () => ({
-  dispatchLinkedInDraftUpdate: jest.fn(),
+vi.mock("../utils/linkedInDraftContentTypeStorage", () => ({
+  dispatchLinkedInDraftUpdate: vi.fn(),
 }));
 
 const articleAsset: LinkedInDraftAsset = {
@@ -26,11 +26,11 @@ const articleAsset: LinkedInDraftAsset = {
 
 describe("openDraftInStudio", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it("dispatches content and contentType for asset drafts", () => {
-    openDraftAssetInStudio(articleAsset, jest.fn());
+    openDraftAssetInStudio(articleAsset, vi.fn());
 
     expect(dispatchLinkedInDraftUpdate).toHaveBeenCalledWith(
       expect.stringContaining("Long article body"),

@@ -11,7 +11,15 @@ export const CreateWedgeModal: React.FC<CreateWedgeProps> = ({
   onOpenSeo,
   onOpenThumb,
 }) => (
-  <YouTubeActionModal open={open} title="Create" intro={WEDGE_MODAL_INTROS.create} onClose={onClose}>
+  <YouTubeActionModal
+    open={open}
+    title="Create"
+    intro={WEDGE_MODAL_INTROS.create}
+    onClose={onClose}
+    maxWidth={1100}
+    titleSize="xl"
+    headerLayout="centeredRow"
+  >
     <div className="yt-tool-tile-grid">
       <YouTubeToolTile
         icon="🎥"

@@ -18,13 +18,11 @@ import {
   Tooltip
 } from '@mui/material';
 import { longRunningApiClient } from '../../api/client';
-import {
-  ExpandMore as ExpandMoreIcon,
-  ContentCopy as CopyIcon,
-  CheckCircle as CheckIcon,
-  Error as ErrorIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CopyIcon from '@mui/icons-material/ContentCopy';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import InfoIcon from '@mui/icons-material/Info';
 import { useOnboardingStyles } from './common/useOnboardingStyles';
 
 interface StyleDetectionStepProps {

@@ -18,7 +18,7 @@ class WebCrawlerLogic:
     
     def __init__(self):
         """Initialize the Web Crawler Logic service."""
-        logger.info("[WebCrawlerLogic.__init__] Initializing web crawler service")
+        logger.debug("[WebCrawlerLogic.__init__] Initializing web crawler service")
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
@@ -118,18 +118,36 @@ class WebCrawlerLogic:
             
             # Fetch content via Exa + aiohttp in parallel
             async def _fetch_html():
-                try:
-                    async with aiohttp.ClientSession(headers=self.headers, timeout=aiohttp.ClientTimeout(total=self.timeout)) as session:
-                        async with session.get(fixed_url) as response:
-                            if response.status == 200:
-                                html = await response.text()
-                                logger.debug("[WebCrawlerLogic.crawl_website] Successfully fetched HTML content")
-                                return {"html": html, "status": response.status}
-                            logger.error(f"[WebCrawlerLogic.crawl_website] Fetch HTTP status {response.status}")
-                            return {"html": None, "status": response.status}
-                except Exception as fetch_err:
-                    logger.error(f"[WebCrawlerLogic.crawl_website] Fetch failed: {str(fetch_err)}")
-                    return {"html": None, "status": None}
+                max_retries = 3
+                base_delay = 2.0
+                
+                for attempt in range(max_retries):
+                    try:
+                        async with aiohttp.ClientSession(headers=self.headers, timeout=aiohttp.ClientTimeout(total=self.timeout)) as session:
+                            async with session.get(fixed_url) as response:
+                                if response.status == 200:
+                                    html = await response.text()
+                                    logger.debug("[WebCrawlerLogic.crawl_website] Successfully fetched HTML content")
+                                    return {"html": html, "status": response.status}
+                                elif response.status == 429 and attempt < max_retries - 1:
+                                    # Rate limited - exponential backoff
+                                    delay = base_delay * (2 ** attempt)
+                                    logger.warning(f"[WebCrawlerLogic.crawl_website] HTTP 429, retrying in {delay}s (attempt {attempt + 1}/{max_retries})")
+                                    await asyncio.sleep(delay)
+                                    continue
+                                else:
+                                    logger.error(f"[WebCrawlerLogic.crawl_website] Fetch HTTP status {response.status}")
+                                    return {"html": None, "status": response.status}
+                    except Exception as fetch_err:
+                        if attempt < max_retries - 1:
+                            delay = base_delay * (2 ** attempt)
+                            logger.warning(f"[WebCrawlerLogic.crawl_website] Fetch error: {fetch_err}, retrying in {delay}s")
+                            await asyncio.sleep(delay)
+                            continue
+                        logger.error(f"[WebCrawlerLogic.crawl_website] Fetch failed: {str(fetch_err)}")
+                        return {"html": None, "status": None}
+                
+                return {"html": None, "status": None}
 
             exa_result, html_result = await asyncio.gather(
                 self._extract_content_via_exa(fixed_url) if use_exa else self._empty_exa_result(),

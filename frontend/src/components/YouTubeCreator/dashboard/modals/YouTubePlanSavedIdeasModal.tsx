@@ -153,8 +153,10 @@ export const YouTubePlanSavedIdeasModal: React.FC<YouTubePlanSavedIdeasModalProp
       title="Saved Ideas"
       onClose={onClose}
       onBack={shell.onBack}
-      backLabel={YOUTUBE_WEDGE_BACK_LABELS.plan}
+      backLabel={shell.backLabel}
       maxWidth={shell.maxWidth}
+      titleSize={shell.titleSize}
+      headerLayout={shell.headerLayout}
       cardClassName="yt-plan-saved-ideas-modal"
     >
       <p className="yt-plan-saved-ideas-modal__intro">

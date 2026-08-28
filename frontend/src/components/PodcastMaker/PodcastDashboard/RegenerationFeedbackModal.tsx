@@ -13,14 +13,12 @@ import {
   alpha,
   IconButton
 } from '@mui/material';
-import {
-  Psychology as PsychologyIcon,
-  Close as CloseIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  RecordVoiceOver as VoiceIcon,
-  Groups as AudienceIcon,
-  FormatListBulleted as OutlineIcon
-} from '@mui/icons-material';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import CloseIcon from '@mui/icons-material/Close';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import VoiceIcon from '@mui/icons-material/RecordVoiceOver';
+import AudienceIcon from '@mui/icons-material/Groups';
+import OutlineIcon from '@mui/icons-material/FormatListBulleted';
 
 interface RegenerationFeedbackModalProps {
   open: boolean;

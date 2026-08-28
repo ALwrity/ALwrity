@@ -57,7 +57,7 @@ class ResearchDataFilter:
             r'^https?://(www\.)?(wikipedia)\.org',  # Wikipedia (too generic)
         ]
         
-        logger.info("✅ ResearchDataFilter initialized with quality thresholds")
+        logger.debug("✅ ResearchDataFilter initialized with quality thresholds")
     
     def filter_research_data(self, research_data: BlogResearchResponse) -> BlogResearchResponse:
         """

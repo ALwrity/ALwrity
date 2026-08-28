@@ -1,17 +1,17 @@
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { PlanUrlImportBar } from "./PlanUrlImportBar";
 import { buildIdeaFromExtraction, extractApiError } from "./planUrlImportUtils";
 import { podcastApi } from "../../../services/podcastApi";
 
-jest.mock("../../../services/podcastApi", () => ({
+vi.mock("../../../services/podcastApi", () => ({
   podcastApi: {
-    extractUrl: jest.fn(),
+    extractUrl: vi.fn(),
   },
 }));
 
-jest.mock("../../PodcastMaker/CreateStep/WebsitePreviewModal", () => {
+vi.mock("../../PodcastMaker/CreateStep/WebsitePreviewModal", () => {
   const React = require("react");
   return {
     WebsitePreviewModal: (props: {
@@ -40,7 +40,7 @@ jest.mock("../../PodcastMaker/CreateStep/WebsitePreviewModal", () => {
   };
 });
 
-const mockedExtractUrl = jest.mocked(podcastApi.extractUrl);
+const mockedExtractUrl = vi.mocked(podcastApi.extractUrl);
 
 describe("PlanUrlImportBar helpers", () => {
   it("buildIdeaFromExtraction prefers title and summary", () => {
@@ -59,11 +59,11 @@ describe("PlanUrlImportBar helpers", () => {
 });
 
 describe("PlanUrlImportBar", () => {
-  const onIdeaChange = jest.fn();
-  const onSourceArticleChange = jest.fn();
+  const onIdeaChange = vi.fn();
+  const onSourceArticleChange = vi.fn();
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it("does not call extract when the URL is empty", () => {
@@ -349,9 +349,9 @@ describe("PlanUrlImportBar", () => {
         },
       ],
     });
-    const onInlineSave = jest.fn();
-    const onInlineBrainstorm = jest.fn();
-    const onInlineUse = jest.fn();
+    const onInlineSave = vi.fn();
+    const onInlineBrainstorm = vi.fn();
+    const onInlineUse = vi.fn();
 
     render(
       <PlanUrlImportBar

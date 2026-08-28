@@ -23,23 +23,21 @@ import {
   TableRow,
   Checkbox,
 } from '@mui/material';
-import {
-  Search,
-  GridView,
-  ViewList,
-  Favorite,
-  Download,
-  Delete,
-  Image as ImageIcon,
-  Collections,
-  History,
-  Star,
-  Refresh,
-  Warning,
-  ArrowBack,
-  Add,
-  InfoOutlined,
-} from '@mui/icons-material';
+import Search from '@mui/icons-material/Search';
+import GridView from '@mui/icons-material/GridView';
+import ViewList from '@mui/icons-material/ViewList';
+import Favorite from '@mui/icons-material/Favorite';
+import Download from '@mui/icons-material/Download';
+import Delete from '@mui/icons-material/Delete';
+import ImageIcon from '@mui/icons-material/Image';
+import Collections from '@mui/icons-material/Collections';
+import History from '@mui/icons-material/History';
+import Star from '@mui/icons-material/Star';
+import Refresh from '@mui/icons-material/Refresh';
+import Warning from '@mui/icons-material/Warning';
+import ArrowBack from '@mui/icons-material/ArrowBack';
+import Add from '@mui/icons-material/Add';
+import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import { Tooltip } from '@mui/material';
 import { ImageStudioLayout } from './ImageStudioLayout';
 import { DashboardHeaderProps } from '../shared/types';

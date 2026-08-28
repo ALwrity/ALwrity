@@ -5,15 +5,13 @@
 
 import React from 'react';
 import { Grid, Typography, Box } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Schedule as ScheduleIcon,
-  PlayArrow as PlayArrowIcon,
-  Pause as PauseIcon,
-  TrendingUp as TrendingUpIcon,
-  AccessTime as AccessTimeIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { SchedulerStats } from '../../api/schedulerDashboard';
 import { TerminalCard, TerminalCardContent, TerminalTypography, TerminalChip, TerminalChipSuccess, TerminalChipError, terminalColors } from './terminalTheme';
 

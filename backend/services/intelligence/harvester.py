@@ -79,15 +79,15 @@ class SemanticHarvesterService:
             crawler = WebCrawlerLogic()
 
             # Rate-limit-friendly crawling: a small pause between requests,
-            # plus a single retry when the site returns HTTP 429.
+            # plus exponential backoff retries when the site returns HTTP 429.
             try:
                 crawl_delay = float(os.getenv("SIF_CRAWL_DELAY_MS", "1500")) / 1000.0
             except (TypeError, ValueError):
                 crawl_delay = 1.5
             try:
-                max_retries = int(os.getenv("SIF_CRAWL_MAX_RETRIES", "1"))
+                max_retries = int(os.getenv("SIF_CRAWL_MAX_RETRIES", "3"))
             except (TypeError, ValueError):
-                max_retries = 1
+                max_retries = 3
             if max_retries < 0:
                 max_retries = 0
 
@@ -107,10 +107,10 @@ class SemanticHarvesterService:
                     if crawl_result and crawl_result.get("success"):
                         break
 
-                    # Retry only on rate limiting (HTTP 429)
+                    # Retry only on rate limiting (HTTP 429) with exponential backoff
                     if crawl_result and crawl_result.get("http_status") == 429 and attempt < max_retries:
-                        backoff = 2.0 * (attempt + 1)
-                        logger.warning(f"[SemanticHarvester] Rate limited (429) for {url}; retrying in {backoff}s")
+                        backoff = 2.0 ** attempt  # Exponential: 1s, 2s, 4s, 8s...
+                        logger.warning(f"[SemanticHarvester] Rate limited (429) for {url}; retrying in {backoff}s (attempt {attempt + 1}/{max_retries})")
                         await _emit(f"Rate limited (429) — retrying {url} in {backoff}s")
                         await asyncio.sleep(backoff)
                         continue

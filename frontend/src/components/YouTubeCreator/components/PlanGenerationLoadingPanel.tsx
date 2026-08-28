@@ -1,5 +1,5 @@
 /**
- * Status bar while Generate Video Plan is in flight.
+ * Status bar while pitch or script expansion is in flight.
  * Reuses brainstorm/podcast rotating-step UX. Progress is typical-step, not live backend %.
  */
 
@@ -23,7 +23,7 @@ export const PlanGenerationLoadingPanel: React.FC<PlanGenerationLoadingPanelProp
 
   useEffect(() => {
     setLoaderMessageIndex(0);
-    console.info("[PlanGenerationLoadingPanel] Plan generation status started", {
+    console.info("[PlanGenerationLoadingPanel] Pitch generation status started", {
       enableResearch,
       stepCount: messages.length,
     });
@@ -32,7 +32,7 @@ export const PlanGenerationLoadingPanel: React.FC<PlanGenerationLoadingPanelProp
     }, PLAN_GENERATION_LOADER_INTERVAL_MS);
     return () => {
       window.clearInterval(intervalId);
-      console.info("[PlanGenerationLoadingPanel] Plan generation status stopped");
+      console.info("[PlanGenerationLoadingPanel] Pitch generation status stopped");
     };
   }, [enableResearch, messages.length]);
 
@@ -42,7 +42,7 @@ export const PlanGenerationLoadingPanel: React.FC<PlanGenerationLoadingPanelProp
 
   return (
     <PlanStatusProgressPanel
-      title="Generating video plan"
+      title="Generating pitch"
       message={message}
       progress={progress}
       steps={steps}

@@ -8,12 +8,10 @@ import {
   CircularProgress,
   Backdrop,
 } from '@mui/material';
-import {
-  InfoOutlined,
-  Psychology as PsychologyIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Assessment as AssessmentIcon,
-} from '@mui/icons-material';
+import InfoOutlined from '@mui/icons-material/InfoOutlined';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import { 
   getPersonalizationConfigurationOptions,
 } from '../../api/componentLogic';

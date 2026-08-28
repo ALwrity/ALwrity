@@ -23,27 +23,25 @@ import {
   useTheme,
   Collapse,
 } from "@mui/material";
-import {
-  Info as InfoIcon,
-  Refresh as RefreshIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  CheckCircle as CheckCircleIcon,
-  Analytics as AnalyticsIcon,
-  Title as TitleIcon,
-  ListAlt as ListAltIcon,
-  Psychology as PsychologyIcon,
-  RecordVoiceOver as RecordVoiceOverIcon,
-  Search as SearchIcon,
-  Edit as EditIcon,
-  VideoCameraFront as VideoIcon,
-  TrendingUp as TrendingUpIcon,
-  Headphones as HeadphonesIcon,
-  Article as ArticleIcon,
-  Campaign as CampaignIcon,
-  Groups as GroupsIcon,
-  School as SchoolIcon,
-  Error as ErrorIcon,
-} from "@mui/icons-material";
+import InfoIcon from '@mui/icons-material/Info';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import TitleIcon from '@mui/icons-material/Title';
+import ListAltIcon from '@mui/icons-material/ListAlt';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
+import SearchIcon from '@mui/icons-material/Search';
+import EditIcon from '@mui/icons-material/Edit';
+import VideoIcon from '@mui/icons-material/VideoCameraFront';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import HeadphonesIcon from '@mui/icons-material/Headphones';
+import ArticleIcon from '@mui/icons-material/Article';
+import CampaignIcon from '@mui/icons-material/Campaign';
+import GroupsIcon from '@mui/icons-material/Groups';
+import SchoolIcon from '@mui/icons-material/School';
+import ErrorIcon from '@mui/icons-material/Error';
 import { PrimaryButton, SecondaryButton } from "../ui";
 
 interface CreateActionsProps {

@@ -11,16 +11,16 @@ const emptyCreatorState = {
 
 describe("CreateWedgeModal — shared goCreate → Full Creator modal", () => {
   it("New Video (Full) calls goCreate with medium duration", () => {
-    const goCreate = jest.fn();
+    const goCreate = vi.fn();
 
     render(
       <CreateWedgeModal
         open
-        onClose={jest.fn()}
+        onClose={vi.fn()}
         goCreate={goCreate}
         creatorState={emptyCreatorState}
-        onOpenSeo={jest.fn()}
-        onOpenThumb={jest.fn()}
+        onOpenSeo={vi.fn()}
+        onOpenThumb={vi.fn()}
       />,
     );
 
@@ -29,16 +29,16 @@ describe("CreateWedgeModal — shared goCreate → Full Creator modal", () => {
   });
 
   it("Shorts Fast Path calls goCreate with shorts duration", () => {
-    const goCreate = jest.fn();
+    const goCreate = vi.fn();
 
     render(
       <CreateWedgeModal
         open
-        onClose={jest.fn()}
+        onClose={vi.fn()}
         goCreate={goCreate}
         creatorState={emptyCreatorState}
-        onOpenSeo={jest.fn()}
-        onOpenThumb={jest.fn()}
+        onOpenSeo={vi.fn()}
+        onOpenThumb={vi.fn()}
       />,
     );
 

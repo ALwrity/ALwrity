@@ -8,17 +8,15 @@ import {
   DialogContent, 
   Button
 } from '@mui/material';
-import {
-  Link as LinkIcon,
-  GpsFixed as GpsFixedIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Info as InfoIcon,
-  BarChart as BarChartIcon,
-  Hub as HubIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Close as CloseIcon,
-} from '@mui/icons-material';
+import LinkIcon from '@mui/icons-material/Link';
+import GpsFixedIcon from '@mui/icons-material/GpsFixed';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import InfoIcon from '@mui/icons-material/Info';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import HubIcon from '@mui/icons-material/Hub';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CloseIcon from '@mui/icons-material/Close';
 import { BlogResearchResponse } from '../../../services/blogWriterApi';
 
 interface ResearchIntegrationProps {

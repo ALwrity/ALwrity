@@ -15,6 +15,7 @@ export interface MapPitchToVideoPlanInput {
     target_audience?: string;
     video_goal?: string;
     brand_style?: string;
+    language?: string;
   };
 }
 
@@ -41,6 +42,7 @@ export function toYouTubeVideoPitch(
     generation: pitch.generation,
     research_enabled: pitch.research_enabled,
     research_sources: pitch.research_sources,
+    research_prompt_block: (pitch.research_prompt_block || "").trim() || undefined,
   };
 }
 
@@ -56,6 +58,7 @@ export function mapPitchToVideoPlan({
       section: (beat.section_title || "").trim(),
       description: (beat.spoken_script || "").trim(),
       duration_estimate: Number(beat.estimated_duration_seconds) || 0,
+      visual: (beat.visual || "").trim() || undefined,
     }));
 
     const plan: VideoPlan = {
@@ -65,6 +68,7 @@ export function mapPitchToVideoPlan({
       key_message: (expansion.key_message || "").trim() || undefined,
       content_outline: outline,
       hook_strategy: hookSpoken,
+      outro: (expansion.outro || "").trim() || undefined,
       call_to_action: (expansion.call_to_action || "").trim() || undefined,
       visual_style: (form.brand_style || "").trim(),
       tone: (form.brand_style || "").trim() || undefined,
@@ -75,6 +79,7 @@ export function mapPitchToVideoPlan({
       title_suggestions: selectedTitle ? [selectedTitle] : [],
       duration_type: expansion.duration_type || form.duration_type,
       duration_metadata: expansion.duration_metadata,
+      language: (form.language || "").trim() || undefined,
       research_enabled: expansion.research_enabled,
       research_sources: expansion.research_sources,
       research_sources_count: expansion.research_sources_count,
@@ -85,6 +90,8 @@ export function mapPitchToVideoPlan({
       outlineCount: outline.length,
       hasSelectedTitle: Boolean(selectedTitle),
       hasHook: Boolean(hookSpoken),
+      hasOutro: Boolean(plan.outro),
+      outlineVisuals: outline.filter((item) => Boolean(item.visual)).length,
       hasGeneration: Boolean(expansion.generation),
     });
 
@@ -92,6 +99,7 @@ export function mapPitchToVideoPlan({
   } catch (error) {
     console.error("[mapPitchToVideoPlan] Failed to map expansion", {
       outlineCount: expansion?.main_content_outline?.length ?? 0,
+      error: error instanceof Error ? error.message : "unknown",
     });
     throw error instanceof Error ? error : new Error("Could not map pitch to video plan.");
   }

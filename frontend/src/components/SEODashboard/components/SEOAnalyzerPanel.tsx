@@ -10,11 +10,9 @@ import {
   Tooltip, 
   Stack
 } from '@mui/material';
-import { 
-  Refresh as RefreshIcon, 
-  Language as LanguageIcon, 
-  Help as HelpIcon 
-} from '@mui/icons-material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import LanguageIcon from '@mui/icons-material/Language';
+import HelpIcon from '@mui/icons-material/Help';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Shared styled components

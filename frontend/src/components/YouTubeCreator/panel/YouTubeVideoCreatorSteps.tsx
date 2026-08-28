@@ -52,7 +52,6 @@ export interface YouTubeVideoCreatorStepsProps {
   setSourceArticle: (article: YouTubeSourceArticle | null) => void;
   setActiveStep: (step: number) => void;
   handleLanguageChange: (value: YouTubeContentLanguage) => void;
-  handleGeneratePlan: () => void;
   creativeAngle: string;
   currentPitch: YouTubeCreatorState["currentPitch"];
   pitchHistory: YouTubeCreatorState["pitchHistory"];
@@ -114,7 +113,6 @@ export const YouTubeVideoCreatorSteps: React.FC<YouTubeVideoCreatorStepsProps> =
         onBrandStyleChange={(value) => props.updateState({ brandStyle: value })}
         onReferenceImageChange={(value) => props.updateState({ referenceImage: value })}
         onLanguageChange={props.handleLanguageChange}
-        onGeneratePlan={props.handleGeneratePlan}
         onAvatarUpload={props.handleAvatarUpload}
         onRemoveAvatar={props.handleRemoveAvatar}
         onMakePresentable={props.handleMakePresentable}

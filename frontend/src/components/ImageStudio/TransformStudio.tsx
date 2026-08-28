@@ -24,16 +24,14 @@ import {
   Divider,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import {
-  Transform as TransformIcon,
-  VideoLibrary,
-  Upload,
-  PlayArrow,
-  Download,
-  AttachMoney,
-  Info,
-  Close,
-} from "@mui/icons-material";
+import TransformIcon from '@mui/icons-material/Transform';
+import VideoLibrary from '@mui/icons-material/VideoLibrary';
+import Upload from '@mui/icons-material/Upload';
+import PlayArrow from '@mui/icons-material/PlayArrow';
+import Download from '@mui/icons-material/Download';
+import AttachMoney from '@mui/icons-material/AttachMoney';
+import Info from '@mui/icons-material/Info';
+import Close from '@mui/icons-material/Close';
 import { motion, type Variants, type Easing } from "framer-motion";
 import { useTransformStudio } from "../../hooks/useTransformStudio";
 import { ImageStudioLayout } from "./ImageStudioLayout";

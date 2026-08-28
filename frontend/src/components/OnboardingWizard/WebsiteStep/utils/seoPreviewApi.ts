@@ -1,7 +1,7 @@
 /**
  * SEO Preview API — lightweight subset of full site audit for onboarding.
  */
-import { aiApiClient } from "../../../../api/client";
+import { longRunningApiClient } from "../../../../api/client";
 
 export interface SeoPageResult {
   url: string;
@@ -12,7 +12,14 @@ export interface SeoPageResult {
   url_structure: { score: number; issues?: string[] };
   accessibility: { score: number; issues?: string[] };
   ux: { score: number; issues?: string[] };
-  top_issues: Array<{ category: string; issue: string }>;
+  top_issues: Array<{
+    category: string;
+    severity?: string;
+    issue?: string;
+    message?: string;
+    fix?: string;
+    location?: string;
+  }>;
 }
 
 export interface SeoPreviewResult {
@@ -26,9 +33,17 @@ export interface SeoPreviewResult {
 }
 
 export async function runSeoPreview(websiteUrl: string): Promise<SeoPreviewResult> {
-  const response = await aiApiClient.post(
+  const response = await longRunningApiClient.post(
     "/api/onboarding/step2/preview-seo-audit",
     { website_url: websiteUrl }
+  );
+  return response.data;
+}
+
+export async function getSeoPreview(websiteUrl?: string): Promise<SeoPreviewResult> {
+  const response = await longRunningApiClient.get(
+    "/api/onboarding/step2/preview-seo-audit",
+    { params: websiteUrl ? { website_url: websiteUrl } : undefined }
   );
   return response.data;
 }

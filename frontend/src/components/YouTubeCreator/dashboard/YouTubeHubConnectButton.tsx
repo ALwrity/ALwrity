@@ -1,35 +1,50 @@
 import React from "react";
-import { YT_RED } from "../constants";
+import { YouTubeHubConnectAnchor } from "./YouTubeHubConnectAnchor";
+import {
+  YOUTUBE_CONNECT_CTA,
+  YOUTUBE_CREATE_VIDEO_CTA,
+  YOUTUBE_HUB_CONNECT_BUTTON_STYLE,
+} from "./youtubeHubConnectUi";
 
 interface YouTubeHubConnectButtonProps {
   connected: boolean;
   onConnect: () => void;
   onCreateVideo: () => void;
+  isLoading?: boolean;
+  isConnecting?: boolean;
 }
 
-/** Hub-axis CTA — Connect when disconnected, Create Video when connected. */
+/** Hub-axis CTA — Connect when disconnected, Create Video when connected (LinkedIn-sized). */
 export const YouTubeHubConnectButton: React.FC<YouTubeHubConnectButtonProps> = ({
   connected,
   onConnect,
   onCreateVideo,
-}) => (
-  <button
-    type="button"
-    className="yt-hub-connect-btn"
-    onClick={connected ? onCreateVideo : onConnect}
-    style={{
-      background: YT_RED,
-      color: "white",
-      border: "none",
-      padding: "10px 22px",
-      borderRadius: 50,
-      fontSize: 13,
-      fontWeight: 700,
-      cursor: "pointer",
-      boxShadow: "0 6px 20px rgba(255,0,0,0.35)",
-      whiteSpace: "nowrap",
-    }}
-  >
-    {connected ? "Create Video" : "Connect YouTube"}
-  </button>
-);
+  isLoading = false,
+  isConnecting = false,
+}) => {
+  const busy = isLoading || isConnecting;
+  const label = busy
+    ? "Checking connection..."
+    : connected
+      ? YOUTUBE_CREATE_VIDEO_CTA
+      : YOUTUBE_CONNECT_CTA;
+
+  return (
+    <YouTubeHubConnectAnchor>
+      <button
+        type="button"
+        className="yt-hub-connect-btn"
+        onClick={connected ? onCreateVideo : onConnect}
+        disabled={busy}
+        aria-busy={busy || undefined}
+        style={{
+          ...YOUTUBE_HUB_CONNECT_BUTTON_STYLE,
+          opacity: busy ? 0.82 : 1,
+          cursor: busy ? "default" : "pointer",
+        }}
+      >
+        {label}
+      </button>
+    </YouTubeHubConnectAnchor>
+  );
+};

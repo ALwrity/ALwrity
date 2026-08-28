@@ -43,10 +43,7 @@ jobs:
 
       - name: Run Tests
         working-directory: frontend
-        # PollingIntegration.test.tsx uses @testing-library/react render()
-        # which requires @testing-library/dom — a known CRA Jest resolution gap.
-        # TODO: fix CopilotKit mocking or add @testing-library/dom to peer deps.
-        run: npm test -- --watchAll=false --ci --testPathIgnorePatterns=PollingIntegration
+        run: npx vitest run --coverage
 
       - name: Upload Coverage
         if: always()

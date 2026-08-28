@@ -13,13 +13,11 @@ import {
   ListItemText,
   Divider,
 } from '@mui/material';
-import {
-  Close as CloseIcon,
-  CheckCircle as CheckIcon,
-  TrendingUp as TrendIcon,
-  Info as InfoIcon,
-  AutoAwesome as AIIcon,
-} from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import TrendIcon from '@mui/icons-material/TrendingUp';
+import InfoIcon from '@mui/icons-material/Info';
+import AIIcon from '@mui/icons-material/AutoAwesome';
 import { TrendsConfig } from '../../../types/intent.types';
 
 interface TrendsKnowMoreModalProps {

@@ -20,7 +20,7 @@ class BlogSEOMetadataGenerator:
     
     def __init__(self):
         """Initialize the metadata generator"""
-        logger.info("BlogSEOMetadataGenerator initialized")
+        logger.debug("BlogSEOMetadataGenerator initialized")
     
     async def generate_comprehensive_metadata(
         self, 

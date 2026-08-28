@@ -5,11 +5,11 @@ import {
 
 describe("linkedInImageModelUtils", () => {
   beforeEach(() => {
-    jest.spyOn(console, "debug").mockImplementation(() => {});
+    vi.spyOn(console, "debug").mockImplementation(() => {});
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it("uses gemini-3-pro-image as the LinkedIn default model", () => {

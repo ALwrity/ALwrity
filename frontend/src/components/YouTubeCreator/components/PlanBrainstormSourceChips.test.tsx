@@ -1,15 +1,15 @@
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { PlanBrainstormSourceChips } from "./PlanBrainstormSourceChips";
 
 describe("PlanBrainstormSourceChips", () => {
-  const onToggleChannelBible = jest.fn();
-  const onToggleTrending = jest.fn();
-  const onToggleRepurpose = jest.fn();
+  const onToggleChannelBible = vi.fn();
+  const onToggleTrending = vi.fn();
+  const onToggleRepurpose = vi.fn();
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it("renders all source chips in one row", () => {
@@ -49,7 +49,7 @@ describe("PlanBrainstormSourceChips", () => {
   });
 
   it("opens Channel Bible editor when empty and onOpenChannelBible is provided", () => {
-    const onOpenChannelBible = jest.fn();
+    const onOpenChannelBible = vi.fn();
     render(
       <PlanBrainstormSourceChips
         useChannelBible={false}
@@ -71,7 +71,7 @@ describe("PlanBrainstormSourceChips", () => {
   });
 
   it("opens Channel Bible editor when identity exists if onOpenChannelBible is provided", () => {
-    const onOpenChannelBible = jest.fn();
+    const onOpenChannelBible = vi.fn();
     render(
       <PlanBrainstormSourceChips
         useChannelBible

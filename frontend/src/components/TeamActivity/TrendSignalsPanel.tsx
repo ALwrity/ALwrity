@@ -7,11 +7,9 @@ import {
   LinearProgress,
   Button,
 } from '@mui/material';
-import {
-  TrendingUp as TrendIcon,
-  Whatshot as HotIcon,
-  EditNote as EditNoteIcon,
-} from '@mui/icons-material';
+import TrendIcon from '@mui/icons-material/TrendingUp';
+import HotIcon from '@mui/icons-material/Whatshot';
+import EditNoteIcon from '@mui/icons-material/EditNote';
 import { AgentEventItem } from '../../hooks/useAgentHuddleFeed';
 
 interface TrendOpportunity {

@@ -15,18 +15,16 @@ import {
   Switch,
   FormControlLabel
 } from '@mui/material';
-import {
-  Visibility as VisibilityIcon,
-  Refresh as RefreshIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  TrendingUp as TrendingUpIcon,
-  People as PeopleIcon,
-  MonetizationOn as MonetizationOnIcon,
-  Speed as SpeedIcon,
-  Assessment as AssessmentIcon,
-  CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon
-} from '@mui/icons-material';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import PeopleIcon from '@mui/icons-material/People';
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
+import SpeedIcon from '@mui/icons-material/Speed';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 import { motion } from 'framer-motion';
 import MetricTransparencyCard from './MetricTransparencyCard';
 import { strategyMonitoringApi } from '../../../../../services/strategyMonitoringApi';

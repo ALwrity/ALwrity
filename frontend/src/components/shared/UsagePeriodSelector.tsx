@@ -7,7 +7,7 @@ import {
   Typography,
   SelectChangeEvent,
 } from '@mui/material';
-import { CalendarMonth } from '@mui/icons-material';
+import CalendarMonth from '@mui/icons-material/CalendarMonth';
 
 interface UsagePeriodSelectorProps {
   selectedPeriod: string;

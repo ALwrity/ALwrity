@@ -31,6 +31,7 @@ interface UseCompetitorDiscoveryReturn {
   startCompetitorDiscovery: (force?: boolean) => Promise<void>;
   loadCachedAnalysis: () => boolean;
   updateCacheWithSitemapAnalysis: (sitemapResult: any) => void;
+  refreshContentPillars: () => Promise<void>;
 }
 
 export function useCompetitorDiscovery({
@@ -107,11 +108,24 @@ export function useCompetitorDiscovery({
         const parsedData = JSON.parse(cachedData);
         parsedData.sitemap_analysis = sitemapResult;
         localStorage.setItem('competitor_analysis_data', JSON.stringify(parsedData));
+      } else {
+        // Create the cache entry so future mounts have the sitemap data
+        // even if competitor_analysis_data was never written.
+        const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
+        localStorage.setItem('competitor_analysis_data', JSON.stringify({
+          competitors: [],
+          social_media_accounts: {},
+          research_summary: null,
+          sitemap_analysis: sitemapResult,
+          content_pillars: null,
+        }));
+        localStorage.setItem('competitor_analysis_url', finalUserUrl);
+        localStorage.setItem('competitor_analysis_timestamp', Date.now().toString());
       }
     } catch (err) {
       console.warn('Failed to update cache with sitemap analysis:', err);
     }
-  }, []);
+  }, [userUrl]);
 
   const startCompetitorDiscovery = useCallback(async (force = false) => {
     if (!force && loadCachedAnalysis()) {
@@ -122,13 +136,23 @@ export function useCompetitorDiscovery({
       try {
         const dbResult = await longRunningApiClient.get('/api/onboarding/competitor-analysis');
         if (dbResult?.data?.competitors?.length > 0) {
-          const comps = dbResult.data.competitors.map((c: any) => ({
-            url: c.url || '', domain: c.domain || '', title: c.url || '',
-            summary: '', relevance_score: 0.8,
-            highlights: [], favicon: null, image: null, published_date: null, author: null,
-            competitive_insights: { business_model: '', target_audience: '' },
-            content_insights: { content_focus: '', content_quality: '' },
-          }));
+          const comps = dbResult.data.competitors.map((c: any) => {
+            const ad = c.analysis_data && typeof c.analysis_data === 'object' ? c.analysis_data : {};
+            return {
+              url: c.url || c.competitor_url || '',
+              domain: c.domain || c.competitor_domain || '',
+              title: ad.title || c.title || c.url || '',
+              summary: ad.summary || '',
+              relevance_score: ad.relevance_score ?? 0.8,
+              highlights: ad.highlights || [],
+              favicon: ad.favicon ?? null,
+              image: ad.image ?? null,
+              published_date: ad.published_date ?? null,
+              author: ad.author ?? null,
+              competitive_insights: ad.competitive_analysis || ad.competitive_insights || { business_model: '', target_audience: '' },
+              content_insights: ad.content_insights || { content_focus: '', content_quality: '' },
+            };
+          });
           setCompetitors(comps);
           setUsingCachedData(true);
         }
@@ -234,6 +258,45 @@ export function useCompetitorDiscovery({
     }
   }, [userUrl, industryContext, loadCachedAnalysis, sitemapAnalysis, mergeCrawlSocialMedia]);
 
+  const refreshContentPillars = useCallback(async () => {
+    setIsLoadingPillars(true);
+    setError(null);
+
+    try {
+      const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
+      if (!finalUserUrl || finalUserUrl.trim() === '') {
+        throw new Error('No website URL available for content pillar discovery.');
+      }
+
+      const response = await aiApiClient.post('/api/onboarding/step3/discover-content-pillars', {
+        user_url: finalUserUrl,
+      });
+
+      const result = response.data;
+      if (result.success && result.content_pillars) {
+        setContentPillars(result.content_pillars);
+
+        try {
+          const cachedData = localStorage.getItem('competitor_analysis_data');
+          if (cachedData) {
+            const parsedData = JSON.parse(cachedData);
+            parsedData.content_pillars = result.content_pillars;
+            localStorage.setItem('competitor_analysis_data', JSON.stringify(parsedData));
+          }
+        } catch (cacheErr) {
+          console.warn('Failed to update cache with content pillars:', cacheErr);
+        }
+      } else {
+        setError(result.error || 'Content pillar discovery failed');
+      }
+    } catch (err) {
+      console.error('Content pillar refresh error:', err);
+      setError(err instanceof Error ? err.message : 'Content pillar discovery failed');
+    } finally {
+      setIsLoadingPillars(false);
+    }
+  }, [userUrl]);
+
   // Initialize: Check cache first, then run analysis if needed
   useEffect(() => {
     const initialize = async () => {
@@ -313,5 +376,6 @@ export function useCompetitorDiscovery({
     startCompetitorDiscovery,
     loadCachedAnalysis,
     updateCacheWithSitemapAnalysis,
+    refreshContentPillars,
   };
 }

@@ -10,6 +10,7 @@ import {
 import { getCurrentStep, setCurrentStep } from '../../api/onboarding';
 import { apiClient, longRunningApiClient } from '../../api/client';
 import { useOnboarding } from '../../contexts/OnboardingContext';
+import { useUser } from '@clerk/clerk-react';
 import WebsiteStep from './WebsiteStep';
 import LinkedInConnectStep from './LinkedInConnectStep';
 import CompetitorAnalysisStep from './CompetitorAnalysisStep';
@@ -20,6 +21,7 @@ import { WizardHeader } from './common/WizardHeader';
 import { WizardNavigation } from './common/WizardNavigation';
 import { WizardLoadingState } from './common/WizardLoadingState';
 import SystemStatusChip from './common/SystemStatusChip';
+
 
 // Set to true in dev to restore verbose per-action tracing
 const DEV_DEBUG = false;
@@ -57,6 +59,39 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   const [retryNextStep, setRetryNextStep] = useState<number>(0);
   // sessionId removed - backend uses Clerk user ID from auth token
   const [stepData, setStepData] = useState<any>(null);
+  const { user } = useUser();
+  const [email, setEmail] = useState<string>('');
+
+  // Sync email from backend onboarding step data or Clerk fallback
+  useEffect(() => {
+    if (data?.onboarding?.steps) {
+      const step1Data = getBackendStep(data.onboarding.steps, 0);
+      if (step1Data?.data?.email) {
+        setEmail(step1Data.data.email);
+        return;
+      }
+    }
+    if (stepData?.email) {
+      setEmail(stepData.email);
+      return;
+    }
+    if (user) {
+      const primaryEmail = user.primaryEmailAddress?.emailAddress;
+      const firstEmail = user.emailAddresses?.[0]?.emailAddress;
+      const resolvedEmail = primaryEmail || firstEmail || '';
+      if (resolvedEmail) {
+        setEmail(resolvedEmail);
+      }
+    }
+  }, [data, stepData?.email, user]);
+
+  const handleEmailChange = useCallback((newEmail: string) => {
+    setEmail(newEmail);
+    setStepData((prev: any) => ({
+      ...prev,
+      email: newEmail
+    }));
+  }, []);
   const [competitorDataCollector, setCompetitorDataCollector] = useState<(() => any) | null>(null);
   const [isCurrentStepValid, setIsCurrentStepValid] = useState<boolean>(false);
   const [stepValidationStates, setStepValidationStates] = useState<Record<number, boolean>>({});
@@ -66,7 +101,15 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   });
   const [validationMessage, setValidationMessage] = useState<string>('');
   const [backgroundTasks, setBackgroundTasks] = useState<{
-    tasks: Record<string, { status: string; started_at: string | null; progress_pct: number }>;
+    tasks: Record<string, {
+      status: string;
+      started_at: string | null;
+      progress_pct: number;
+      failure_reason?: string | null;
+      recurring?: boolean;
+      last_success?: string | null;
+      next_execution?: string | null;
+    }>;
     total: number;
     completed_count: number;
     failed_count: number;
@@ -597,6 +640,16 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     }
   };
 
+  // "View Results" from the background-tasks banner: navigate back to the
+  // Website step and scroll to the Smart Background Setup section.
+  const handleViewBackgroundResults = (taskKey: string) => {
+    handleStepClick(0);
+    // Wait for the step to mount before scrolling.
+    setTimeout(() => {
+      document.getElementById('smart-background-setup')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+  };
+
   const updateHeaderContent = useCallback((content: StepHeaderContent) => {
     setStepHeaderContent(prev => {
       if (prev.title === content.title && prev.description === content.description) {
@@ -656,6 +709,8 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         updateHeaderContent={updateHeaderContent}
         onValidationChange={onStep0Valid}
         onDataReady={handleWebsiteDataReady}
+        email={email}
+        onEmailChange={handleEmailChange}
       />
     );
 
@@ -717,7 +772,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        p: { xs: 2, md: 4 },
+        p: 0,
         position: 'relative',
         '&::before': {
           content: '""',
@@ -732,17 +787,20 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       }}
     >
       <Paper
-        elevation={24}
+        elevation={0}
         sx={{
           maxWidth: '100%',
           width: '100%',
-          borderRadius: 4,
+          minHeight: '100vh',
+          borderRadius: 0,
           overflow: 'visible',
           background: 'rgba(255, 255, 255, 0.98)',
           backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
+          border: 'none',
           position: 'relative',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          boxShadow: 'none',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
         {/* Header with Stepper */}
@@ -758,6 +816,8 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           steps={steps}
           onStepClick={handleStepClick}
           onHelpToggle={() => setShowHelp(!showHelp)}
+          email={email}
+          onEmailChange={handleEmailChange}
         />
 
         {/* Retry bar for step completion failures */}
@@ -809,17 +869,18 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           </div>
         )}
 
-        {/* Background tasks status chip (visible after Step 2) */}
-        {backgroundTasks && (!backgroundTasks.all_done || backgroundTasks.failed_count > 0) && (
+        {/* Background tasks status banner (visible after Step 2) */}
+        {backgroundTasks && backgroundTasks.tasks && Object.keys(backgroundTasks.tasks).length > 0 && (
           <SystemStatusChip
             activeTasks={backgroundTasks.total - backgroundTasks.completed_count - backgroundTasks.failed_count}
             totalTasks={backgroundTasks.total}
             tasks={backgroundTasks.tasks}
+            onViewResults={handleViewBackgroundResults}
           />
         )}
 
         {/* Content */}
-        <Box sx={{ p: { xs: 1, md: 2 }, pt: 1, width: '100%', overflow: 'visible' }}>
+        <Box sx={{ p: { xs: 2, md: 4 }, pt: { xs: 2, md: 3 }, flexGrow: 1, width: '100%', overflow: 'visible' }}>
           <Fade in={true} timeout={400}>
             <Box sx={{ width: '100%', overflow: 'visible' }}>
               {renderStepContent(activeStep)}

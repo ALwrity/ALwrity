@@ -1,7 +1,7 @@
 /**
  * linkedInArticleImageUtils unit tests.
  * Run manually:
- *   npx react-scripts test --watchAll=false --testPathPattern=linkedInArticleImageUtils
+ *   npx vitest run linkedInArticleImageUtils
  */
 
 import { createEditorImageBlock } from "../utils/linkedInEditorDraftUtils";

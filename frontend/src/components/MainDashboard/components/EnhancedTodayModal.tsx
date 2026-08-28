@@ -17,23 +17,21 @@ import {
   LinearProgress,
 } from '@mui/material';
 import { motion } from 'framer-motion';
-import {
-  Today as TodayIcon,
-  Close as CloseIcon,
-  AutoAwesome as AlwrityIcon,
-  CheckCircle as CheckIcon,
-  PlayArrow as PlayIcon,
-  SkipNext as SkipIcon,
-  NavigateNext,
-  Psychology as AgentIcon,
-  TrendingUp as TrendUpIcon,
-  TrendingDown as TrendDownIcon,
-  TrendingFlat as TrendFlatIcon,
-  GpsFixed as GapIcon,
-  BarChart as VolumeIcon,
-  CalendarMonth as CalendarIcon,
-  WarningAmber as FallbackIcon,
-} from '@mui/icons-material';
+import TodayIcon from '@mui/icons-material/Today';
+import CloseIcon from '@mui/icons-material/Close';
+import AlwrityIcon from '@mui/icons-material/AutoAwesome';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import PlayIcon from '@mui/icons-material/PlayArrow';
+import SkipIcon from '@mui/icons-material/SkipNext';
+import NavigateNext from '@mui/icons-material/NavigateNext';
+import AgentIcon from '@mui/icons-material/Psychology';
+import TrendUpIcon from '@mui/icons-material/TrendingUp';
+import TrendDownIcon from '@mui/icons-material/TrendingDown';
+import TrendFlatIcon from '@mui/icons-material/TrendingFlat';
+import GapIcon from '@mui/icons-material/GpsFixed';
+import VolumeIcon from '@mui/icons-material/BarChart';
+import CalendarIcon from '@mui/icons-material/CalendarMonth';
+import FallbackIcon from '@mui/icons-material/WarningAmber';
 import { useNavigate } from 'react-router-dom';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import { TodayTask } from '../../../types/workflow';

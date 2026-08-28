@@ -5,7 +5,6 @@ Converts video plans into structured scenes with narration, visual prompts, and 
 """
 
 from typing import Dict, Any, Optional, List
-import re
 
 from fastapi import HTTPException
 
@@ -17,6 +16,7 @@ from services.youtube.scene_builder_enhance import (
 )
 from services.youtube.scene_builder_generation import generate_scenes_from_plan
 from services.youtube.scene_builder_generation_metadata import attach_scene_generation_metadata
+from services.youtube.scene_builder_parse import parse_youtube_custom_script
 from services.youtube.scene_builder_prompts import build_scene_generation_prompts
 
 logger = get_service_logger("youtube.scene_builder")
@@ -122,12 +122,20 @@ class YouTubeSceneBuilderService:
                 )
                 llm_called = True
 
-            # Limit to max scenes
-            if len(scenes) > max_scenes:
+            # Limit LLM-generated scenes. Parsed scripts keep 1:1 paragraphs so
+            # duration rebalance still targets 30 / 150 / 420 seconds.
+            if len(scenes) > max_scenes and not custom_script_used:
                 logger.warning(
                     f"[YouTubeSceneBuilder] Truncating {len(scenes)} scenes to {max_scenes}"
                 )
                 scenes = scenes[:max_scenes]
+            elif len(scenes) > max_scenes:
+                logger.info(
+                    "[YouTubeSceneBuilder] Keeping {} parsed script scenes "
+                    "(max_scenes={} applies to LLM generation only)",
+                    len(scenes),
+                    max_scenes,
+                )
 
             # Enhance visual prompts efficiently based on duration type
             duration_type = video_plan.get("duration_type", "medium")
@@ -214,50 +222,17 @@ class YouTubeSceneBuilderService:
         duration_metadata: Dict[str, Any],
         user_id: str,
     ) -> List[Dict[str, Any]]:
-        """Parse a custom script into structured scenes."""
-        # Simple parsing: split by double newlines or scene markers
-        # Try to detect scene markers
-        scene_pattern = r'(?:Scene\s+\d+|#\s*\d+\.|^\d+\.)\s*(.+?)(?=(?:Scene\s+\d+|#\s*\d+\.|^\d+\.|$))'
-        matches = re.finditer(scene_pattern, custom_script, re.MULTILINE | re.DOTALL)
-
-        scenes = []
-        for idx, match in enumerate(matches, 1):
-            scene_text = match.group(1).strip()
-            # Extract narration (first paragraph or before visual markers)
-            narration_match = re.search(r'^(.*?)(?:\n\n|Visual:|Image:)', scene_text, re.DOTALL)
-            narration = narration_match.group(1).strip() if narration_match else scene_text.split('\n')[0]
-
-            # Extract visual description
-            visual_match = re.search(r'(?:Visual:|Image:)\s*(.+?)(?:\n\n|$)', scene_text, re.DOTALL)
-            visual_description = visual_match.group(1).strip() if visual_match else narration
-
-            scenes.append({
-                "scene_number": idx,
-                "title": f"Scene {idx}",
-                "narration": narration,
-                "visual_description": visual_description,
-                "duration_estimate": duration_metadata.get("scene_duration_range", [5, 15])[0],
-                "emphasis": "hook" if idx == 1 else ("cta" if idx == len(list(matches)) else "main_content"),
-                "visual_cues": [],
-                "visual_prompt": visual_description,
-            })
-
-        # Fallback: split by paragraphs if no scene markers
-        if not scenes:
-            paragraphs = [p.strip() for p in custom_script.split('\n\n') if p.strip()]
-            for idx, para in enumerate(paragraphs[:duration_metadata.get("max_scenes", 10)], 1):
-                scenes.append({
-                    "scene_number": idx,
-                    "title": f"Scene {idx}",
-                    "narration": para,
-                    "visual_description": para,
-                    "duration_estimate": duration_metadata.get("scene_duration_range", [5, 15])[0],
-                    "emphasis": "hook" if idx == 1 else ("cta" if idx == len(paragraphs) else "main_content"),
-                    "visual_cues": [],
-                    "visual_prompt": para,
-                })
-
-        return scenes
+        """Parse expanded fullScript into scenes (durations, titles, distinct visuals)."""
+        logger.debug(
+            "[YouTubeSceneBuilder] Parsing custom script user_present={}",
+            bool(user_id),
+        )
+        return parse_youtube_custom_script(
+            custom_script=custom_script,
+            duration_type=str(video_plan.get("duration_type") or "medium"),
+            duration_metadata=duration_metadata or {},
+            video_plan=video_plan,
+        )
 
     def _enhance_visual_prompts_batch(
         self,
@@ -270,7 +245,8 @@ class YouTubeSceneBuilderService:
         Efficiently enhance visual prompts based on video duration type.
 
         Strategy:
-        - Shorts: Skip enhancement (use original descriptions) - 0 AI calls
+        - Shorts: Skip only when visuals are already distinct from narration;
+          otherwise one batch call (same as medium)
         - Medium: Batch enhance all scenes in 1 call - 1 AI call
         - Long: Batch enhance in 2 calls (split scenes) - 2 AI calls max
         """

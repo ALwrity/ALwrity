@@ -32,26 +32,24 @@ import {
   ListItemIcon,
   LinearProgress
 } from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  CalendarToday as CalendarIcon,
-  Event as EventIcon,
-  Refresh as RefreshIcon,
-  TrendingUp as TrendingIcon,
-  Analytics as AnalyticsIcon,
-  ExpandMore as ExpandMoreIcon,
-  Schedule as ScheduleIcon,
-  Psychology as PsychologyIcon,
-  Business as BusinessIcon,
-  Timeline as TimelineIcon,
-  Lightbulb as LightbulbIcon,
-  CheckCircle as CheckCircleIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  LinkedIn as LinkedInIcon,
-  Description as DescriptionIcon
-} from '@mui/icons-material';
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import CalendarIcon from '@mui/icons-material/CalendarToday';
+import EventIcon from '@mui/icons-material/Event';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import TrendingIcon from '@mui/icons-material/TrendingUp';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import BusinessIcon from '@mui/icons-material/Business';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import DescriptionIcon from '@mui/icons-material/Description';
 import { useContentPlanningStore } from '../../../stores/contentPlanningStore';
 
 interface TabPanelProps {

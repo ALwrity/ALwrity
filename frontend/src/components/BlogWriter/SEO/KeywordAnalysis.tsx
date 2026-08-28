@@ -15,11 +15,9 @@ import {
   IconButton,
   Tooltip
 } from '@mui/material';
-import {
-  GpsFixed,
-  Search,
-  Warning
-} from '@mui/icons-material';
+import GpsFixed from '@mui/icons-material/GpsFixed';
+import Search from '@mui/icons-material/Search';
+import Warning from '@mui/icons-material/Warning';
 
 interface KeywordAnalysisProps {
   detailedAnalysis?: {

@@ -10,10 +10,8 @@ import {
   Divider,
   Box
 } from '@mui/material';
-import { 
-  ExpandMore as ExpandMoreIcon, 
-  ExpandLess as ExpandLessIcon 
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { CategoryCardProps } from '../../shared/types';
 import { getCategoryIcon, getCategoryTitle, getStatusColor } from './seoUtils';
 import IssueList from './IssueList';

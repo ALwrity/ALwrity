@@ -15,16 +15,14 @@ import {
   Collapse,
   Chip,
 } from '@mui/material';
-import {
-  Assessment as AssessmentIcon,
-  Refresh as RefreshIcon,
-  CheckCircle as CheckCircleIcon,
-  Info as InfoIcon,
-  ExpandLess as ExpandLessIcon,
-  Search as SearchIcon,
-  TrendingUp as TrendingUpIcon,
-  AutoAwesome as AutoFixHighIcon,
-} from '@mui/icons-material';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import InfoIcon from '@mui/icons-material/Info';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import SearchIcon from '@mui/icons-material/Search';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import AutoFixHighIcon from '@mui/icons-material/AutoAwesome';
 import { aiApiClient, longRunningApiClient } from '../../api/client';
 import { useOnboardingStyles } from './common/useOnboardingStyles';
 import { SocialMediaPresenceSection, CompetitorsGrid } from './WebsiteStep/components';
@@ -125,6 +123,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     usingCachedData,
     startCompetitorDiscovery,
     updateCacheWithSitemapAnalysis,
+    refreshContentPillars,
   } = useCompetitorDiscovery({
     userUrl,
     industryContext,
@@ -220,40 +219,99 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   const startSitemapAnalysis = useCallback(async (force = false) => {
     if (isAnalyzingSitemap) return;
     
+    const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
+    const stateKey = 'alwrity_sitemap_state';
+
+    // DB-first: when not forced, restore the persisted analysis from the DB
+    // (mirrors the Discovered Competitors flow) before paying for an LLM call.
+    if (!force && finalUserUrl) {
+      try {
+        const dbResp = await aiApiClient.get('/api/onboarding/step3/sitemap-analysis', {
+          params: { user_url: finalUserUrl }
+        });
+        if (dbResp?.data?.success && dbResp.data.sitemap_analysis) {
+          const cached = dbResp.data.sitemap_analysis;
+          console.log('[sitemap] Loaded persisted analysis from DB');
+          setSitemapAnalysis(cached);
+          updateCacheWithSitemapAnalysis(cached);
+          return;
+        }
+      } catch (e) {
+        console.warn('[sitemap] DB lookup failed, will fall through to LLM', e);
+      }
+    }
+
+    // Persistent guard (localStorage, not sessionStorage — survives hard refresh):
+    // blocks duplicate LLM calls across remounts AND page reloads.
+    if (!force && finalUserUrl) {
+      try {
+        const prev = JSON.parse(localStorage.getItem(stateKey) || 'null');
+        if (prev && prev.url === finalUserUrl) {
+          const ageMs = Date.now() - (prev.ts || 0);
+          if (prev.status === 'inflight' && ageMs < 5 * 60_000) {
+            console.log('[sitemap] Blocked: already inflight');
+            return;
+          }
+          if (prev.status === 'done' && ageMs < 24 * 60 * 60_000) {
+            console.log('[sitemap] Blocked: completed within 24h');
+            return;
+          }
+        }
+      } catch { /* corrupted — ignore */ }
+    }
+    
     setIsAnalyzingSitemap(true);
     if (force) {
-        setSitemapAnalysis(null); // Clear existing data to show loading state
+        setSitemapAnalysis(null);
+    }
+
+    // Mark inflight
+    if (finalUserUrl) {
+      try {
+        localStorage.setItem(stateKey, JSON.stringify({ url: finalUserUrl, status: 'inflight', ts: Date.now() }));
+      } catch { /* non-critical */ }
     }
     
     try {
-      const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
       const competitorDomains = competitors.map(c => c.domain).filter(Boolean);
       
-      console.log('Starting sitemap analysis for:', finalUserUrl);
+      console.log('[sitemap] Starting analysis for:', finalUserUrl);
       
       const response = await aiApiClient.post('/api/onboarding/step3/analyze-sitemap', {
         user_url: finalUserUrl,
         competitors: competitorDomains,
         industry_context: industryContext,
         analyze_content_trends: true,
-        analyze_publishing_patterns: true
+        analyze_publishing_patterns: true,
+        force
       });
       
       const result = response.data;
       
       if (result.success) {
-        console.log('Sitemap analysis completed successfully');
+        console.log('[sitemap] Analysis completed successfully');
         setSitemapAnalysis(result);
-        
-        // Update cache with sitemap analysis
         updateCacheWithSitemapAnalysis(result);
+
+        // Mark done (24h TTL in the check above)
+        if (finalUserUrl) {
+          try {
+            localStorage.setItem(stateKey, JSON.stringify({ url: finalUserUrl, status: 'done', ts: Date.now() }));
+          } catch { /* non-critical */ }
+        }
+      } else if (result.error === 'analysis_in_progress') {
+        console.log('[sitemap] Backend busy — another request running');
+        // Leave state as-is so next mount also waits
       } else {
-        console.error('Sitemap analysis failed:', result.error);
+        console.error('[sitemap] Analysis failed:', result.error);
         setError(result.error || 'Sitemap analysis failed');
+        // Clear state on hard failure so next mount retries
+        if (finalUserUrl) localStorage.removeItem(stateKey);
       }
     } catch (err) {
-      console.error('Sitemap analysis error:', err);
+      console.error('[sitemap] Request error:', err);
       setError(err instanceof Error ? err.message : 'Sitemap analysis failed');
+      if (finalUserUrl) localStorage.removeItem(stateKey);
     } finally {
       setIsAnalyzingSitemap(false);
     }
@@ -285,22 +343,41 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   }, [competitors.length, sitemapAnalysis]);
 
   // Auto-trigger sitemap analysis only when competitors load and there is no
-  // persisted data either in state or from the Wizard's initialData. Waiting on
-  // initialData prevents an unnecessary LLM call on back-navigation.
+  // persisted data available in state, initialData, or localStorage. The
+  // localStorage check here must be SYNCHRONOUS: the cache-load effect above
+  // only schedules a state update, and within the same commit this effect
+  // would otherwise still see the stale null value and fire an LLM call.
   useEffect(() => {
     if (
       competitors.length > 0 &&
       !sitemapAnalysis &&
-      !initialData?.sitemapAnalysis &&
       !isAnalyzing &&
       !isAnalyzingSitemap &&
       !sitemapAutoTriggered.current
     ) {
+      // Re-check initialData at fire time
+      if (initialData?.sitemapAnalysis) return;
+
+      // Re-check localStorage synchronously (covers back-navigation where
+      // Wizard's stepData was seeded before the analysis ever ran)
+      let hasCached = false;
+      try {
+        const cachedData = JSON.parse(localStorage.getItem('competitor_analysis_data') || 'null');
+        if (cachedData?.sitemap_analysis) {
+          setSitemapAnalysis(cachedData.sitemap_analysis);
+          hasCached = true;
+        }
+      } catch {
+        // Corrupted cache — treat as absent
+      }
+      if (hasCached) {
+        console.log('CompetitorAnalysisStep: Using cached sitemap analysis, skipping auto-trigger');
+        return;
+      }
+
       sitemapAutoTriggered.current = true;
       console.log('CompetitorAnalysisStep: Auto-triggering sitemap analysis');
-      startSitemapAnalysis(false).finally(() => {
-        sitemapAutoTriggered.current = false;
-      });
+      startSitemapAnalysis(false);
     }
   }, [competitors.length, isAnalyzing, sitemapAnalysis, isAnalyzingSitemap, startSitemapAnalysis, initialData?.sitemapAnalysis]);
 
@@ -623,7 +700,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
       )}
 
       {/* Content Pillars Section */}
-      <ContentPillarsSection data={contentPillars} isLoading={isLoadingPillars} error={error} />
+      <ContentPillarsSection data={contentPillars} isLoading={isLoadingPillars} error={error} onRefresh={refreshContentPillars} />
 
       {/* Competitor Sitemap Analysis — results */}
       {benchmarkReport && (

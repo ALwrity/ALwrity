@@ -14,14 +14,12 @@ import {
   IconButton,
   Alert,
 } from '@mui/material';
-import {
-  CheckCircle,
-  ErrorOutline,
-  ExpandMore,
-  ExpandLess,
-  RocketLaunch,
-  Autorenew,
-} from '@mui/icons-material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import ErrorOutline from '@mui/icons-material/ErrorOutline';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import RocketLaunch from '@mui/icons-material/RocketLaunch';
+import Autorenew from '@mui/icons-material/Autorenew';
 
 export interface ScheduledTask {
   task: string;

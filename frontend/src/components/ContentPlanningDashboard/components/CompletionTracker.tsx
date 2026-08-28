@@ -10,11 +10,9 @@ import {
   Tooltip,
   IconButton
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  TrendingUp as TrendingUpIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import InfoIcon from '@mui/icons-material/Info';
 
 interface CompletionStats {
   total_fields: number;

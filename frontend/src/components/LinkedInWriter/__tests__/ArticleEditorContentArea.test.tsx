@@ -1,7 +1,7 @@
 /**
  * ArticleEditorContentArea tests.
  * Run manually:
- *   npx react-scripts test --watchAll=false --testPathPattern=ArticleEditorContentArea
+ *   npx vitest run ArticleEditorContentArea
  */
 
 import React, { createRef } from "react";
@@ -9,23 +9,23 @@ import { render, screen } from "@testing-library/react";
 import { ArticleEditorContentArea } from "../components/ArticleEditor/ArticleEditorContentArea";
 import type { LinkedInArticleDraftState } from "../utils/linkedInArticleDraftUtils";
 
-jest.mock("../components/LinkedInArticleLivePreview", () => ({
+vi.mock("../components/LinkedInArticleLivePreview", () => ({
   LinkedInArticleLivePreview: () => (
     <div data-testid="mock-article-live-preview">article preview</div>
   ),
 }));
 
-jest.mock("../components/LinkedInDraftPreview", () => ({
+vi.mock("../components/LinkedInDraftPreview", () => ({
   LinkedInDraftPreview: ({ draft }: { draft: string }) => (
     <div data-testid="mock-citation-preview">{draft.slice(0, 40)}</div>
   ),
 }));
 
-jest.mock("../components/ArticleEditor/ArticleEditorLayout", () => ({
+vi.mock("../components/ArticleEditor/ArticleEditorLayout", () => ({
   ArticleEditorLayout: () => <div data-testid="article-editor-layout">editor</div>,
 }));
 
-jest.mock("../components/LinkedInAssistiveWritingCard", () => ({
+vi.mock("../components/LinkedInAssistiveWritingCard", () => ({
   __esModule: true,
   default: () => <div data-testid="assistive-writing-card" />,
 }));
@@ -45,7 +45,7 @@ const sampleState: LinkedInArticleDraftState = {
 const baseProps = {
   contentRef: createRef<HTMLDivElement>(),
   articleDraftState: sampleState,
-  onArticleDraftChange: jest.fn(),
+  onArticleDraftChange: vi.fn(),
   draftMarkdown: "# Future of Remote Work\n\nRemote work is here to stay.",
   isGenerating: false,
   loadingMessage: "",

@@ -26,15 +26,13 @@ import {
   ListItemSecondaryAction,
   Divider
 } from '@mui/material';
-import {
-  Web as WordPressIcon,
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Refresh as RefreshIcon,
-  Settings as SettingsIcon
-} from '@mui/icons-material';
+import WordPressIcon from '@mui/icons-material/Web';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import SettingsIcon from '@mui/icons-material/Settings';
 import { useWordPressConnection } from '../../../hooks/useWordPressConnection';
 
 interface WordPressPlatformCardProps {

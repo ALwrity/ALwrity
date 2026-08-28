@@ -7,8 +7,8 @@ import {
 } from "../../components/dashboard/performancePulse/openPerformanceContentInQuickCreate";
 import { buildPerformancePulseCreatePayload } from "../../components/dashboard/performancePulse/payload";
 
-jest.mock("../../components/dashboard/engagementWedgeNavigation", () => ({
-  openQuickCreateFromWedge: jest.fn(),
+vi.mock("../../components/dashboard/engagementWedgeNavigation", () => ({
+  openQuickCreateFromWedge: vi.fn(),
 }));
 
 function makePost(text: string): LinkedInPost {
@@ -34,7 +34,7 @@ function makePost(text: string): LinkedInPost {
 
 describe("openRepurposeLabInQuickCreate", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it("passes rich repurpose payload and Remarket return target", () => {

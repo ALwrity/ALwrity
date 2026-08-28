@@ -11,15 +11,13 @@ import {
   Fade,
   Slide,
 } from '@mui/material';
-import {
-  WifiOff as WifiOffIcon,
-  Refresh as RefreshIcon,
-  Home as HomeIcon,
-  CheckCircle as CheckCircleIcon,
-  ErrorOutline as ErrorOutlineIcon,
-  CloudQueue as CloudIcon,
-  Schedule as ScheduleIcon,
-} from '@mui/icons-material';
+import WifiOffIcon from '@mui/icons-material/WifiOff';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import HomeIcon from '@mui/icons-material/Home';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import CloudIcon from '@mui/icons-material/CloudQueue';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 import { keyframes } from '@mui/system';
 
 interface ConnectionErrorPageProps {

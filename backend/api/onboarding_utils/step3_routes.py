@@ -14,6 +14,7 @@ from pydantic import BaseModel, HttpUrl, Field
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta, timezone
 import traceback
+import re
 from loguru import logger
 
 from middleware.auth_middleware import get_current_user
@@ -50,10 +51,22 @@ class CompetitorDiscoveryResponse(BaseModel):
     social_media_accounts: Optional[Dict[str, str]] = None
     social_media_citations: Optional[List[Dict[str, Any]]] = None
     research_summary: Optional[Dict[str, Any]] = None
+    content_pillars: Optional[Dict[str, Any]] = None
     total_competitors: Optional[int] = None
     industry_context: Optional[str] = None
     analysis_timestamp: Optional[str] = None
     api_cost: Optional[float] = None
+    error: Optional[str] = None
+
+class ContentPillarsRequest(BaseModel):
+    """Request model for content pillar discovery."""
+    user_url: str = Field(..., description="User's website URL")
+
+class ContentPillarsResponse(BaseModel):
+    """Response model for content pillar discovery."""
+    success: bool
+    message: str
+    content_pillars: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 
 class ResearchDataRequest(BaseModel):
@@ -181,6 +194,7 @@ class SitemapAnalysisRequest(BaseModel):
     industry_context: Optional[str] = Field(None, description="Industry context for analysis")
     analyze_content_trends: bool = Field(True, description="Whether to analyze content trends")
     analyze_publishing_patterns: bool = Field(True, description="Whether to analyze publishing patterns")
+    force: bool = Field(False, description="Skip cached result and force a fresh analysis")
 
 class SitemapAnalysisResponse(BaseModel):
     """Response model for sitemap analysis."""
@@ -289,6 +303,7 @@ async def discover_competitors(
                 social_media_accounts=result.get("social_media_accounts"),
                 social_media_citations=result.get("social_media_citations"),
                 research_summary=result["research_summary"],
+                content_pillars=result.get("content_pillars"),
                 total_competitors=result["total_competitors"],
                 industry_context=result["industry_context"],
                 analysis_timestamp=result["analysis_timestamp"],
@@ -318,6 +333,63 @@ async def discover_competitors(
             message="Internal server error during competitor discovery",
             session_id=clerk_user_id,
             user_url=request.user_url,
+            error=str(e)
+        )
+
+@router.post("/discover-content-pillars", response_model=ContentPillarsResponse)
+async def discover_content_pillars(
+    request: ContentPillarsRequest,
+    current_user: dict = Depends(get_current_user)
+) -> ContentPillarsResponse:
+    """
+    Re-discover content pillars for the user's website without re-running the
+    full competitor discovery. Results are persisted to ResearchPreferences so
+    they survive refresh and stepper navigation.
+    """
+    try:
+        clerk_user_id = str(current_user.get('id'))
+        user_url = request.user_url
+        if not user_url.startswith(('http://', 'https://')):
+            user_url = f"https://{user_url}"
+
+        logger.info(f"Content pillar refresh for user {clerk_user_id}, URL: {user_url}")
+
+        pillars = await step3_research_service._discover_content_pillars_with_fallback(user_url)
+
+        if not pillars:
+            logger.warning(f"Content pillar refresh returned no data for user {clerk_user_id}")
+            return ContentPillarsResponse(
+                success=False,
+                message="Content pillar discovery returned no data",
+                error="Content pillar discovery returned no data. Exa credits may be exhausted or the domain returned no results."
+            )
+
+        persist_ok = False
+        try:
+            from api.onboarding_utils.step_management_service import StepManagementService
+            db = get_session_for_user(clerk_user_id)
+            if db:
+                svc = StepManagementService()
+                persist_ok = svc.save_content_pillars(clerk_user_id, pillars, db)
+                db.close()
+        except Exception as persist_err:
+            logger.warning(f"Failed to persist content pillars for user {clerk_user_id}: {persist_err}")
+
+        if not persist_ok:
+            logger.warning(f"Content pillar persistence failed for user {clerk_user_id}")
+
+        return ContentPillarsResponse(
+            success=True,
+            message="Content pillars discovered",
+            content_pillars=pillars,
+        )
+
+    except Exception as e:
+        logger.error(f"Error in content pillar discovery endpoint: {str(e)}")
+        logger.error(traceback.format_exc())
+        return ContentPillarsResponse(
+            success=False,
+            message="Content pillar discovery failed",
             error=str(e)
         )
 
@@ -705,6 +777,56 @@ async def discover_sitemap(
             "error": str(e)
         }
 
+@router.get("/sitemap-analysis")
+async def get_persisted_sitemap_analysis(
+    user_url: Optional[str] = None,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Return the persisted sitemap analysis from DB (no LLM call).
+
+    Mirrors ``GET /api/onboarding/competitor-analysis``: the frontend calls
+    this before auto-triggering an LLM analysis so the Strategic Content
+    Opportunities section restores from DB on navigation/refresh instead of
+    paying for a fresh LLM call every time.
+    """
+    try:
+        user_id = str(current_user.get('id'))
+        from services.database import get_session_for_user
+        from api.onboarding_utils.step_management_service import StepManagementService
+        from models.onboarding import WebsiteAnalysis
+
+        db = get_session_for_user(user_id)
+        if not db:
+            logger.info(f"[sitemap_get] MISS: no DB for user={user_id}")
+            return {"success": False, "sitemap_analysis": None, "discovery_method": "none"}
+
+        try:
+            svc = StepManagementService()
+            session = svc._get_or_create_session(user_id, db)
+            analysis = db.query(WebsiteAnalysis).filter(
+                WebsiteAnalysis.session_id == session.id
+            ).order_by(WebsiteAnalysis.updated_at.desc()).first()
+
+            if not analysis:
+                logger.info(f"[sitemap_get] MISS: no WebsiteAnalysis row for session={getattr(session, 'id', None)} user={user_id}")
+                return {"success": False, "sitemap_analysis": None, "discovery_method": "none"}
+
+            seo_audit = analysis.seo_audit or {}
+            cached = seo_audit.get("sitemap_analysis")
+            if not isinstance(cached, dict) or not cached.get("success", True):
+                logger.info(f"[sitemap_get] MISS: no sitemap_analysis in seo_audit (keys={list(seo_audit.keys())}) user={user_id}")
+                return {"success": False, "sitemap_analysis": None, "discovery_method": "none"}
+
+            logger.info(f"[sitemap_get] HIT for user={user_id}")
+            return {"success": True, "sitemap_analysis": cached, "discovery_method": "db"}
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error reading persisted sitemap analysis: {e}")
+        logger.error(traceback.format_exc())
+        return {"success": False, "sitemap_analysis": None, "discovery_method": "error", "error": str(e)}
+
+
 @router.post("/analyze-sitemap", response_model=SitemapAnalysisResponse)
 async def analyze_sitemap_for_onboarding(
     request: SitemapAnalysisRequest,
@@ -721,77 +843,121 @@ async def analyze_sitemap_for_onboarding(
     try:
         logger.info(f"Starting sitemap analysis for user: {current_user.get('user_id', 'unknown')}")
         logger.info(f"Sitemap analysis request: {request.user_url}")
-        
-        # Determine sitemap URL using intelligent discovery
-        sitemap_url = request.sitemap_url
-        if not sitemap_url:
-            # Use intelligent sitemap discovery
-            discovered_sitemap = await sitemap_service.discover_sitemap_url(request.user_url)
-            if discovered_sitemap:
-                sitemap_url = discovered_sitemap
-                logger.info(f"Discovered sitemap via intelligent search: {sitemap_url}")
-            else:
-                # Fallback to standard location if discovery fails
-                base_url = request.user_url.rstrip('/')
-                sitemap_url = f"{base_url}/sitemap.xml"
-                logger.info(f"Using fallback sitemap URL: {sitemap_url}")
-        
-        logger.info(f"Analyzing sitemap: {sitemap_url}")
-        
-        # Run onboarding-specific sitemap analysis
-        analysis_result = await sitemap_service.analyze_sitemap_for_onboarding(
-            sitemap_url=sitemap_url,
-            user_url=request.user_url,
-            competitors=request.competitors,
-            industry_context=request.industry_context,
-            analyze_content_trends=request.analyze_content_trends,
-            analyze_publishing_patterns=request.analyze_publishing_patterns,
-            user_id=str(current_user.get('id'))
-        )
-        
-        # Check if analysis was successful
-        if analysis_result.get("error"):
-            logger.error(f"Sitemap analysis failed: {analysis_result['error']}")
-            return SitemapAnalysisResponse(
-                success=False,
-                message="Sitemap analysis failed",
-                user_url=request.user_url,
-                sitemap_url=sitemap_url,
-                error=analysis_result["error"]
-            )
-        
-        # Extract onboarding insights
-        onboarding_insights = analysis_result.get("onboarding_insights", {})
-        
-        # Log successful analysis
-        logger.info(f"Sitemap analysis completed successfully for {request.user_url}")
-        logger.info(f"Found {analysis_result.get('structure_analysis', {}).get('total_urls', 0)} URLs")
-        
-        # Background task to persist analysis results to DB
-        background_tasks.add_task(
-            _persist_sitemap_analysis,
-            str(current_user.get('id')),
-            request.user_url,
-            analysis_result
-        )
-        
-        # Determine discovery method
-        discovery_method = "fallback"
-        if request.sitemap_url:
-            discovery_method = "user_provided"
-        elif discovered_sitemap:
-            discovery_method = "intelligent_search"
-        
-        return SitemapAnalysisResponse(
-            success=True,
-            message="Sitemap analysis completed successfully",
-            user_url=request.user_url,
-            sitemap_url=sitemap_url,
-            analysis_data=analysis_result,
-            onboarding_insights=onboarding_insights,
-            analysis_timestamp=datetime.utcnow().isoformat(),
-            discovery_method=discovery_method
-        )
+
+        # ------------------------------------------------------------------
+        # In-flight dedup: if another request is already running the
+        # same analysis (e.g. user navigated away/back during the 45-90s
+        # window), block the duplicate rather than paying for a second
+        # LLM call.  Skip this check when force=True (Refresh button).
+        # ------------------------------------------------------------------
+        inflight_key = _normalize_site_url(request.user_url)
+        if not request.force:
+            if inflight_key in _sitemap_inflight_locks:
+                logger.info(f"[sitemap_dedup] BLOCKED concurrent duplicate for {inflight_key}")
+                return SitemapAnalysisResponse(
+                    success=False,
+                    message="Analysis already in progress for this URL. Please wait.",
+                    user_url=request.user_url,
+                    sitemap_url=request.sitemap_url or f"{request.user_url.rstrip('/')}/sitemap.xml",
+                    error="analysis_in_progress"
+                )
+            _sitemap_inflight_locks[inflight_key] = True
+
+        try:
+          # ------------------------------------------------------------------
+          # Cache-first: return a recently persisted analysis instead of paying
+          # for a fresh LLM call on every navigation/refresh. The frontend
+          # "Refresh Strategy" button sends force=True to bypass this.
+          # ------------------------------------------------------------------
+          if not request.force:
+              cached = _load_cached_sitemap_analysis(str(current_user.get('id')), request.user_url)
+              if cached:
+                  logger.info(f"Sitemap analysis cache HIT for {request.user_url}; returning persisted result")
+                  return SitemapAnalysisResponse(
+                      success=True,
+                      message="Returning cached sitemap analysis",
+                      user_url=request.user_url,
+                      sitemap_url=cached.get("sitemap_url") or f"{request.user_url.rstrip('/')}/sitemap.xml",
+                      analysis_data=cached.get("analysis_data"),
+                      onboarding_insights=(cached.get("analysis_data") or {}).get("onboarding_insights"),
+                      analysis_timestamp=cached.get("analyzed_at"),
+                      discovery_method="cache"
+                  )
+
+          # Determine sitemap URL using intelligent discovery
+          sitemap_url = request.sitemap_url
+          if not sitemap_url:
+              # Use intelligent sitemap discovery
+              discovered_sitemap = await sitemap_service.discover_sitemap_url(request.user_url)
+              if discovered_sitemap:
+                  sitemap_url = discovered_sitemap
+                  logger.info(f"Discovered sitemap via intelligent search: {sitemap_url}")
+              else:
+                  # Fallback to standard location if discovery fails
+                  base_url = request.user_url.rstrip('/')
+                  sitemap_url = f"{base_url}/sitemap.xml"
+                  logger.info(f"Using fallback sitemap URL: {sitemap_url}")
+          
+          logger.info(f"Analyzing sitemap: {sitemap_url}")
+          
+          # Run onboarding-specific sitemap analysis
+          analysis_result = await sitemap_service.analyze_sitemap_for_onboarding(
+              sitemap_url=sitemap_url,
+              user_url=request.user_url,
+              competitors=request.competitors,
+              industry_context=request.industry_context,
+              analyze_content_trends=request.analyze_content_trends,
+              analyze_publishing_patterns=request.analyze_publishing_patterns,
+              user_id=str(current_user.get('id'))
+          )
+          
+          # Check if analysis was successful
+          if analysis_result.get("error"):
+              logger.error(f"Sitemap analysis failed: {analysis_result['error']}")
+              return SitemapAnalysisResponse(
+                  success=False,
+                  message="Sitemap analysis failed",
+                  user_url=request.user_url,
+                  sitemap_url=sitemap_url,
+                  error=analysis_result["error"]
+              )
+          
+          # Extract onboarding insights
+          onboarding_insights = analysis_result.get("onboarding_insights", {})
+          
+          # Log successful analysis
+          logger.info(f"Sitemap analysis completed successfully for {request.user_url}")
+          logger.info(f"Found {analysis_result.get('structure_analysis', {}).get('total_urls', 0)} URLs")
+          
+          # Persist synchronously (matching competitor discovery) so the result
+          # survives navigation even if the process restarts before a background
+          # task would have run. `_persist_sitemap_analysis` is a fast DB write.
+          await _persist_sitemap_analysis(
+              str(current_user.get('id')),
+              request.user_url,
+              analysis_result
+          )
+          
+          # Determine discovery method
+          discovery_method = "fallback"
+          if request.sitemap_url:
+              discovery_method = "user_provided"
+          elif discovered_sitemap:
+              discovery_method = "intelligent_search"
+          
+          return SitemapAnalysisResponse(
+              success=True,
+              message="Sitemap analysis completed successfully",
+              user_url=request.user_url,
+              sitemap_url=sitemap_url,
+              analysis_data=analysis_result,
+              onboarding_insights=onboarding_insights,
+              analysis_timestamp=datetime.utcnow().isoformat(),
+              discovery_method=discovery_method
+          )
+          
+        finally:
+          _sitemap_inflight_locks.pop(inflight_key, None)
         
     except Exception as e:
         logger.error(f"Error in sitemap analysis: {str(e)}")
@@ -804,6 +970,89 @@ async def analyze_sitemap_for_onboarding(
             sitemap_url=sitemap_url or f"{request.user_url.rstrip('/')}/sitemap.xml",
             error=str(e)
         )
+
+def _normalize_site_url(url: str) -> str:
+    """Normalize a site URL for cache matching (strip protocol/www/trailing slash)."""
+    if not isinstance(url, str):
+        return ''
+    u = url.strip().lower()
+    u = re.sub(r'^https?://', '', u)
+    if u.startswith('www.'):
+        u = u[4:]
+    return u.rstrip('/')
+
+
+# Track in-flight analyze-sitemap requests to block duplicate concurrent
+# calls across frontend remounts (e.g., user navigates away/back during the
+# 45-90s analysis window).  Module-level dict keyed by normalized URL →
+# asyncio.Lock.  Slightly cheaper than a full module-level Lock + dict of
+# timestamps; the lock is released as soon as the coroutine finishes.
+_sitemap_inflight_locks: Dict[str, bool] = {}
+
+
+def _load_cached_sitemap_analysis(user_id: str, user_url: str) -> Optional[Dict[str, Any]]:
+    """Load a recent sitemap analysis from WebsiteAnalysis.seo_audit, if any.
+
+    Returns the persisted ``sitemap_analysis`` dict when it exists for the
+    same ``user_url`` and is fresher than 24h; otherwise returns None.
+    """
+    norm_requested = _normalize_site_url(user_url)
+    try:
+        from services.database import get_session_for_user
+        from api.onboarding_utils.step_management_service import StepManagementService
+        from models.onboarding import WebsiteAnalysis
+
+        db = get_session_for_user(user_id)
+        if not db:
+            logger.info(f"[sitemap_cache] MISS: get_session_for_user returned None for user={user_id}")
+            return None
+        try:
+            svc = StepManagementService()
+            session = svc._get_or_create_session(user_id, db)
+            analysis = db.query(WebsiteAnalysis).filter(
+                WebsiteAnalysis.session_id == session.id
+            ).first()
+            if not analysis:
+                logger.info(f"[sitemap_cache] MISS: no WebsiteAnalysis row for session={getattr(session,'id',None)} user={user_id}")
+                return None
+
+            seo_audit = analysis.seo_audit or {}
+            cached = seo_audit.get("sitemap_analysis")
+            if not isinstance(cached, dict):
+                logger.info(f"[sitemap_cache] MISS: seo_audit has no sitemap_analysis key (keys={list(seo_audit.keys())}) user={user_id}")
+                return None
+            if not cached.get("success", True):
+                logger.info(f"[sitemap_cache] MISS: sitemap_analysis.success={cached.get('success')} user={user_id}")
+                return None
+
+            # Normalize-then-compare (protocol/www/trailing slash tolerant)
+            cached_url = _normalize_site_url(cached.get("user_url") or "")
+            if cached_url != norm_requested:
+                logger.info(
+                    f"[sitemap_cache] MISS: URL mismatch cached='{cached_url}' "
+                    f"requested='{norm_requested}' user={user_id}"
+                )
+                return None
+
+            # TTL check (24h, matching the frontend localStorage cache)
+            analyzed_at = cached.get("analyzed_at")
+            if analyzed_at:
+                try:
+                    analyzed_dt = datetime.fromisoformat(str(analyzed_at))
+                    if datetime.utcnow() - analyzed_dt > timedelta(hours=24):
+                        logger.info(f"[sitemap_cache] MISS: expired analyzed_at={analyzed_at} user={user_id}")
+                        return None
+                except ValueError:
+                    pass  # Unparseable timestamp — treat as fresh rather than blocking
+
+            logger.info(f"[sitemap_cache] HIT for user={user_id} url={norm_requested}")
+            return cached
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"[sitemap_cache] MISS: exception for user={user_id}: {e}")
+        return None
+
 
 async def _persist_sitemap_analysis(
     user_id: str,
@@ -831,12 +1080,18 @@ async def _persist_sitemap_analysis(
         ).first()
         
         if analysis:
-            seo_audit = analysis.seo_audit or {}
+            # Copy into a NEW dict before mutating. `seo_audit` is a plain
+            # JSON column (not MutableDict), so mutating the loaded object
+            # in-place and re-assigning the SAME object makes SQLAlchemy skip
+            # the UPDATE entirely — the sitemap analysis was silently never
+            # persisted. flag_modified() makes the change explicit regardless.
+            from sqlalchemy.orm.attributes import flag_modified
+            seo_audit = dict(analysis.seo_audit or {})
             seo_audit["sitemap_analysis"] = {
                 "success": True,
                 "user_url": user_url,
                 "sitemap_url": analysis_result.get("sitemap_url"),
-                "analyzed_at": analysis_result.get("timestamp"),
+                "analyzed_at": datetime.utcnow().isoformat(),
                 "analysis_data": {
                     "total_urls": analysis_result.get("total_urls", 0),
                     "url_list": analysis_result.get("url_list", []),
@@ -849,6 +1104,7 @@ async def _persist_sitemap_analysis(
                 },
             }
             analysis.seo_audit = seo_audit
+            flag_modified(analysis, "seo_audit")
             db.commit()
             logger.info(f"Sitemap analysis persisted for user {user_id}")
         else:

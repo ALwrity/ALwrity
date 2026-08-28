@@ -17,14 +17,12 @@ import {
   ListItemText,
   ListItemIcon
 } from '@mui/material';
-import {
-  Search as SearchIcon,
-  Add as AddIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
-  TrendingUp as TrendingUpIcon,
-  Assessment as AssessmentIcon
-} from '@mui/icons-material';
+import SearchIcon from '@mui/icons-material/Search';
+import AddIcon from '@mui/icons-material/Add';
+import WarningIcon from '@mui/icons-material/Warning';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import { useContentPlanningStore } from '../../../stores/contentPlanningStore';
 import { contentPlanningApi } from '../../../services/contentPlanningApi';
 

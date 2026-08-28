@@ -9,15 +9,13 @@ import {
   Divider,
   Box
 } from '@mui/material';
-import {
-  Edit as EditIcon,
-  DeleteOutline as DeleteOutlineIcon,
-  FileCopyOutlined as FileCopyOutlinedIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  MoreHoriz as MoreHorizIcon,
-  Visibility as VisibilityIcon,
-} from '@mui/icons-material';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import FileCopyOutlinedIcon from '@mui/icons-material/FileCopyOutlined';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import useBlogTextSelectionHandler from './BlogTextSelectionHandler';
 import HoverMenu from './HoverMenu';
 import { blogWriterApi } from '../../../services/blogWriterApi';

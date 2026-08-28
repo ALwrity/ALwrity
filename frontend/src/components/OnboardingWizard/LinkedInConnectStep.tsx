@@ -21,10 +21,8 @@ import {
   CardContent,
   Divider,
 } from '@mui/material';
-import {
-  LinkedIn as LinkedInIcon,
-  CheckCircle as CheckCircleIcon,
-} from '@mui/icons-material';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useLinkedInSocialConnection } from '../../hooks/useLinkedInSocialConnection';
 
 interface LinkedInConnectStepProps {

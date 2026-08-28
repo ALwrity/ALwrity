@@ -322,16 +322,10 @@ def start_backend(enable_reload=False, production_mode=False):
     print(f"   ==> Host: {host}", flush=True)
     print(f"   ==> Port: {port}", flush=True)
     print(f"   [DEV] Reload: {reload}", flush=True)
-    print(f"[DEBUG] About to import app module...", flush=True)
-    print("[DEBUG] >>> START APP IMPORT <<<", flush=True)
-    
+
     try:
-        # Import and run the app
-        from app import app
-        print("[DEBUG] >>> END APP IMPORT <<<", flush=True)
-        
         import uvicorn
-        print(f"[DEBUG] Imported app and uvicorn successfully", flush=True)
+        print(f"[DEBUG] Imported uvicorn successfully", flush=True)
 
         # Note: Database already initialized by DatabaseSetup in main()
         

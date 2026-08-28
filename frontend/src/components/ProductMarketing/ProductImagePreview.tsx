@@ -11,12 +11,10 @@ import {
   Stack,
   Chip,
 } from '@mui/material';
-import {
-  PhotoCamera,
-  Palette,
-  LightMode,
-  Style as StyleIcon,
-} from '@mui/icons-material';
+import PhotoCamera from '@mui/icons-material/PhotoCamera';
+import Palette from '@mui/icons-material/Palette';
+import LightMode from '@mui/icons-material/LightMode';
+import StyleIcon from '@mui/icons-material/Style';
 
 interface ProductImageSettingsPreviewProps {
   productName: string;

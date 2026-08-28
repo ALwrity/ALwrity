@@ -270,7 +270,6 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light', showPlanChip
               height: 12,
               borderRadius: '50%',
               bgcolor: getStatusBulbColor(),
-              border: `2px solid ${colorMode === 'dark' ? '#1a1a1a' : 'white'}`,
               boxShadow: `0 0 8px ${getStatusBulbColor()}80`,
               animation: systemStatus === 'healthy' ? 'pulse 2s ease-in-out infinite' : 'none',
               '@keyframes pulse': {

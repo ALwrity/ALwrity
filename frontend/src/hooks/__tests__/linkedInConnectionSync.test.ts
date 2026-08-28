@@ -34,7 +34,7 @@ describe('linkedInConnectionEvents sync', () => {
   });
 
   it('subscribeLinkedInStatusSync receives same-tab CustomEvent', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     const unsubscribe = subscribeLinkedInStatusSync(handler);
 
     broadcastLinkedInStatusChanged('connected');
@@ -48,7 +48,7 @@ describe('linkedInConnectionEvents sync', () => {
   });
 
   it('subscribeLinkedInStatusSync ignores storage events from same tab', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     const unsubscribe = subscribeLinkedInStatusSync(handler);
 
     window.dispatchEvent(
@@ -67,7 +67,7 @@ describe('linkedInConnectionEvents sync', () => {
   });
 
   it('subscribeLinkedInStatusSync handles cross-tab storage events', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     const unsubscribe = subscribeLinkedInStatusSync(handler);
 
     window.dispatchEvent(
@@ -89,7 +89,7 @@ describe('linkedInConnectionEvents sync', () => {
   });
 
   it('dispatches LINKEDIN_STATUS_CHANGED_EVENT with detail payload', () => {
-    const listener = jest.fn();
+    const listener = vi.fn();
     window.addEventListener(LINKEDIN_STATUS_CHANGED_EVENT, listener);
 
     broadcastLinkedInStatusChanged('connected');

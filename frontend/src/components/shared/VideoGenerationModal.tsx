@@ -25,12 +25,10 @@ import {
   Button,
   Slider,
 } from '@mui/material';
-import {
-  Info as InfoIcon,
-  HelpOutline as HelpOutlineIcon,
-  Close as CloseIcon,
-  Videocam as VideocamIcon,
-} from '@mui/icons-material';
+import InfoIcon from '@mui/icons-material/Info';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import CloseIcon from '@mui/icons-material/Close';
+import VideocamIcon from '@mui/icons-material/Videocam';
 
 import {
   VideoGenerationModalProps,

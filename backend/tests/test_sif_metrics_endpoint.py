@@ -37,7 +37,7 @@ def metrics():
 def _fake_endpoint(metrics, current_user):
     """Re-implements the body of ``sif_metrics_endpoint``.
 
-    Kept in sync with main.py so the test does not need to load
+    Kept in sync with app.py so the test does not need to load
     the full FastAPI app. The contract is:
       - on success: return get_metrics_for_user(user_id)
       - on ImportError: return degraded dict with "error" key

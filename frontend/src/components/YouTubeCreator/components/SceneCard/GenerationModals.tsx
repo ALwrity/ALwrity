@@ -1,7 +1,13 @@
-import React from 'react';
-import { AudioSettingsModal, AudioGenerationSettings } from '../../../../components/shared/AudioSettingsModal';
-import { YouTubeImageGenerationModal, YouTubeImageGenerationSettings } from '../../shared/YouTubeImageGenerationModal';
-import { Scene } from '../../../../services/youtubeApi';
+import React from "react";
+import {
+  AudioSettingsModal,
+  AudioGenerationSettings,
+} from "../../../../components/shared/AudioSettingsModal";
+import {
+  YouTubeImageGenerationModal,
+  YouTubeImageGenerationSettings,
+} from "../../shared/YouTubeImageGenerationModal";
+import { Scene } from "../../../../services/youtubeApi";
 
 interface GenerationModalsProps {
   scene: Scene;
@@ -29,7 +35,7 @@ export const GenerationModals: React.FC<GenerationModalsProps> = ({
   language,
 }) => {
   const imageInitialPrompt =
-    `${scene.visual_prompt || ''}\n${scene.enhanced_visual_prompt || ''}`.trim() ||
+    `${scene.visual_prompt || ""}\n${scene.enhanced_visual_prompt || ""}`.trim() ||
     `Create a YouTube scene image for: ${scene.title}`;
 
   return (
@@ -52,7 +58,7 @@ export const GenerationModals: React.FC<GenerationModalsProps> = ({
         initialRenderingSpeed="Quality"
         initialAspectRatio="16:9"
         initialModel="ideogram-v3-turbo"
-        isGenerating={false} // This will be passed from parent
+        isGenerating={false}
         sceneTitle={scene.title}
       />
     </>

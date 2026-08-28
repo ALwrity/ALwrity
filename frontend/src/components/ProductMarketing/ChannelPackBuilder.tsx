@@ -15,15 +15,13 @@ import {
   Tabs,
   Tab,
 } from '@mui/material';
-import {
-  Instagram,
-  LinkedIn,
-  Facebook,
-  Twitter,
-  YouTube,
-  Pinterest,
-  MusicNote,
-} from '@mui/icons-material';
+import Instagram from '@mui/icons-material/Instagram';
+import LinkedIn from '@mui/icons-material/LinkedIn';
+import Facebook from '@mui/icons-material/Facebook';
+import Twitter from '@mui/icons-material/Twitter';
+import YouTube from '@mui/icons-material/YouTube';
+import Pinterest from '@mui/icons-material/Pinterest';
+import MusicNote from '@mui/icons-material/MusicNote';
 import { motion } from 'framer-motion';
 import { GlassyCard } from '../ImageStudio/ui/GlassyCard';
 import { SectionHeader } from '../ImageStudio/ui/SectionHeader';

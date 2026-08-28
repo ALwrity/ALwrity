@@ -15,7 +15,7 @@ describe("useYouTubeFullCreatorModalHost", () => {
   });
 
   it("opens Full Creator modal when openYouTubeCreator fires", () => {
-    const onCloseWedges = jest.fn();
+    const onCloseWedges = vi.fn();
     const { result } = renderHook(() => useYouTubeFullCreatorModalHost(onCloseWedges));
 
     expect(result.current.fullCreatorOpen).toBe(false);
@@ -29,7 +29,7 @@ describe("useYouTubeFullCreatorModalHost", () => {
   });
 
   it("closes modal via closeFullCreatorModal", () => {
-    const { result } = renderHook(() => useYouTubeFullCreatorModalHost(jest.fn()));
+    const { result } = renderHook(() => useYouTubeFullCreatorModalHost(vi.fn()));
 
     act(() => {
       window.dispatchEvent(new CustomEvent(YT_OPEN_CREATOR_EVENT, { detail: {} }));
@@ -44,7 +44,7 @@ describe("useYouTubeFullCreatorModalHost", () => {
 
   it("opens Full Creator modal when pending deep-link exists on mount", () => {
     queueYouTubeCreatorOpen({ step: 0, userIdea: "From blog" });
-    const onCloseWedges = jest.fn();
+    const onCloseWedges = vi.fn();
     const { result } = renderHook(() => useYouTubeFullCreatorModalHost(onCloseWedges));
 
     expect(onCloseWedges).toHaveBeenCalled();
@@ -57,7 +57,7 @@ describe("useYouTubeFullCreatorModalHost", () => {
       userIdea: "Blog idea",
       focusUrlImport: true,
     });
-    const onCloseWedges = jest.fn();
+    const onCloseWedges = vi.fn();
     const { result } = renderHook(() => useYouTubeFullCreatorModalHost(onCloseWedges));
 
     expect(onCloseWedges).not.toHaveBeenCalled();
@@ -67,7 +67,7 @@ describe("useYouTubeFullCreatorModalHost", () => {
 
   it("closes modal and clears pending on YT_CLOSE_CREATOR_EVENT", () => {
     queueYouTubeCreatorOpen({ step: 0, userIdea: "Queued" });
-    const { result } = renderHook(() => useYouTubeFullCreatorModalHost(jest.fn()));
+    const { result } = renderHook(() => useYouTubeFullCreatorModalHost(vi.fn()));
 
     act(() => {
       window.dispatchEvent(new CustomEvent(YT_OPEN_CREATOR_EVENT, { detail: {} }));

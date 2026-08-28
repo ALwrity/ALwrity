@@ -10,10 +10,8 @@ import {
   // Divider
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Close as CloseIcon,
-  Search as SearchIcon
-} from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import SearchIcon from '@mui/icons-material/Search';
 import ToolCard from '../../shared/ToolCard';
 import { Tool } from '../../shared/types';
 import { getToolsForCategory } from '../../shared/utils';

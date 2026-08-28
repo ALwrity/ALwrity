@@ -9,13 +9,11 @@ import {
   useTheme,
   Chip
 } from '@mui/material';
-import { 
-  MovieFilter, 
-  Campaign, 
-  CurrencyExchange, 
-  RecordVoiceOver,
-  AutoAwesome
-} from '@mui/icons-material';
+import MovieFilter from '@mui/icons-material/MovieFilter';
+import Campaign from '@mui/icons-material/Campaign';
+import CurrencyExchange from '@mui/icons-material/CurrencyExchange';
+import RecordVoiceOver from '@mui/icons-material/RecordVoiceOver';
+import AutoAwesome from '@mui/icons-material/AutoAwesome';
 
 interface TipSlide {
   title: string;

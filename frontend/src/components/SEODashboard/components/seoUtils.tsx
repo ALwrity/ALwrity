@@ -1,17 +1,15 @@
 import React from 'react';
-import { 
-  CheckCircle as CheckCircleIcon, 
-  Warning as WarningIcon, 
-  Error as ErrorIcon, 
-  Info as InfoIcon,
-  Speed as SpeedIcon, 
-  Security as SecurityIcon, 
-  Code as CodeIcon, 
-  Accessibility as AccessibilityIcon, 
-  MobileFriendly as MobileIcon, 
-  Search as SearchIcon, 
-  Article as ArticleIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
+import InfoIcon from '@mui/icons-material/Info';
+import SpeedIcon from '@mui/icons-material/Speed';
+import SecurityIcon from '@mui/icons-material/Security';
+import CodeIcon from '@mui/icons-material/Code';
+import AccessibilityIcon from '@mui/icons-material/Accessibility';
+import MobileIcon from '@mui/icons-material/MobileFriendly';
+import SearchIcon from '@mui/icons-material/Search';
+import ArticleIcon from '@mui/icons-material/Article';
 
 // SEO Analysis Utilities
 export const getStatusColor = (status: string) => {

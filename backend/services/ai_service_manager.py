@@ -473,14 +473,16 @@ Format as structured JSON with detailed assessment and optimization guidance.
             
             # Check for errors in response
             if response.get("error"):
-                error_message = response["error"]
+                error_message = response.get("error", "Unknown error from LLM service")
                 logger.error(f"AI call error for {service_type.value}: {error_message}")
+                if response.get("details"):
+                    logger.error(f"AI call error details: {response.get('details')}")
                 await self._emit_educational_content(service_type, "error", error_message)
                 raise Exception(error_message)
             
             # Validate response structure
             if not response or not isinstance(response, dict):
-                error_message = "Invalid response structure from AI service"
+                error_message = f"Invalid response structure from AI service: type={type(response).__name__}"
                 logger.error(f"AI call error for {service_type.value}: {error_message}")
                 await self._emit_educational_content(service_type, "error", error_message)
                 raise Exception(error_message)
@@ -504,8 +506,12 @@ Format as structured JSON with detailed assessment and optimization guidance.
             }
             
         except Exception as e:
+            import traceback
             processing_time = (datetime.utcnow() - start_time).total_seconds()
-            error_message = str(e)
+            error_message = str(e) or "Unknown error (empty exception message)"
+            
+            # Get full traceback for debugging
+            tb = traceback.format_exc()
             
             # Emit error educational content
             await self._emit_educational_content(service_type, "error", error_message)
@@ -514,6 +520,7 @@ Format as structured JSON with detailed assessment and optimization guidance.
             self._record_metrics(service_type, processing_time, success, error_message)
             
             logger.error(f"❌ AI call error for {service_type.value}: {error_message}")
+            logger.error(f"Full traceback: {tb}")
             
             return {
                 "error": error_message,
