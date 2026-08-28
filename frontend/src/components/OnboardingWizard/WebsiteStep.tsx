@@ -28,7 +28,6 @@ import { ContentAuditSummaryCard } from './WebsiteStep/ContentAuditSummaryCard';
 import { SiteHealthSummaryCard } from './WebsiteStep/SiteHealthSummaryCard';
 import PlatformSection from './common/PlatformSection';
 import PlatformAnalytics from '../shared/PlatformAnalytics';
-import EmailSection from './common/EmailSection';
 
 // Import API client for saving
 import { apiClient } from '../../api/client';
@@ -49,7 +48,6 @@ interface WebsiteStepProps {
   onDataReady?: (getData: () => any) => void;
   initialData?: any;
   email?: string;
-  onEmailChange?: (email: string) => void;
 }
 
 interface AnalysisProgress {
@@ -81,8 +79,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   onValidationChange, 
   onDataReady, 
   initialData,
-  email: propEmail,
-  onEmailChange
+  email: propEmail
 }) => {
   const [website, setWebsite] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +100,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   const urlWasPreFilledRef = useRef(false);
   const { user } = useUser();
   const [email, setEmail] = useState<string>('');
-  const [emailDigestOptIn, setEmailDigestOptIn] = useState<boolean>(false);
+  const [emailDigestOptIn, setEmailDigestOptIn] = useState<boolean>(true);
   const [userTimezone, setUserTimezone] = useState<string>('UTC');
 
   const linkedinConnected = connectedPlatforms.includes('linkedin');
@@ -166,13 +163,6 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
       setEmail(propEmail);
     }
   }, [propEmail]);
-
-  const handleEmailChange = (newEmail: string) => {
-    setEmail(newEmail);
-    if (onEmailChange) {
-      onEmailChange(newEmail);
-    }
-  };
 
   // Notify parent when validation state changes (guard against infinite loops)
   const prevValidRef = useRef<boolean | null>(null);
@@ -486,29 +476,6 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
         '100%': { opacity: 1, transform: 'translateY(0)' }
       }
     }}>
-      {/* Header */}
-      <Box sx={{ mb: 3, textAlign: 'center', animation: 'fadeIn 0.6s ease-out' }}>
-        <Typography variant="h4" sx={{
-          fontWeight: 700,
-          mb: 1,
-          background: 'linear-gradient(135deg, #60A5FA 0%, #3B82F6 50%, #1D4ED8 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-        }}>
-          Let ALwrity Learn Your Brand
-        </Typography>
-      </Box>
-
-      {/* Email Section */}
-      <EmailSection 
-        email={email} 
-        onEmailChange={setEmail}
-        emailDigestOptIn={emailDigestOptIn}
-        onEmailDigestOptInChange={setEmailDigestOptIn}
-        userTimezone={userTimezone}
-        onUserTimezoneChange={setUserTimezone}
-      />
-
       {/* Tab Bar */}
       <Box sx={{ display: 'flex', gap: 1.5, mb: 3 }}>
         <Button

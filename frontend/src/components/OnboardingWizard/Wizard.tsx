@@ -758,7 +758,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         onValidationChange={onStep0Valid}
         onDataReady={handleWebsiteDataReady}
         email={email}
-        onEmailChange={handleEmailChange}
       />
     );
 

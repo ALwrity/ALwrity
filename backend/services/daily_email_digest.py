@@ -415,28 +415,58 @@ def render_email(payload: DigestPayload, verbose: bool = True) -> str:
 
 
 # =============================================================================
-# Resend Stub
+# Resend Integration
 # =============================================================================
 
 def _send_via_resend(to_email: str, subject: str, html: str) -> Optional[str]:
     """
-    Send email via Resend. STUB - returns message_id mock or None on error.
-    Replace with actual Resend API call when credentials are available.
+    Send email via Resend SDK.
+    Returns message_id on success, None on failure.
     """
-    # TODO: Replace with actual Resend API call:
-    # import resend
-    # resend.api_key = os.getenv("RESEND_API_KEY")
-    # response = resend.Emails.send({
-    #   "from": "ALwrity Team <onboarding@resend.dev>",
-    #   "to": to_email,
-    #   "subject": subject,
-    #   "html": html,
-    # })
-    # return response["id"]
+    import os
+    import resend
+    from resend.exceptions import ResendError, RateLimitError, ValidationError
 
-    logger.info(f"[RESEND STUB] Would send email to {to_email}: {subject}")
-    # Return mock message ID for now
-    return f"stub_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+    api_key = os.environ.get("RESEND_API_KEY")
+    if not api_key:
+        logger.error("RESEND_API_KEY not configured")
+        return None
+
+    resend.api_key = api_key
+
+    from_address = os.environ.get("RESEND_FROM_ADDRESS", "ALwrity <digest@alwrity.ai>")
+
+    params: resend.Emails.SendParams = {
+        "from": from_address,
+        "to": [to_email],
+        "subject": subject,
+        "html": html,
+        "tags": [
+            {"name": "type", "value": "daily_digest"},
+        ],
+    }
+
+    try:
+        response = resend.Emails.send(params)
+        message_id = response.get("id")
+        if message_id:
+            logger.info(f"Email sent successfully to {to_email}, message_id: {message_id}")
+            return message_id
+        else:
+            logger.error(f"Resend response missing id: {response}")
+            return None
+    except RateLimitError as e:
+        logger.warning(f"Resend rate limit exceeded: {e}")
+        return None
+    except ValidationError as e:
+        logger.error(f"Resend validation error: {e}")
+        return None
+    except ResendError as e:
+        logger.error(f"Resend error: {e.code} - {e.message}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error sending email: {e}")
+        return None
 
 
 # =============================================================================

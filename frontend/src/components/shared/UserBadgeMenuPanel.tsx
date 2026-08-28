@@ -125,6 +125,7 @@ export const UserBadgeMenuPanel: React.FC<UserBadgeMenuPanelProps> = ({
   onManageSubscription,
   onViewCosting,
   onGifMaker,
+  onEmailPreferences,
   onSignOut,
 }) => (
   <Box onClick={(e) => e.stopPropagation()}>
@@ -170,7 +171,7 @@ export const UserBadgeMenuPanel: React.FC<UserBadgeMenuPanelProps> = ({
     <UserBadgeMenuSection 
       label="Email Preferences" 
       headerOnly 
-      onClick={onEmailPreferences} 
+      onClick={() => onEmailPreferences?.()}
     />
 
     <Box
