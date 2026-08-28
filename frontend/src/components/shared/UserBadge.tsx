@@ -331,6 +331,12 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light', showPlanChip
               handleClose();
               window.dispatchEvent(new CustomEvent('open-gif-maker'));
             }}
+            onEmailPreferences={() => {
+              handleClose();
+              // Navigate to email preferences - for now could be a settings page
+              // In future: window.location.href = '/settings/email-preferences';
+              alert('Email Preferences: Manage your daily digest and notification settings here.');
+            }}
             onSignOut={() => {
               handleClose();
               void handleSignOut();

@@ -35,6 +35,7 @@ interface UserBadgeMenuPanelProps {
   onClose: () => void;
   onRefreshPlan: () => void;
   onToggleAdvanced: () => void;
+  onEmailPreferences?: () => void;
   onResetOpen: () => void;
   onDeleteOpen: () => void;
   onManageSubscription: () => void;
@@ -164,6 +165,13 @@ export const UserBadgeMenuPanel: React.FC<UserBadgeMenuPanelProps> = ({
     <UserBadgeMenuSection label="Manage Subscription" headerOnly onClick={onManageSubscription} />
     <UserBadgeMenuSection label="View Costing Details" headerOnly onClick={onViewCosting} />
     <UserBadgeMenuSection label="GIF Maker" headerOnly onClick={onGifMaker} />
+    
+    {/* Email Preferences - for Daily Digest opt-out */}
+    <UserBadgeMenuSection 
+      label="Email Preferences" 
+      headerOnly 
+      onClick={onEmailPreferences} 
+    />
 
     <Box
       component="button"

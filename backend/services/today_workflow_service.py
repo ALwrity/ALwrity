@@ -404,6 +404,31 @@ async def generate_agent_enhanced_plan(
         result["meeting_id"] = meeting_id
         result["meeting_status"] = status
         finish_daily_meeting(db, meeting, status, result, error_message=error_message)
+        
+        # Enqueue daily digest email (non-blocking)
+        # Import here to avoid circular imports
+        try:
+            from services.daily_email_digest import enqueue_digest
+            from models.onboarding import OnboardingSession
+            
+            # Get user's contact email and timezone from onboarding
+            onboarding = db.query(OnboardingSession).filter(
+                OnboardingSession.user_id == user_id
+            ).first()
+            contact_email = onboarding.contact_email if onboarding and onboarding.contact_email else None
+            
+            if contact_email and (onboarding.email_digest_opt_in if onboarding else False):
+                # Enqueue asynchronously (non-blocking)
+                enqueue_digest(user_id, date, contact_email)
+                logger.info(f"Enqueued daily digest for user {user_id} to {contact_email}")
+            elif onboarding and not onboarding.email_digest_opt_in:
+                logger.debug(f"User {user_id} has opted out of email digest")
+            else:
+                logger.debug(f"No contact email for user {user_id}, skipping digest")
+        except Exception as e:
+            # Never fail the meeting flow if digest fails
+            logger.warning(f"Failed to enqueue digest for user {user_id}: {e}")
+        
         return result
 
     meeting_preflight = run_daily_meeting_preflight(user_id, db, grounding, date)
