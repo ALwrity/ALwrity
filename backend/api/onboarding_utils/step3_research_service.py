@@ -132,24 +132,36 @@ class Step3ResearchService:
                 industry_context
             )
             
+            # Generate research summary
+            research_summary = self._generate_research_summary(
+                enhanced_competitors,
+                industry_context
+            )
+            
+            # Get social media citations for persistence
+            social_media_citations = social_media_results.get("citations", [])
+            
             # Persist to DB immediately so results survive refresh
+            # Include research_summary and social_media_citations for persistence
             try:
                 from services.database import get_session_for_user
                 from api.onboarding_utils.step_management_service import StepManagementService
                 db = get_session_for_user(user_id)
                 if db:
                     svc = StepManagementService()
-                    svc._save_competitor_analysis(user_id, enhanced_competitors, industry_context, db, content_pillars=pillars_results)
+                    svc._save_competitor_analysis(
+                        user_id, 
+                        enhanced_competitors, 
+                        industry_context, 
+                        db, 
+                        content_pillars=pillars_results,
+                        research_summary=research_summary,
+                        social_media_citations=social_media_citations
+                    )
                     db.close()
                     logger.info(f"Competitor analysis persisted for user {user_id}")
             except Exception as persist_err:
                 logger.warning(f"Failed to persist competitor analysis for user {user_id}: {persist_err}")
-            
-            # Generate research summary
-            research_summary = self._generate_research_summary(
-                enhanced_competitors,
-                industry_context
-            )
             
             logger.info(f"Successfully discovered {len(enhanced_competitors)} competitors for user {user_id}")
 
@@ -159,7 +171,7 @@ class Step3ResearchService:
                 "user_url": user_url,
                 "competitors": enhanced_competitors,
                 "social_media_accounts": social_media_results.get("social_media_accounts", {}),
-                "social_media_citations": social_media_results.get("citations", []),
+                "social_media_citations": social_media_citations,
                 "content_pillars": pillars_results,
                 "research_summary": research_summary,
                 "total_competitors": len(enhanced_competitors),

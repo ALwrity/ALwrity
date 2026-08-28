@@ -253,12 +253,44 @@ class StepManagementService:
             db.rollback()
             raise e
 
-    def _save_competitor_analysis(self, user_id: str, competitors: List[Dict[str, Any]], industry_context: Optional[str], db: Session, content_pillars: Optional[Dict[str, Any]] = None) -> bool:
-        """Save competitor analysis results to database."""
+    def _save_competitor_analysis(
+        self, 
+        user_id: str, 
+        competitors: List[Dict[str, Any]], 
+        industry_context: Optional[str], 
+        db: Session, 
+        content_pillars: Optional[Dict[str, Any]] = None,
+        research_summary: Optional[Dict[str, Any]] = None,
+        social_media_citations: Optional[List[Dict[str, Any]]] = None
+    ) -> bool:
+        """Save competitor analysis results to database.
+        
+        Args:
+            user_id: User ID
+            competitors: List of competitor data dicts
+            industry_context: Industry context for the analysis
+            db: Database session
+            content_pillars: Optional content pillars from discovery
+            research_summary: Optional research summary (market insights, key findings)
+            social_media_citations: Optional social media citations list
+        """
         try:
             session = self._get_or_create_session(user_id, db)
 
             logger.info(f" COMPETITOR SAVE: Starting to save {len(competitors)} competitors for session {session.id}")
+            
+            # Delete existing competitors for this session before re-inserting
+            # This ensures stale competitors from previous runs are removed
+            try:
+                deleted_stale = db.query(CompetitorAnalysis).filter(
+                    CompetitorAnalysis.session_id == session.id
+                ).delete(synchronize_session=False)
+                db.commit()
+                if deleted_stale > 0:
+                    logger.info(f"  Deleted {deleted_stale} stale competitors for session {session.id}")
+            except Exception as del_err:
+                logger.warning(f"  Failed to delete stale competitors: {del_err}")
+                db.rollback()
             
             saved_count = 0
             failed_count = 0
@@ -326,14 +358,20 @@ class StepManagementService:
             db.commit()
             logger.info(f" Saved {saved_count} competitors ({failed_count} failed)")
 
-            # Persist discovered content pillars so they survive cache expiry
-            if content_pillars:
+            # Persist discovered content pillars, research summary, and social media citations
+            # so they survive cache expiry and page refreshes
+            if content_pillars or research_summary or social_media_citations:
                 try:
                     research_prefs = db.query(ResearchPreferences).filter(
                         ResearchPreferences.session_id == session.id
                     ).first()
                     if research_prefs:
-                        research_prefs.content_pillars = content_pillars
+                        if content_pillars:
+                            research_prefs.content_pillars = content_pillars
+                        if research_summary:
+                            research_prefs.research_summary = research_summary
+                        if social_media_citations:
+                            research_prefs.social_media_citations = social_media_citations
                         research_prefs.updated_at = datetime.utcnow()
                     else:
                         research_prefs = ResearchPreferences(
@@ -343,12 +381,17 @@ class StepManagementService:
                             auto_research=True,
                             factual_content=True,
                             content_pillars=content_pillars,
+                            research_summary=research_summary,
+                            social_media_citations=social_media_citations,
                         )
                         db.add(research_prefs)
                     db.commit()
-                    logger.info(f" Saved content_pillars for session {session.id}")
+                    logger.info(f" Saved research data for session {session.id}: "
+                                f"content_pillars={bool(content_pillars)}, "
+                                f"research_summary={bool(research_summary)}, "
+                                f"social_media_citations={bool(social_media_citations)}")
                 except Exception as pillars_err:
-                    logger.warning(f"Failed to save content_pillars for user {user_id}: {pillars_err}")
+                    logger.warning(f"Failed to save research data for user {user_id}: {pillars_err}")
                     db.rollback()
 
             # Refresh Step 3 flat context with competitor details saved by this flow
@@ -744,6 +787,9 @@ class StepManagementService:
                 step_data['social_media_accounts'] = social_media
                 step_data['crawl_social_media'] = crawl_social_media
                 step_data['content_pillars'] = research.get('content_pillars') if isinstance(research, dict) else None
+                # Include research summary and social media citations from DB persistence
+                step_data['researchSummary'] = research.get('research_summary') if isinstance(research, dict) else None
+                step_data['social_media_citations'] = research.get('social_media_citations') if isinstance(research, dict) else None
 
                 # Include saved sitemap analysis if available
                 seo_audit = website.get('seo_audit', {}) or {}

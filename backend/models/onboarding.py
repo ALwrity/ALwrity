@@ -157,6 +157,8 @@ class ResearchPreferences(Base):
     target_audience = Column(JSON)  # Demographics, expertise level from analysis
     recommended_settings = Column(JSON)  # AI-generated recommendations from analysis
     content_pillars = Column(JSON, nullable=True)  # Discovered content pillars from competitor analysis
+    research_summary = Column(JSON, nullable=True)  # Market insights, key findings, recommendations from competitor analysis
+    social_media_citations = Column(JSON, nullable=True)  # Social media citations discovered during competitor analysis
 
     # Metadata
     created_at = Column(DateTime, default=func.now())
@@ -182,6 +184,8 @@ class ResearchPreferences(Base):
             'target_audience': self.target_audience,
             'recommended_settings': self.recommended_settings,
             'content_pillars': self.content_pillars,
+            'research_summary': self.research_summary,
+            'social_media_citations': self.social_media_citations,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         } 
