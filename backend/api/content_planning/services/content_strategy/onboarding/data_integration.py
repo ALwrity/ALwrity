@@ -35,6 +35,7 @@ from .canonical_profile_builder import (
 from .data_quality import assess_data_quality
 from .analytics_fetchers import fetch_gsc_analytics, fetch_bing_analytics
 import os
+from services.seo_audit_lock import get_seo_audit_lock
 
 logger = get_service_logger("onboarding.data_integration")
 
@@ -186,97 +187,129 @@ class OnboardingDataIntegrationService:
             # Best-effort: never fail the caller (persona save) on a refresh error.
 
     async def store_competitive_sitemap_benchmarking(self, user_id: str, report: Dict[str, Any], db: Session) -> bool:
-        try:
-            if not user_id:
-                return False
-            if not isinstance(report, dict):
-                return False
-
-            session = db.query(OnboardingSession).filter(
-                OnboardingSession.user_id == user_id
-            ).order_by(OnboardingSession.updated_at.desc()).first()
-
-            if not session:
-                return False
-
-            website_analysis = db.query(WebsiteAnalysis).filter(
-                WebsiteAnalysis.session_id == session.id
-            ).order_by(WebsiteAnalysis.updated_at.desc()).first()
-
-            if not website_analysis:
-                return False
-
-            existing = website_analysis.seo_audit if isinstance(website_analysis.seo_audit, dict) else {}
-            existing["competitive_sitemap_benchmarking"] = report
-            website_analysis.seo_audit = existing
-            website_analysis.updated_at = datetime.utcnow()
-            
-            # Use flag_modified to ensure JSON update is detected by SQLAlchemy
-            from sqlalchemy.orm.attributes import flag_modified
-            flag_modified(website_analysis, "seo_audit")
-            
-            db.commit()
-
+        """Store sitemap benchmark report, protected by per-user lock.
+        
+        Gets a fresh db session inside the lock to avoid conflicts with
+        concurrent calls that may have their own session.
+        """
+        async def _do_store():
             try:
-                await self.refresh_integrated_data(user_id, db)
-            except Exception:
-                pass
+                if not user_id:
+                    return False
+                if not isinstance(report, dict):
+                    return False
 
-            return True
-        except Exception as e:
-            logger.error(f"Failed to store competitive sitemap benchmarking for user {user_id}: {e}")
-            db.rollback()
-            return False
+                from services.database import get_session_for_user
+                lock_db = get_session_for_user(user_id)
+                if not lock_db:
+                    return False
+                
+                try:
+                    session = lock_db.query(OnboardingSession).filter(
+                        OnboardingSession.user_id == user_id
+                    ).order_by(OnboardingSession.updated_at.desc()).first()
+
+                    if not session:
+                        return False
+
+                    website_analysis = lock_db.query(WebsiteAnalysis).filter(
+                        WebsiteAnalysis.session_id == session.id
+                    ).order_by(WebsiteAnalysis.updated_at.desc()).first()
+
+                    if not website_analysis:
+                        return False
+
+                    existing = website_analysis.seo_audit if isinstance(website_analysis.seo_audit, dict) else {}
+                    existing["competitive_sitemap_benchmarking"] = report
+                    website_analysis.seo_audit = existing
+                    website_analysis.updated_at = datetime.utcnow()
+                    
+                    from sqlalchemy.orm.attributes import flag_modified
+                    flag_modified(website_analysis, "seo_audit")
+                    
+                    lock_db.commit()
+
+                    try:
+                        await self.refresh_integrated_data(user_id, lock_db)
+                    except Exception:
+                        pass
+
+                    return True
+                finally:
+                    lock_db.close()
+            except Exception as e:
+                logger.error(f"Failed to store competitive sitemap benchmarking for user {user_id}: {e}")
+                if lock_db:
+                    lock_db.rollback()
+                return False
+        
+        lock = await get_seo_audit_lock(user_id)
+        async with lock:
+            return await _do_store()
 
     async def update_competitive_sitemap_benchmarking_status(self, user_id: str, status: str, db: Session, error: Optional[str] = None) -> bool:
-        """Update the status of the competitive sitemap benchmarking task."""
-        try:
-            if not user_id:
+        """Update the status of the competitive sitemap benchmarking task.
+        
+        Protected by per-user lock to prevent concurrent writes from overwriting
+        each other's keys in the seo_audit JSON.
+        """
+        async def _do_update():
+            try:
+                if not user_id:
+                    return False
+
+                from services.database import get_session_for_user
+                lock_db = get_session_for_user(user_id)
+                if not lock_db:
+                    return False
+
+                try:
+                    session = lock_db.query(OnboardingSession).filter(
+                        OnboardingSession.user_id == user_id
+                    ).order_by(OnboardingSession.updated_at.desc()).first()
+
+                    if not session:
+                        return False
+
+                    website_analysis = lock_db.query(WebsiteAnalysis).filter(
+                        WebsiteAnalysis.session_id == session.id
+                    ).order_by(WebsiteAnalysis.updated_at.desc()).first()
+
+                    if not website_analysis:
+                        return False
+
+                    existing = website_analysis.seo_audit if isinstance(website_analysis.seo_audit, dict) else {}
+                    
+                    benchmarking = existing.get("competitive_sitemap_benchmarking", {})
+                    if not isinstance(benchmarking, dict):
+                        benchmarking = {}
+                    
+                    benchmarking["status"] = status
+                    if error:
+                        benchmarking["error"] = error
+                    if status == "processing":
+                        benchmarking["started_at"] = datetime.utcnow().isoformat()
+                    
+                    existing["competitive_sitemap_benchmarking"] = benchmarking
+                    website_analysis.seo_audit = existing
+                    website_analysis.updated_at = datetime.utcnow()
+                    
+                    from sqlalchemy.orm.attributes import flag_modified
+                    flag_modified(website_analysis, "seo_audit")
+                    
+                    lock_db.commit()
+                    return True
+                finally:
+                    lock_db.close()
+            except Exception as e:
+                logger.error(f"Failed to update competitive sitemap benchmarking status for user {user_id}: {e}")
+                if lock_db:
+                    lock_db.rollback()
                 return False
-
-            session = db.query(OnboardingSession).filter(
-                OnboardingSession.user_id == user_id
-            ).order_by(OnboardingSession.updated_at.desc()).first()
-
-            if not session:
-                return False
-
-            website_analysis = db.query(WebsiteAnalysis).filter(
-                WebsiteAnalysis.session_id == session.id
-            ).order_by(WebsiteAnalysis.updated_at.desc()).first()
-
-            if not website_analysis:
-                return False
-
-            existing = website_analysis.seo_audit if isinstance(website_analysis.seo_audit, dict) else {}
-            
-            # Get existing benchmarking data or initialize
-            benchmarking = existing.get("competitive_sitemap_benchmarking", {})
-            if not isinstance(benchmarking, dict):
-                benchmarking = {}
-            
-            benchmarking["status"] = status
-            if error:
-                benchmarking["error"] = error
-            if status == "processing":
-                benchmarking["started_at"] = datetime.utcnow().isoformat()
-            
-            existing["competitive_sitemap_benchmarking"] = benchmarking
-            website_analysis.seo_audit = existing
-            # Force update flag if needed, but assignment should trigger it
-            website_analysis.updated_at = datetime.utcnow()
-            
-            # Use flag_modified if using JSON type with SQLAlchemy to ensure update
-            from sqlalchemy.orm.attributes import flag_modified
-            flag_modified(website_analysis, "seo_audit")
-            
-            db.commit()
-            return True
-        except Exception as e:
-            logger.error(f"Failed to update competitive sitemap benchmarking status for user {user_id}: {e}")
-            if db:
-                db.rollback()
-            return False
+        
+        lock = await get_seo_audit_lock(user_id)
+        async with lock:
+            return await _do_update()
 
     async def process_onboarding_data(self, user_id: str, db: Session) -> Dict[str, Any]:
         """Process and integrate all onboarding data for a user.

@@ -29,6 +29,7 @@ from models.website_analysis_monitoring_models import (
     DeepWebsiteCrawlExecutionLog
 )
 from services.research.deep_crawl_service import DeepCrawlService
+from services.seo_audit_lock import get_seo_audit_lock
 
 router = APIRouter(prefix="/api/onboarding/step3", tags=["Onboarding Step 3 - Research"])
 
@@ -1059,62 +1060,67 @@ async def _persist_sitemap_analysis(
     user_url: str,
     analysis_result: Dict[str, Any]
 ) -> None:
-    """Background task to persist sitemap analysis results to DB."""
-    try:
-        if not analysis_result or not isinstance(analysis_result, dict):
-            logger.warning(f"_persist_sitemap_analysis: invalid analysis_result for user {user_id}")
-            return
+    """Background task to persist sitemap analysis results to DB.
+    
+    Protected by per-user lock to prevent concurrent writes from overwriting
+    each other's keys in the seo_audit JSON (e.g., sitemap_analysis vs
+    competitive_sitemap_benchmarking).
+    """
+    async def _do_persist():
+        try:
+            if not analysis_result or not isinstance(analysis_result, dict):
+                logger.warning(f"_persist_sitemap_analysis: invalid analysis_result for user {user_id}")
+                return
 
-        from services.database import get_session_for_user
-        from api.onboarding_utils.step_management_service import StepManagementService
-        db = get_session_for_user(user_id)
-        if not db:
-            return
-        
-        svc = StepManagementService()
-        session = svc._get_or_create_session(user_id, db)
-        
-        from models.onboarding import WebsiteAnalysis
-        analysis = db.query(WebsiteAnalysis).filter(
-            WebsiteAnalysis.session_id == session.id
-        ).first()
-        
-        if analysis:
-            # Copy into a NEW dict before mutating. `seo_audit` is a plain
-            # JSON column (not MutableDict), so mutating the loaded object
-            # in-place and re-assigning the SAME object makes SQLAlchemy skip
-            # the UPDATE entirely — the sitemap analysis was silently never
-            # persisted. flag_modified() makes the change explicit regardless.
-            from sqlalchemy.orm.attributes import flag_modified
-            seo_audit = dict(analysis.seo_audit or {})
-            seo_audit["sitemap_analysis"] = {
-                "success": True,
-                "user_url": user_url,
-                "sitemap_url": analysis_result.get("sitemap_url"),
-                "analyzed_at": datetime.utcnow().isoformat(),
-                "analysis_data": {
-                    "total_urls": analysis_result.get("total_urls", 0),
-                    "url_list": analysis_result.get("url_list", []),
-                    "structure_analysis": analysis_result.get("structure_analysis"),
-                    "content_trends": analysis_result.get("content_trends"),
-                    "publishing_patterns": analysis_result.get("publishing_patterns"),
-                    "ai_insights": analysis_result.get("ai_insights"),
-                    "onboarding_insights": analysis_result.get("onboarding_insights") or analysis_result.get("sitemap_onboarding_insights"),
-                    "competitors_analyzed": analysis_result.get("competitors_analyzed", []),
-                },
-            }
-            analysis.seo_audit = seo_audit
-            flag_modified(analysis, "seo_audit")
-            db.commit()
-            logger.info(f"Sitemap analysis persisted for user {user_id}")
-        else:
-            logger.warning(f"No WebsiteAnalysis found for session {session.id}")
-        
-        db.close()
-    except Exception as e:
-        import traceback
-        logger.error(f"Error persisting sitemap analysis: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
+            from services.database import get_session_for_user
+            from api.onboarding_utils.step_management_service import StepManagementService
+            db = get_session_for_user(user_id)
+            if not db:
+                return
+            
+            svc = StepManagementService()
+            session = svc._get_or_create_session(user_id, db)
+            
+            from models.onboarding import WebsiteAnalysis
+            analysis = db.query(WebsiteAnalysis).filter(
+                WebsiteAnalysis.session_id == session.id
+            ).first()
+            
+            if analysis:
+                from sqlalchemy.orm.attributes import flag_modified
+                seo_audit = dict(analysis.seo_audit or {})
+                seo_audit["sitemap_analysis"] = {
+                    "success": True,
+                    "user_url": user_url,
+                    "sitemap_url": analysis_result.get("sitemap_url"),
+                    "analyzed_at": datetime.utcnow().isoformat(),
+                    "analysis_data": {
+                        "total_urls": analysis_result.get("total_urls", 0),
+                        "url_list": analysis_result.get("url_list", []),
+                        "structure_analysis": analysis_result.get("structure_analysis"),
+                        "content_trends": analysis_result.get("content_trends"),
+                        "publishing_patterns": analysis_result.get("publishing_patterns"),
+                        "ai_insights": analysis_result.get("ai_insights"),
+                        "onboarding_insights": analysis_result.get("onboarding_insights") or analysis_result.get("sitemap_onboarding_insights"),
+                        "competitors_analyzed": analysis_result.get("competitors_analyzed", []),
+                    },
+                }
+                analysis.seo_audit = seo_audit
+                flag_modified(analysis, "seo_audit")
+                db.commit()
+                logger.info(f"Sitemap analysis persisted for user {user_id}")
+            else:
+                logger.warning(f"No WebsiteAnalysis found for session {session.id}")
+            
+            db.close()
+        except Exception as e:
+            import traceback
+            logger.error(f"Error persisting sitemap analysis: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+    
+    lock = await get_seo_audit_lock(user_id)
+    async with lock:
+        await _do_persist()
 
 
 async def _log_sitemap_analysis_result(
