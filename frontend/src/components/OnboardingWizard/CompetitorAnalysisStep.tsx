@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
-  Paper,
   CircularProgress,
   Alert,
   Button,
@@ -17,9 +16,7 @@ import {
   Chip,
   Stack,
 } from '@mui/material';
-import AssessmentIcon from '@mui/icons-material/Assessment';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import InfoIcon from '@mui/icons-material/Info';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import SearchIcon from '@mui/icons-material/Search';
@@ -32,6 +29,7 @@ import type { Competitor } from './WebsiteStep/components';
 import ResearchStepBackgroundSetupModal from './CompetitorAnalysisStep/ResearchStepBackgroundSetupModal';
 import { SifIndexingPanel } from './common/SifIndexingPanel';
 import { ContentPillarsSection, type ContentPillarData } from './CompetitorAnalysisStep/ContentPillarsSection';
+import { BenchmarkInsightsSection } from './CompetitorAnalysisStep/BenchmarkInsightsSection';
 import { StrategicInsightsSection } from './CompetitorAnalysisStep/StrategicInsightsSection';
 import { InsightsModals } from './CompetitorAnalysisStep/InsightsModals';
 import { ProgressModal } from './CompetitorAnalysisStep/ProgressModal';
@@ -409,6 +407,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   const [benchmarkReport, setBenchmarkReport] = useState<any>(null);
   const [benchmarkLoading, setBenchmarkLoading] = useState(false);
   const [isRunningBenchmark, setIsRunningBenchmark] = useState(false);
+  const [benchmarkError, setBenchmarkError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!competitors.length || isAnalyzing) return;
@@ -427,33 +426,55 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     return () => { cancelled = true; };
   }, [competitors.length, isAnalyzing]);
 
+  // Normalize a competitor's identifier into a usable URL. Sources may store a
+  // bare domain (e.g. "example.com") instead of a full scheme — accept both so
+  // the benchmark is never silently skipped.
+  const normalizeCompetitorUrl = (c: Competitor): string | null => {
+    const raw = (c?.url || c?.domain || '').trim();
+    if (!raw) return null;
+    const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw)
+      ? raw
+      : `https://${raw}`;
+    return candidate;
+  };
+
   const runSitemapBenchmark = async () => {
     const validCompetitors = competitors
-      .filter(c => c.url && (c.url.startsWith('http') || c.url.startsWith('https')))
-      .map(c => c.url);
-    if (!validCompetitors.length) return;
+      .map(normalizeCompetitorUrl)
+      .filter((u): u is string => !!u);
+    setBenchmarkError(null);
+    if (!validCompetitors.length) {
+      // Nothing to benchmark — tell the user instead of silently doing nothing.
+      setBenchmarkError('No competitor URLs available. Add or refresh competitors before running the benchmark.');
+      return;
+    }
     setIsRunningBenchmark(true);
     try {
       await longRunningApiClient.post('/api/seo/competitive-sitemap-benchmarking/run', {
         max_competitors: 5,
         competitors: validCompetitors.slice(0, 5)
       });
+      setBenchmarkError(null);
+      // The run is a background task — poll until the report is persisted so the
+      // result appears without requiring a manual "View Sitemap Report" click.
+      for (let attempt = 0; attempt < 12; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        try {
+          const resp = await aiApiClient.get('/api/onboarding/step3/sitemap-benchmark-report');
+          const report = resp.data || resp.data?.benchmark;
+          if (report && (report?.competitors?.summaries || report?.competitors?.errors)) {
+            setBenchmarkReport(report);
+            break;
+          }
+        } catch {
+          break;
+        }
+      }
     } catch (err) {
       console.warn('Sitemap benchmark run failed (may already be running):', err);
+      setBenchmarkError('Failed to start the sitemap benchmark. Please try again.');
     }
     setIsRunningBenchmark(false);
-  };
-
-  const fetchSitemapReport = async () => {
-    setBenchmarkLoading(true);
-    try {
-      const resp = await aiApiClient.get('/api/onboarding/step3/sitemap-benchmark-report');
-      setBenchmarkReport(resp.data || resp.data?.benchmark);
-    } catch {
-      setBenchmarkReport(null);
-    } finally {
-      setBenchmarkLoading(false);
-    }
   };
 
   // Data collection function for global Continue button (no side effects)
@@ -696,82 +717,23 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         onAddCompetitor={handleAddCompetitor}
       />
 
-      {/* Sitemap Benchmark Actions — user-triggered */}
-      {competitors.length > 0 && (
-        <Box mt={3} display="flex" gap={2} flexWrap="wrap">
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={isRunningBenchmark ? <CircularProgress size={14} /> : <RefreshIcon />}
-            onClick={runSitemapBenchmark}
-            disabled={isRunningBenchmark}
-            sx={{ textTransform: 'none' }}
-          >
-            {isRunningBenchmark ? 'Scheduling...' : 'Run Sitemap Benchmark'}
-          </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={benchmarkLoading ? <CircularProgress size={14} /> : <AssessmentIcon />}
-            onClick={fetchSitemapReport}
-            disabled={benchmarkLoading}
-            sx={{ textTransform: 'none' }}
-          >
-            {benchmarkLoading ? 'Loading...' : 'View Sitemap Report'}
-          </Button>
-        </Box>
+      {benchmarkError && (
+        <Alert severity="warning" sx={{ mt: 2 }} onClose={() => setBenchmarkError(null)}>
+          {benchmarkError}
+        </Alert>
       )}
 
       {/* Content Pillars Section */}
       <ContentPillarsSection data={contentPillars} isLoading={isLoadingPillars} error={error} onRefresh={refreshContentPillars} />
 
-      {/* Competitor Sitemap Analysis — results */}
-      {benchmarkReport && (
-        <Box mt={4} mb={3}>
-          <Paper sx={{ p: 3, bgcolor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 2 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, color: '#1e293b' }}>
-              Competitor Sitemap Analysis
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {benchmarkReport.competitors?.summaries &&
-                Object.entries(benchmarkReport.competitors.summaries).map(([url, info]: [string, any]) => {
-                  let hostname = url;
-                  try { hostname = new URL(url).hostname.replace('www.', ''); } catch {}
-                  return (
-                  <Chip
-                    key={url}
-                    size="small"
-                    label={hostname}
-                    icon={info?.error ? <span style={{ fontSize: 14 }}>⚠️</span> : <CheckCircleIcon sx={{ fontSize: 18, color: '#10b981' }} />}
-                    color={info?.error ? 'default' : 'success'}
-                    variant={info?.error ? 'outlined' : 'filled'}
-                    title={info?.error || `Analyzed: ${(info as any)?.total_urls ?? '?'} URLs`}
-                  />
-                )})}
-              {benchmarkReport.competitors?.errors &&
-                Object.entries(benchmarkReport.competitors.errors).map(([url, err]: [string, any]) => {
-                  let hostname = url;
-                  try { hostname = new URL(url).hostname.replace('www.', ''); } catch {}
-                  return (
-                  <Chip
-                    key={`err-${url}`}
-                    size="small"
-                    label={hostname}
-                    icon={<span style={{ fontSize: 14 }}>❌</span>}
-                    color="error"
-                    variant="outlined"
-                    title={typeof err === 'string' ? err : 'Analysis failed'}
-                  />
-                )})}
-            </Box>
-            {(!benchmarkReport?.competitors?.summaries && !benchmarkReport?.competitors?.errors) && (
-              <Typography variant="body2" sx={{ color: '#64748b', fontStyle: 'italic' }}>
-                Analysis running in background — results will appear here when complete.
-              </Typography>
-            )}
-          </Paper>
-        </Box>
-      )}
+      {/* Competitor Sitemap Benchmark — enriched insights */}
+      <Box mt={4} mb={3}>
+        <BenchmarkInsightsSection
+          report={benchmarkReport}
+          onRefresh={runSitemapBenchmark}
+          isRefreshing={isRunningBenchmark}
+        />
+      </Box>
 
       {/* Strategic Content Opportunities Section */}
       {competitors.length > 0 && (

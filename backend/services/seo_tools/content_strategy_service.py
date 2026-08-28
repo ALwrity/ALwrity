@@ -486,6 +486,9 @@ class ContentStrategyService:
             "publishing_velocity": trends.get("publishing_velocity"),
             "date_range": trends.get("date_range") or {},
             "total_dated_urls": trends.get("total_dated_urls"),
+            "monthly_distribution": trends.get("monthly_distribution") or {},
+            "yearly_distribution": trends.get("yearly_distribution") or {},
+            "trends": trends.get("trends") or [],
             "priority_distribution": patterns.get("priority_distribution") or {},
             "changefreq_distribution": patterns.get("changefreq_distribution") or {},
         }

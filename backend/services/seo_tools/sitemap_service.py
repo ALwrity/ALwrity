@@ -313,9 +313,22 @@ class SitemapService:
                     if content_length and int(content_length) > MAX_SITEMAP_SIZE:
                         raise Exception(f"Sitemap too large: {content_length} bytes")
 
-                    # Read with size limit (safe read)
-                    raw = await response.content.read(MAX_SITEMAP_SIZE + 1)
-                    if len(raw) > MAX_SITEMAP_SIZE:
+                    # Read with size limit (safe read). A single
+                    # response.content.read(n) can return early before EOF on
+                    # brotli/gzip-(streamed) responses, silently truncating
+                    # valid sitemaps ("no element found" parse errors). Loop
+                    # until EOF (or the cap) so the complete body is always
+                    # obtained.
+                    chunks: List[bytes] = []
+                    total_read = 0
+                    while total_read <= MAX_SITEMAP_SIZE:
+                        chunk = await response.content.read(MAX_SITEMAP_SIZE + 1 - total_read)
+                        if not chunk:
+                            break
+                        chunks.append(chunk)
+                        total_read += len(chunk)
+                    raw = b"".join(chunks)
+                    if total_read > MAX_SITEMAP_SIZE:
                         raise Exception(f"Sitemap size exceeds limit of {MAX_SITEMAP_SIZE} bytes")
 
                     if sitemap_url.lower().endswith(".gz") or (len(raw) >= 2 and raw[0] == 0x1F and raw[1] == 0x8B):
