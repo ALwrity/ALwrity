@@ -409,6 +409,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   const [benchmarkReport, setBenchmarkReport] = useState<any>(null);
   const [benchmarkLoading, setBenchmarkLoading] = useState(false);
   const [isRunningBenchmark, setIsRunningBenchmark] = useState(false);
+  const [benchmarkError, setBenchmarkError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!competitors.length || isAnalyzing) return;
@@ -427,30 +428,69 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     return () => { cancelled = true; };
   }, [competitors.length, isAnalyzing]);
 
+  // Normalize a competitor's identifier into a usable URL. Sources may store a
+  // bare domain (e.g. "example.com") instead of a full scheme — accept both so
+  // the benchmark is never silently skipped.
+  const normalizeCompetitorUrl = (c: Competitor): string | null => {
+    const raw = (c?.url || c?.domain || '').trim();
+    if (!raw) return null;
+    const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw)
+      ? raw
+      : `https://${raw}`;
+    return candidate;
+  };
+
   const runSitemapBenchmark = async () => {
     const validCompetitors = competitors
-      .filter(c => c.url && (c.url.startsWith('http') || c.url.startsWith('https')))
-      .map(c => c.url);
-    if (!validCompetitors.length) return;
+      .map(normalizeCompetitorUrl)
+      .filter((u): u is string => !!u);
+    setBenchmarkError(null);
+    if (!validCompetitors.length) {
+      // Nothing to benchmark — tell the user instead of silently doing nothing.
+      setBenchmarkError('No competitor URLs available. Add or refresh competitors before running the benchmark.');
+      return;
+    }
     setIsRunningBenchmark(true);
     try {
       await longRunningApiClient.post('/api/seo/competitive-sitemap-benchmarking/run', {
         max_competitors: 5,
         competitors: validCompetitors.slice(0, 5)
       });
+      setBenchmarkError(null);
+      // The run is a background task — poll until the report is persisted so the
+      // result appears without requiring a manual "View Sitemap Report" click.
+      for (let attempt = 0; attempt < 12; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        try {
+          const resp = await aiApiClient.get('/api/onboarding/step3/sitemap-benchmark-report');
+          const report = resp.data || resp.data?.benchmark;
+          if (report && (report?.competitors?.summaries || report?.competitors?.errors)) {
+            setBenchmarkReport(report);
+            break;
+          }
+        } catch {
+          break;
+        }
+      }
     } catch (err) {
       console.warn('Sitemap benchmark run failed (may already be running):', err);
+      setBenchmarkError('Failed to start the sitemap benchmark. Please try again.');
     }
     setIsRunningBenchmark(false);
   };
 
   const fetchSitemapReport = async () => {
     setBenchmarkLoading(true);
+    setBenchmarkError(null);
     try {
       const resp = await aiApiClient.get('/api/onboarding/step3/sitemap-benchmark-report');
       setBenchmarkReport(resp.data || resp.data?.benchmark);
+      if (!resp.data) {
+        setBenchmarkError('No sitemap benchmark report available yet. Run the benchmark first.');
+      }
     } catch {
       setBenchmarkReport(null);
+      setBenchmarkError('Failed to load the sitemap benchmark report.');
     } finally {
       setBenchmarkLoading(false);
     }
@@ -720,6 +760,12 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
             {benchmarkLoading ? 'Loading...' : 'View Sitemap Report'}
           </Button>
         </Box>
+      )}
+
+      {benchmarkError && (
+        <Alert severity="warning" sx={{ mt: 2 }} onClose={() => setBenchmarkError(null)}>
+          {benchmarkError}
+        </Alert>
       )}
 
       {/* Content Pillars Section */}
