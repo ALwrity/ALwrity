@@ -112,6 +112,25 @@ class WebsiteOnboardingStrategy:
                         except Exception:
                             pass
                         schedule_step2_tasks(user_id, db, website_url, preferences=prefs)
+
+                    # Save email digest preferences from onboarding step
+                    try:
+                        onboarding_session = svc._get_or_create_session(user_id, db)
+                        contact_email = website_data.get('email')
+                        user_timezone = website_data.get('userTimezone')
+                        email_digest_opt_in = website_data.get('emailDigestOptIn', False)
+                        
+                        if contact_email:
+                            onboarding_session.contact_email = contact_email
+                        if user_timezone:
+                            onboarding_session.timezone = user_timezone
+                        if email_digest_opt_in is not None:
+                            onboarding_session.email_digest_opt_in = email_digest_opt_in
+                        
+                        db.commit()
+                        logger.info(f"Saved email digest preferences for user {user_id}: email={contact_email}, tz={user_timezone}, opt_in={email_digest_opt_in}")
+                    except Exception as e:
+                        logger.warning(f"Failed to save email digest preferences for user {user_id}: {e}")
             except Exception as e:
                 logger.error(f" BLOCKING ERROR: Failed to save website analysis: {str(e)}")
                 from fastapi import HTTPException

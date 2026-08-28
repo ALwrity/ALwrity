@@ -8,7 +8,9 @@ import {
   Stack,
   Tooltip,
   Alert,
-  IconButton
+  IconButton,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import {
   Email as EmailIcon,
@@ -24,27 +26,59 @@ import {
 interface EmailSectionProps {
   email: string;
   onEmailChange: (email: string) => void;
+  emailDigestOptIn?: boolean;
+  onEmailDigestOptInChange?: (optIn: boolean) => void;
+  userTimezone?: string;
+  onUserTimezoneChange?: (tz: string) => void;
 }
 
-const EmailSection: React.FC<EmailSectionProps> = ({ email, onEmailChange }) => {
+const EmailSection: React.FC<EmailSectionProps> = ({ 
+  email, 
+  onEmailChange,
+  emailDigestOptIn = false,
+  onEmailDigestOptInChange,
+  userTimezone = 'UTC',
+  onUserTimezoneChange,
+}) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempEmail, setTempEmail] = useState(email);
   const [showBenefits, setShowBenefits] = useState<boolean>(false);
+  const [localOptIn, setLocalOptIn] = useState(emailDigestOptIn);
 
-  // Sync tempEmail when email prop changes
   useEffect(() => {
     setTempEmail(email);
   }, [email]);
 
+  useEffect(() => {
+    setLocalOptIn(emailDigestOptIn);
+  }, [emailDigestOptIn]);
+
+  useEffect(() => {
+    if (!userTimezone || userTimezone === 'UTC') {
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz && onUserTimezoneChange) {
+          onUserTimezoneChange(tz);
+        }
+      } catch (e) {
+        console.warn('Could not capture timezone:', e);
+      }
+    }
+  }, [userTimezone, onUserTimezoneChange]);
+
   const handleSave = () => {
     if (tempEmail && tempEmail.includes('@')) {
       onEmailChange(tempEmail);
+      if (onEmailDigestOptInChange) {
+        onEmailDigestOptInChange(localOptIn);
+      }
       setIsEditing(false);
     }
   };
 
   const handleCancel = () => {
     setTempEmail(email);
+    setLocalOptIn(emailDigestOptIn);
     setIsEditing(false);
   };
 
@@ -53,6 +87,13 @@ const EmailSection: React.FC<EmailSectionProps> = ({ email, onEmailChange }) => 
       handleSave();
     } else if (e.key === 'Escape') {
       handleCancel();
+    }
+  };
+
+  const handleOptInChange = (checked: boolean) => {
+    setLocalOptIn(checked);
+    if (onEmailDigestOptInChange) {
+      onEmailDigestOptInChange(checked);
     }
   };
 
@@ -116,7 +157,6 @@ const EmailSection: React.FC<EmailSectionProps> = ({ email, onEmailChange }) => 
           Help us send you personalized business insights, daily tasks, and growth opportunities
         </Typography>
         
-        {/* Progressive Disclosure - Benefits Section */}
         <Box 
           sx={{ 
             mt: 2,
@@ -158,7 +198,6 @@ const EmailSection: React.FC<EmailSectionProps> = ({ email, onEmailChange }) => 
             </Box>
           </Typography>
           
-          {/* Benefits Content - Shows on Hover */}
           <Fade in={showBenefits} timeout={300} mountOnEnter unmountOnExit>
             <Box sx={{ mt: 2 }}>
               <Stack direction="row" spacing={1} flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
@@ -227,7 +266,6 @@ const EmailSection: React.FC<EmailSectionProps> = ({ email, onEmailChange }) => 
                 </Tooltip>
               </Stack>
               
-              {/* AI-First Platform Message */}
               <Alert 
                 severity="info" 
                 sx={{ 
@@ -254,7 +292,6 @@ const EmailSection: React.FC<EmailSectionProps> = ({ email, onEmailChange }) => 
                 </Stack>
               </Alert>
               
-              {/* Security & Privacy Message */}
               <Alert 
                 severity="info" 
                 sx={{ 
@@ -281,6 +318,35 @@ const EmailSection: React.FC<EmailSectionProps> = ({ email, onEmailChange }) => 
               </Alert>
             </Box>
           </Fade>
+        </Box>
+
+        {/* Email Digest Opt-in Checkbox */}
+        <Box sx={{ mt: 3, p: 2, backgroundColor: '#f0fdf4', borderRadius: 2, border: '1px solid #86efac' }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={localOptIn}
+                onChange={(e) => handleOptInChange(e.target.checked)}
+                sx={{ color: '#16a34a', '&.Mui-checked': { color: '#16a34a' } }}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#166534' }}>
+                  Send me a daily AI agent team summary
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#15803d' }}>
+                  Get a personalized daily plan with tasks, progress, and insights for your business growth. 
+                  We never send marketing emails — only your own AI-generated tasks.
+                </Typography>
+              </Box>
+            }
+          />
+          {localOptIn && userTimezone && (
+            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#15803d' }}>
+              We'll send at 9:00 AM your time ({userTimezone})
+            </Typography>
+          )}
         </Box>
       </Box>
     </Fade>

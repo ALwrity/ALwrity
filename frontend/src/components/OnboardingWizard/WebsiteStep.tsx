@@ -95,6 +95,8 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
   const urlWasPreFilledRef = useRef(false);
   const { user } = useUser();
   const [email, setEmail] = useState<string>('');
+  const [emailDigestOptIn, setEmailDigestOptIn] = useState<boolean>(false);
+  const [userTimezone, setUserTimezone] = useState<string>('UTC');
 
   const linkedinConnected = connectedPlatforms.includes('linkedin');
   const analyticsPlatforms = useMemo(() => ['gsc', 'bing'], []);
@@ -430,6 +432,8 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
           useAnalysisForGenAI,
           integrations: integrationsPayload,
           email,
+          emailDigestOptIn,
+          userTimezone,
         };
       });
     }
@@ -474,7 +478,14 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
       </Box>
 
       {/* Email Section */}
-      <EmailSection email={email} onEmailChange={setEmail} />
+      <EmailSection 
+        email={email} 
+        onEmailChange={setEmail}
+        emailDigestOptIn={emailDigestOptIn}
+        onEmailDigestOptInChange={setEmailDigestOptIn}
+        userTimezone={userTimezone}
+        onUserTimezoneChange={setUserTimezone}
+      />
 
       {/* Tab Bar */}
       <Box sx={{ display: 'flex', gap: 1.5, mb: 3 }}>

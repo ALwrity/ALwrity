@@ -34,6 +34,7 @@ import models.content_strategy_state_models  # noqa: E402, F401
 import models.crawled_content  # noqa: E402, F401
 import models.daily_meeting_models  # noqa: E402, F401
 import models.daily_workflow_models  # noqa: E402, F401
+import models.daily_email_ledger  # noqa: E402, F401
 import models.workflow_execution_models  # noqa: E402, F401
 import models.enhanced_calendar_models  # noqa: E402, F401
 import models.enhanced_strategy_models  # noqa: E402, F401
