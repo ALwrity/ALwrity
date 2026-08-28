@@ -31,7 +31,7 @@ async def restore_platform_insights_tasks(scheduler):
         scheduler: TaskScheduler instance
     """
     try:
-        logger.warning("[Platform Insights Restoration] Starting platform insights task restoration...")
+        logger.debug("[Platform Insights Restoration] Starting platform insights task restoration...")
         
         user_ids = get_all_user_ids()
         total_created = 0
@@ -119,12 +119,12 @@ async def restore_platform_insights_tasks(scheduler):
                 
         # Log summary
         if total_created > 0:
-            logger.warning(
+            logger.info(
                 f"[Platform Insights Restoration] ✅ Created {total_created} platform insights tasks:\n" +
                 "\n".join(restoration_summary)
             )
         else:
-            logger.warning(
+            logger.info(
                 f"[Platform Insights Restoration] ✅ All users have required platform insights tasks. "
                 f"Processed {users_processed} users."
             )

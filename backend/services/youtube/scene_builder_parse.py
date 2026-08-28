@@ -94,6 +94,104 @@ def scene_needs_visual_enhance(scene: Dict[str, Any]) -> bool:
     return not vis or vis.lower() == nar.lower()
 
 
+def backfill_empty_visual_prompt_from_enhance(scenes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Copy enhanced shot into visual_prompt when parse left it empty (hook/outro/CTA).
+
+    Does not copy narration. Does not overwrite a distinct expand beat visual.
+    """
+    for scene in scenes:
+        narration = str(scene.get("narration") or "")
+        existing = distinct_visual(
+            str(scene.get("visual_prompt") or scene.get("visual_description") or ""),
+            narration,
+        )
+        if existing:
+            continue
+        shot = distinct_visual(str(scene.get("enhanced_visual_prompt") or ""), narration)
+        if not shot:
+            continue
+        scene["visual_prompt"] = shot
+        scene["visual_description"] = shot
+        logger.info(
+            "Backfilled empty visual_prompt from enhance scene={} prompt_len={}",
+            scene.get("scene_number"),
+            len(shot),
+        )
+    return scenes
+
+
+_HOOK_SHOT_SUFFIX = (
+    "Opening shot, same person, wardrobe, and location, looking toward camera."
+)
+_OUTRO_SHOT_SUFFIX = (
+    "Same person, wardrobe, and location, winding-down medium shot."
+)
+_CTA_SHOT_SUFFIX = (
+    "Same person, wardrobe, and location, addressing the camera for the call to action."
+)
+_BEAT_SHOT_SUFFIX = (
+    "Same person, wardrobe, and location, this beat's action continues."
+)
+
+
+def _continuity_shot_suffix(scene: Dict[str, Any]) -> str:
+    emphasis = str(scene.get("emphasis") or "").lower()
+    title = str(scene.get("title") or "").strip().lower()
+    if emphasis == "hook" or title == "hook":
+        return _HOOK_SHOT_SUFFIX
+    if emphasis == "cta" or "call to action" in title:
+        return _CTA_SHOT_SUFFIX
+    if title == "outro":
+        return _OUTRO_SHOT_SUFFIX
+    return _BEAT_SHOT_SUFFIX
+
+
+def seed_empty_visuals_from_continuity(scenes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """If hook/outro/CTA still have no shot, reuse a beat visual (same world, new framing)."""
+    donor = ""
+    for scene in scenes:
+        shot = distinct_visual(
+            str(scene.get("visual_prompt") or scene.get("visual_description") or ""),
+            str(scene.get("narration") or ""),
+        )
+        if shot:
+            donor = shot
+            break
+    if not donor:
+        logger.warning(
+            "No distinct beat visual available to seed empty hook/outro/CTA prompts"
+        )
+        return scenes
+
+    for scene in scenes:
+        narration = str(scene.get("narration") or "")
+        if distinct_visual(
+            str(scene.get("visual_prompt") or scene.get("visual_description") or ""),
+            narration,
+        ):
+            continue
+        seeded = distinct_visual(f"{donor} {_continuity_shot_suffix(scene)}", narration)
+        if not seeded:
+            continue
+        scene["visual_prompt"] = seeded
+        scene["visual_description"] = seeded
+        if not distinct_visual(str(scene.get("enhanced_visual_prompt") or ""), narration):
+            scene["enhanced_visual_prompt"] = seeded
+        logger.info(
+            "Seeded empty visual_prompt from beat continuity scene={} donor_len={}",
+            scene.get("scene_number"),
+            len(donor),
+        )
+    return scenes
+
+
+def finalize_youtube_scene_visuals(scenes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Fill visual_prompt for Assets UI: enhance first, then beat continuity."""
+    backfill_empty_visual_prompt_from_enhance(scenes)
+    seed_empty_visuals_from_continuity(scenes)
+    return scenes
+
+
 def _split_paragraphs(script: str) -> List[str]:
     return [p.strip() for p in re.split(r"\n\s*\n", script.strip()) if p.strip()]
 

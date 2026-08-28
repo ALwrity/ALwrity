@@ -28,6 +28,7 @@ import { ContentAuditSummaryCard } from './WebsiteStep/ContentAuditSummaryCard';
 import { SiteHealthSummaryCard } from './WebsiteStep/SiteHealthSummaryCard';
 import PlatformSection from './common/PlatformSection';
 import PlatformAnalytics from '../shared/PlatformAnalytics';
+import EmailSection from './common/EmailSection';
 
 // Import API client for saving
 import { apiClient } from '../../api/client';
@@ -102,6 +103,8 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   const urlWasPreFilledRef = useRef(false);
   const { user } = useUser();
   const [email, setEmail] = useState<string>('');
+  const [emailDigestOptIn, setEmailDigestOptIn] = useState<boolean>(false);
+  const [userTimezone, setUserTimezone] = useState<string>('UTC');
 
   const linkedinConnected = connectedPlatforms.includes('linkedin');
   const analyticsPlatforms = useMemo(() => ['gsc', 'bing'], []);
@@ -451,6 +454,8 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
           useAnalysisForGenAI,
           integrations: integrationsPayload,
           email,
+          emailDigestOptIn,
+          userTimezone,
         };
       });
     }
@@ -482,6 +487,27 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
       }
     }}>
       {/* Header */}
+      <Box sx={{ mb: 3, textAlign: 'center', animation: 'fadeIn 0.6s ease-out' }}>
+        <Typography variant="h4" sx={{
+          fontWeight: 700,
+          mb: 1,
+          background: 'linear-gradient(135deg, #60A5FA 0%, #3B82F6 50%, #1D4ED8 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+        }}>
+          Let ALwrity Learn Your Brand
+        </Typography>
+      </Box>
+
+      {/* Email Section */}
+      <EmailSection 
+        email={email} 
+        onEmailChange={setEmail}
+        emailDigestOptIn={emailDigestOptIn}
+        onEmailDigestOptInChange={setEmailDigestOptIn}
+        userTimezone={userTimezone}
+        onUserTimezoneChange={setUserTimezone}
+      />
 
       {/* Tab Bar */}
       <Box sx={{ display: 'flex', gap: 1.5, mb: 3 }}>
@@ -675,7 +701,9 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
                   onSave={() => saveAnalysis(analysis)}
                 />
               </Box>
-              <BackgroundSetupCard websiteUrl={website} brandAnalysis={analysis.brand_analysis} seoAudit={analysis.seo_audit} />
+              <Box id="smart-background-setup">
+                <BackgroundSetupCard websiteUrl={website} brandAnalysis={analysis.brand_analysis} seoAudit={analysis.seo_audit} />
+              </Box>
             </>
           )}
 

@@ -96,6 +96,7 @@ class AdvertoolsService:
         max_retries: int = 3,
         _depth: int = 0,
         _deadline: Optional[float] = None,
+        max_urls: Optional[int] = None,
     ) -> pd.DataFrame:
         """Fetch sitemap with rate-limit-aware retry + jittered backoff.
 
@@ -245,11 +246,24 @@ class AdvertoolsService:
                 if _time.monotonic() >= _deadline:
                     logger.warning("sitemap_to_df batch deadline reached, returning partial results")
                     break
+                # Stop early once we have enough URLs (e.g. an SEO preview only
+                # needs a handful) so we don't crawl every sub-sitemap of a
+                # large index and trip the origin's rate limit.
+                if max_urls is not None and sum(len(f) for f in frames) >= max_urls:
+                    logger.info(
+                        f"sitemap_to_df collected {sum(len(f) for f in frames)} URLs, "
+                        f"reached max_urls={max_urls}, stopping sub-sitemap recursion"
+                    )
+                    break
                 # Once the origin has shown it's throttling, cap retries for the
                 # remaining sub-sitemaps so the batch degrades quickly.
                 sub_retries = 1 if _domain_429_cooldown(domain) > 0 else max_retries
                 sub_df = AdvertoolsService._sitemap_to_df_with_retry(
-                    sub_url, max_retries=sub_retries, _depth=_depth + 1, _deadline=_deadline
+                    sub_url,
+                    max_retries=sub_retries,
+                    _depth=_depth + 1,
+                    _deadline=_deadline,
+                    max_urls=max_urls,
                 )
                 if sub_df is not None and not sub_df.empty:
                     frames.append(sub_df)
@@ -266,17 +280,24 @@ class AdvertoolsService:
 
         return df
 
-    async def analyze_sitemap(self, sitemap_url: str) -> Dict[str, Any]:
+    async def analyze_sitemap(self, sitemap_url: str, max_retries: int = 3) -> Dict[str, Any]:
         """
         Analyzes a website's sitemap to extract metrics on publishing velocity, freshness,
         URL structure patterns, and topic distribution.
+
+        ``max_retries`` bounds how many times each sitemap / sub-sitemap is retried
+        on transient failures (e.g. HTTP 429). Background tasks on rate-limited
+        origins pass a low value so the sitemap index recursion degrades fast
+        instead of burning 4 attempts × 30s backoff per sub-sitemap.
         """
         try:
             self.logger.info(f"Analyzing sitemap: {sitemap_url}")
             
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, lambda: _throttle_domain_sync(_extract_domain(sitemap_url)))
-            df = await loop.run_in_executor(None, lambda: self._sitemap_to_df_with_retry(sitemap_url))
+            df = await loop.run_in_executor(
+                None, lambda: self._sitemap_to_df_with_retry(sitemap_url, max_retries=max_retries)
+            )
             
             if df is None or df.empty or 'loc' not in df.columns:
                 return {"success": False, "error": "Sitemap is empty, unparseable, or missing URL column."}
@@ -298,7 +319,7 @@ class AdvertoolsService:
             pillars = {}
             url_df = None
             try:
-                url_df = adv.url_to_df(df['loc'])
+                url_df = await loop.run_in_executor(None, lambda: adv.url_to_df(df['loc']))
                 if url_df is not None and not url_df.empty:
                     dir_cols = [c for c in url_df.columns if c.startswith('dir_')]
                     if dir_cols:
@@ -540,12 +561,23 @@ class AdvertoolsService:
                 # English stopword set is what the old boolean True
                 # behaviour produced, so use ``adv.stopwords['english']``
                 # to preserve the original behaviour.
+                # phrase_len=2 yields meaningful 2-word topics ("content
+                # marketing", "small business") instead of bare single words
+                # that read as noise to non-technical users.
                 lambda: adv.word_frequency(
                     [all_text],
+                    phrase_len=2,
                     rm_words=adv.stopwords.get("english", set()),
                 ),
             )
-            top_themes = word_freq.head(20).to_dict(orient='records')
+            # Drop phrases that are stopword-only ("how to", "of page",
+            # "the right") — they read as noise and are not real topics.
+            stopwords = adv.stopwords.get("english", set())
+            records = word_freq.head(40).to_dict(orient='records')
+            top_themes = [
+                r for r in records
+                if all(w not in stopwords for w in str(r.get("word", "")).split())
+            ][:20]
 
             # Additional metrics: Readability, word count
             avg_word_count = 0
@@ -608,9 +640,12 @@ class AdvertoolsService:
             result = {"success": True, "page_count": page_count}
 
             # --- Link Health via crawlytics ---
+            loop = asyncio.get_event_loop()
             try:
                 internal_regex = site_domain if site_domain else None
-                link_df = adv.crawlytics.links(crawl_df, internal_url_regex=internal_regex)
+                link_df = await loop.run_in_executor(
+                    None, lambda: adv.crawlytics.links(crawl_df, internal_url_regex=internal_regex)
+                )
                 if link_df is not None and not link_df.empty:
                     total_links = len(link_df)
                     internal_links = int(link_df['internal'].sum()) if 'internal' in link_df.columns else 0
@@ -648,7 +683,9 @@ class AdvertoolsService:
 
             # --- Redirect Chain Audit via crawlytics ---
             try:
-                redirect_df = adv.crawlytics.redirects(crawl_df)
+                redirect_df = await loop.run_in_executor(
+                    None, lambda: adv.crawlytics.redirects(crawl_df)
+                )
                 if redirect_df is not None and not redirect_df.empty:
                     total_redirects = len(redirect_df)
                     redirect_chains = redirect_df['redirect_times'].nunique() if 'redirect_times' in redirect_df.columns else 0
@@ -670,7 +707,9 @@ class AdvertoolsService:
 
             # --- Image SEO overview via crawlytics ---
             try:
-                img_df = adv.crawlytics.images(crawl_df)
+                img_df = await loop.run_in_executor(
+                    None, lambda: adv.crawlytics.images(crawl_df)
+                )
                 if img_df is not None and not img_df.empty:
                     total_images = len(img_df)
                     missing_alt = int(img_df['img_alt'].isna().sum()) if 'img_alt' in img_df.columns else 0

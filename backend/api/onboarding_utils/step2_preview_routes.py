@@ -3,12 +3,76 @@ SEO Preview endpoints for onboarding — lightweight subset of full analysis.
 Stores results in SEOPageAudit so the SEO dashboard can display them.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 from middleware.auth_middleware import get_current_user
 
 router = APIRouter(prefix="/api/onboarding/step2", tags=["Onboarding SEO Preview"])
+
+
+@router.get("/preview-seo-audit")
+async def get_preview_seo_audit(
+    website_url: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Return previously persisted SEO preview results for the user.
+
+    Lets the onboarding UI restore preview results after a page refresh or
+    step navigation without re-running the (network-heavy) preview. Returns
+    {"success": False} when no persisted preview exists yet.
+    """
+    user_id = str(current_user.get("id", "unknown"))
+
+    try:
+        from services.database import get_session_for_user
+        from models.onboarding import SEOPageAudit
+
+        db = get_session_for_user(user_id)
+        try:
+            query = db.query(SEOPageAudit).filter(
+                SEOPageAudit.user_id == user_id,
+                SEOPageAudit.analysis_source == "preview",
+            )
+            if website_url:
+                query = query.filter(SEOPageAudit.website_url == website_url)
+            rows = query.order_by(SEOPageAudit.last_analyzed_at.desc()).all()
+
+            if not rows:
+                return {"success": False, "pages": []}
+
+            pages = []
+            for row in rows:
+                audit_data = row.audit_data if isinstance(row.audit_data, dict) else {}
+                page = dict(audit_data)
+                page.setdefault("url", row.page_url)
+                page.setdefault("overall_score", row.overall_score)
+                if row.issues is not None and not page.get("top_issues"):
+                    page["top_issues"] = row.issues
+                pages.append(page)
+
+            avg_score = (
+                round(sum(int(p.get("overall_score", 0)) for p in pages) / len(pages), 1)
+                if pages else 0
+            )
+            total_issues = sum(len(p.get("top_issues", []) or []) for p in pages)
+
+            logger.info(
+                f"[SeoPreview] Returned {len(pages)} persisted preview pages for user={user_id}"
+            )
+            return {
+                "success": True,
+                "pages_analyzed": len(pages),
+                "average_score": avg_score,
+                "total_issues_found": total_issues,
+                "preview_mode": True,
+                "pages": pages,
+            }
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"[SeoPreview] Failed to load persisted preview results: {e}")
+        return {"success": False, "pages": []}
 
 
 @router.post("/preview-seo-audit")

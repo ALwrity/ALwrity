@@ -71,12 +71,21 @@ async def run_seo_preview(website_url: str) -> Dict[str, Any]:
             scores.append(cat_score * weight)
         page_result["overall_score"] = round(sum(scores) * 100, 1)
 
-        # Top issues
+        # Top issues — flatten into human-readable {category, severity, issue, fix}
         issues = []
         for cat in ("meta", "content", "technical", "accessibility", "ux"):
             cat_issues = page_result.get(cat, {}).get("issues", [])[:3]
             for i in cat_issues:
-                issues.append({"category": cat, "issue": str(i)[:120]})
+                if isinstance(i, dict):
+                    issues.append({
+                        "category": cat,
+                        "severity": i.get("severity", "issue"),
+                        "issue": i.get("message", ""),
+                        "fix": i.get("fix", ""),
+                        "location": i.get("location", ""),
+                    })
+                else:
+                    issues.append({"category": cat, "severity": "issue", "issue": str(i), "fix": ""})
         page_result["top_issues"] = issues[:5]
 
         results.append(page_result)
@@ -105,13 +114,13 @@ async def _discover_preview_pages(website_url: str) -> List[tuple]:
     base = website_url.rstrip("/")
     parsed = urlparse(website_url)
     domain = parsed.netloc.replace("www.", "")
-    sitemap_candidates = [
+    sitemap_candidates = list(dict.fromkeys([
         f"{base}/sitemap.xml",
         f"{base}/sitemap_index.xml",
         f"{base}/wp-sitemap.xml",
         f"https://{domain}/sitemap.xml",
         f"https://www.{domain}/sitemap.xml",
-    ]
+    ]))
 
     logger.info(f"[SeoPreview] Trying sitemap candidates: {sitemap_candidates}")
 
@@ -122,7 +131,20 @@ async def _discover_preview_pages(website_url: str) -> List[tuple]:
             # Use the rate-limit-aware wrapper: fetches sitemap indexes and
             # sub-sitemaps SEQUENTIALLY with pacing, instead of advertools'
             # default recursive concurrent fetch (max_workers=8) which 429s.
-            df = AdvertoolsService._sitemap_to_df_with_retry(sitemap_url)
+            # A preview only needs a handful of URLs, so cap the sub-sitemap
+            # recursion at PREVIEW_PAGE_LIMIT and keep retries low (fast fail
+            # instead of burning 4 retries × 30s backoff per sub-sitemap).
+            # The fetch is synchronous (blocking sleeps), so run it in a thread
+            # to avoid blocking the FastAPI event loop for other requests.
+            loop = asyncio.get_running_loop()
+            df = await loop.run_in_executor(
+                None,
+                lambda: AdvertoolsService._sitemap_to_df_with_retry(
+                    sitemap_url,
+                    max_retries=1,
+                    max_urls=PREVIEW_PAGE_LIMIT * 2,
+                ),
+            )
             if df is not None and not df.empty and "loc" in df.columns:
                 urls = df["loc"].dropna().head(PREVIEW_PAGE_LIMIT).tolist()
                 logger.info(
@@ -160,8 +182,6 @@ async def _discover_preview_pages(website_url: str) -> List[tuple]:
         pass
     return []
 
-    return discovered[:PREVIEW_PAGE_LIMIT]
-
 
 def _summarize(result: Dict) -> Dict:
     """Extract key fields from an analyzer result for preview display."""
@@ -174,10 +194,21 @@ def _summarize(result: Dict) -> Dict:
         if isinstance(issues, list):
             for item in issues:
                 if isinstance(item, dict):
-                    flat.append({"category": item.get("type", "issue"), "issue": item.get("message", str(item))})
+                    # Keep the rich analyzer fields (message + fix + severity)
+                    # so the UI can render a human-readable problem and remedy.
+                    flat.append({
+                        "severity": item.get("type", "issue"),
+                        "message": item.get("message", ""),
+                        "location": item.get("location", ""),
+                        "fix": item.get("fix", ""),
+                        "current_value": item.get("current_value", ""),
+                    })
                 else:
-                    flat.append({"category": "issue", "issue": str(item)})
+                    flat.append({"severity": "issue", "message": str(item), "location": "", "fix": ""})
         elif isinstance(issues, dict):
-            flat = [{"category": k, "issue": str(v)} for k, v in list(issues.items())[:3]]
+            flat = [
+                {"severity": "issue", "message": str(v), "location": k, "fix": ""}
+                for k, v in list(issues.items())[:3]
+            ]
         summary["issues"] = flat[:5]
     return summary

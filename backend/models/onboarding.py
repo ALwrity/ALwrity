@@ -10,6 +10,9 @@ class OnboardingSession(Base):
     user_id = Column(String(255), nullable=False)  # Clerk user ID (string)
     current_step = Column(Integer, default=1)
     progress = Column(Float, default=0.0)
+    timezone = Column(String(50), nullable=True)  # IANA timezone, e.g. "America/New_York"
+    contact_email = Column(String(255), nullable=True)  # User's email for notifications
+    email_digest_opt_in = Column(Boolean, default=False)  # Explicit opt-in for daily digest
     started_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     payload = Column(JSON, nullable=True)  # Task scheduling manifest

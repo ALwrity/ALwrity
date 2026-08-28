@@ -30,7 +30,7 @@ class ContextMemory:
         self._recent: deque[Tuple[str, str]] = deque(maxlen=max_entries)
         # Cache for LLM-generated summaries
         self._summary_cache: Dict[str, str] = {}
-        logger.info("✅ ContextMemory initialized with LLM-enhanced summarization")
+        logger.debug("✅ ContextMemory initialized with LLM-enhanced summarization")
 
     def update_with_section(self, section_id: str, full_text: str, use_llm: bool = True) -> None:
         """Create a compact summary and store it for continuity usage."""

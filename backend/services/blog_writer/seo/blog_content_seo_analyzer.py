@@ -33,7 +33,7 @@ class BlogContentSEOAnalyzer:
         self.url_analyzer = URLStructureAnalyzer()
         self.ai_insights = AIInsightGenerator()
         
-        logger.info("BlogContentSEOAnalyzer initialized")
+        logger.debug("BlogContentSEOAnalyzer initialized")
     
     async def analyze_blog_content(self, blog_content: str, research_data: Dict[str, Any], blog_title: Optional[str] = None, user_id: str = None, outline: Optional[List[Dict[str, Any]]] = None, competitive_advantage: Optional[str] = None) -> Dict[str, Any]:
         """

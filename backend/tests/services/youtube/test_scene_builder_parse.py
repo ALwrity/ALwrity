@@ -35,6 +35,117 @@ class TestDistinctVisual:
         )
 
 
+class TestBackfillEmptyVisualPromptFromEnhance:
+    def test_fills_hook_from_enhanced_shot_not_narration(self):
+        from services.youtube.scene_builder_parse import (
+            backfill_empty_visual_prompt_from_enhance,
+        )
+
+        narration = "Want titles that explode clicks? Watch this!"
+        scenes = backfill_empty_visual_prompt_from_enhance(
+            [
+                {
+                    "scene_number": 1,
+                    "narration": narration,
+                    "visual_prompt": "",
+                    "visual_description": "",
+                    "enhanced_visual_prompt": "Same creator in a sunlit kitchen, she leans toward camera.",
+                }
+            ]
+        )
+        assert scenes[0]["visual_prompt"].startswith("Same creator")
+        assert scenes[0]["visual_prompt"] != narration
+        assert scenes[0]["visual_description"] == scenes[0]["visual_prompt"]
+
+    def test_does_not_overwrite_expand_beat_visual(self):
+        from services.youtube.scene_builder_parse import (
+            backfill_empty_visual_prompt_from_enhance,
+        )
+
+        scenes = backfill_empty_visual_prompt_from_enhance(
+            [
+                {
+                    "scene_number": 2,
+                    "narration": "Book midweek",
+                    "visual_prompt": "Calendar highlighting Tuesday",
+                    "enhanced_visual_prompt": "A different cinematic kitchen shot",
+                }
+            ]
+        )
+        assert scenes[0]["visual_prompt"] == "Calendar highlighting Tuesday"
+
+    def test_does_not_copy_enhanced_narration(self):
+        from services.youtube.scene_builder_parse import (
+            backfill_empty_visual_prompt_from_enhance,
+        )
+
+        spoken = "Follow for the alert setup."
+        scenes = backfill_empty_visual_prompt_from_enhance(
+            [
+                {
+                    "scene_number": 6,
+                    "narration": spoken,
+                    "visual_prompt": "",
+                    "enhanced_visual_prompt": spoken,
+                }
+            ]
+        )
+        assert scenes[0]["visual_prompt"] == ""
+
+
+class TestSeedEmptyVisualsFromContinuity:
+    def test_fills_hook_and_cta_from_beat_visual(self):
+        from services.youtube.scene_builder_parse import seed_empty_visuals_from_continuity
+
+        hook_nar = "Want titles that explode clicks? Watch this!"
+        scenes = seed_empty_visuals_from_continuity(
+            [
+                {
+                    "scene_number": 1,
+                    "title": "Hook",
+                    "emphasis": "hook",
+                    "narration": hook_nar,
+                    "visual_prompt": "",
+                },
+                {
+                    "scene_number": 2,
+                    "title": "Why it works",
+                    "emphasis": "main_content",
+                    "narration": "Book midweek",
+                    "visual_prompt": "Calendar highlighting Tuesday",
+                },
+                {
+                    "scene_number": 6,
+                    "title": "Call to action",
+                    "emphasis": "cta",
+                    "narration": "Follow for the alert setup.",
+                    "visual_prompt": "",
+                },
+            ]
+        )
+        assert "Calendar highlighting Tuesday" in scenes[0]["visual_prompt"]
+        assert scenes[0]["visual_prompt"] != hook_nar
+        assert "Calendar highlighting Tuesday" in scenes[2]["visual_prompt"]
+        assert scenes[1]["visual_prompt"] == "Calendar highlighting Tuesday"
+
+    def test_does_not_copy_narration_when_no_donor(self):
+        from services.youtube.scene_builder_parse import seed_empty_visuals_from_continuity
+
+        spoken = "Want titles that explode clicks? Watch this!"
+        scenes = seed_empty_visuals_from_continuity(
+            [
+                {
+                    "scene_number": 1,
+                    "title": "Hook",
+                    "emphasis": "hook",
+                    "narration": spoken,
+                    "visual_prompt": "",
+                }
+            ]
+        )
+        assert scenes[0]["visual_prompt"] == ""
+
+
 class TestRebalanceDurations:
     def test_shorts_sum_within_twenty_percent(self):
         from services.youtube.scene_builder_parse import rebalance_scene_durations

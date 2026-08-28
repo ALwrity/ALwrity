@@ -165,7 +165,7 @@ class ClerkAuthMiddleware:
 
                     # Use cached PyJWKClient with pinned jwks_url (never derived from token)
                     if jwks_url not in self._jwks_client_cache:
-                        logger.info(f"Creating new PyJWKClient for {jwks_url} with caching enabled")
+                        logger.debug(f"Creating new PyJWKClient for {jwks_url} (caching enabled)")
                         # Create client with caching enabled (cache_keys=True keeps keys in memory)
                         self._jwks_client_cache[jwks_url] = PyJWKClient(
                             jwks_url,
@@ -195,7 +195,7 @@ class ClerkAuthMiddleware:
                     last_name = decoded_token.get('last_name') or decoded_token.get('family_name')
                     
                     if user_id:
-                        logger.info(f"Token verified successfully using fastapi-clerk-auth for user: {email} (ID: {user_id})")
+                        logger.debug(f"Token verified for user {user_id}")
                         return {
                             'id': user_id,
                             'email': email,

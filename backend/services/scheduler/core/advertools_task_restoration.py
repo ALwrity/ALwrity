@@ -20,7 +20,7 @@ async def restore_advertools_tasks(scheduler: Any) -> int:
     Returns:
         Number of tasks created/restored
     """
-    logger.info("Restoring Advertools intelligence tasks...")
+    logger.debug("Restoring Advertools intelligence tasks...")
     total_created = 0
     total_existing = 0
     
@@ -65,7 +65,7 @@ async def restore_advertools_tasks(scheduler: Any) -> int:
                     db.add(new_audit)
                     db.commit()
                     total_created += 1
-                    logger.info(f"Created weekly content audit task for user {user_id}")
+                    logger.debug(f"Created weekly content audit task for user {user_id}")
                 
                 existing_health = db.query(AdvertoolsTask).filter(
                     AdvertoolsTask.user_id == user_id,
@@ -90,7 +90,7 @@ async def restore_advertools_tasks(scheduler: Any) -> int:
                     db.add(new_health)
                     db.commit()
                     total_created += 1
-                    logger.info(f"Created weekly site health task for user {user_id}")
+                    logger.debug(f"Created weekly site health task for user {user_id}")
                 
             finally:
                 db.close()

@@ -37,6 +37,7 @@ import models.content_strategy_state_models  # noqa: E402, F401
 import models.crawled_content  # noqa: E402, F401
 import models.daily_meeting_models  # noqa: E402, F401
 import models.daily_workflow_models  # noqa: E402, F401
+import models.daily_email_ledger  # noqa: E402, F401
 import models.workflow_execution_models  # noqa: E402, F401
 import models.enhanced_calendar_models  # noqa: E402, F401
 import models.enhanced_strategy_models  # noqa: E402, F401
@@ -161,7 +162,7 @@ def init_user_database(user_id: str) -> None:
                     pricing_service.initialize_default_pricing()
                     pricing_service.initialize_default_plans()
                     db.commit()
-                    logger.info(f"Default pricing and plans initialized for user {user_id}")
+                    logger.debug(f"Default pricing and plans initialized for user {user_id}")
                 except Exception as data_error:
                     logger.error(f"Error initializing default data for user {user_id}: {data_error}")
                     db.rollback()
@@ -172,7 +173,7 @@ def init_user_database(user_id: str) -> None:
                     f"Could not initialize pricing data (PricingService import failed): {import_error}"
                 )
 
-        logger.info(f"Database initialized successfully for user {user_id}")
+        logger.debug(f"Database initialized successfully for user {user_id}")
     except SQLAlchemyError as e:
         logger.error(f"Error initializing database for user {user_id}: {str(e)}")
         raise

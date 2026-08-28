@@ -18,11 +18,17 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import { runSeoPreview, type SeoPreviewResult } from "./utils/seoPreviewApi";
+import { runSeoPreview, getSeoPreview, type SeoPreviewResult } from "./utils/seoPreviewApi";
 
 interface SeoPreviewCardProps {
   websiteUrl: string;
+  /** When true (default), fall back to running the preview if no persisted
+   *  results exist. When false ("View Results" mode), only show persisted
+   *  results and never trigger a fresh run. */
+  autoRun?: boolean;
 }
+
+const STORAGE_KEY = "seo_preview_result";
 
 const CATEGORY_LABELS: Record<string, string> = {
   meta: "Meta Tags",
@@ -42,6 +48,15 @@ const CATEGORY_ICONS: Record<string, string> = {
   ux: "👤",
 };
 
+const CATEGORY_DESCRIPTIONS: Record<string, string> = {
+  meta: "Titles, descriptions & social sharing tags.",
+  content: "Headings, length & internal links.",
+  technical: "Page speed, compression & server setup.",
+  url_structure: "How clean & readable your URLs are.",
+  accessibility: "Alt text & screen-reader friendliness.",
+  ux: "Overall user experience signals.",
+};
+
 function scoreBar(score: number): string {
   if (score >= 80) return "#10b981";
   if (score >= 60) return "#f59e0b";
@@ -54,7 +69,7 @@ function scoreLabel(s: number): string {
   return "Poor";
 }
 
-export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl }) => {
+export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl, autoRun = true }) => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SeoPreviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +82,13 @@ export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl }) =>
     try {
       const data = await runSeoPreview(websiteUrl);
       setResult(data);
-      if (!data.success) setError(data.error || "Preview failed");
+      if (data.success) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        } catch {}
+      } else {
+        setError(data.error || "Preview failed");
+      }
     } catch (e: any) {
       setError(e?.message || "Could not run preview");
     } finally {
@@ -78,9 +99,36 @@ export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl }) =>
   useEffect(() => {
     if (!autoLoaded && websiteUrl) {
       setAutoLoaded(true);
-      runPreview();
+
+      // 1. Restore instantly from localStorage (survives refresh).
+      try {
+        const cached = localStorage.getItem(STORAGE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached) as SeoPreviewResult;
+          if (parsed?.success && parsed?.pages?.length) {
+            setResult(parsed);
+            return;
+          }
+        }
+      } catch {}
+
+      // 2. Otherwise load persisted results from the DB (no re-run, no 429s).
+      getSeoPreview(websiteUrl)
+        .then((data) => {
+          if (data?.success && data?.pages?.length) {
+            setResult(data);
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            } catch {}
+          } else if (autoRun) {
+            runPreview();
+          }
+        })
+        .catch(() => {
+          if (autoRun) runPreview();
+        });
     }
-  }, [websiteUrl, autoLoaded]);
+  }, [websiteUrl, autoLoaded, autoRun]);
 
   const togglePage = (i: number) => {
     setExpandedPages((prev) => {
@@ -102,7 +150,8 @@ export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl }) =>
   if (stats && result?.pages) {
     for (const p of result.pages) {
       for (const iss of p.top_issues || []) {
-        if (iss.category.includes("critical")) stats.critical++;
+        const sev = (iss as any)?.severity || iss.category || "";
+        if (String(sev).includes("critical")) stats.critical++;
         else stats.warning++;
       }
     }
@@ -187,6 +236,22 @@ export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl }) =>
                       }}
                     />
                   </Box>
+                  <Tooltip title={CATEGORY_DESCRIPTIONS[cat] || CATEGORY_LABELS[cat]} arrow>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#475569",
+                        display: "block",
+                        textAlign: "center",
+                        mt: 0.4,
+                        lineHeight: 1.3,
+                        fontSize: 9,
+                        cursor: "help",
+                      }}
+                    >
+                      {CATEGORY_DESCRIPTIONS[cat]}
+                    </Typography>
+                  </Tooltip>
                   <Typography variant="caption" sx={{ color: scoreBar(avg), textAlign: "center", display: "block", mt: 0.2 }}>
                     {avg}%
                   </Typography>
@@ -202,7 +267,10 @@ export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl }) =>
           {result.pages?.map((page, i) => {
             const isOpen = expandedPages.has(i);
             const topIssues = page.top_issues || [];
-            const criticalCount = topIssues.filter((iss) => iss.category?.includes("critical")).length;
+            const criticalCount = topIssues.filter((iss) => {
+              const sev = (iss as any)?.severity || iss.category || "";
+              return String(sev).includes("critical");
+            }).length;
 
             return (
               <Paper
@@ -245,16 +313,40 @@ export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl }) =>
                   <Box sx={{ px: 2, pb: 2, bgcolor: "#fafafa", borderTop: "1px solid #f1f5f9" }}>
                     {/* Issues list */}
                     {topIssues.map((issue, j) => {
-                      const category = typeof issue.category === 'string' ? issue.category : String(issue.category || 'issue');
-                      const rawIssue: any = (issue as any).issue;
-                      const issueText = typeof rawIssue === 'string' ? rawIssue
-                        : typeof rawIssue === 'object' ? (rawIssue.issue || rawIssue.message || JSON.stringify(rawIssue).slice(0, 200))
-                        : String(rawIssue || '');
+                      const rawIssue: any = (issue as any);
+                      const severity = (rawIssue.severity || rawIssue.category || "issue")?.toString() || "issue";
+                      const isCritical = severity.includes("critical") || severity === "error";
+                      const issueText = typeof rawIssue.issue === 'string' && rawIssue.issue
+                        ? rawIssue.issue
+                        : (rawIssue.message || "");
+                      const fixText = typeof rawIssue.fix === 'string' ? rawIssue.fix : "";
+                      const label = CATEGORY_LABELS[rawIssue.category] || rawIssue.category || "SEO";
                       return (
-                      <Box key={j} sx={{ mt: 1.5, pl: 1, borderLeft: `3px solid ${category?.includes("critical") ? "#ef4444" : "#f59e0b"}` }}>
-                        <Typography variant="caption" sx={{ fontWeight: 600, color: category?.includes("critical") ? "#ef4444" : "#92400e" }}>
-                          [{category}] {issueText}
+                      <Box key={j} sx={{ mt: 1.5, pl: 1, borderLeft: `3px solid ${isCritical ? "#ef4444" : "#f59e0b"}` }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                          <Chip
+                            size="small"
+                            label={isCritical ? "Critical" : "Needs work"}
+                            sx={{
+                              height: 20,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "#fff",
+                              bgcolor: isCritical ? "#ef4444" : "#f59e0b",
+                            }}
+                          />
+                          <Typography variant="caption" sx={{ fontWeight: 700, color: "#334155" }}>
+                            {label}
+                          </Typography>
+                        </Box>
+                        <Typography variant="body2" sx={{ color: "#334155", mt: 0.5 }}>
+                          {issueText || "Issue detected"}
                         </Typography>
+                        {fixText && (
+                          <Typography variant="caption" sx={{ color: "#64748b", mt: 0.5, display: "block" }}>
+                            Fix: {fixText}
+                          </Typography>
+                        )}
                       </Box>
                     )})}
                     {topIssues.length === 0 && (
@@ -268,10 +360,10 @@ export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl }) =>
                       {(["meta", "content", "technical", "accessibility", "ux", "url_structure"] as const).map((cat) => {
                         const s = ((page as any)[cat]?.score ?? 0) * 100;
                         return (
-                          <Tooltip key={cat} title={`${CATEGORY_LABELS[cat]}: ${Math.round(s)}%`}>
+                          <Tooltip key={cat} title={`${CATEGORY_LABELS[cat]} (${Math.round(s)}%): ${CATEGORY_DESCRIPTIONS[cat] || ""}`} arrow>
                             <Box sx={{ flex: "1 1 80px", minWidth: 60 }}>
                               <Typography variant="caption" sx={{ fontSize: 10, color: "#64748b" }}>
-                                {cat}
+                                {CATEGORY_LABELS[cat]}
                               </Typography>
                               <Box sx={{ bgcolor: "#e2e8f0", borderRadius: 1, height: 4, mt: 0.3 }}>
                                 <Box sx={{ width: `${s}%`, height: "100%", bgcolor: scoreBar(s), borderRadius: 1 }} />
