@@ -1,14 +1,12 @@
 import { useCallback } from 'react';
 
 interface PersonaInitializationProps {
-  onboardingData?: any;
   stepData?: {
     corePersona?: any;
     platformPersonas?: Record<string, any>;
     qualityMetrics?: any;
     selectedPlatforms?: string[];
   };
-  updateHeaderContent: (content: { title: string; description: string }) => void;
   setCorePersona: (persona: any) => void;
   setPlatformPersonas: (personas: Record<string, any>) => void;
   setQualityMetrics: (metrics: any) => void;
@@ -24,9 +22,7 @@ interface PersonaInitializationProps {
 }
 
 export const usePersonaInitialization = ({
-  onboardingData,
   stepData,
-  updateHeaderContent,
   setCorePersona,
   setPlatformPersonas,
   setQualityMetrics,
@@ -43,32 +39,8 @@ export const usePersonaInitialization = ({
   
   const initialize = useCallback(async () => {
     console.log('PersonaStep: Initialization started');
-    
-    // Extract domain for personalization
-    const websiteUrl = onboardingData?.websiteAnalysis?.website_url || 
-                       onboardingData?.website || 
-                       onboardingData?.userUrl || 
-                       '';
-    
-    let domainName = '';
-    try {
-      if (websiteUrl) {
-        const url = new URL(websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`);
-        domainName = url.hostname.replace('www.', '');
-      }
-    } catch (e) {
-      domainName = websiteUrl;
-    }
 
-    const personalizedTitle = domainName 
-      ? `Brand Voice for ${domainName}` 
-      : 'Your AI Brand Voice';
-
-    // Update header immediately
-    updateHeaderContent({
-      title: personalizedTitle,
-      description: "Your 'Brand Voice' is a unique AI profile that captures how your business sounds. It analyzes your website's tone, audience, and style to ensure every post generated matches your brand identity perfectly."
-    });
+    // Header title/description owned by Wizard.tsx (Option B: "Define Your Brand Persona").
 
     // Check if we already have persona data from stepData (when navigating back)
     if (stepData?.corePersona) {
@@ -126,9 +98,7 @@ export const usePersonaInitialization = ({
     await generatePersonas();
     setHasCheckedCache(true);
   }, [
-    onboardingData,
     stepData,
-    updateHeaderContent,
     setCorePersona,
     setPlatformPersonas,
     setQualityMetrics,

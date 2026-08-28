@@ -31,7 +31,6 @@ import { Step4Hero } from './PersonaStep/Step4Hero';
 
 interface PersonalizationStepProps {
   onContinue: (data?: any) => void;
-  updateHeaderContent: (content: { title: string; description: string }) => void;
   onValidationChange?: (isValid: boolean) => void;
   onDataChange?: (data: any) => void;
   onboardingType?: string;
@@ -84,7 +83,6 @@ function persistPlatformPersonaToCache(platformId: string, persona: any) {
 
 const PersonalizationStep: React.FC<PersonalizationStepProps> = ({ 
   onContinue: _onContinue, 
-  updateHeaderContent, 
   onValidationChange,
   onDataChange,
   onboardingType,
@@ -459,9 +457,7 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
   });
 
   const { initialize } = usePersonaInitialization({
-    onboardingData,
     stepData,
-    updateHeaderContent,
     setCorePersona,
     setPlatformPersonas,
     setQualityMetrics,
@@ -483,12 +479,6 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
     initRef.current = true;
     
     const initSequence = async () => {
-      // Set initial header
-      updateHeaderContent({
-        title: 'Define Your Brand Persona',
-        description: 'Go beyond text. Define how your brand sounds, looks, and speaks. Configure your brand voice, generate an AI avatar, and prepare for voice cloning.'
-      });
-
       // Load configuration options first (lightweight)
       try {
         const options = await getPersonalizationConfigurationOptions();
@@ -510,7 +500,7 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
     };
 
     initSequence();
-  }, [updateHeaderContent, initialize]);
+  }, [initialize]);
 
   const handleRegenerate = () => {
     setShowPreview(false);
