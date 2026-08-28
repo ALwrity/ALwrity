@@ -717,22 +717,6 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         onAddCompetitor={handleAddCompetitor}
       />
 
-      {/* Sitemap Benchmark Actions — user-triggered */}
-      {competitors.length > 0 && (
-        <Box mt={3} display="flex" gap={2} flexWrap="wrap">
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={isRunningBenchmark ? <CircularProgress size={14} /> : <RefreshIcon />}
-            onClick={runSitemapBenchmark}
-            disabled={isRunningBenchmark}
-            sx={{ textTransform: 'none' }}
-          >
-            {isRunningBenchmark ? 'Scheduling...' : 'Run Sitemap Benchmark'}
-          </Button>
-        </Box>
-      )}
-
       {benchmarkError && (
         <Alert severity="warning" sx={{ mt: 2 }} onClose={() => setBenchmarkError(null)}>
           {benchmarkError}
@@ -743,15 +727,13 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
       <ContentPillarsSection data={contentPillars} isLoading={isLoadingPillars} error={error} onRefresh={refreshContentPillars} />
 
       {/* Competitor Sitemap Benchmark — enriched insights */}
-      {benchmarkReport && (
-        <Box mt={4} mb={3}>
-          <BenchmarkInsightsSection
-            report={benchmarkReport}
-            onRefresh={runSitemapBenchmark}
-            isRefreshing={isRunningBenchmark}
-          />
-        </Box>
-      )}
+      <Box mt={4} mb={3}>
+        <BenchmarkInsightsSection
+          report={benchmarkReport}
+          onRefresh={runSitemapBenchmark}
+          isRefreshing={isRunningBenchmark}
+        />
+      </Box>
 
       {/* Strategic Content Opportunities Section */}
       {competitors.length > 0 && (

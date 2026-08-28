@@ -82,7 +82,42 @@ interface BenchmarkInsightsSectionProps {
 
 export const BenchmarkInsightsSection: React.FC<BenchmarkInsightsSectionProps> = ({ report, onRefresh, isRefreshing }) => {
   const [expanded, setExpanded] = useState(true);
-  if (!report) return null;
+
+  // Render placeholder when no report exists — allows user to run the benchmark
+  if (!report) {
+    return (
+      <Paper sx={{ p: 3, bgcolor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 2 }}>
+        <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <InsightsIcon sx={{ color: '#6C5CE7' }} />
+            Benchmark Insights
+          </Typography>
+          {onRefresh && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={isRefreshing ? <CircularProgress size={14} /> : <RefreshIcon />}
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              sx={{
+                borderColor: '#667eea',
+                color: '#667eea',
+                textTransform: 'none',
+                '&:hover': { borderColor: '#5a6fd8', bgcolor: 'rgba(102,126,234,0.04)' }
+              }}
+            >
+              {isRefreshing ? 'Running...' : 'Run Sitemap Benchmark'}
+            </Button>
+          )}
+        </Box>
+        <Typography variant="body2" sx={{ color: '#64748b', fontStyle: 'italic' }}>
+          No benchmark report yet. Click "Run Sitemap Benchmark" to analyze your site against competitors.
+        </Typography>
+      </Paper>
+    );
+  }
+
+  // Report exists — show full insights
 
   const user = report.user?.summary || {};
   const summaries = report.competitors?.summaries || {};
@@ -297,6 +332,41 @@ export const BenchmarkInsightsSection: React.FC<BenchmarkInsightsSectionProps> =
                         <Typography variant="body2" sx={{ color: '#475569' }}>
                           <strong>File types:</strong> {Object.entries(c.file_types).map(([k, v]) => `${k} (${v})`).join(', ')}
                         </Typography>
+                      )}
+                      {c.priority_distribution && Object.keys(c.priority_distribution).length > 0 && (
+                        <Box mt={1}>
+                          <Typography variant="body2" sx={{ color: '#475569' }}>
+                            <strong>Priority:</strong> {Object.entries(c.priority_distribution).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                          </Typography>
+                        </Box>
+                      )}
+                      {c.changefreq_distribution && Object.keys(c.changefreq_distribution).length > 0 && (
+                        <Box mt={0.5}>
+                          <Typography variant="body2" sx={{ color: '#475569' }}>
+                            <strong>Change frequency:</strong> {Object.entries(c.changefreq_distribution).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                          </Typography>
+                        </Box>
+                      )}
+                      {c.trends && c.trends.length > 0 && (
+                        <Box mt={0.5}>
+                          <Typography variant="body2" sx={{ color: '#059669', fontWeight: 600 }}>
+                            <strong>Trend:</strong> {c.trends.join(', ')}
+                          </Typography>
+                        </Box>
+                      )}
+                      {c.monthly_distribution && Object.keys(c.monthly_distribution).length > 0 && (
+                        <Box mt={0.5}>
+                          <Typography variant="body2" sx={{ color: '#475569' }}>
+                            <strong>Monthly (last 12):</strong> {Object.entries(c.monthly_distribution).map(([k, v]) => `${k.split('-')[1]}/${k.slice(2,2)}: ${v}`).join(', ')}
+                          </Typography>
+                        </Box>
+                      )}
+                      {c.yearly_distribution && Object.keys(c.yearly_distribution).length > 0 && (
+                        <Box mt={0.5}>
+                          <Typography variant="body2" sx={{ color: '#475569' }}>
+                            <strong>Yearly:</strong> {Object.entries(c.yearly_distribution).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                          </Typography>
+                        </Box>
                       )}
                       {c.top_url_patterns && Object.keys(c.top_url_patterns).length > 0 && (
                         <Box mt={1}>
