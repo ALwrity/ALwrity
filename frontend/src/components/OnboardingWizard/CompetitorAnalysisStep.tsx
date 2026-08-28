@@ -10,10 +10,12 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  Divider,
   Tooltip,
   IconButton,
   Collapse,
   Chip,
+  Stack,
 } from '@mui/material';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -52,6 +54,29 @@ const lightTheme = {
   radiusLg: '20px'
 };
 
+// Render a titled list of strings with bullet styling (used in the competitor modal)
+const renderStringList = (title: string, items: string[]): React.ReactNode => (
+  <Box>
+    <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+      {title}
+    </Typography>
+    <Stack spacing={0.5}>
+      {items.map((item, i) => (
+        <Typography key={i} variant="body2" sx={{ color: '#4B5563' }}>
+          • {item}
+        </Typography>
+      ))}
+    </Stack>
+  </Box>
+);
+
+// Convert snake_case keys into human-friendly labels
+const labelify = (key: string): string =>
+  key
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+
 interface ResearchSummary {
   total_competitors: number;
   market_insights: string;
@@ -80,8 +105,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
 
   // UI state (modals, header, sitemap, social discovery) — stays in parent
   const [showHighlightsModal, setShowHighlightsModal] = useState(false);
-  const [selectedCompetitorHighlights, setSelectedCompetitorHighlights] = useState<string[]>([]);
-  const [selectedCompetitorTitle, setSelectedCompetitorTitle] = useState<string>('');
+  const [selectedCompetitor, setSelectedCompetitor] = useState<Competitor | null>(null);
   // Seed from initialData so the persisted sitemap/strategic insights render
   // immediately and don't trigger an unnecessary AI call on back-navigation.
   const [sitemapAnalysis, setSitemapAnalysis] = useState<any>(initialData?.sitemapAnalysis ?? null);
@@ -460,8 +484,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   }, [onDataReady, getResearchData]); // Include getResearchData in dependencies
 
   const handleShowHighlights = (competitor: Competitor) => {
-    setSelectedCompetitorHighlights(competitor.highlights || []);
-    setSelectedCompetitorTitle(competitor.title);
+    setSelectedCompetitor(competitor);
     setShowHighlightsModal(true);
   };
 
@@ -783,45 +806,213 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         step={analysisStep}
       />
 
-      {/* Highlights Modal */}
-      <Dialog 
-        open={showHighlightsModal} 
+      {/* Competitor analysis modal — shows the full data persisted by the backend */}
+      <Dialog
+        open={showHighlightsModal}
         onClose={() => setShowHighlightsModal(false)}
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>
-          <Typography variant="h6" component="span" fontWeight={600}>
-            Key Highlights - {selectedCompetitorTitle}
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
-          {selectedCompetitorHighlights.length > 0 ? (
-            <Box>
-              {selectedCompetitorHighlights.map((highlight, index) => (
-                <Box 
-                  key={index} 
-                  sx={{ 
-                    p: 2, 
-                    mb: 2, 
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    backgroundColor: 'background.paper'
-                  }}
-                >
-                  <Typography variant="body2" color="text.secondary">
-                    {highlight}
-                  </Typography>
+        {selectedCompetitor && (
+          <>
+            <DialogTitle>
+              <Typography variant="h6" component="span" fontWeight={700} sx={{ color: '#0B1220' }}>
+                {selectedCompetitor.title || selectedCompetitor.domain}
+              </Typography>
+              <Typography variant="caption" component="div" sx={{ color: '#6B7280', mt: 0.5 }}>
+                {selectedCompetitor.domain}
+              </Typography>
+            </DialogTitle>
+            <DialogContent dividers>
+              <Stack spacing={2.5}>
+                {/* Top-line chips */}
+                <Box display="flex" gap={1} flexWrap="wrap">
+                  <Chip
+                    size="small"
+                    label={`${Math.round(selectedCompetitor.relevance_score * 100)}% match`}
+                    sx={{ bgcolor: '#f0fdf4', color: '#15803d', fontWeight: 600, border: '1px solid #bbf7d0' }}
+                  />
+                  {selectedCompetitor.competitive_insights?.threat_level && (
+                    <Chip
+                      size="small"
+                      label={`Threat: ${selectedCompetitor.competitive_insights.threat_level}`}
+                      sx={{
+                        bgcolor:
+                          selectedCompetitor.competitive_insights.threat_level === 'high'
+                            ? '#fef2f2' : selectedCompetitor.competitive_insights.threat_level === 'low'
+                            ? '#f0fdf4' : '#fffbeb',
+                        color:
+                          selectedCompetitor.competitive_insights.threat_level === 'high'
+                            ? '#b91c1c' : selectedCompetitor.competitive_insights.threat_level === 'low'
+                            ? '#15803d' : '#b45309',
+                        fontWeight: 600,
+                        border: '1px solid',
+                        borderColor:
+                          selectedCompetitor.competitive_insights.threat_level === 'high'
+                            ? '#fecaca' : selectedCompetitor.competitive_insights.threat_level === 'low'
+                            ? '#bbf7d0' : '#fde68a',
+                      }}
+                    />
+                  )}
+                  {selectedCompetitor.published_date && (
+                    <Chip
+                      size="small"
+                      label={`Published: ${new Date(selectedCompetitor.published_date).toLocaleDateString()}`}
+                      variant="outlined"
+                      sx={{ fontSize: '0.7rem', height: 22, borderColor: '#E5E7EB', color: '#6B7280' }}
+                    />
+                  )}
                 </Box>
-              ))}
-            </Box>
-          ) : (
-            <Typography variant="body2" color="text.secondary">
-              No highlights available for this competitor.
-            </Typography>
-          )}
-        </DialogContent>
+
+                {/* Summary */}
+                {selectedCompetitor.summary && (
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+                      Summary
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#4B5563' }}>
+                      {selectedCompetitor.summary}
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Business / audience / market share */}
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+                    Business & Audience
+                  </Typography>
+                  <Box display="flex" gap={1} flexWrap="wrap">
+                    {selectedCompetitor.competitive_insights?.business_model &&
+                      selectedCompetitor.competitive_insights.business_model !== 'unknown' && (
+                        <Chip size="small" label={`Model: ${selectedCompetitor.competitive_insights.business_model}`} variant="outlined" sx={{ fontSize: '0.72rem', borderColor: '#d1d5db', color: '#374151' }} />
+                      )}
+                    {selectedCompetitor.competitive_insights?.target_audience &&
+                      selectedCompetitor.competitive_insights.target_audience !== 'unknown' && (
+                        <Chip size="small" label={`Audience: ${selectedCompetitor.competitive_insights.target_audience}`} variant="outlined" sx={{ fontSize: '0.72rem', borderColor: '#d1d5db', color: '#374151' }} />
+                      )}
+                    {selectedCompetitor.competitive_insights?.market_share_estimate &&
+                      selectedCompetitor.competitive_insights.market_share_estimate !== 'unknown' && (
+                        <Chip size="small" label={`Market share: ${selectedCompetitor.competitive_insights.market_share_estimate}`} variant="outlined" sx={{ fontSize: '0.72rem', borderColor: '#d1d5db', color: '#374151' }} />
+                      )}
+                  </Box>
+                </Box>
+
+                {/* Strengths */}
+                {selectedCompetitor.competitive_insights.competitive_strengths &&
+                  selectedCompetitor.competitive_insights.competitive_strengths.length > 0 && (
+                    renderStringList('Competitive Strengths', selectedCompetitor.competitive_insights.competitive_strengths)
+                  )}
+
+                {/* Weaknesses */}
+                {selectedCompetitor.competitive_insights.competitive_weaknesses &&
+                  selectedCompetitor.competitive_insights.competitive_weaknesses.length > 0 && (
+                    renderStringList('Competitive Weaknesses', selectedCompetitor.competitive_insights.competitive_weaknesses)
+                  )}
+
+                {/* Differentiation opportunities */}
+                {selectedCompetitor.competitive_insights.differentiation_opportunities &&
+                  selectedCompetitor.competitive_insights.differentiation_opportunities.length > 0 && (
+                    renderStringList('Differentiation Opportunities', selectedCompetitor.competitive_insights.differentiation_opportunities)
+                  )}
+
+                {/* Market positioning */}
+                {selectedCompetitor.market_positioning && (
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+                      Market Positioning
+                    </Typography>
+                    <Box display="flex" gap={1} flexWrap="wrap">
+                      {Object.entries(selectedCompetitor.market_positioning)
+                        .filter(([, v]) => v && v !== 'unknown')
+                        .map(([k, v]) => (
+                          <Chip key={k} size="small" label={`${labelify(k)}: ${v}`} variant="outlined" sx={{ fontSize: '0.72rem', borderColor: '#d1d5db', color: '#374151' }} />
+                        ))}
+                      {(!selectedCompetitor.market_positioning || 
+                        !Object.values(selectedCompetitor.market_positioning).some((v) => v && v !== 'unknown')) && (
+                        <Typography variant="body2" color="text.secondary">No market positioning data available.</Typography>
+                      )}
+                    </Box>
+                  </Box>
+                )}
+
+                {/* Content insights */}
+                {selectedCompetitor.content_insights && (
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+                      Content Insights
+                    </Typography>
+                    <Box display="flex" gap={1} flexWrap="wrap">
+                      {selectedCompetitor.content_insights.content_focus && (
+                        <Chip size="small" label={`Focus: ${selectedCompetitor.content_insights.content_focus}`} variant="outlined" sx={{ fontSize: '0.72rem', borderColor: '#d1d5db', color: '#374151' }} />
+                      )}
+                      {selectedCompetitor.content_insights.target_audience && (
+                        <Chip size="small" label={`Audience: ${selectedCompetitor.content_insights.target_audience}`} variant="outlined" sx={{ fontSize: '0.72rem', borderColor: '#d1d5db', color: '#374151' }} />
+                      )}
+                      {selectedCompetitor.content_insights.content_quality && (
+                        <Chip size="small" label={`Quality: ${selectedCompetitor.content_insights.content_quality}`} variant="outlined" sx={{ fontSize: '0.72rem', borderColor: '#d1d5db', color: '#374151' }} />
+                      )}
+                      {selectedCompetitor.content_insights.publishing_frequency && (
+                        <Chip size="small" label={`Frequency: ${selectedCompetitor.content_insights.publishing_frequency}`} variant="outlined" sx={{ fontSize: '0.72rem', borderColor: '#d1d5db', color: '#374151' }} />
+                      )}
+                    </Box>
+                    {selectedCompetitor.content_insights.content_types &&
+                      selectedCompetitor.content_insights.content_types.length > 0 && (
+                      <Typography variant="body2" sx={{ color: '#4B5563', mt: 0.75 }}>
+                        <strong>Content types:</strong> {selectedCompetitor.content_insights.content_types.join(', ')}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+
+                <Divider />
+
+                {/* Highlights */}
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+                    Key Highlights
+                  </Typography>
+                  {selectedCompetitor.highlights && selectedCompetitor.highlights.length > 0 ? (
+                    <Box>
+                      {selectedCompetitor.highlights.map((highlight, index) => (
+                        <Box
+                          key={index}
+                          sx={{
+                            p: 1.5,
+                            mb: 1,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            borderRadius: 1,
+                            backgroundColor: 'background.paper'
+                          }}
+                        >
+                          <Typography variant="body2" color="text.secondary">{highlight}</Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">No highlights available.</Typography>
+                  )}
+                </Box>
+
+                {/* Subpages */}
+                {selectedCompetitor.subpages && selectedCompetitor.subpages.length > 0 && (
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+                      Subpages ({selectedCompetitor.subpages.length})
+                    </Typography>
+                    <Stack spacing={0.5}>
+                      {selectedCompetitor.subpages.map((sp, i) => (
+                        <Typography key={i} variant="body2" sx={{ color: '#4B5563', wordBreak: 'break-all' }}>
+                          • {sp}
+                        </Typography>
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
+              </Stack>
+            </DialogContent>
+          </>
+        )}
       </Dialog>
 
       <ResearchStepBackgroundSetupModal

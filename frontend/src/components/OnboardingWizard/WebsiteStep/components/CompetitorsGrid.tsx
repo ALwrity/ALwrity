@@ -37,17 +37,32 @@ export interface Competitor {
   summary: string;
   relevance_score: number;
   highlights?: string[];
+  subpages?: string[];
   favicon?: string;
   image?: string;
   published_date?: string;
   author?: string;
   competitive_insights: {
+    threat_level?: string;
+    competitive_strengths?: string[];
+    competitive_weaknesses?: string[];
+    market_share_estimate?: string;
+    differentiation_opportunities?: string[];
     business_model: string;
     target_audience: string;
   };
   content_insights: {
     content_focus: string;
+    target_audience?: string;
+    content_types?: string[];
+    publishing_frequency?: string;
     content_quality: string;
+  };
+  market_positioning?: {
+    market_tier?: string;
+    pricing_position?: string;
+    brand_positioning?: string;
+    competitive_advantage?: string;
   };
 }
 

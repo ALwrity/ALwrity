@@ -283,6 +283,7 @@ class StepManagementService:
                         "author": competitor.get("author"),
                         "competitive_analysis": competitor.get("competitive_analysis") or competitor.get("competitive_insights", {}),
                         "content_insights": competitor.get("content_insights", {}),
+                        "market_positioning": competitor.get("market_positioning", {}),
                         "industry_context": industry_context,
                         "completed_at": datetime.utcnow().isoformat()
                     }
