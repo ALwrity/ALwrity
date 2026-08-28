@@ -530,13 +530,21 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     const newCompetitors = [...competitors];
     newCompetitors.splice(index, 1);
     setCompetitors(newCompetitors);
-    // Update cache
+    // Update cache - clear entire cache if no competitors remain to prevent
+    // stale data resurrection on next page load
     try {
-        const cachedData = localStorage.getItem('competitor_analysis_data');
-        if (cachedData) {
-            const parsedData = JSON.parse(cachedData);
-            parsedData.competitors = newCompetitors;
-            localStorage.setItem('competitor_analysis_data', JSON.stringify(parsedData));
+        if (newCompetitors.length === 0) {
+            localStorage.removeItem('competitor_analysis_data');
+            localStorage.removeItem('competitor_analysis_url');
+            localStorage.removeItem('competitor_analysis_timestamp');
+            console.log('Cleared competitor cache after deleting last competitor');
+        } else {
+            const cachedData = localStorage.getItem('competitor_analysis_data');
+            if (cachedData) {
+                const parsedData = JSON.parse(cachedData);
+                parsedData.competitors = newCompetitors;
+                localStorage.setItem('competitor_analysis_data', JSON.stringify(parsedData));
+            }
         }
     } catch (e) {
         console.warn('Failed to update cache for competitors', e);
