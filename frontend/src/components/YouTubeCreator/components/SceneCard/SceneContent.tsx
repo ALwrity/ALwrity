@@ -278,7 +278,9 @@ export const SceneContent: React.FC<SceneContentProps> = ({
       <NarrationSection narration={scene.narration} />
 
       {/* Visual Prompt Section */}
-      <VisualPromptSection visualPrompt={scene.visual_prompt} />
+      <VisualPromptSection
+        visualPrompt={(scene.visual_prompt || scene.enhanced_visual_prompt || "").trim()}
+      />
 
       {/* Visual Cues Section */}
       {scene.visual_cues && scene.visual_cues.length > 0 && (
