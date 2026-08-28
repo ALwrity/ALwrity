@@ -1,10 +1,13 @@
 """Visual prompt batch enhancement for YouTube scenes."""
 
-from typing import Dict, Any, List, Callable
-import json
+from typing import Any, Callable, Dict, List
 
 from services.llm_providers.main_text_generation import llm_text_gen
-from services.youtube.scene_builder_parse import scene_needs_visual_enhance
+from services.youtube.scene_builder_parse import (
+    finalize_youtube_scene_visuals,
+    scene_needs_visual_enhance,
+)
+from services.youtube.youtube_scene_enhance_response import map_youtube_enhance_response
 from utils.logger_utils import get_service_logger
 
 logger = get_service_logger("youtube.scene_builder_enhance")
@@ -37,7 +40,7 @@ def enhance_visual_prompts_batch(
                 scene["enhanced_visual_prompt"] = scene.get(
                     "visual_prompt", scene.get("visual_description", "")
                 )
-            return scenes
+            return finalize_youtube_scene_visuals(scenes)
         logger.info(
             "[YouTubeSceneBuilder] Batch enhancing {} shorts scenes in 1 AI call "
             "(empty visual or visual copied narration)",
@@ -87,7 +90,7 @@ def enhance_visual_prompts_batch(
                 scene["enhanced_visual_prompt"] = scene.get(
                     "visual_prompt", scene.get("visual_description", "")
                 )
-        return scenes
+        return finalize_youtube_scene_visuals(scenes)
     
     # For long videos, split into 2 batches to avoid token limits
     if duration_type == "long":
@@ -125,7 +128,7 @@ def enhance_visual_prompts_batch(
             scene["enhanced_visual_prompt"] = all_enhanced.get(
                 idx, scene.get("visual_prompt", scene.get("visual_description", ""))
             )
-        return scenes
+        return finalize_youtube_scene_visuals(scenes)
     
     # Fallback: use original prompts
     logger.warning(
@@ -136,7 +139,7 @@ def enhance_visual_prompts_batch(
         scene["enhanced_visual_prompt"] = scene.get(
             "visual_prompt", scene.get("visual_description", "")
         )
-    return scenes
+    return finalize_youtube_scene_visuals(scenes)
 
 
 def batch_enhance_prompts(
@@ -207,50 +210,19 @@ Make sure the array length matches the number of scenes provided ({len(scene_dat
                 }
             }
         )
-        
-        # Parse response
-        if isinstance(response, list):
-            enhanced_list = response
-        elif isinstance(response, str):
-            import json
-            enhanced_list = json.loads(response)
-        else:
-            enhanced_list = response
-        
-        # Build result dictionary
-        result = {}
-        for item in enhanced_list:
-            idx = item.get("scene_index", 0)
-            prompt = item.get("enhanced_prompt", "")
-            if prompt:
-                result[idx] = prompt
-            else:
-                # Fallback to original
-                original_scene = scene_data_list[idx] if idx < len(scene_data_list) else {}
-                result[idx] = original_scene.get(
-                    "image_prompt", original_scene.get("description", "")
-                )
-        
-        # Fill in any missing scenes with original prompts
-        for idx in range(len(scene_data_list)):
-            if idx not in result:
-                original_scene = scene_data_list[idx]
-                result[idx] = original_scene.get(
-                    "image_prompt", original_scene.get("description", "")
-                )
-        
+
+        result = map_youtube_enhance_response(response, scene_data_list)
         logger.info(
-            f"[YouTubeSceneBuilder] ✅ Batch enhanced {len(result)} prompts "
-            f"in 1 AI call"
+            "[YouTubeSceneBuilder] Batch enhanced {} prompts in 1 AI call",
+            len(result),
         )
         return result
-        
+
     except Exception as e:
         logger.error(
             f"[YouTubeSceneBuilder] Batch enhancement failed: {e}",
             exc_info=True
         )
-        # Return original prompts as fallback
         return {
             idx: scene.get("image_prompt", scene.get("description", ""))
             for idx, scene in enumerate(scene_data_list)
