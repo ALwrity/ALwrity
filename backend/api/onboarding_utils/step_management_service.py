@@ -29,10 +29,13 @@ class StepManagementService:
         When ``onboarding_type`` is provided and a new session is created,
         it is set on the session so the correct platform strategy is used
         from the very first step.
+
+        Returns the most recent session if one exists (ordered by updated_at DESC)
+        to ensure writes go to the same session that reads target.
         """
         session = db.query(OnboardingSession).filter(
             OnboardingSession.user_id == user_id
-        ).first()
+        ).order_by(OnboardingSession.updated_at.desc()).first()
 
         if not session:
             session = OnboardingSession(
@@ -289,9 +292,11 @@ class StepManagementService:
                     }
                     
                     # Check if competitor already exists for this session
+                    # Use the CLEANED URL (competitor_url) for dedupe to match what's stored,
+                    # avoiding duplicates when same URL has different formatting (whitespace, backticks, etc.)
                     existing_competitor = db.query(CompetitorAnalysis).filter(
                         CompetitorAnalysis.session_id == session.id,
-                        CompetitorAnalysis.competitor_url == competitor.get("url", "")
+                        CompetitorAnalysis.competitor_url == competitor_url
                     ).first()
 
                     has_details = bool(analysis_data.get("summary") or analysis_data.get("highlights"))

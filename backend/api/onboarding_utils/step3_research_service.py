@@ -73,11 +73,13 @@ class Step3ResearchService:
             logger.info(f"Starting research analysis for user {user_id}, URL: {user_url}")
 
             # Find the correct onboarding session for this user
+            # Use the most recent session (ordered by updated_at DESC) to match
+            # the session that reads target, ensuring writes go to the same session.
             with get_db_session(user_id) as db:
                 from models.onboarding import OnboardingSession
                 session = db.query(OnboardingSession).filter(
                     OnboardingSession.user_id == user_id
-                ).first()
+                ).order_by(OnboardingSession.updated_at.desc()).first()
 
                 if not session:
                     logger.error(f"No onboarding session found for user {user_id}")
