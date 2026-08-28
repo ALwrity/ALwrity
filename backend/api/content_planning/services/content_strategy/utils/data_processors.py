@@ -36,7 +36,8 @@ class DataProcessorService:
             temp_db = get_db_session()
             try:
                 service = AutoFillService(temp_db)
-                payload = await service.get_autofill(user_id)
+                # Use generate() method - get_autofill() does not exist
+                payload = await service.generate(user_id)
                 self.logger.info(f"Retrieved comprehensive onboarding data for user {user_id}")
                 return payload
             except Exception as e:
