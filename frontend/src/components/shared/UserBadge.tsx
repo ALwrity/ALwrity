@@ -19,6 +19,7 @@ import {
 import { UserConfirmModal } from './UserConfirmModal';
 import { UserBadgeMenuPanel } from './UserBadgeMenuPanel';
 import { UserBadgeMenuScroll } from './UserBadgeMenuScroll';
+import { EmailPreferencesModal } from './EmailPreferencesModal';
 import { userBadgeMenuPaperSx } from './userBadgeMenuStyles';
 import './user-badge-menu.css';
 
@@ -87,6 +88,7 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light', showPlanChip
   const [signOutAfterReset, setSignOutAfterReset] = useState(true);
   const [personaSnapshot, setPersonaSnapshot] = useState<LinkedInPersonaSnapshot | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [emailPrefsOpen, setEmailPrefsOpen] = useState(false);
   const [menuOpenCounter, setMenuOpenCounter] = useState(0);
   const [menuAnchorPosition, setMenuAnchorPosition] = useState<{ top: number; left: number } | null>(null);
   const badgeAnchorRef = React.useRef<HTMLDivElement>(null);
@@ -333,9 +335,7 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light', showPlanChip
             }}
             onEmailPreferences={() => {
               handleClose();
-              // Navigate to email preferences - for now could be a settings page
-              // In future: window.location.href = '/settings/email-preferences';
-              alert('Email Preferences: Manage your daily digest and notification settings here.');
+              setEmailPrefsOpen(true);
             }}
             onSignOut={() => {
               handleClose();
@@ -404,6 +404,8 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light', showPlanChip
           You will be signed out and redirected to the landing page. This action is irreversible.
         </Typography>
       </UserConfirmModal>
+
+      <EmailPreferencesModal open={emailPrefsOpen} onClose={() => setEmailPrefsOpen(false)} />
     </Box>
   );
 };
