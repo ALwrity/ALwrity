@@ -149,8 +149,10 @@ export function useCompetitorDiscovery({
               image: ad.image ?? null,
               published_date: ad.published_date ?? null,
               author: ad.author ?? null,
+              subpages: ad.subpages || [],
               competitive_insights: ad.competitive_analysis || ad.competitive_insights || { business_model: '', target_audience: '' },
               content_insights: ad.content_insights || { content_focus: '', content_quality: '' },
+              market_positioning: ad.market_positioning || {},
             };
           });
           setCompetitors(comps);

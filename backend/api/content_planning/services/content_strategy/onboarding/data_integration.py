@@ -668,6 +668,7 @@ class OnboardingDataIntegrationService:
                     competitor_dict['published_date'] = ad.get('published_date')
                     competitor_dict['author'] = ad.get('author')
                     competitor_dict['content_insights'] = ad.get('content_insights', {})
+                    competitor_dict['market_positioning'] = ad.get('market_positioning', {})
                     # The persisted field is `competitive_analysis`; expose it under
                     # both keys so consumers can rely on `competitive_insights`.
                     competitor_dict['competitive_insights'] = ad.get('competitive_analysis') or ad.get('competitive_insights', {})
