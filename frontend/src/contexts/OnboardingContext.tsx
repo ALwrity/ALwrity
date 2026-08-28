@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, Component } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, Component, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { apiClient, ConnectionError, NetworkError } from '../api/client';
 import { shouldSkipOnboarding } from '../utils/demoMode';
@@ -142,6 +142,8 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   const [data, setData] = useState<OnboardingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Prevents ring/checkmark flicker when refresh returns stale progress before server catches up. */
+  const optimisticProgressFloorRef = useRef(0);
 
   /**
    * Fetch onboarding data from batch endpoint
@@ -174,11 +176,29 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       console.log('OnboardingContext: Data fetched successfully', {
         user: user.id,
         step: onboarding.current_step,
-        completed: onboarding.is_completed
+        completed: onboarding.is_completed,
+        serverProgress: onboarding.completion_percentage,
       });
+
+      const serverProgress = onboarding.completion_percentage ?? 0;
+      const floor = optimisticProgressFloorRef.current;
+      const mergedProgress = Math.max(serverProgress, floor);
+      if (serverProgress >= floor) {
+        optimisticProgressFloorRef.current = 0;
+      } else if (floor > 0) {
+        console.log(
+          'OnboardingContext: Applying optimistic progress floor until server catches up',
+          { serverProgress, floor, mergedProgress }
+        );
+      }
+
+      const mergedOnboarding = {
+        ...onboarding,
+        completion_percentage: mergedProgress,
+      };
       
       // Update state
-      setData({ user, onboarding, session });
+      setData({ user, onboarding: mergedOnboarding, session });
       
       // Also cache in sessionStorage for backwards compatibility
       sessionStorage.setItem('onboarding_init', JSON.stringify(response.data));
@@ -262,9 +282,13 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
           ? { ...step, status: 'completed' as const, completed_at: new Date().toISOString() }
           : step
       );
-      
-      const completedSteps = updatedSteps.filter(s => s.status === 'completed' || s.status === 'skipped').length;
-      const completionPercentage = (completedSteps / updatedSteps.length) * 100;
+
+      const totalSteps = updatedSteps.length;
+      const completionPercentage = Math.min(
+        100,
+        Math.round((stepNumber / totalSteps) * 100)
+      );
+      optimisticProgressFloorRef.current = completionPercentage;
       
       return {
         ...prevData,
@@ -306,6 +330,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     localStorage.removeItem('competitor_analysis_data');
     localStorage.removeItem('competitor_analysis_url');
     localStorage.removeItem('competitor_analysis_timestamp');
+    optimisticProgressFloorRef.current = 0;
     
     // Reset state
     setData(null);
@@ -320,7 +345,12 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
    */
   const isOnboardingComplete = shouldSkipOnboarding() || (data?.onboarding?.is_completed ?? false);
   const currentStep = data?.onboarding?.current_step ?? 1;
-  const completionPercentage = data?.onboarding?.completion_percentage ?? 0;
+
+  // SSOT: session.progress from backend (updated only on explicit step completion via Continue).
+  const completionPercentage = isOnboardingComplete
+    ? 100
+    : (data?.onboarding?.completion_percentage ?? 0);
+
   const onboardingType = data?.onboarding?.onboarding_type ?? 'website';
 
   const value: OnboardingContextValue = {

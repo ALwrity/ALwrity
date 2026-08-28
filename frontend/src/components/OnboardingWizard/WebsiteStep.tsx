@@ -146,7 +146,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
     // Update header content when component mounts
     updateHeaderContent({
       title: 'Let ALwrity Learn Your Brand',
-      description: ''
+      description: 'Let Alwrity analyze your website to understand your brand voice, writing style, and content characteristics. This helps us generate content that matches your existing tone and resonates with your audience.'
     });
   }, [updateHeaderContent]);
 

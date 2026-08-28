@@ -18,9 +18,15 @@ import LinkedInResearchStep from './LinkedInResearchStep';
 import PersonalizationStep from './PersonalizationStep';
 import FinalStep from './FinalStep';
 import { WizardHeader } from './common/WizardHeader';
+import { WizardStepper } from './common/WizardStepper';
+import { WizardRetryBar } from './common/WizardRetryBar';
 import { WizardNavigation } from './common/WizardNavigation';
 import { WizardLoadingState } from './common/WizardLoadingState';
 import SystemStatusChip from './common/SystemStatusChip';
+import {
+  getOnboardingProgressState,
+  progressPercentAfterStepComplete,
+} from './common/onboardingProgressState';
 
 
 // Set to true in dev to restore verbose per-action tracing
@@ -129,21 +135,25 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   const onboardingType = data?.onboarding?.onboarding_type || defaultOnboardingType;
   const steps = useMemo(() => websiteSteps, []);
 
-  // Derived from persisted statuses plus the current progression step. Completed steps
-  // remain reachable after going backward, while the current in-progress step remains selectable.
-  const furthestAccessibleStep = useMemo(() => {
-    const backendSteps = data?.onboarding?.steps || [];
-    let frontier = 0;
-    for (let index = 0; index < steps.length; index += 1) {
-      const backendStep = getBackendStep(backendSteps, index);
-      if (backendStep?.status !== 'completed' && backendStep?.status !== 'skipped') {
-        break;
-      }
-      frontier = index;
+  const isOnboardingComplete = data?.onboarding?.is_completed ?? false;
+
+  // Progress-first SSOT: ring, checkmarks, and step access all derive from completion_percentage.
+  const progressState = useMemo(
+    () => getOnboardingProgressState(completionPercentage, steps.length, isOnboardingComplete),
+    [completionPercentage, steps.length, isOnboardingComplete]
+  );
+
+  const { percent: setupProgressPercent, completedFrontier, furthestAccessibleStep } = progressState;
+
+  // Prevent activeStep from sitting ahead of what completion_percentage unlocks.
+  useEffect(() => {
+    if (activeStep > furthestAccessibleStep) {
+      setActiveStep(furthestAccessibleStep);
+      try {
+        localStorage.setItem('onboarding_active_step', String(furthestAccessibleStep));
+      } catch (_e) {}
     }
-    const currentProgressionStep = Math.max(0, Math.min(steps.length - 1, currentStep - 1));
-    return Math.max(frontier, currentProgressionStep);
-  }, [currentStep, data, steps]);
+  }, [activeStep, furthestAccessibleStep]);
 
   useEffect(() => {
     if (activeStep < 1) return;
@@ -294,15 +304,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     
     const { onboarding } = data;
     
-    // Fast local restore: try localStorage active step first (non-authoritative)
-    const cachedActiveStep = localStorage.getItem('onboarding_active_step');
-    if (cachedActiveStep !== null) {
-      const stepIdx = Math.max(0, Math.min(steps.length - 1, parseInt(cachedActiveStep, 10)));
-      if (!Number.isNaN(stepIdx)) {
-        setActiveStep(stepIdx);
-      }
-    }
-    
     // Merge step payload data from backend.
     // Renumbered: 1=Connect, 2=Research, 3=Personalization (frontend 0,1,2).
     if (onboarding.steps && Array.isArray(onboarding.steps)) {
@@ -326,26 +327,24 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       }
     }
     
-    // Set active step from context (1-based → 0-based)
+    // Set active step from context (1-based → 0-based), clamped to unlocked frontier.
     let computedStep = Math.max(0, Math.min(steps.length - 1, currentStep - 1));
     if (onboarding.is_completed) {
       computedStep = steps.length - 1;
     }
-    // Use localStorage only if it's ahead of the authoritative backend step
-    // (e.g. the user advanced locally but the backend hasn't committed yet).
-    // Never allow localStorage to go backwards from the backend step.
     const lsStep = localStorage.getItem('onboarding_active_step');
     if (lsStep !== null) {
       const lsIdx = Math.max(0, Math.min(steps.length - 1, parseInt(lsStep, 10)));
-      if (!Number.isNaN(lsIdx) && lsIdx > computedStep && lsIdx <= computedStep + 2) {
+      if (!Number.isNaN(lsIdx) && lsIdx > computedStep && lsIdx <= furthestAccessibleStep) {
         computedStep = lsIdx;
       }
     }
+    computedStep = Math.min(computedStep, furthestAccessibleStep);
     setActiveStep(computedStep);
     if (onboarding.steps) {
       localStorage.setItem('onboarding_active_step', String(computedStep));
     }
-  }, [data, currentStep, steps.length]);
+  }, [data, currentStep, steps.length, furthestAccessibleStep]);
 
   const handleNext = useCallback(async (rawStepData?: any) => {
     const isLinkedIn = onboardingType === 'linkedin';
@@ -472,20 +471,19 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     
     setDirection('right');
     const nextStep = activeStep + 1;
-    
-    // Show progress message
-    const newProgress = ((nextStep + 1) / steps.length) * 100;
-    setProgressMessage(`Your data is saved, moving to the next step. Progress is ${Math.round(newProgress)}%`);
-    setShowProgressMessage(true);
-    
-    // Hide message after 3 seconds
-    setTimeout(() => {
-      setShowProgressMessage(false);
-    }, 3000);
+    const currentStepNumber = activeStep + 1;
+
+    const showSuccessProgressToast = (stepNumber: number) => {
+      const progressPct = progressPercentAfterStepComplete(stepNumber, steps.length);
+      setProgressMessage(`Your data is saved, moving to the next step. Progress is ${progressPct}%`);
+      setShowProgressMessage(true);
+      setTimeout(() => {
+        setShowProgressMessage(false);
+      }, 3000);
+    };
     
     // Complete the current step. Backend and frontend use identical 1-indexed
     // step numbers after the Phase-1 backend renumber (4 steps + completion at 5).
-    const currentStepNumber = activeStep + 1;
 
     const hasCoreStepData = currentStepData && typeof currentStepData === 'object' && (
       currentStepData.website || 
@@ -532,8 +530,10 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           setProgressMessage(`Step completed but with issues: ${warnings.join(', ')}`);
           setTimeout(() => {
             setShowProgressMessage(false);
-            setProgressMessage(`Your data is saved, moving to the next step. Progress is ${Math.round(newProgress)}%`);
+            showSuccessProgressToast(currentStepNumber);
           }, 4000);
+        } else {
+          showSuccessProgressToast(currentStepNumber);
         }
       } catch (error: any) {
         console.error('Wizard: BLOCKING ERROR - Failed to complete step with backend.', error);
@@ -659,6 +659,54 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     });
   }, []);
 
+  // Synchronize default header content based on step index when it changes
+  // This serves as a foolproof fallback or default, ensuring going back/forth is completely regular!
+  useEffect(() => {
+    const step = activeStep;
+    if (step === 0) {
+      if (onboardingType === 'linkedin') {
+        setStepHeaderContent({
+          title: "Connect Your LinkedIn",
+          description: "Connect your LinkedIn account so ALwrity can analyze your profile, posts, and writing style. This powers your persona and content strategy."
+        });
+      } else {
+        setStepHeaderContent({
+          title: "Let ALwrity Learn Your Brand",
+          description: "Let Alwrity analyze your website to understand your brand voice, writing style, and content characteristics. This helps us generate content that matches your existing tone and resonates with your audience."
+        });
+      }
+    } else if (step === 1) {
+      if (onboardingType === 'linkedin') {
+        setStepHeaderContent({
+          title: "Industry Research",
+          description: "ALwrity analyzed your industry and profile to discover trending topics, content gaps, and creators worth following. Review the findings, then continue."
+        });
+      } else {
+        setStepHeaderContent({
+          title: "Industry Research",
+          description: "Discover competitor ideas and explore growth insights."
+        });
+      }
+    } else if (step === 2) {
+      setStepHeaderContent({
+        title: "Define Your Brand Persona",
+        description: "Go beyond text. Define how your brand sounds, looks, and speaks. Configure your brand voice, generate an AI avatar, and prepare for voice cloning."
+      });
+    } else if (step === 3) {
+      if (onboardingType === 'linkedin') {
+        setStepHeaderContent({
+          title: "Review & Launch Your LinkedIn Workspace 🚀",
+          description: "Review your LinkedIn profile, persona, and content preferences before launching your AI-powered LinkedIn growth workspace."
+        });
+      } else {
+        setStepHeaderContent({
+          title: "Review & Launch Alwrity 🚀",
+          description: "Review your configuration and confirm all settings before launching your AI-powered content creation workspace."
+        });
+      }
+    }
+  }, [activeStep, onboardingType]);
+
   const handleComplete = useCallback(async () => {
     console.log('Wizard: handleComplete called - completing onboarding');
     try {
@@ -739,7 +787,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       <PersonalizationStep 
         key="personalization" 
         onContinue={handleNext} 
-        updateHeaderContent={updateHeaderContent}
         onValidationChange={onStep2Valid}
         onDataChange={handleStepDataChange}
         onboardingType={onboardingType}
@@ -805,69 +852,34 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       >
         {/* Header with Stepper */}
         <WizardHeader
-          activeStep={activeStep}
-          furthestAccessibleStep={furthestAccessibleStep}
-          progress={completionPercentage}
           stepHeaderContent={stepHeaderContent}
           showProgressMessage={showProgressMessage}
           progressMessage={progressMessage}
           showHelp={showHelp}
           isMobile={isMobile}
-          steps={steps}
-          onStepClick={handleStepClick}
           onHelpToggle={() => setShowHelp(!showHelp)}
           email={email}
           onEmailChange={handleEmailChange}
         />
 
+        {/* Separated Step Progression Stepper (White Background Box below Navigation Bar) */}
+        <WizardStepper
+          activeStep={activeStep}
+          completedFrontier={completedFrontier}
+          furthestAccessibleStep={furthestAccessibleStep}
+          isMobile={isMobile}
+          steps={steps}
+          onStepClick={handleStepClick}
+          progress={setupProgressPercent}
+        />
+
         {/* Retry bar for step completion failures */}
-        {retryStepNumber !== null && (
-          <div style={{
-            margin: '0 16px 8px',
-            padding: '10px 16px',
-            borderRadius: 10,
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            flexWrap: 'wrap',
-          }}>
-            <span style={{ flex: 1, fontSize: '0.85rem', color: '#dc2626', fontWeight: 500 }}>
-              {progressMessage}
-            </span>
-            <button
-              onClick={retryStepCompletion}
-              style={{
-                padding: '6px 16px',
-                borderRadius: 8,
-                border: 'none',
-                background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
-                color: '#fff',
-                fontWeight: 600,
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-              }}
-            >
-              Retry
-            </button>
-            <button
-              onClick={dismissRetry}
-              style={{
-                padding: '6px 16px',
-                borderRadius: 8,
-                border: '1px solid #d1d5db',
-                background: '#fff',
-                color: '#6b7280',
-                fontWeight: 600,
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-              }}
-            >
-              Continue Anyway
-            </button>
-          </div>
-        )}
+        <WizardRetryBar
+          retryStepNumber={retryStepNumber}
+          progressMessage={progressMessage}
+          retryStepCompletion={retryStepCompletion}
+          dismissRetry={dismissRetry}
+        />
 
         {/* Background tasks status banner (visible after Step 2) */}
         {backgroundTasks && backgroundTasks.tasks && Object.keys(backgroundTasks.tasks).length > 0 && (
