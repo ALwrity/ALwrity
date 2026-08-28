@@ -36,6 +36,7 @@ interface SceneEditorProps {
   onAudioGenerationStart?: (sceneId: string) => void;
   onAudioGenerated?: (sceneId: string, audioUrl: string) => void;
   idea?: string; // Podcast idea for image generation context
+  projectId?: string; // Project ID for session character locking
   avatarUrl?: string | null; // Base avatar URL for consistent scene image generation
   totalScenes?: number; // Total number of scenes in the script
   sceneIndex?: number; // Current scene index (0-based) for 1/N numbering
@@ -57,6 +58,7 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
   onAudioGenerationStart,
   onAudioGenerated,
   idea,
+  projectId,
   avatarUrl,
   totalScenes,
   sceneIndex,
@@ -404,13 +406,25 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
       // Log avatar URL for debugging
       console.log("[SceneEditor] Generating image with avatarUrl:", avatarUrl);
       console.log("[SceneEditor] Custom settings:", settings);
-      
+
+      // ── Ensure presenter reference image exists (idempotent, non-fatal) ──
+      // The backend returns immediately with was_cached=true if already generated.
+      // Skip if the user has an avatar (Path A handles identity via Ideogram Character).
+      if (projectId && !avatarUrl) {
+        try {
+          await podcastApi.generatePresenterReference({ projectId });
+        } catch (refErr) {
+          console.warn("[SceneEditor] Presenter reference non-fatal error:", refErr);
+        }
+      }
+
       // Simulate progress updates during API call
       progressInterval = setInterval(() => {
         const elapsed = Date.now() - startTime;
         const seconds = Math.floor(elapsed / 1000);
         
         // Update status based on elapsed time
+
         if (seconds < 5) {
           setImageGenerationStatus("Submitting request to AI service...");
           setImageGenerationProgress(15);
@@ -432,8 +446,11 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
       const result = await podcastApi.generateSceneImage({
         sceneId: scene.id,
         sceneTitle: scene.title,
+        projectId: projectId,
         sceneContent: sceneContent,
         sceneEmotion: scene.emotion,
+        cameraAngle: scene.camera_angle,
+        visualAtmosphere: scene.visual_atmosphere,
         baseAvatarUrl: avatarUrl || undefined,
         idea: idea,
         analysis: analysis || undefined,
@@ -1106,7 +1123,8 @@ export const SceneEditor: React.FC<SceneEditorProps> = ({
                       height: "auto",
                       display: "block",
                       maxHeight: 400,
-                      objectFit: "cover",
+                      objectFit: "contain",
+                      background: "rgba(0,0,0,0.04)",
                     }}
                     onError={(e) => {
                       console.error('[SceneEditor] Image failed to load:', {

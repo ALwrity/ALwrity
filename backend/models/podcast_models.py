@@ -63,6 +63,10 @@ class PodcastProject(Base):
     avatar_url = Column(String(1000), nullable=True)
     avatar_prompt = Column(Text, nullable=True)
     avatar_persona_id = Column(String(255), nullable=True)
+
+    # Presenter reference image for cross-scene visual anchoring (Path B img2img)
+    # Generated once per episode; each subsequent scene uses this as image-to-image anchor.
+    presenter_reference_url = Column(String(1000), nullable=True)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)

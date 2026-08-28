@@ -139,7 +139,7 @@ const PodcastDashboard: React.FC = () => {
   }, [resetState]);
 
   if (showProjectList) {
-    return <ProjectList onSelectProject={handleSelectProject} onBack={() => setShowProjectList(false)} />;
+    return <ProjectList onSelectProject={handleSelectProject} onBack={() => setShowProjectList(false)} onNewEpisode={handleNewEpisode} />;
   }
 
   return (
@@ -253,7 +253,7 @@ const PodcastDashboard: React.FC = () => {
                 speakers={project?.speakers}
                 voiceName={estimate?.voiceName}
                 podcastMode={project?.podcastMode}
-                avatarUrl={project?.avatarUrl}
+                avatarUrl={project?.presenterReferenceUrl || project?.avatarUrl}
                 avatarPrompt={project?.avatarPrompt}
                 bible={bible}
                 onRegenerate={() => setShowRegenModal(true)}

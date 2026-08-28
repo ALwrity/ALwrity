@@ -24,7 +24,10 @@ export interface PodcastProjectState {
     avatarUrl?: string | null;
     avatarPrompt?: string | null;
     avatarPersonaId?: string | null;
+    /** Base presenter reference image URL used for cross-scene img2img anchoring (Path B1). */
+    presenterReferenceUrl?: string | null;
   } | null;
+
   
   // Step results
   analysis: PodcastAnalysis | null;
@@ -231,6 +234,8 @@ export const usePodcastProjectState = () => {
           show_render_queue: state.showRenderQueue,
           current_step: state.currentStep,
           status: state.currentStep === 'render' && state.renderJobs.every(j => j.status === 'completed') ? 'completed' : 'in_progress',
+          avatar_url: state.project?.avatarUrl || null,
+          presenter_reference_url: state.project?.presenterReferenceUrl || null,
         };
 
         const saved = await podcastApi.saveProject(projectId, dbState);
@@ -405,13 +410,14 @@ export const usePodcastProjectState = () => {
     const finalAvatarUrl = avatarUrlOverride !== undefined ? avatarUrlOverride : payload.avatarUrl;
     
     try {
-      dbProject = await podcastApi.createProjectInDb({
+      dbProject = await podcastApi.initProject({
         project_id: projectId,
         idea: payload.ideaOrUrl,
         duration: payload.duration,
         speakers: payload.speakers,
         budget_cap: payload.budgetCap,
         avatar_url: finalAvatarUrl,
+        presenter_reference_url: payload.presenterReferenceUrl,
       });
     } catch (error: any) {
       const errorStr = error?.message || "";
@@ -433,6 +439,7 @@ export const usePodcastProjectState = () => {
         avatarUrl: finalAvatarUrl || null,
         avatarPrompt: null, // Will be set when avatar is generated
         avatarPersonaId: null,
+        presenterReferenceUrl: payload.presenterReferenceUrl || dbProject?.presenter_reference_url || null,
       },
       knobs: payload.knobs,
       budgetCap: payload.budgetCap,
@@ -461,6 +468,7 @@ export const usePodcastProjectState = () => {
           avatarUrl: dbProject.avatar_url || null,
           avatarPrompt: dbProject.avatar_prompt || null,
           avatarPersonaId: dbProject.avatar_persona_id || null,
+          presenterReferenceUrl: dbProject.presenter_reference_url || null,
         },
         analysis: dbProject.analysis,
         queries: dbProject.queries || [],

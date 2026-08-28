@@ -20,6 +20,11 @@ class PodcastService:
     def __init__(self, db: Session):
         self.db = db
         self.bible_service = PodcastBibleService()
+        try:
+            from services.podcast_schema_utils import ensure_podcast_projects_columns
+            ensure_podcast_projects_columns(self.db)
+        except Exception:
+            pass
     
     def create_project(
         self,
