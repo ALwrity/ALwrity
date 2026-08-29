@@ -11,8 +11,6 @@ import {
   Chip,
   List,
   ListItem,
-  ListItemIcon,
-  ListItemText,
   Tooltip,
 } from '@mui/material';
 import AssessmentIcon from '@mui/icons-material/Assessment';
@@ -22,17 +20,78 @@ import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SearchIcon from '@mui/icons-material/Search';
 import AutoFixHighIcon from '@mui/icons-material/AutoAwesome';
+import BoltIcon from '@mui/icons-material/Bolt';
+import LocalOfferIcon from '@mui/icons-material/LocalOffer';
+import PeopleIcon from '@mui/icons-material/People';
+import CampaignIcon from '@mui/icons-material/Campaign';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
 
 const ACTION_VERBS = ['Target', 'Expand', 'Create', 'Build', 'Optimize', 'Capture', 'Scale', 'Launch'];
 
-function safeText(item: any): string {
-  if (typeof item === 'string') return item;
+const PRIORITY_COLORS: Record<string, string> = {
+  high: '#e11d48',
+  medium: '#d97706',
+  low: '#059669',
+};
+
+function opportunityTitle(item: any): string {
+  if (typeof item?.topic === 'string') return item.topic;
+  if (typeof item?.title === 'string') return item.title;
   if (typeof item?.action === 'string') return item.action;
   if (typeof item?.finding === 'string') return item.finding;
-  if (typeof item?.type === 'string') return item.type;
-  if (typeof item?.title === 'string') return item.title;
+  if (typeof item?.name === 'string') return item.name;
   return JSON.stringify(item);
 }
+
+const OpportunityView: React.FC<{ item: any; verbIndex?: number }> = ({ item, verbIndex }) => {
+  if (typeof item === 'string') {
+    const label = verbIndex !== undefined ? `${ACTION_VERBS[verbIndex % ACTION_VERBS.length]} ${item}` : item;
+    return <Typography variant="body2">{label}</Typography>;
+  }
+  if (typeof item !== 'object' || item === null) {
+    return <Typography variant="body2">{String(item)}</Typography>;
+  }
+  const title = opportunityTitle(item);
+  const priority = typeof item.priority === 'string' ? item.priority.toLowerCase() : undefined;
+  const effort = typeof item.effort === 'string' ? item.effort : undefined;
+  const impact = typeof item.impact === 'string' ? item.impact : undefined;
+  const rationale = typeof item.rationale === 'string' ? item.rationale : undefined;
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+        <Typography variant="body2" fontWeight={600}>
+          {title}
+        </Typography>
+        {priority && (
+          <Chip
+            label={priority}
+            size="small"
+            sx={{
+              height: 20,
+              fontSize: '0.65rem',
+              fontWeight: 700,
+              textTransform: 'capitalize',
+              color: 'white',
+              bgcolor: PRIORITY_COLORS[priority] || '#64748b',
+            }}
+          />
+        )}
+      </Box>
+      {(effort || impact) && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 0.5 }}>
+          {impact && <Chip size="small" variant="outlined" label={`Impact: ${impact}`} sx={{ height: 20, fontSize: '0.65rem' }} />}
+          {effort && <Chip size="small" variant="outlined" label={`Effort: ${effort}`} sx={{ height: 20, fontSize: '0.65rem' }} />}
+        </Box>
+      )}
+      {rationale && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+          {rationale}
+        </Typography>
+      )}
+    </Box>
+  );
+};
 
 interface StrategicInsightsSectionProps {
   sitemapAnalysis: any;
@@ -116,9 +175,13 @@ export const StrategicInsightsSection: React.FC<StrategicInsightsSectionProps> =
                   </Typography>
                   {insights?.content_gaps?.length > 0 ? (
                     <Box display="flex" flexWrap="wrap" gap={1}>
-                      {insights.content_gaps.map((gap: string, i: number) => (
-                        <Chip key={i} label={gap} size="small" sx={{ bgcolor: 'white', border: '1px solid #fde68a', fontWeight: 500 }} />
-                      ))}
+                      {insights.content_gaps.map((gap: any, i: number) =>
+                        typeof gap === 'string' ? (
+                          <Chip key={i} label={gap} size="small" sx={{ bgcolor: 'white', border: '1px solid #fde68a', fontWeight: 500 }} />
+                        ) : (
+                          <OpportunityView key={i} item={gap} />
+                        )
+                      )}
                     </Box>
                   ) : (
                     <Typography variant="caption" fontStyle="italic" color="#78716c">No gaps detected yet.</Typography>
@@ -144,18 +207,11 @@ export const StrategicInsightsSection: React.FC<StrategicInsightsSectionProps> =
                     ];
                     return growthMoves.length > 0 ? (
                       <List dense disablePadding>
-                        {growthMoves.map((move: any, i: number) => {
-                          const text = safeText(move);
-                          return (
-                          <ListItem key={i} disableGutters sx={{ py: 0.5 }}>
-                            <ListItemIcon sx={{ minWidth: 28 }}>
-                              <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: '#22c55e', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>
-                                {i + 1}
-                              </Box>
-                            </ListItemIcon>
-                            <ListItemText primary={`${ACTION_VERBS[i % ACTION_VERBS.length]} ${text}`} primaryTypographyProps={{ variant: 'body2', color: '#166534' }} />
+                        {growthMoves.map((move: any, i: number) => (
+                          <ListItem key={i} disableGutters sx={{ py: 0.75 }}>
+                            <OpportunityView item={move} verbIndex={i} />
                           </ListItem>
-                        )})}
+                        ))}
                       </List>
                     ) : (
                       <Typography variant="caption" fontStyle="italic" color="#6b7280">Generating recommendations...</Typography>
@@ -164,6 +220,136 @@ export const StrategicInsightsSection: React.FC<StrategicInsightsSectionProps> =
                 </CardContent>
               </Card>
             </Grid>
+          </Grid>
+
+          {/* 5. Grounded opportunity cards (present only when populated) */}
+          <Grid container spacing={3} sx={{ mt: 0.5 }}>
+            {/* Quick Wins */}
+            {insights?.quick_wins?.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Card sx={{ height: '100%', bgcolor: '#f5f3ff', border: '1px solid #ddd6fe' }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ color: '#5b21b6', display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <BoltIcon fontSize="small" sx={{ color: '#8b5cf6' }} /> Quick Wins
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 2, color: '#71717a' }}>
+                      Fast, low-effort content actions you can execute within days.
+                    </Typography>
+                    <List dense disablePadding>
+                      {insights.quick_wins.map((win: any, i: number) => (
+                        <ListItem key={i} disableGutters sx={{ py: 0.75 }}>
+                          <OpportunityView item={win} />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+
+            {/* Keyword & Topic Opportunities */}
+            {insights?.keyword_topic_opportunities?.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Card sx={{ height: '100%', bgcolor: '#f0fdfa', border: '1px solid #99f6e4' }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ color: '#134e4a', display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <LocalOfferIcon fontSize="small" sx={{ color: '#14b8a6' }} /> Keyword & Topic Opportunities
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 2, color: '#64748b' }}>
+                      Topic + keyword pairs your site isn&apos;t covering yet, matched to existing clusters and competitor focus.
+                    </Typography>
+                    <List dense disablePadding>
+                      {insights.keyword_topic_opportunities.map((opp: any, i: number) => (
+                        <ListItem key={i} disableGutters sx={{ py: 0.75 }}>
+                          <OpportunityView item={opp} />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+
+            {/* Audience-Fit Ideas */}
+            {insights?.audience_fit_opportunities?.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Card sx={{ height: '100%', bgcolor: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <PeopleIcon fontSize="small" sx={{ color: '#3b82f6' }} /> Audience-Fit Ideas
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 2, color: '#64748b' }}>
+                      Content matched to your target audience segments and interests from your onboarding research.
+                    </Typography>
+                    <List dense disablePadding>
+                      {insights.audience_fit_opportunities.map((idea: any, i: number) => (
+                        <ListItem key={i} disableGutters sx={{ py: 0.75 }}>
+                          <OpportunityView item={idea} />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+
+            {/* Channel Playbook */}
+            {insights?.channel_playbook?.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Card sx={{ height: '100%', bgcolor: '#fff7ed', border: '1px solid #fed7aa' }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ color: '#9a3412', display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <CampaignIcon fontSize="small" sx={{ color: '#ea580c' }} /> Channel Playbook
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 2, color: '#78716c' }}>
+                      Channel-specific guidance mapped to your preferred content channels.
+                    </Typography>
+                    <List dense disablePadding>
+                      {insights.channel_playbook.map((entry: any, i: number) => {
+                        const channel = typeof entry?.channel === 'string' ? entry.channel : JSON.stringify(entry);
+                        const recs = Array.isArray(entry?.recommendations) ? entry.recommendations : [];
+                        return (
+                          <ListItem key={i} disableGutters sx={{ flexDirection: 'column', alignItems: 'flex-start', py: 0.75 }}>
+                            <Chip size="small" label={channel} sx={{ bgcolor: '#ffffff', border: '1px solid #fed7aa', fontWeight: 600, color: '#9a3412', mb: 0.5 }} />
+                            {recs.map((rec: string, j: number) => (
+                              <Box key={j} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, py: 0.35, width: '100%' }}>
+                                <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#fdba74', mt: 0.6, flexShrink: 0 }} />
+                                <Typography variant="caption" color="#431407">
+                                  {rec}
+                                </Typography>
+                              </Box>
+                            ))}
+                          </ListItem>
+                        );
+                      })}
+                    </List>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+
+            {/* Pillar Expansion */}
+            {insights?.pillar_expansion?.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Card sx={{ height: '100%', bgcolor: '#fdf2f8', border: '1px solid #fbcfe8' }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ color: '#831843', display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <AccountTreeIcon fontSize="small" sx={{ color: '#db2777' }} /> Pillar Expansion
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 2, color: '#71717a' }}>
+                      Ways to deepen and expand your existing content pillars into new content.
+                    </Typography>
+                    <List dense disablePadding>
+                      {insights.pillar_expansion.map((idea: any, i: number) => (
+                        <ListItem key={i} disableGutters sx={{ py: 0.75 }}>
+                          <OpportunityView item={idea} />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
           </Grid>
 
           {/* 4. Deeper Insights — secondary buttons */}
