@@ -20,6 +20,14 @@ import gzip
 
 from ..llm_providers.main_text_generation import llm_text_gen
 from middleware.logging_middleware import seo_logger
+from .onboarding_context import build_onboarding_opportunity_context
+from .onboarding_insights import (
+    build_onboarding_analysis_prompt,
+    get_onboarding_system_prompt,
+    onboarding_insights_json_schema,
+    parse_onboarding_insights,
+    validate_onboarding_insights,
+)
 
 
 # Global concurrency throttle for sitemap HTTP fetches.
@@ -717,42 +725,25 @@ class SitemapService:
         user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Generate onboarding-specific insights for competitive analysis"""
-        
+
         try:
             structure_analysis = analysis_result.get("structure_analysis", {})
             content_trends = analysis_result.get("content_trends", {})
             publishing_patterns = analysis_result.get("publishing_patterns", {})
-            
+
+            # Enrich the single LLM call with Step-1/Step-2 context already
+            # collected during onboarding (audience, brand, competitor intel).
+            context = build_onboarding_opportunity_context(user_id, competitors)
+            context_chars = sum(len(t) for t in context.values())
+
             # Build onboarding-specific prompt
-            prompt = self._build_onboarding_analysis_prompt(
-                structure_analysis, content_trends, publishing_patterns, 
-                user_url, competitors, industry_context
+            prompt = build_onboarding_analysis_prompt(
+                structure_analysis, content_trends, publishing_patterns,
+                user_url, competitors, industry_context, context=context
             )
-            
-            # Define JSON schema for structured output
-            json_struct = {
-                "type": "object",
-                "properties": {
-                    "competitive_positioning": {"type": "string"},
-                    "content_gaps": {
-                        "type": "array",
-                        "items": {"type": "string"}
-                    },
-                    "growth_opportunities": {
-                        "type": "array",
-                        "items": {"type": "string"}
-                    },
-                    "industry_benchmarks": {
-                        "type": "array",
-                        "items": {"type": "string"}
-                    },
-                    "strategic_recommendations": {
-                        "type": "array",
-                        "items": {"type": "string"}
-                    }
-                },
-                "required": ["competitive_positioning", "content_gaps", "growth_opportunities", "industry_benchmarks", "strategic_recommendations"]
-            }
+
+            # Define JSON schema for structured output (kept in onboarding_insights).
+            json_struct = onboarding_insights_json_schema()
 
             # Generate AI insights
             import time as _time
@@ -760,7 +751,7 @@ class SitemapService:
             trace_id = f"alwrity_onboarding_sitemap_{user_id}"
             ai_response = llm_text_gen(
                 prompt=prompt,
-                system_prompt=self._get_onboarding_system_prompt(),
+                system_prompt=get_onboarding_system_prompt(),
                 json_struct=json_struct,
                 user_id=user_id,
                 trace_id=trace_id,
@@ -769,13 +760,14 @@ class SitemapService:
 
             # Parse and structure insights
             parse_t0 = _time.time()
-            insights = self._parse_onboarding_insights(ai_response)
+            insights = parse_onboarding_insights(ai_response)
             parse_took = (_time.time() - parse_t0) * 1000
 
-            pydantic_result = self._validate_with_pydantic(insights)
+            pydantic_result = validate_onboarding_insights(insights)
             logger.warning(
                 f"[onboarding_insights_telemetry] trace={trace_id} "
                 f"api_latency_ms={api_took:.0f} parse_ms={parse_took:.0f} "
+                f"ctx_chars={context_chars} "
                 f"pydantic_valid={pydantic_result['valid']} "
                 f"fields_ok={pydantic_result['fields_ok']}/{pydantic_result['total_fields']} "
                 f"parse_source={'direct_dict' if isinstance(ai_response, dict) else 'json_string'}"
@@ -785,7 +777,7 @@ class SitemapService:
                     f"[onboarding_insights_telemetry] trace={trace_id} "
                     f"Pydantic errors: {pydantic_result.get('errors', '')}"
                 )
-            
+
             # Log AI analysis
             await seo_logger.log_ai_analysis(
                 tool_name=f"{self.service_name}_onboarding",
@@ -793,9 +785,9 @@ class SitemapService:
                 response=ai_response if isinstance(ai_response, str) else str(ai_response),
                 model_used="gemini-2.0-flash-001"
             )
-            
+
             return insights
-            
+
         except Exception as e:
             logger.error(f"Error generating onboarding insights: {e}")
             return {
@@ -1102,171 +1094,6 @@ RETURN ONLY this JSON schema (minified, no markdown):
                 "last_check": datetime.utcnow().isoformat()
             }
 
-    def _build_onboarding_analysis_prompt(
-        self,
-        structure_analysis: Dict[str, Any],
-        content_trends: Dict[str, Any],
-        publishing_patterns: Dict[str, Any],
-        user_url: str,
-        competitors: List[str] = None,
-        industry_context: str = None
-    ) -> str:
-        """Build AI prompt for onboarding-specific sitemap analysis"""
-        
-        total_urls = structure_analysis.get("total_urls", 0)
-        url_patterns = structure_analysis.get("url_patterns", {})
-        avg_depth = structure_analysis.get("average_path_depth", 0)
-        publishing_velocity = content_trends.get("publishing_velocity", 0)
-        
-        competitor_info = ""
-        if competitors:
-            competitor_info = f"\nCompetitors to consider: {', '.join(competitors)}"
-        
-        industry_info = ""
-        if industry_context:
-            industry_info = f"\nIndustry Context: {industry_context}"
-        
-        prompt = f"""
-Analyze this website's sitemap for competitive positioning and content strategy insights:
-
-USER WEBSITE: {user_url}
-Total URLs: {total_urls}
-Average Path Depth: {avg_depth}
-Publishing Velocity: {publishing_velocity:.2f} posts/day
-{industry_info}{competitor_info}
-
-URL Structure Analysis:
-{chr(10).join([f"- {category}: {count} URLs" for category, count in list(url_patterns.items())[:8]])}
-
-Content Publishing Patterns:
-- Publishing Rate: {publishing_velocity:.2f} pages per day
-- Content Categories: {len(url_patterns)} main categories identified
-
-Please provide competitive analysis insights focusing on the following sections:
-
-1. **COMPETITIVE POSITIONING**: How does this site's content structure compare to industry standards? (Provide a brief paragraph)
-2. **CONTENT GAPS**: What content categories or topics are missing based on the URL structure? (List 3-5 specific gaps)
-3. **GROWTH OPPORTUNITIES**: Specific content expansion opportunities to compete better (List 3-5 opportunities)
-4. **INDUSTRY BENCHMARKS**: How does publishing frequency and content depth compare to competitors? (List 3 key comparisons)
-5. **STRATEGIC RECOMMENDATIONS**: 3-5 actionable steps for content strategy improvement
-
-Focus on actionable insights that help content creators understand their competitive position and identify growth opportunities.
-"""
-        
-        return prompt
-
-    def _get_onboarding_system_prompt(self) -> str:
-        """Get system prompt for onboarding sitemap analysis"""
-        return """You are a competitive intelligence and content strategy expert specializing in website structure analysis for content creators and digital marketers.
-
-Your role is to analyze website sitemaps and provide strategic insights that help users understand their competitive position and identify content opportunities.
-
-Key focus areas:
-- Competitive positioning analysis
-- Content gap identification
-- Growth opportunity recommendations
-- Industry benchmarking insights
-- Actionable strategic recommendations
-
-Provide practical, data-driven insights that help content creators make informed decisions about their content strategy and competitive positioning.
-
-IMPORTANT: Your response MUST be a single valid minified JSON object. No markdown, no code fences, no prose outside JSON."""
-
-    def _parse_onboarding_insights(self, ai_response: Any) -> Dict[str, Any]:
-        """Parse AI response for onboarding-specific insights"""
-        
-        try:
-            insights = {}
-            
-            # If it's already a dict (structured output), use it
-            if isinstance(ai_response, dict):
-                insights = ai_response
-            elif isinstance(ai_response, str):
-                # Try to parse JSON string
-                try:
-                    insights = json.loads(ai_response)
-                except json.JSONDecodeError:
-                    # Try to extract JSON from markdown block
-                    json_match = re.search(r'```json\s*(.*?)\s*```', ai_response, re.DOTALL)
-                    if json_match:
-                        try:
-                            insights = json.loads(json_match.group(1))
-                        except json.JSONDecodeError:
-                            pass
-            
-            # Ensure all required keys exist
-            required_keys = [
-                "competitive_positioning", 
-                "content_gaps", 
-                "growth_opportunities", 
-                "industry_benchmarks", 
-                "strategic_recommendations"
-            ]
-            
-            # Validate and fill missing keys
-            validated_insights = {
-                "competitive_positioning": insights.get("competitive_positioning", "Analysis in progress..."),
-                "content_gaps": insights.get("content_gaps", []),
-                "growth_opportunities": insights.get("growth_opportunities", []),
-                "industry_benchmarks": insights.get("industry_benchmarks", []),
-                "strategic_recommendations": insights.get("strategic_recommendations", [])
-            }
-            
-            # Ensure lists are actually lists
-            for key in required_keys[1:]:
-                if not isinstance(validated_insights[key], list):
-                    if isinstance(validated_insights[key], str):
-                        validated_insights[key] = [validated_insights[key]]
-                    else:
-                        validated_insights[key] = []
-                        
-            return validated_insights
-            
-        except Exception as e:
-            logger.error(f"Error parsing onboarding insights: {e}")
-            return {
-                "competitive_positioning": "Analysis unavailable",
-                "content_gaps": [],
-                "growth_opportunities": [],
-                "industry_benchmarks": [],
-                "strategic_recommendations": []
-            }
-
-    def _validate_with_pydantic(self, insights: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate onboarding insights against Pydantic model.
-
-        Returns dict with: valid, total_fields, fields_ok, errors (field paths only, no raw content).
-        """
-        try:
-            from pydantic import BaseModel, field_validator, ValidationError
-
-            class OnboardingInsights(BaseModel):
-                competitive_positioning: str = ""
-                content_gaps: list = []
-                growth_opportunities: list = []
-                industry_benchmarks: list = []
-                strategic_recommendations: list = []
-
-            OnboardingInsights(**insights)
-            return {
-                "valid": True,
-                "total_fields": 5,
-                "fields_ok": 5,
-                "errors": "",
-            }
-        except Exception as e:
-            error_fields = []
-            if hasattr(e, 'errors'):
-                for err in e.errors():
-                    loc = ".".join(str(x) for x in err.get("loc", []))
-                    typ = err.get("type", "unknown")
-                    error_fields.append(f"{loc}({typ})")
-            return {
-                "valid": False,
-                "total_fields": 5,
-                "fields_ok": 5 - len(error_fields),
-                "errors": "; ".join(error_fields) if error_fields else str(e)[:200],
-            }
 
     async def discover_sitemap_url(self, website_url: str) -> Optional[str]:
         """
