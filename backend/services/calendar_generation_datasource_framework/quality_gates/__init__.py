@@ -12,13 +12,15 @@ from .chain_context_gate import ChainContextGate
 from .calendar_structure_gate import CalendarStructureGate
 from .enterprise_standards_gate import EnterpriseStandardsGate
 from .kpi_integration_gate import KPIIntegrationGate
+from .onboarding_data_grounding_gate import OnboardingDataGroundingGate
 
 __all__ = [
     "QualityGateManager",
     "ContentUniquenessGate",
-    "ContentMixGate", 
+    "ContentMixGate",
     "ChainContextGate",
     "CalendarStructureGate",
     "EnterpriseStandardsGate",
-    "KPIIntegrationGate"
+    "KPIIntegrationGate",
+    "OnboardingDataGroundingGate"
 ]
