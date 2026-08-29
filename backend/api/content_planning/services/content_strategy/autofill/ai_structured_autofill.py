@@ -57,10 +57,25 @@ class AIStructuredAutofillService:
         self.max_retries = 2  # Maximum retry attempts for malformed JSON
 
     def _build_context_summary(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        website = context.get('website_analysis') or {}
-        research = context.get('research_preferences') or {}
-        api_keys = context.get('api_keys_data') or {}
-        session = context.get('onboarding_session') or {}
+        # Unwrap nested onboarding data if present (strategy generator nests sources
+        # under context['onboarding_data']); otherwise fall back to top-level keys.
+        src = context.get('onboarding_data') or context
+
+        website = src.get('website_analysis') or {}
+        research = src.get('research_preferences') or {}
+        api_keys = src.get('api_keys_data') or {}
+        session = src.get('onboarding_session') or {}
+
+        # NEW: Extract ALL onboarding data sources for comprehensive AI context
+        persona = src.get('persona_data') or {}
+        competitors = src.get('competitor_analysis') or []
+        deep_competitors = src.get('deep_competitor_analysis') or {}
+        linkedin = src.get('linkedin_profile') or {}
+        platforms = src.get('platform_integrations') or {}
+        gsc_analytics = src.get('gsc_analytics') or {}
+        bing_analytics = src.get('bing_analytics') or {}
+        canonical = src.get('canonical_profile') or {}
+        data_quality = src.get('data_quality') or {}
         
         # Extract detailed personalization data
         writing_style = website.get('writing_style', {})
@@ -118,10 +133,36 @@ class AIStructuredAutofillService:
                 'total_keys': api_keys.get('total_keys', 0),
                 'available_services': self._extract_available_services(api_keys)
             },
+            'persona_data': self._extract_persona(persona),
+            'competitive_data': {
+                'competitors': competitors if isinstance(competitors, list) else competitors.get('competitors', []),
+                'deep_competitor_analysis': self._extract_deep_competitors(deep_competitors),
+                'linkedin_profile': linkedin.get('summary') or linkedin
+            },
+            'platform_integrations': {
+                'connected_platforms': platforms.get('connected_platforms', platforms if isinstance(platforms, list) else []),
+                'platform_count': len(platforms.get('connected_platforms', [])) if isinstance(platforms, dict) else len(platforms)
+            },
+            'analytics_data': {
+                'gsc': self._extract_analytics(gsc_analytics),
+                'bing': self._extract_analytics(bing_analytics),
+                'has_analytics': bool(gsc_analytics or bing_analytics)
+            },
+            'canonical_profile': {
+                'industry': canonical.get('industry'),
+                'company_size': canonical.get('company_size'),
+                'target_audience': canonical.get('target_audience'),
+                'brand_positioning': canonical.get('brand_positioning'),
+                'content_focus': canonical.get('content_focus'),
+                'summary': canonical.get('summary')
+            },
             'data_quality': {
                 'website_freshness': website.get('data_freshness'),
                 'confidence_level': website.get('confidence_level'),
-                'analysis_status': website.get('status')
+                'analysis_status': website.get('status'),
+                'overall_score': data_quality.get('overall_score', data_quality.get('completeness', 0)),
+                'completeness': data_quality.get('completeness', 0),
+                'freshness': data_quality.get('freshness', 0)
             }
         }
         
@@ -158,6 +199,49 @@ class AIStructuredAutofillService:
                 services.extend(provider_service_map[provider])
         
         return list(set(services))  # Remove duplicates
+
+    def _extract_persona(self, persona: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract persona details for AI context (avoid sending raw/voluminous blobs)."""
+        core = persona.get('core_persona') or persona.get('corePersona') or {}
+        if isinstance(core, str):
+            return {'core_persona': core}
+        return {
+            'name': core.get('name') if isinstance(core, dict) else None,
+            'role': core.get('role') if isinstance(core, dict) else None,
+            'demographics': core.get('demographics') if isinstance(core, dict) else None,
+            'goals': core.get('goals') if isinstance(core, dict) else None,
+            'pain_points': core.get('pain_points') if isinstance(core, dict) else None,
+        }
+
+    def _extract_deep_competitors(self, deep_competitors: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Extract deep competitor analysis summaries."""
+        if isinstance(deep_competitors, list):
+            items = deep_competitors
+        else:
+            items = deep_competitors.get('competitors') or deep_competitors.get('results') or []
+        result = []
+        for comp in items:
+            if not isinstance(comp, dict):
+                continue
+            result.append({
+                'domain': comp.get('domain') or comp.get('url') or comp.get('website'),
+                'name': comp.get('name'),
+                'strategy_summary': comp.get('strategy_summary') or comp.get('content_strategy') or comp.get('overview'),
+                'market_gaps': comp.get('market_gaps') or comp.get('gaps'),
+            })
+        return result
+
+    def _extract_analytics(self, analytics: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract analytics for AI context (strip noise, keep signal)."""
+        if not analytics:
+            return {}
+        return {
+            'total_queries': analytics.get('total_queries') or analytics.get('metrics', {}).get('total_queries'),
+            'total_clicks': analytics.get('total_clicks') or analytics.get('metrics', {}).get('total_clicks'),
+            'avg_position': analytics.get('avg_position') or analytics.get('metrics', {}).get('avg_position'),
+            'top_keywords': (analytics.get('top_keywords') or [])[:10],
+            'ctr': analytics.get('ctr') or analytics.get('metrics', {}).get('ctr'),
+        }
 
     def _build_schema(self) -> Dict[str, Any]:
         # Simplified schema following Gemini best practices

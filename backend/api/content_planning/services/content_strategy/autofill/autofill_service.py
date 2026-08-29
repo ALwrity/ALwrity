@@ -108,6 +108,15 @@ class AutoFillService:
                 "research_preferences": raw.get("research_preferences", {}),
                 "api_keys_data": raw.get("api_keys_data", {}),
                 "onboarding_session": raw.get("onboarding_session", {}),
+                "persona_data": raw.get("persona_data", {}) or {},
+                "competitor_analysis": raw.get("competitor_analysis", []) or [],
+                "deep_competitor_analysis": raw.get("deep_competitor_analysis", {}) or {},
+                "linkedin_profile": raw.get("linkedin_profile", {}) or {},
+                "platform_integrations": raw.get("platform_integrations", {}) or {},
+                "gsc_analytics": raw.get("gsc_analytics", {}) or {},
+                "bing_analytics": raw.get("bing_analytics", {}) or {},
+                "canonical_profile": raw.get("canonical_profile", {}) or {},
+                "data_quality": raw.get("data_quality", {}) or {},
             }
             result = await self.ai_service.generate_autofill_fields(user_id, ai_context)
             if result.get("meta", {}).get("ai_used"):

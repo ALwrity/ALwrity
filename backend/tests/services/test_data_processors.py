@@ -1,7 +1,13 @@
 """
-Tests for Content Strategy Data Processors - Critical Bug Fix Validation
+Tests for Content Strategy Data Processors - Phase 1 & 2 Validation
 
-Tests verify that get_onboarding_data uses the correct AutoFillService method.
+Tests verify:
+1. get_onboarding_data returns raw integrated onboarding data (all 8+ sources)
+2. _build_context_summary correctly extracts and unwraps context
+3. _validate_strategy_context fail-fast guard works
+
+Phase 1: Fixed get_autofill -> generate bug + raw data plumbing
+Phase 2: Added fail-fast guard + context unwrapping + tests
 """
 
 import pytest
@@ -9,139 +15,297 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import sys
 import os
 
-# Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
 
-class TestDataProcessorService:
-    """Test DataProcessorService onboarding data retrieval."""
-    
-    @pytest.mark.asyncio
-    async def test_get_onboarding_data_uses_generate_method(self):
-        """
-        CRITICAL TEST: Verify get_onboarding_data calls service.generate()
-        not the non-existent service.get_autofill()
-        
-        This test validates the fix for the bug where:
-        - service.get_autofill(user_id) was called (method doesn't exist)
-        - Should be: service.generate(user_id)
-        """
-        from api.content_planning.services.content_strategy.utils.data_processors import DataProcessorService
-        
-        with patch('services.database.get_db_session') as mock_db:
-            mock_db.return_value = MagicMock()
-            
-            with patch('api.content_planning.services.content_strategy.autofill.AutoFillService') as MockAutoFill:
-                mock_service = MagicMock()
-                mock_service.generate = AsyncMock(return_value={"fields": {"test": "value"}})
-                MockAutoFill.return_value = mock_service
-                
-                processor = DataProcessorService()
-                result = await processor.get_onboarding_data("user_test_123")
-                
-                # Critical assertion: generate() should be called, NOT get_autofill()
-                mock_service.generate.assert_called_once_with("user_test_123")
-                
-                # Verify result is returned
-                assert result is not None
-                assert "fields" in result
+class TestDataProcessorServiceRawSources:
+    """Test DataProcessorService returns raw integrated onboarding data."""
 
     @pytest.mark.asyncio
-    async def test_get_onboarding_data_returns_fields(self):
+    async def test_get_onboarding_data_returns_raw_sources(self):
         """
-        Verify get_onboarding_data returns valid payload structure.
-        
-        Expected structure:
-        {
-            "fields": {...},
-            "sources": {...},
-            "quality_scores": {...},
-            "confidence_levels": {...},
-            "data_freshness": {...}
-        }
+        CRITICAL TEST: Verify get_onboarding_data returns raw integrated data
+        with all 8+ onboarding sources (not the processed payload).
+
+        This validates the fix where:
+        - Old: returned AutoFillService.generate() payload {fields, sources, ...}
+        - New: returns process_onboarding_data() raw sources
         """
         from api.content_planning.services.content_strategy.utils.data_processors import DataProcessorService
-        
-        expected_fields = {
-            "fields": {"business_objectives": {"value": "Test"}},
-            "sources": {"business_objectives": "website_analysis"},
-            "quality_scores": {"overall": 0.8},
-            "confidence_levels": {"business_objectives": "high"},
-            "data_freshness": {"fresh": True}
+
+        mock_raw_data = {
+            "website_analysis": {"website_url": "https://test.com", "target_audience": {}},
+            "research_preferences": {"research_depth": "comprehensive"},
+            "onboarding_session": {"progress": 5, "completed": True},
+            "persona_data": {"core_persona": {"name": "Test Persona"}},
+            "competitor_analysis": [{"domain": "competitor.com"}],
+            "deep_competitor_analysis": {"competitors": []},
+            "linkedin_profile": {"summary": "Test profile"},
+            "platform_integrations": {"connected_platforms": ["wordpress"]},
+            "gsc_analytics": {"total_queries": 100},
+            "bing_analytics": {"total_clicks": 50},
+            "canonical_profile": {"industry": "tech"},
+            "data_quality": {"completeness": 0.9, "overall_score": 0.85}
         }
-        
+
         with patch('services.database.get_db_session') as mock_db:
             mock_db.return_value = MagicMock()
-            
-            with patch('api.content_planning.services.content_strategy.autofill.AutoFillService') as MockAutoFill:
+
+            with patch('api.content_planning.services.content_strategy.onboarding.data_integration.OnboardingDataIntegrationService') as MockIntegration:
                 mock_service = MagicMock()
-                mock_service.generate = AsyncMock(return_value=expected_fields)
-                MockAutoFill.return_value = mock_service
-                
+                mock_service.process_onboarding_data = AsyncMock(return_value=mock_raw_data)
+                MockIntegration.return_value = mock_service
+
                 processor = DataProcessorService()
                 result = await processor.get_onboarding_data("user_test_123")
-                
-                # Verify all expected keys are present
-                assert "fields" in result
-                assert "sources" in result
-                assert "quality_scores" in result
-                assert "confidence_levels" in result
-                assert "data_freshness" in result
+
+                # Critical assertion: process_onboarding_data() should be called
+                mock_service.process_onboarding_data.assert_called_once_with("user_test_123", mock_db.return_value)
+
+                # Verify raw source keys are present (not payload keys)
+                assert "website_analysis" in result
+                assert "persona_data" in result
+                assert "competitor_analysis" in result
+                assert "gsc_analytics" in result
+                assert "canonical_profile" in result
+                # Should NOT have payload keys
+                assert "fields" not in result
+                assert "sources" not in result
 
     @pytest.mark.asyncio
-    async def test_get_onboarding_data_error_handling(self):
+    async def test_get_onboarding_data_includes_all_8_sources(self):
         """
-        Verify proper error handling when AutoFillService.generate() fails.
+        Verify all 8+ onboarding sources are returned.
         """
         from api.content_planning.services.content_strategy.utils.data_processors import DataProcessorService
-        
+
+        expected_sources = [
+            "website_analysis",
+            "research_preferences",
+            "onboarding_session",
+            "persona_data",
+            "competitor_analysis",
+            "deep_competitor_analysis",
+            "linkedin_profile",
+            "platform_integrations",
+            "gsc_analytics",
+            "bing_analytics",
+            "canonical_profile",
+            "data_quality"
+        ]
+
         with patch('services.database.get_db_session') as mock_db:
             mock_db.return_value = MagicMock()
-            
-            with patch('api.content_planning.services.content_strategy.autofill.AutoFillService') as MockAutoFill:
+
+            with patch('api.content_planning.services.content_strategy.onboarding.data_integration.OnboardingDataIntegrationService') as MockIntegration:
                 mock_service = MagicMock()
-                # Simulate generate() raising an exception
-                mock_service.generate = AsyncMock(side_effect=RuntimeError("Database connection failed"))
-                MockAutoFill.return_value = mock_service
-                
+                mock_service.process_onboarding_data = AsyncMock(return_value={src: {} for src in expected_sources})
+                MockIntegration.return_value = mock_service
+
                 processor = DataProcessorService()
-                
-                # Should propagate the error
-                with pytest.raises(RuntimeError, match="Database connection failed"):
+                result = await processor.get_onboarding_data("user_test_456")
+
+                for source in expected_sources:
+                    assert source in result, f"Missing source: {source}"
+
+    @pytest.mark.asyncio
+    async def test_get_onboarding_data_error_propagation(self):
+        """
+        Verify proper error handling when process_onboarding_data fails.
+        """
+        from api.content_planning.services.content_strategy.utils.data_processors import DataProcessorService
+
+        with patch('services.database.get_db_session') as mock_db:
+            mock_db.return_value = MagicMock()
+
+            with patch('api.content_planning.services.content_strategy.onboarding.data_integration.OnboardingDataIntegrationService') as MockIntegration:
+                mock_service = MagicMock()
+                mock_service.process_onboarding_data = AsyncMock(side_effect=RuntimeError("DB connection failed"))
+                MockIntegration.return_value = mock_service
+
+                processor = DataProcessorService()
+
+                with pytest.raises(RuntimeError, match="DB connection failed"):
                     await processor.get_onboarding_data("user_test_123")
+
+
+class TestBuildContextSummary:
+    """Test _build_context_summary unwrapping and source extraction."""
+
+    @pytest.mark.asyncio
+    async def test_unwraps_nested_onboarding_data(self):
+        """
+        Verify _build_context_summary unwraps context['onboarding_data'] when present.
+        """
+        from api.content_planning.services.content_strategy.autofill.ai_structured_autofill import AIStructuredAutofillService
+
+        service = AIStructuredAutofillService()
+
+        # Context with nested onboarding_data (as endpoint passes)
+        context = {
+            "onboarding_data": {
+                "website_analysis": {"website_url": "https://test.com"},
+                "persona_data": {"core_persona": {"name": "CEO"}},
+                "competitor_analysis": [{"domain": "comp.com"}],
+                "gsc_analytics": {"total_queries": 100},
+                "canonical_profile": {"industry": "SaaS"}
+            },
+            "user_id": "user_123"
+        }
+
+        summary = service._build_context_summary(context)
+
+        # Should have extracted website_url from nested data
+        assert summary["user_profile"]["website_url"] == "https://test.com"
+        assert summary["persona_data"]["name"] == "CEO"
+        assert summary["analytics_data"]["has_analytics"] is True
+
+    @pytest.mark.asyncio
+    async def test_includes_all_sources_in_summary(self):
+        """
+        Verify _build_context_summary includes all 8+ sources in output.
+        """
+        from api.content_planning.services.content_strategy.autofill.ai_structured_autofill import AIStructuredAutofillService
+
+        service = AIStructuredAutofillService()
+
+        full_context = {
+            "website_analysis": {"website_url": "https://test.com", "target_audience": {}},
+            "research_preferences": {"research_depth": "deep"},
+            "api_keys_data": {"providers": ["google_analytics"]},
+            "onboarding_session": {"progress": 5},
+            "persona_data": {"core_persona": {"name": "Tech Leader", "goals": "Growth"}},
+            "competitor_analysis": [{"domain": "comp.com", "name": "Competitor"}],
+            "deep_competitor_analysis": {"competitors": [{"domain": "deep.com"}]},
+            "linkedin_profile": {"summary": "LinkedIn profile"},
+            "platform_integrations": {"connected_platforms": ["wordpress", "medium"]},
+            "gsc_analytics": {"total_queries": 500},
+            "bing_analytics": {"total_clicks": 200},
+            "canonical_profile": {"industry": "Tech", "company_size": "mid-market"},
+            "data_quality": {"completeness": 0.8, "overall_score": 0.75}
+        }
+
+        summary = service._build_context_summary(full_context)
+
+        # Verify all sections exist
+        assert "user_profile" in summary
+        assert "content_analysis" in summary
+        assert "audience_insights" in summary
+        assert "persona_data" in summary
+        assert "competitive_data" in summary
+        assert "platform_integrations" in summary
+        assert "analytics_data" in summary
+        assert "canonical_profile" in summary
+        assert "data_quality" in summary
+
+        # Verify persona extraction
+        assert summary["persona_data"]["name"] == "Tech Leader"
+
+        # Verify competitive data extraction
+        assert summary["competitive_data"]["competitors"][0]["domain"] == "comp.com"
+
+        # Verify analytics
+        assert summary["analytics_data"]["has_analytics"] is True
+        assert summary["analytics_data"]["gsc"]["total_queries"] == 500
+
+        # Verify canonical
+        assert summary["canonical_profile"]["industry"] == "Tech"
+
+        # Verify data quality from raw source
+        assert summary["data_quality"]["completeness"] == 0.8
+
+
+class TestValidateStrategyContext:
+    """Test fail-fast guard for missing onboarding context."""
+
+    def test_raises_409_for_empty_context(self):
+        """Verify _validate_strategy_context raises 409 when context is empty."""
+        from fastapi import HTTPException
+        from api.content_planning.api.content_strategy.endpoints.ai_generation_endpoints import _validate_strategy_context
+
+        with pytest.raises(HTTPException) as exc_info:
+            _validate_strategy_context({})
+
+        assert exc_info.value.status_code == 409
+        assert "missing" in exc_info.value.detail.lower()
+
+    def test_raises_409_for_none(self):
+        """Verify raises 409 when context is None."""
+        from fastapi import HTTPException
+        from api.content_planning.api.content_strategy.endpoints.ai_generation_endpoints import _validate_strategy_context
+
+        with pytest.raises(HTTPException) as exc_info:
+            _validate_strategy_context(None)
+
+        assert exc_info.value.status_code == 409
+
+    def test_passes_with_website_url(self):
+        """Verify passes when website_analysis with URL exists."""
+        from fastapi import HTTPException
+        from api.content_planning.api.content_strategy.endpoints.ai_generation_endpoints import _validate_strategy_context
+
+        # Should not raise
+        _validate_strategy_context({
+            "website_analysis": {"website_url": "https://test.com"}
+        })
+
+    def test_passes_with_persona(self):
+        """Verify passes when persona_data exists."""
+        from fastapi import HTTPException
+        from api.content_planning.api.content_strategy.endpoints.ai_generation_endpoints import _validate_strategy_context
+
+        _validate_strategy_context({
+            "persona_data": {"core_persona": {"name": "CEO"}}
+        })
+
+    def test_passes_with_completed_session(self):
+        """Verify passes when onboarding session is completed."""
+        from fastapi import HTTPException
+        from api.content_planning.api.content_strategy.endpoints.ai_generation_endpoints import _validate_strategy_context
+
+        _validate_strategy_context({
+            "onboarding_session": {"progress": 5, "completed": True}
+        })
+
+    def test_raises_409_with_empty_sources(self):
+        """Verify raises 409 when sources exist but have no meaningful data."""
+        from fastapi import HTTPException
+        from api.content_planning.api.content_strategy.endpoints.ai_generation_endpoints import _validate_strategy_context
+
+        with pytest.raises(HTTPException) as exc_info:
+            _validate_strategy_context({
+                "website_analysis": {},  # empty
+                "persona_data": {},      # empty
+                "onboarding_session": {"progress": 0}  # not completed
+            })
+
+        assert exc_info.value.status_code == 409
 
 
 class TestDataProcessorServiceBackwardCompatibility:
     """Test backward compatible standalone functions."""
-    
+
     @pytest.mark.asyncio
     async def test_standalone_get_onboarding_data_function(self):
         """
-        Test the standalone get_onboarding_data function works correctly.
-        This function is used by other parts of the system.
+        Test the standalone get_onboarding_data function forwards to service.
         """
         from api.content_planning.services.content_strategy.utils.data_processors import get_onboarding_data
-        
-        mock_payload = {
-            "fields": {"test_field": {"value": "test_value"}},
-            "sources": {},
-            "quality_scores": {},
-            "confidence_levels": {},
-            "data_freshness": {}
+
+        mock_raw_data = {
+            "website_analysis": {"website_url": "https://test.com"},
+            "persona_data": {}
         }
-        
+
         with patch('api.content_planning.services.content_strategy.utils.data_processors.DataProcessorService') as MockProcessor:
             mock_instance = AsyncMock()
-            mock_instance.get_onboarding_data = AsyncMock(return_value=mock_payload)
+            mock_instance.get_onboarding_data = AsyncMock(return_value=mock_raw_data)
             MockProcessor.return_value = mock_instance
-            
+
             result = await get_onboarding_data("user_test_456")
-            
-            # Verify the processor was called with correct user_id
+
             mock_instance.get_onboarding_data.assert_called_once_with("user_test_456")
-            
-            # Verify result
-            assert result == mock_payload
+            assert result == mock_raw_data
 
 
 # Run tests with: pytest tests/services/test_data_processors.py -v
