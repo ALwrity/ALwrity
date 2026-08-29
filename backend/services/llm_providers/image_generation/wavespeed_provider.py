@@ -24,21 +24,21 @@ class WaveSpeedImageProvider(ImageGenerationProvider):
         "ideogram-v3-turbo": {
             "name": "Ideogram V3 Turbo",
             "description": "Photorealistic generation with superior text rendering",
-            "cost_per_image": 0.30,
+            "cost_per_image": 0.05,
             "max_resolution": (1024, 1024),
             "default_steps": 20,
         },
         "qwen-image": {
             "name": "Qwen Image",
             "description": "Fast, high-quality text-to-image generation",
-            "cost_per_image": 0.30,
+            "cost_per_image": 0.03,
             "max_resolution": (1024, 1024),
             "default_steps": 15,
         },
         "flux-kontext-pro": {
             "name": "FLUX Kontext Pro",
             "description": "Professional typography and text rendering with improved prompt adherence",
-            "cost_per_image": 0.30,
+            "cost_per_image": 0.04,
             "max_resolution": (1024, 1024),
             "default_steps": 20,
         },
@@ -356,9 +356,10 @@ class WaveSpeedImageProvider(ImageGenerationProvider):
         image = Image.open(io.BytesIO(image_bytes))
         width, height = image.size
         
-        # Calculate estimated cost
+        # Calculate estimated cost via SSOT pricing lookup
+        from services.subscription import get_image_model_cost
         model_info = self.SUPPORTED_MODELS[model]
-        estimated_cost = model_info["cost_per_image"]
+        estimated_cost = get_image_model_cost(model, default=model_info.get("cost_per_image", 0.04))
         steps = options.steps if options.steps is not None else model_info.get("default_steps")
         
         # Return result

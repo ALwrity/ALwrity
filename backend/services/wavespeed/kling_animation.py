@@ -8,6 +8,7 @@ import requests
 from fastapi import HTTPException
 
 from services.llm_providers.main_text_generation import llm_text_gen
+from services.subscription import get_video_model_cost
 from utils.logger_utils import get_service_logger
 
 from .client import WaveSpeedClient
@@ -366,7 +367,7 @@ def animate_scene_image(
         )
 
     model_name = KLING_MODEL_5S if duration == 5 else KLING_MODEL_10S
-    cost = 0.21 if duration == 5 else 0.42
+    cost = get_video_model_cost(model_name, duration_sec=duration, default=0.21 if duration == 5 else 0.42)
 
     return {
         "video_bytes": video_response.content,
@@ -425,7 +426,7 @@ def resume_scene_animation(
 
     animation_prompt = result.get("prompt") or ""
     model_name = KLING_MODEL_5S if duration == 5 else KLING_MODEL_10S
-    cost = 0.21 if duration == 5 else 0.42
+    cost = get_video_model_cost(model_name, duration_sec=duration, default=0.21 if duration == 5 else 0.42)
 
     logger.info("[AnimateScene] Resumed download for prediction=%s", prediction_id)
 

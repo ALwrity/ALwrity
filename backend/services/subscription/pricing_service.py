@@ -185,11 +185,6 @@ class PricingService:
 
     def initialize_default_plans(self):
         """Initialize default subscription plans from pricing.yaml SSOT."""
-        existing = self.db.query(SubscriptionPlan).first()
-        if existing is not None:
-            logger.debug("[PRICING_INIT] Plans already initialized — skipping")
-            return
-
         loader = PricingConfigLoader()
         config = loader.load()
 

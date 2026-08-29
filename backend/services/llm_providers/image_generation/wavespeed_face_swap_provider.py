@@ -302,16 +302,21 @@ class WaveSpeedFaceSwapProvider:
 
             logger.info(f"[Face Swap] ✅ Successfully swapped face: {len(image_bytes)} bytes, {width}x{height}")
 
+            from services.subscription import get_face_swap_model_cost
+            model_key = options.model or model_path
+            estimated_cost = get_face_swap_model_cost(model_key, default=model_info.get("cost", 0.025))
+
             return ImageGenerationResult(
                 image_bytes=image_bytes,
                 width=width,
                 height=height,
                 provider="wavespeed",
-                model=options.model or model_path,
+                model=model_key,
                 metadata={
                     "model_path": model_path,
                     "status": status,
                     "created_at": data.get("created_at"),
+                    "estimated_cost": estimated_cost,
                 },
             )
 

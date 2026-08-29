@@ -96,22 +96,24 @@ def _track_image_operation_usage(
             new_cost = current_cost_before + cost
 
             from sqlalchemy import text as sql_text
+            now_utc = datetime.utcnow()
             update_query = sql_text(f"""
                 UPDATE usage_summaries
                 SET {calls_col} = :new_calls,
-                    {cost_col} = :new_cost
+                    {cost_col} = :new_cost,
+                    total_calls = COALESCE(total_calls, 0) + 1,
+                    total_cost = COALESCE(total_cost, 0.0) + :cost,
+                    updated_at = :now
                 WHERE user_id = :user_id AND billing_period = :period
             """)
             db_track.execute(update_query, {
                 'new_calls': new_calls,
                 'new_cost': new_cost,
+                'cost': cost,
                 'user_id': user_id,
-                'period': current_period
+                'period': current_period,
+                'now': now_utc,
             })
-
-            summary.total_cost = (summary.total_cost or 0.0) + cost
-            summary.total_calls = (summary.total_calls or 0) + 1
-            summary.updated_at = datetime.utcnow()
 
             # Map provider to APIProvider enum
             provider_api_map = {
@@ -170,22 +172,12 @@ def _track_image_operation_usage(
             clear_dashboard_cache(user_id)
             logger.info(f"{log_prefix} ✅ Tracked usage: user {user_id} -> {operation_type} -> {new_calls} calls, ${cost:.4f}")
 
-            operation_name = operation_type.replace("-", " ").title()
-            print(f"""
-[SUBSCRIPTION] {operation_name}
-├─ User: {user_id}
-├─ Plan: {plan_name} ({tier})
-├─ Provider: {provider}
-├─ Actual Provider: {provider}
-├─ Model: {model or 'unknown'}
-├─ Calls: {current_calls_before} → {new_calls} / {provider_limit_display}
-├─ Cost: ${current_cost_before:.4f} → ${new_cost:.4f}
-├─ Audio: {current_audio_calls} / {audio_limit if audio_limit > 0 else '∞'}
-├─ Image Editing: {current_image_edit_calls} / {image_edit_limit if image_edit_limit > 0 else '∞'}
-├─ Videos: {current_video_calls} / {video_limit if video_limit > 0 else '∞'}
-└─ Status: ✅ Allowed & Tracked
-""", flush=True)
-            sys.stdout.flush()
+            try:
+                operation_name = operation_type.replace("-", " ").title()
+                sys.stdout.write(f"\n[SUBSCRIPTION] {operation_name} user={user_id} model={model} cost=${cost:.4f}\n")
+                sys.stdout.flush()
+            except Exception:
+                pass
 
             return {"current_calls": new_calls, "cost": cost, "total_cost": new_cost}
 

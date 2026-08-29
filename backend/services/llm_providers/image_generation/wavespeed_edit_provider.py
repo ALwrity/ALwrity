@@ -265,13 +265,14 @@ class WaveSpeedEditProvider(ImageEditProvider):
             image = Image.open(io.BytesIO(image_bytes))
             width, height = image.size
             
-            # Calculate estimated cost - handle resolution-based pricing
-            estimated_cost = model_info.get("cost", 0.02)
-            if api_params.get("uses_resolution", False):
-                # Check if 8K was requested
-                resolution = extra_params.get("resolution", "4k")
-                if resolution == "8k" and "cost_8k" in model_info:
-                    estimated_cost = model_info["cost_8k"]
+            # Calculate estimated cost via SSOT pricing lookup
+            from services.subscription import get_image_edit_model_cost
+            resolution = extra_params.get("resolution", "4k") if api_params.get("uses_resolution", False) else None
+            estimated_cost = get_image_edit_model_cost(
+                model_name=model,
+                resolution=resolution,
+                default=model_info.get("cost", 0.02)
+            )
             
             logger.info(
                 "[WaveSpeed Edit] ✅ Successfully edited image: {} bytes, {}x{}",

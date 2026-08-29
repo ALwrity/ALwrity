@@ -8,13 +8,14 @@ import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import InfoIcon from '@mui/icons-material/Info';
 import { useImageGeneration, ImageGenerationRequest, fetchPromptSuggestions } from './useImageGeneration';
 import { apiClient } from '../../api/client';
+import { useModelPricing } from '../../hooks/useModelPricing';
 
-type ImageType = 'realistic' | 'chart' | 'conceptual' | 'diagram' | 'illustration' | 'background' | 'infographic';
+export type ImageType = 'chart' | 'diagram' | 'realistic' | 'illustration' | 'conceptual' | 'background';
 
-interface ImageGeneratorProps {
+export interface ImageGeneratorProps {
   defaultModel?: string;
   defaultPrompt?: string;
-  onImageReady?: (base64: string) => void;
+  onImageReady?: (imageBase64: string) => void;
   context?: {
     title?: string | null;
     outline?: any[];
@@ -27,6 +28,13 @@ interface ImageGeneratorProps {
       keywords?: string[];
       [key: string]: any;
     };
+    topic?: string;
+    targetAudience?: string;
+    sectionHeader?: string;
+    sectionContent?: string;
+    outlineSummary?: string;
+    category?: string;
+    [key: string]: any;
   };
 }
 
@@ -36,14 +44,14 @@ export interface ImageGeneratorHandle {
 }
 
 const MODEL_META: Record<string, { label: string; cost: string; description: string }> = {
-  'qwen-image': { label: 'Qwen Image', cost: '$0.30/image', description: 'Fast generation, optimized for blog content' },
-  'ideogram-v3-turbo': { label: 'Ideogram V3 Turbo', cost: '$0.30/image', description: 'Superior text rendering, photorealistic' },
-  'flux-kontext-pro': { label: 'FLUX Kontext Pro', cost: '$0.30/image', description: 'Professional typography, improved prompt adherence' },
-  'black-forest-labs/FLUX.1-Krea-dev': { label: 'FLUX.1 Krea Dev', cost: '$0.30', description: 'Photorealistic Flux model' },
-  'black-forest-labs/FLUX.1-dev': { label: 'FLUX.1 Dev', cost: '$0.30', description: 'High-quality Flux generation' },
-  'runwayml/flux-dev': { label: 'Flux Dev (Runway)', cost: '$0.30', description: 'RunwayML hosted Flux' },
-  'stable-diffusion-xl-1024-v1-0': { label: 'SDXL 1.0', cost: '$0.30', description: 'SDXL-quality professional outputs' },
-  'stable-diffusion-xl-base-1.0': { label: 'SDXL Base', cost: '$0.30', description: 'SDXL base model' },
+  'qwen-image': { label: 'Qwen Image', cost: '$0.03/image', description: 'Fast generation, optimized for blog content' },
+  'ideogram-v3-turbo': { label: 'Ideogram V3 Turbo', cost: '$0.05/image', description: 'Superior text rendering, photorealistic' },
+  'flux-kontext-pro': { label: 'FLUX Kontext Pro', cost: '$0.04/image', description: 'Professional typography, improved prompt adherence' },
+  'black-forest-labs/FLUX.1-Krea-dev': { label: 'FLUX.1 Krea Dev', cost: '$0.04/image', description: 'Photorealistic Flux model' },
+  'black-forest-labs/FLUX.1-dev': { label: 'FLUX.1 Dev', cost: '$0.04/image', description: 'High-quality Flux generation' },
+  'runwayml/flux-dev': { label: 'Flux Dev (Runway)', cost: '$0.04/image', description: 'RunwayML hosted Flux' },
+  'stable-diffusion-xl-1024-v1-0': { label: 'SDXL 1.0', cost: '$0.04/image', description: 'SDXL-quality professional outputs' },
+  'stable-diffusion-xl-base-1.0': { label: 'SDXL Base', cost: '$0.04/image', description: 'SDXL base model' },
 };
 
 const PROVIDER_MODELS: Record<string, string[]> = {
@@ -73,6 +81,7 @@ export const ImageGenerator = React.forwardRef<ImageGeneratorHandle, ImageGenera
   const [width, setWidth] = useState<number>(1024);
   const [height, setHeight] = useState<number>(1024);
   const { isGenerating, error, result, generate } = useImageGeneration();
+  const { getImageCostDisplay } = useModelPricing();
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Array<{ prompt: string; negative_prompt?: string; width?: number; height?: number; overlay_text?: string }>>([]);
@@ -97,12 +106,12 @@ export const ImageGenerator = React.forwardRef<ImageGeneratorHandle, ImageGenera
   const availableModels = provider ? (PROVIDER_MODELS[provider] || []) : [];
   const defaultModelForProvider = provider ? (DEFAULT_MODELS[provider] || '') : '';
 
-  // Set initial model once provider is known, if not already set via defaultModel prop
+  // Set default model once provider is known
   useEffect(() => {
-    if (!model && defaultModelForProvider) {
-      setModel(defaultModelForProvider);
+    if (provider && !model) {
+      setModel(DEFAULT_MODELS[provider] || 'flux-kontext-pro');
     }
-  }, [defaultModelForProvider]);
+  }, [provider, model]);
 
   // Sync model if current selection is invalid for the resolved provider
   useEffect(() => {
@@ -124,19 +133,23 @@ export const ImageGenerator = React.forwardRef<ImageGeneratorHandle, ImageGenera
     }
   }, [model]);
 
-  // Get model-specific tips, warnings, and compatibility guidance
-  const getModelGuidance = (modelName: string, imgType: ImageType): { tips: string[]; warnings: string[]; recommendations: string } => {
-    const modelLower = modelName.toLowerCase();
+  // Context-aware prompt suggestions
+  const [loadingSuggestion, setLoadingSuggestion] = useState(false);
+
+  // Model and Image Type Best Practices Guidance
+  const getModelGuidance = (modelName: string, imgType: ImageType) => {
     const tips: string[] = [];
     const warnings: string[] = [];
     let recommendations = '';
 
+    const modelLower = (modelName || '').toLowerCase();
+
     if (modelLower === 'ideogram-v3-turbo') {
-      tips.push('Excellent photorealistic quality with good text rendering');
-      tips.push('Best for simple text overlays (3-5 words max)');
+      tips.push('Excellent at rendering legible, styled typography and text');
+      tips.push('Strong photorealistic styling and complex compositions');
       if (imgType === 'chart') {
-        warnings.push('Avoid complex charts. Use simple visual representations with text overlay zones, not embedded chart labels.');
-        recommendations = 'Create clean, high-contrast backgrounds for text placement';
+        tips.push('Can render simple charts with readable axis labels and titles');
+        recommendations = 'Specify chart labels explicitly in quotation marks';
       } else if (imgType === 'diagram') {
         tips.push('Can render simple diagrams with text');
         recommendations = 'Keep diagrams simple with clear visual hierarchy';
@@ -144,7 +157,7 @@ export const ImageGenerator = React.forwardRef<ImageGeneratorHandle, ImageGenera
         recommendations = 'Design with text overlay zones in mind (top 20% or bottom 20% of image)';
       }
     } else if (modelLower === 'qwen-image') {
-      tips.push('Fast generation, cost-effective at $0.30/image');
+      tips.push(`Fast generation, cost-effective at ${getImageCostDisplay('qwen-image')}`);
       tips.push('Best for abstract concepts, backgrounds, and simple compositions');
       warnings.push('Cannot render readable text — design for text overlay areas only');
       if (imgType === 'chart') {
@@ -159,7 +172,7 @@ export const ImageGenerator = React.forwardRef<ImageGeneratorHandle, ImageGenera
     } else if (modelLower === 'flux-kontext-pro') {
       tips.push('Excellent typography and text rendering capabilities');
       tips.push('Improved prompt adherence for consistent results');
-      tips.push('Cost-effective at $0.04 per image');
+      tips.push(`Cost-effective at ${getImageCostDisplay('flux-kontext-pro')}`);
       if (imgType === 'chart' || imgType === 'diagram') {
         tips.push('Can render simple charts with text labels effectively');
         recommendations = 'Use for data visualizations that require clear text labels and typography';
@@ -281,9 +294,10 @@ export const ImageGenerator = React.forwardRef<ImageGeneratorHandle, ImageGenera
   }));
 
   const currentModelMeta = model ? MODEL_META[model] : undefined;
+  const dynamicCost = getImageCostDisplay(model);
   const costInfo = currentModelMeta
-    ? { cost: currentModelMeta.cost, description: currentModelMeta.description }
-    : { cost: '', description: '' };
+    ? { cost: dynamicCost || currentModelMeta.cost, description: currentModelMeta.description }
+    : { cost: dynamicCost, description: '' };
 
   if (configLoading) {
     return (
@@ -433,15 +447,14 @@ export const ImageGenerator = React.forwardRef<ImageGeneratorHandle, ImageGenera
                 >
                   {availableModels.map((m) => {
                     const meta = MODEL_META[m];
+                    const displayCost = getImageCostDisplay(m);
                     return (
                       <MenuItem key={m} value={m}>
                         <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>{meta?.label || m}</Typography>
-                          {meta && (
-                            <Typography variant="caption" sx={{ color: '#5f6368' }}>
-                              {meta.cost} — {meta.description}
-                            </Typography>
-                          )}
+                          <Typography variant="caption" sx={{ color: '#5f6368' }}>
+                            {displayCost} {meta?.description ? `— ${meta.description}` : ''}
+                          </Typography>
                         </Box>
                       </MenuItem>
                     );

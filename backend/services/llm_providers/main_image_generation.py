@@ -138,26 +138,14 @@ def generate_image(prompt: str, options: Optional[Dict[str, Any]] = None, user_i
     if user_id and result and result.image_bytes:
         logger.info(f"[Image Generation] ✅ API call successful, tracking usage for user {user_id}")
         
-        # Calculate cost from result metadata or estimate
+        # Calculate cost from result metadata or pricing.yaml SSOT lookup
         estimated_cost = 0.0
         if result.metadata and "estimated_cost" in result.metadata:
             estimated_cost = float(result.metadata["estimated_cost"])
         else:
-            # Model-specific cost resolution:
-            # FLUX / standard studio image generation is $0.04
-            # Qwen Image is $0.03
-            # Ideogram Character is $0.30
-            model_lower = (result.model or image_options.model or "").lower()
-            if "ideogram-character" in model_lower or "character" in model_lower:
-                estimated_cost = 0.30
-            elif "flux" in model_lower:
-                estimated_cost = 0.04
-            elif "qwen" in model_lower:
-                estimated_cost = 0.03
-            elif "stable-diffusion" in model_lower or "sd" in model_lower:
-                estimated_cost = 0.04
-            else:
-                estimated_cost = 0.04
+            from services.subscription import get_image_model_cost
+            model_identifier = result.model or image_options.model or "flux-kontext-pro"
+            estimated_cost = get_image_model_cost(model_identifier, default=0.04)
         
         # Reuse tracking helper
         _track_image_operation_usage(

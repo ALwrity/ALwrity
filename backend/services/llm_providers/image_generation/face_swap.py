@@ -71,9 +71,12 @@ def generate_face_swap(
         if user_id and result and result.image_bytes:
             logger.info(f"[Face Swap] ✅ API call successful, tracking usage for user {user_id}")
 
-            model_id = model or (list(WaveSpeedFaceSwapProvider.SUPPORTED_MODELS.keys())[0] if WaveSpeedFaceSwapProvider.SUPPORTED_MODELS else "unknown")
-            model_info = WaveSpeedFaceSwapProvider.SUPPORTED_MODELS.get(model_id, {})
-            estimated_cost = model_info.get("cost", 0.025)
+            model_id = model or (list(WaveSpeedFaceSwapProvider.SUPPORTED_MODELS.keys())[0] if WaveSpeedFaceSwapProvider.SUPPORTED_MODELS else "image-face-swap-pro")
+            from services.subscription import get_face_swap_model_cost
+            if result.metadata and "estimated_cost" in result.metadata:
+                estimated_cost = float(result.metadata["estimated_cost"])
+            else:
+                estimated_cost = get_face_swap_model_cost(model_id, default=0.025)
 
             _track_image_operation_usage(
                 user_id=user_id,
