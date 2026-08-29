@@ -167,14 +167,30 @@ class AIStructuredAutofillService:
         }
         
         try:
-            logger.debug(
-                "AI Structured Autofill: personalized context | website=%s research=%s api=%s session=%s",
-                bool(website), bool(research), bool(api_keys), bool(session)
+            has_website = bool(website)
+            has_research = bool(research)
+            has_persona = bool(persona)
+            has_competitors = bool(competitors)
+            has_deep = bool(deep_competitors)
+            has_platforms = bool(platforms)
+            has_gsc = bool(gsc_analytics)
+            has_bing = bool(bing_analytics)
+            has_canonical = bool(canonical)
+            source_count = sum([has_website, has_research, has_persona, has_competitors,
+                              has_deep, has_platforms, has_gsc, has_bing, has_canonical])
+
+            logger.info(
+                "AI Structured Autofill: data source coverage | sources=%d/9 | website=%s research=%s persona=%s competitors=%s platforms=%s gsc=%s bing=%s canonical=%s",
+                source_count, has_website, has_research, has_persona, has_competitors,
+                has_platforms, has_gsc, has_bing, has_canonical
             )
-            logger.debug(
-                "AI Structured Autofill: personalization data | writing_style=%s target_audience=%s content_type=%s",
-                bool(writing_style), bool(target_audience), bool(content_type)
-            )
+
+            quality_score = data_quality.get('overall_score', data_quality.get('completeness', 0))
+            if quality_score < 0.5:
+                logger.warning(
+                    "AI Structured Autofill: LOW DATA QUALITY (score=%.2f) - Generation may lack grounding",
+                    quality_score
+                )
         except Exception:
             pass
         return summary
