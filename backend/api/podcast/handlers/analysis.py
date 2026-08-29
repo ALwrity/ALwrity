@@ -257,13 +257,13 @@ async def analyze_podcast_idea(
     except Exception as exc:
         logger.warning(f"[Podcast Analyze] Failed to parse or generate bible context: {exc}")
 
-    # --- NEW: Generate Presenter Avatar if missing ---
-    final_avatar_url = request.avatar_url
+    # --- Presenter Avatar: prioritize locked presenter reference or uploaded avatar ---
+    final_avatar_url = request.presenter_reference_url or request.avatar_url
     final_avatar_prompt = None
     
-    # Skip avatar generation for audio_only mode
+    # Skip avatar generation if presenter reference or avatar is already present, or if audio_only mode
     podcast_mode = getattr(request, 'podcast_mode', None) or 'video_only'
-    should_generate_avatar = not final_avatar_url and podcast_mode != 'audio_only'
+    should_generate_avatar = not final_avatar_url and not request.presenter_reference_url and podcast_mode != 'audio_only'
     
     if should_generate_avatar:
         logger.info(f"[Podcast Analyze] No avatar_url provided, generating one for user {user_id}")
@@ -449,6 +449,7 @@ Requirements:
         bible=bible_obj.model_dump() if bible_obj else None,
         avatar_url=final_avatar_url,
         avatar_prompt=final_avatar_prompt,
+        presenter_reference_url=request.presenter_reference_url,
         estimate=estimate,
     )
 

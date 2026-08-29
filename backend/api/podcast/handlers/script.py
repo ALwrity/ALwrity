@@ -209,6 +209,25 @@ VIDEO-ONLY MODE:
 - Prioritize visual rhythm and concise narration per scene.
 """
 
+    speaker_instructions = ""
+    if request.speakers > 1:
+        speaker_instructions = f"""DIALOGUE STYLE ({request.speakers} SPEAKERS - NATURAL CONVERSATION):
+- Responding speakers MUST react to or build on the prior speaker's line at least once per scene.
+- ANTI-REPETITION (CRITICAL): Do NOT repeat the same acknowledgment phrase more than once per episode. Avoid overusing "Exactly", "Spot on", "Right, and", or "Totally agree".
+- Vary reactive language across scenes using different conversational techniques:
+  * Adding context: "And to put numbers to that...", "What people often miss is...", "Building on that..."
+  * Gentle contrast/pivot: "Fair point, though the catch is...", "Here's what surprised me, though..."
+  * Validation: "That lines up with what we're seeing...", "That's a huge distinction..."
+  * Prompting: "So what does that actually mean for teams on the ground?"
+- Vary line length: mix short punchy reactions (1 sentence) with explanatory points (1-2 sentences). Do NOT make every line a uniform, isolated lecture statement.
+- Make it sound like two smart colleagues having an engaging, spontaneous studio discussion, not reading alternate paragraphs of a report."""
+    else:
+        speaker_instructions = """DIALOGUE STYLE (SOLO HOST - CONVERSATIONAL FLOW):
+- Use natural, conversational podcast host delivery — avoid stiff formal transitions like "From an operational perspective...", "Moving on to our next section...", or "In conclusion...".
+- Use natural contractions ("it's", "we're", "you'll", "let's", "don't", "here's").
+- Include occasional rhetorical questions ("So why does this matter right now?", "How did we get here so fast?", "What's the real catch?") to create dynamic pacing.
+- Speak directly to the listener in an authentic, engaging, approachable cadence."""
+
     prompt = f"""Create a podcast script with scenes and dialogue.
 
 {f"BIBLE: {bible_context[:1500]}" if bible_context else ""}
@@ -221,14 +240,18 @@ Topic: "{request.idea}"
 Duration: {request.duration_minutes} min | Speakers: {request.speakers}
 Podcast mode: {podcast_mode}
 
+{speaker_instructions}
+
 Return JSON with scenes array. Each scene:
 - id: string
 - title: short title (<=50 chars)
 - duration: seconds (total/5)
 - emotion: neutral|happy|excited|serious|curious|confident
+- camera_angle: wide_shot|medium_shot|close_up|over_shoulder (choose the angle that best fits the scene's mood and content)
+- visual_atmosphere: short free-text description of lighting, mood, and setting for this scene (e.g. "dim blue-lit studio, contemplative" or "bright sunlit co-working space, energetic"). Leave empty string if no strong atmosphere applies.
 - lines: array of {{speaker, text, emphasis, usedFactIds, ttsHints}}
   - Use 2-4 LINES PER SCENE (shorter script = lower TTS costs)
-  - Each line: 1-3 sentences, conversational
+  - Each line: 1-3 sentences, natural speech
   - usedFactIds: include related fact ids when research facts are available (example: ["fact_1", "fact_3"])
   - ttsHints: optional list from [pause_300ms, pause_700ms, smile, serious_tone, emphasize_data]
   - Plain text only, no markdown
@@ -305,6 +328,17 @@ COST OPTIMIZATION:
         if emotion not in valid_emotions:
             logger.warning(f"[ScriptGen] Invalid emotion '{emotion}' in scene {idx}, defaulting to 'neutral'")
             emotion = "neutral"
+
+        # camera_angle: validate against known enum values, default to medium_shot
+        valid_camera_angles = {"wide_shot", "medium_shot", "close_up", "over_shoulder"}
+        camera_angle = scene.get("camera_angle") or "medium_shot"
+        if camera_angle not in valid_camera_angles:
+            logger.warning(f"[ScriptGen] Invalid camera_angle '{camera_angle}' in scene {idx}, defaulting to 'medium_shot'")
+            camera_angle = "medium_shot"
+
+        # visual_atmosphere: free-text, default to empty string
+        visual_atmosphere = (scene.get("visual_atmosphere") or "").strip()
+
         lines_raw = scene.get("lines") or []
         total_lines_input += len(lines_raw)
         lines: list[PodcastSceneLine] = []
@@ -393,6 +427,8 @@ COST OPTIMIZATION:
                 lines=lines,
                 approved=False,
                 emotion=emotion,
+                camera_angle=camera_angle,
+                visual_atmosphere=visual_atmosphere,
                 imageUrl=None,  # Will be generated later
                 audioUrl=None,  # Will be generated later
                 imagePrompt=None,  # Will be generated during image generation

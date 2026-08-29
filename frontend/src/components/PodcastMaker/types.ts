@@ -81,6 +81,8 @@ export type Scene = {
   lines: Line[];
   approved?: boolean;
   emotion?: string;
+  camera_angle?: "wide_shot" | "medium_shot" | "close_up" | "over_shoulder";
+  visual_atmosphere?: string;
   audioUrl?: string;
   imageUrl?: string;
   imagePrompt?: string;
@@ -200,8 +202,10 @@ export type CreateProjectPayload = {
   budgetCap: number;
   files: { voiceFile?: File | null; avatarFile?: File | null };
   avatarUrl?: string | null;
+  presenterReferenceUrl?: string | null;
   podcastMode?: PodcastMode;
 };
+
 
 export type CreateProjectResult = {
   projectId: string;
@@ -211,6 +215,7 @@ export type CreateProjectResult = {
   bible?: PodcastBible;
   avatar_url?: string | null;
   avatar_prompt?: string | null;
+  presenterReferenceUrl?: string | null; // Base reference image URL for cross-scene img2img anchoring
 };
 
 export type RenderJobResult = {

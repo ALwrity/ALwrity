@@ -489,11 +489,35 @@ export const useRenderQueue = ({
     setGeneratingImage(sceneId);
     try {
       const sceneContent = scene.lines.map((line) => line.text).join(" ");
+
+      // ── Ensure presenter reference image exists before generating any scene ──
+      // generatePresenterReference is idempotent: if the reference already exists
+      // on the backend (was_cached=true), it returns immediately with no extra cost.
+      // We only call it when a project_id is available (i.e., project is saved to DB)
+      // and we're not on Path A (user uploaded their own avatar).
+      if (projectId && !avatarImageUrl) {
+        try {
+          await podcastApi.generatePresenterReference({
+            projectId,
+            bible,
+            idea: undefined, // project idea not needed; character lock already in DB
+          });
+        } catch (refErr) {
+          // Non-fatal: if reference generation fails, scene generation continues
+          // using Path B2 text-only fallback automatically.
+          console.warn("[useRenderQueue] Presenter reference generation failed (non-fatal):", refErr);
+        }
+      }
+
       const result = await podcastApi.generateSceneImage({
         sceneId: scene.id,
         sceneTitle: scene.title,
+        projectId: projectId,
         sceneContent: sceneContent,
-        baseAvatarUrl: avatarImageUrl || undefined, // Use base avatar if available
+        sceneEmotion: scene.emotion,
+        cameraAngle: scene.camera_angle,
+        visualAtmosphere: scene.visual_atmosphere,
+        baseAvatarUrl: avatarImageUrl || undefined, // Use base avatar if available (Path A gate)
         bible: bible,
         width: 1024,
         height: 1024,
@@ -517,7 +541,8 @@ export const useRenderQueue = ({
     } finally {
       setGeneratingImage(null);
     }
-  }, [generatingImage, getScene, avatarImageUrl, onUpdateJob, onError, script]);
+  }, [generatingImage, getScene, avatarImageUrl, onUpdateJob, onError, script, projectId, bible]);
+
 
   const runVideoRender = useCallback(
     async (sceneId: string, settings?: VideoGenerationSettings) => {
@@ -601,6 +626,8 @@ export const useRenderQueue = ({
           prompt: settings?.prompt || undefined,
           seed: settings?.seed ?? -1,
           maskImageUrl: settings?.maskImageUrl || undefined,
+          sceneEmotion: scene.emotion || undefined,
+          sceneVisualAtmosphere: scene.visual_atmosphere || undefined,
         });
 
         if (!result.taskId) {

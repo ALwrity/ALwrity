@@ -143,13 +143,21 @@ def generate_image(prompt: str, options: Optional[Dict[str, Any]] = None, user_i
         if result.metadata and "estimated_cost" in result.metadata:
             estimated_cost = float(result.metadata["estimated_cost"])
         else:
-            # Fallback: estimate based on provider/model
-            if provider_name == "wavespeed":
+            # Model-specific cost resolution:
+            # FLUX / standard studio image generation is $0.04
+            # Qwen Image is $0.03
+            # Ideogram Character is $0.30
+            model_lower = (result.model or image_options.model or "").lower()
+            if "ideogram-character" in model_lower or "character" in model_lower:
                 estimated_cost = 0.30
-            elif provider_name == "stability":
-                estimated_cost = 0.30
+            elif "flux" in model_lower:
+                estimated_cost = 0.04
+            elif "qwen" in model_lower:
+                estimated_cost = 0.03
+            elif "stable-diffusion" in model_lower or "sd" in model_lower:
+                estimated_cost = 0.04
             else:
-                estimated_cost = 0.30
+                estimated_cost = 0.04
         
         # Reuse tracking helper
         _track_image_operation_usage(

@@ -233,6 +233,9 @@ export const usePodcastWorkflow = ({ projectState, onError }: UsePodcastWorkflow
         setBible(dbProject.bible);
       }
       
+      const effectivePresenterRef = payload.presenterReferenceUrl || result.presenterReferenceUrl || dbProject?.presenter_reference_url || null;
+      const effectiveAvatarUrl = payload.avatarUrl || effectivePresenterRef || result.avatar_url || null;
+
       // Update the project in database with the analysis results
       // If dbProject exists, update it. Otherwise use localStorage fallback
       if (dbProject) {
@@ -242,8 +245,9 @@ export const usePodcastWorkflow = ({ projectState, onError }: UsePodcastWorkflow
             estimate: result.estimate,
             queries: result.queries,
             selected_queries: [],
-            avatar_url: result.avatar_url,
+            avatar_url: effectiveAvatarUrl,
             avatar_prompt: result.avatar_prompt,
+            presenter_reference_url: effectivePresenterRef,
           });
           setBackendProjectCreated(true);
           console.log("[handleCreate] DB project created and updated successfully");
@@ -265,9 +269,10 @@ export const usePodcastWorkflow = ({ projectState, onError }: UsePodcastWorkflow
         duration: payload.duration, 
         speakers: payload.speakers, 
         podcastMode: payload.podcastMode,
-        avatarUrl: result.avatar_url || avatarUrl,
+        avatarUrl: effectiveAvatarUrl,
         avatarPrompt: result.avatar_prompt || null,
         avatarPersonaId: null,
+        presenterReferenceUrl: effectivePresenterRef,
       });
       
       setAnalysis(result.analysis);
@@ -277,9 +282,8 @@ export const usePodcastWorkflow = ({ projectState, onError }: UsePodcastWorkflow
       setKnobs(payload.knobs);
       setBudgetCap(payload.budgetCap);
       
-      // Generate presenters AFTER analysis completes (to use analysis insights)
-      // Only if no avatar was uploaded AND analysis didn't already generate one AND not audio_only
-      if (payload.podcastMode !== "audio_only" && !avatarUrl && !result.avatar_url && payload.speakers > 0 && result.analysis) {
+      // Generate presenters AFTER analysis completes only if no avatar/reference exists
+      if (payload.podcastMode !== "audio_only" && !avatarUrl && !effectivePresenterRef && !result.avatar_url && payload.speakers > 0 && result.analysis) {
         try {
           setAnnouncement("Generating presenter avatars using AI insights...");
           const presentersResponse = await podcastApi.generatePresenters(
@@ -302,6 +306,7 @@ export const usePodcastWorkflow = ({ projectState, onError }: UsePodcastWorkflow
               avatarUrl: firstAvatar.avatar_url,
               avatarPrompt: prompt,
               avatarPersonaId: firstAvatar.persona_id || presentersResponse.persona_id || null,
+              presenterReferenceUrl: effectivePresenterRef,
             });
             setAnnouncement("Analysis complete - Presenter avatars generated");
           }

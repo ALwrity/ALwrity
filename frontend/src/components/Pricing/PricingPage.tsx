@@ -21,7 +21,7 @@ import {
 } from '@mui/material';
 import Warning from '@mui/icons-material/Warning';
 import { useNavigate, useSearchParams, Link as RouterLink } from 'react-router-dom';
-import { useClerk } from '@clerk/clerk-react';
+import { useClerk, useAuth } from '@clerk/clerk-react';
 import { apiClient, getApiUrl } from '../../api/client';
 import { saveNavigationState, restoreNavigationState, saveCurrentPhaseForTool } from '../../utils/navigationState';
 import { getEnabledFeatures, getDefaultLandingRoute } from '../../utils/demoMode';
@@ -163,6 +163,7 @@ const PricingPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { openSignIn } = useClerk();
+  const { isSignedIn: clerkIsSignedIn, userId: clerkUserId } = useAuth();
 
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,9 +186,10 @@ const PricingPage: React.FC = () => {
   const isPendingFreePlan = pendingPlan?.tier === 'free';
 
   const isSignedIn = useCallback((): boolean => {
+    if (clerkIsSignedIn && clerkUserId) return true;
     const userId = localStorage.getItem('user_id');
     return Boolean(userId && userId !== 'anonymous');
-  }, []);
+  }, [clerkIsSignedIn, clerkUserId]);
 
   const isFeatureLimitedMode = (): boolean => {
     const appMode = (localStorage.getItem('app_mode') || '').toLowerCase();
@@ -198,12 +200,14 @@ const PricingPage: React.FC = () => {
     const enabledFeatures = getEnabledFeatures();
 
     return (
-      !enabledFeatures.has('all') ||
+      appMode === 'demo' ||
+      demoMode === 'true' ||
+      demoMode === '1' ||
       podcastOnlyDemoMode === 'true' ||
-      appMode === 'podcast-only' ||
-      demoMode === 'podcast-only' ||
-      envAppMode === 'podcast-only' ||
-      envDemoMode === 'podcast-only'
+      envAppMode === 'demo' ||
+      envDemoMode === 'true' ||
+      envDemoMode === '1' ||
+      (Array.isArray(enabledFeatures) && enabledFeatures.length > 0 && !enabledFeatures.includes('all'))
     );
   };
 
@@ -279,7 +283,14 @@ const PricingPage: React.FC = () => {
   }, [searchParams, setSearchParams]);
 
   const activateFreePlan = async (planId: number) => {
-    const userId = localStorage.getItem('user_id') || 'anonymous';
+    const userId = clerkUserId || localStorage.getItem('user_id') || 'anonymous';
+    if (userId === 'anonymous') {
+      setPendingPlanId(planId);
+      sessionStorage.setItem(PENDING_PLAN_KEY, String(planId));
+      sessionStorage.setItem('subscription_referrer', '/pricing');
+      setShowSignInPrompt(true);
+      return;
+    }
     setSubscribing(true);
     try {
       await apiClient.post(`/api/subscription/subscribe/${userId}`, {
@@ -288,9 +299,10 @@ const PricingPage: React.FC = () => {
       });
       window.dispatchEvent(new CustomEvent('subscription-updated'));
       redirectAfterSubscription();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error subscribing:', err);
-      setError('Failed to process subscription');
+      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to process subscription';
+      setError(errorMessage);
     } finally {
       setSubscribing(false);
     }
@@ -364,7 +376,7 @@ const PricingPage: React.FC = () => {
 
     try {
       setSubscribing(true);
-      const userId = localStorage.getItem('user_id') || 'anonymous';
+      const userId = clerkUserId || localStorage.getItem('user_id') || 'anonymous';
 
       if (stripePublishableKey) {
         if (window.location.pathname !== '/pricing') {

@@ -1,17 +1,20 @@
 import React from "react";
-import { Stack, Box, Typography, Tabs, Tab, CircularProgress, Button, IconButton, Tooltip, alpha, useTheme, useMediaQuery } from "@mui/material";
-import PersonIcon from '@mui/icons-material/Person';
-import InfoIcon from '@mui/icons-material/Info';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import CollectionsIcon from '@mui/icons-material/Collections';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import { Stack, Box, Typography, Tabs, Tab, CircularProgress, Button, IconButton, Tooltip, alpha, useTheme, useMediaQuery, Chip } from "@mui/material";
+import {
+  Person as PersonIcon,
+  Info as InfoIcon,
+  CheckCircle as CheckCircleIcon,
+  Refresh as RefreshIcon,
+  Collections as CollectionsIcon,
+  Delete as DeleteIcon,
+  AutoAwesome as AutoAwesomeIcon,
+  CloudUpload as CloudUploadIcon,
+  PhotoCamera as PhotoCameraIcon,
+} from "@mui/icons-material";
 import { AvatarAssetBrowser } from "../AvatarAssetBrowser";
 import { CameraSelfie } from "../CameraSelfie";
 import { PodcastMode } from "../types";
+import { useSubscription } from "../../../contexts/SubscriptionContext";
 
 interface AvatarSelectorProps {
   avatarTab: number;
@@ -33,6 +36,11 @@ interface AvatarSelectorProps {
   cameraSelfieOpen: boolean;
   setCameraSelfieOpen: (open: boolean) => void;
   podcastMode?: PodcastMode;
+  presenterReferenceUrl?: string | null;
+  presenterReferenceBlobUrl?: string | null;
+  generatingPresenterReference?: boolean;
+  onGeneratePresenterReference?: (forceRegenerate?: boolean, styleIndex?: number) => void;
+  presenterStyleIndex?: number;
 }
 
 export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
@@ -55,10 +63,18 @@ export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
   cameraSelfieOpen,
   setCameraSelfieOpen,
   podcastMode,
+  presenterReferenceUrl,
+  presenterReferenceBlobUrl,
+  generatingPresenterReference,
+  onGeneratePresenterReference,
+  presenterStyleIndex,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+
+  const { subscription } = useSubscription();
+  const isFreeTier = !subscription || subscription.tier?.toLowerCase() === 'free' || subscription.plan?.toLowerCase() === 'free';
 
   // Shorter tab labels for mobile
   const tabLabels = isMobile 
@@ -151,64 +167,81 @@ export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
               <PersonIcon fontSize="medium" sx={{ color: "#6366f1" }} />
             </Box>
             <Box>
-              <Typography variant="subtitle1" sx={{ color: "#0f172a", fontWeight: 700, fontSize: "1rem", letterSpacing: "-0.01em" }}>
-                Podcast Presenter Avatar
-              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography variant="subtitle1" sx={{ color: "#0f172a", fontWeight: 700, fontSize: "1rem", letterSpacing: "-0.01em" }}>
+                  Podcast Presenter Avatar
+                </Typography>
+                {isFreeTier && (
+                  <Chip
+                    label="PRO"
+                    size="small"
+                    sx={{
+                      background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                      color: "#ffffff",
+                      fontWeight: 700,
+                      fontSize: "0.65rem",
+                      height: 20,
+                    }}
+                  />
+                )}
+              </Stack>
               <Typography variant="caption" sx={{ color: "#64748b", fontSize: "0.75rem", display: "block", mt: -0.25 }}>
-                Select or upload an image for your presenter
+                {isFreeTier ? "Consistent AI studio presenter (Free) or custom photo clone (Pro)" : "Select or upload an image for your presenter"}
               </Typography>
             </Box>
           </Stack>
           
-          {/* Tabs in header - Mobile Responsive */}
-          <Tabs 
-            value={avatarTab} 
-            onChange={setAvatarTab}
-            variant="scrollable"
-            scrollButtons="auto"
-            allowScrollButtonsMobile
-            sx={{ 
-              minHeight: { xs: 32, sm: 38 },
-              "& .MuiTabs-scrollButtons": {
-                color: "#64748b",
-                "&.Mui-disabled": { opacity: 0.3 },
-              },
-              "& .MuiTabs-indicator": {
-                display: "none",
-              },
-              "& .MuiTabs-flexContainer": {
-                gap: 0.5,
-              },
-              "& .MuiTab-root": {
-                textTransform: "none",
-                minHeight: { xs: 28, sm: 36 },
-                fontWeight: 600,
-                fontSize: { xs: "0.65rem", sm: "0.8rem" },
-                borderRadius: 1,
-                px: { xs: 1, sm: 1.5 },
-                py: 0.5,
-                minWidth: "auto",
-                color: "#64748b",
-                border: "1px solid #e2e8f0",
-                backgroundColor: "#ffffff",
-                transition: "all 0.2s ease",
-                "&:hover": {
-                  borderColor: "#c7d2fe",
-                  backgroundColor: "#eef2ff",
+          {/* Tabs in header - Mobile Responsive (only show for Pro users) */}
+          {!isFreeTier && (
+            <Tabs 
+              value={avatarTab} 
+              onChange={setAvatarTab}
+              variant="scrollable"
+              scrollButtons="auto"
+              allowScrollButtonsMobile
+              sx={{ 
+                minHeight: { xs: 32, sm: 38 },
+                "& .MuiTabs-scrollButtons": {
+                  color: "#64748b",
+                  "&.Mui-disabled": { opacity: 0.3 },
                 },
-                "&.Mui-selected": {
-                  color: "#ffffff",
-                  borderColor: "transparent",
-                  background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-                  boxShadow: "0 2px 8px rgba(99, 102, 241, 0.3)",
+                "& .MuiTabs-indicator": {
+                  display: "none",
                 },
-              },
-            }}
-          >
-            {tabLabels.map((label, index) => (
-              <Tab key={index} label={label} />
-            ))}
-          </Tabs>
+                "& .MuiTabs-flexContainer": {
+                  gap: 0.5,
+                },
+                "& .MuiTab-root": {
+                  textTransform: "none",
+                  minHeight: { xs: 28, sm: 36 },
+                  fontWeight: 600,
+                  fontSize: { xs: "0.65rem", sm: "0.8rem" },
+                  borderRadius: 1,
+                  px: { xs: 1, sm: 1.5 },
+                  py: 0.5,
+                  minWidth: "auto",
+                  color: "#64748b",
+                  border: "1px solid #e2e8f0",
+                  backgroundColor: "#ffffff",
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    borderColor: "#c7d2fe",
+                    backgroundColor: "#eef2ff",
+                  },
+                  "&.Mui-selected": {
+                    color: "#ffffff",
+                    borderColor: "transparent",
+                    background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                    boxShadow: "0 2px 8px rgba(99, 102, 241, 0.3)",
+                  },
+                },
+              }}
+            >
+              {tabLabels.map((label, index) => (
+                <Tab key={index} label={label} />
+              ))}
+            </Tabs>
+          )}
           
           <Tooltip
             title={
@@ -217,10 +250,8 @@ export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
                   Avatar Options:
                 </Typography>
                 <Typography variant="caption" component="div" sx={{ lineHeight: 1.6, color: "#e5e7eb" }}>
-                  <strong>Brand Avatar:</strong> Use your configured brand avatar for consistency.<br/>
-                  <strong>Asset Library:</strong> Choose from your previously uploaded images.<br/>
-                  <strong>Take a Selfie:</strong> Use your camera to capture a photo instantly.<br/>
-                  <strong>Upload your photo:</strong> We'll enhance it into a professional presenter.
+                  <strong>Free Tier:</strong> Automatically generates a consistent AI studio presenter ($0.04/image).<br/>
+                  <strong>Pro / Paid Tier:</strong> Clone your own photo or custom avatar via Ideogram Character ($0.30/image).
                 </Typography>
               </Box>
             }
@@ -233,7 +264,223 @@ export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
       </Box>
       
       {/* Content Area */}
-      <Stack direction={{ xs: "column", lg: "row" }} spacing={3} alignItems="flex-start" sx={{ p: 2.5 }}>
+      {/* Content Area */}
+      {isFreeTier ? (
+        <Box sx={{ p: { xs: 2, sm: 3 } }}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={3} alignItems="center">
+            {/* Left: Presenter Image Frame / Preview */}
+            <Box
+              sx={{
+                width: { xs: "100%", sm: 220 },
+                height: { xs: 180, sm: 220 },
+                borderRadius: 2.5,
+                bgcolor: "#f8fafc",
+                border: "2px dashed",
+                borderColor: presenterReferenceUrl ? "#6366f1" : "#cbd5e1",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                position: "relative",
+                overflow: "hidden",
+                boxShadow: presenterReferenceUrl ? "0 8px 24px rgba(99, 102, 241, 0.18)" : "none",
+                flexShrink: 0,
+              }}
+            >
+              {generatingPresenterReference ? (
+                <Stack spacing={1.5} alignItems="center" sx={{ p: 2, textAlign: "center" }}>
+                  <CircularProgress size={36} sx={{ color: "#6366f1" }} />
+                  <Typography variant="caption" sx={{ color: "#475569", fontWeight: 600 }}>
+                    Generating Studio Presenter...
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "#94a3b8", fontSize: "0.7rem" }}>
+                    Locking 5600K lighting & identity anchor
+                  </Typography>
+                </Stack>
+              ) : presenterReferenceUrl ? (
+                <>
+                  <Box
+                    component="img"
+                    src={presenterReferenceBlobUrl || presenterReferenceUrl}
+                    alt="Locked AI Studio Presenter"
+                    sx={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
+                    }}
+                  />
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      background: "linear-gradient(180deg, transparent 0%, rgba(15, 23, 42, 0.85) 100%)",
+                      p: 1.25,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Stack direction="row" spacing={0.75} alignItems="center">
+                      <CheckCircleIcon sx={{ color: "#10b981", fontSize: 16 }} />
+                      <Typography sx={{ color: "#ffffff", fontSize: "0.75rem", fontWeight: 700 }}>
+                        Host Locked
+                      </Typography>
+                    </Stack>
+                    <Tooltip title="Re-roll to generate another diverse professional presenter">
+                      <IconButton
+                        size="small"
+                        onClick={() => onGeneratePresenterReference?.(true, ((presenterStyleIndex ?? 0) + 1) % 5)}
+                        sx={{
+                          bgcolor: "rgba(255, 255, 255, 0.2)",
+                          color: "#fff",
+                          "&:hover": { bgcolor: "rgba(255, 255, 255, 0.4)" },
+                          p: 0.5,
+                        }}
+                      >
+                        <RefreshIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </>
+              ) : (
+                <Stack spacing={1.5} alignItems="center" sx={{ p: 2, textAlign: "center" }}>
+                  <Box
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: "50%",
+                      background: "linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <PersonIcon sx={{ color: "#6366f1", fontSize: 28 }} />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
+                    AI Studio Host
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={() => onGeneratePresenterReference?.(false)}
+                    startIcon={<AutoAwesomeIcon sx={{ fontSize: 16 }} />}
+                    sx={{
+                      borderRadius: 1.5,
+                      textTransform: "none",
+                      fontWeight: 600,
+                      fontSize: "0.75rem",
+                      background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                      boxShadow: "0 2px 8px rgba(99, 102, 241, 0.3)",
+                      px: 1.5,
+                      py: 0.5,
+                    }}
+                  >
+                    Preview Presenter
+                  </Button>
+                </Stack>
+              )}
+            </Box>
+
+            {/* Right: Explanation & Controls */}
+            <Box sx={{ flex: 1, width: "100%" }}>
+              <Stack spacing={2}>
+                <Box>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#0f172a", fontSize: "0.95rem" }}>
+                      Consistent AI Studio Presenter (Free Tier)
+                    </Typography>
+                    <Chip
+                      label={presenterReferenceUrl ? "Anchored" : "Auto-Generated"}
+                      size="small"
+                      sx={{
+                        background: presenterReferenceUrl ? "rgba(16, 185, 129, 0.12)" : "rgba(99, 102, 241, 0.12)",
+                        color: presenterReferenceUrl ? "#059669" : "#4f46e5",
+                        fontWeight: 700,
+                        fontSize: "0.65rem",
+                        height: 20,
+                      }}
+                    />
+                  </Stack>
+                  <Typography variant="body2" sx={{ color: "#475569", mt: 0.5, fontSize: "0.825rem", lineHeight: 1.5 }}>
+                    This reference image is generated once upfront and acts as the real <strong>image-to-image anchor</strong> for all 5 scenes in your episode. Ethnicity, facial structure, skin tone, and wardrobe remain consistent across all camera angles.
+                  </Typography>
+                </Box>
+
+                {presenterReferenceUrl && (
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<RefreshIcon />}
+                      onClick={() => onGeneratePresenterReference?.(true, ((presenterStyleIndex ?? 0) + 1) % 5)}
+                      disabled={generatingPresenterReference}
+                      sx={{
+                        borderRadius: 1.5,
+                        textTransform: "none",
+                        fontWeight: 600,
+                        fontSize: "0.75rem",
+                        borderColor: "#c7d2fe",
+                        color: "#4338ca",
+                        "&:hover": { borderColor: "#6366f1", bgcolor: "#eef2ff" },
+                      }}
+                    >
+                      Re-roll AI Presenter
+                    </Button>
+                    <Typography variant="caption" sx={{ color: "#64748b" }}>
+                      Cycles between 5 diverse studio host looks
+                    </Typography>
+                  </Stack>
+                )}
+
+                {/* Subtle Pro upgrade card */}
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 2,
+                    background: "linear-gradient(135deg, rgba(248, 250, 252, 0.8) 0%, rgba(241, 245, 249, 0.8) 100%)",
+                    border: "1px solid #e2e8f0",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 1.5,
+                  }}
+                >
+                  <Box>
+                    <Stack direction="row" spacing={0.75} alignItems="center">
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: "#1e293b" }}>
+                        Want to clone your own face?
+                      </Typography>
+                      <Chip label="PRO" size="small" sx={{ background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)", color: "#fff", fontWeight: 700, fontSize: "0.6rem", height: 16 }} />
+                    </Stack>
+                    <Typography variant="caption" sx={{ color: "#64748b", display: "block", fontSize: "0.7rem" }}>
+                      Upload your own photo or selfie to create a custom digital avatar clone ($0.30/scene).
+                    </Typography>
+                  </Box>
+                  <Button
+                    variant="text"
+                    size="small"
+                    onClick={() => window.location.href = "/pricing"}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 700,
+                      fontSize: "0.75rem",
+                      color: "#6366f1",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Upgrade →
+                  </Button>
+                </Box>
+              </Stack>
+            </Box>
+          </Stack>
+        </Box>
+      ) : (
+        <Stack direction={{ xs: "column", lg: "row" }} spacing={3} alignItems="flex-start" sx={{ p: 2.5 }}>
         {/* Left Side: Content based on selected tab */}
         <Box sx={{ flex: 1, width: "100%" }}>
 
@@ -678,6 +925,7 @@ export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
           )}
         </Box>
       </Stack>
+      )}
 
       {/* Camera Selfie Dialog */}
       <CameraSelfie

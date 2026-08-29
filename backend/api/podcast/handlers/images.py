@@ -7,9 +7,10 @@ Image generation and serving endpoints.
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from pathlib import Path
 import uuid
+import base64
 
 from services.database import get_db
 from middleware.auth_middleware import get_current_user, get_current_user_with_query_token
@@ -19,6 +20,186 @@ from utils.asset_tracker import save_asset_to_library
 from loguru import logger
 from ..constants import get_podcast_media_dir
 from ..models import PodcastImageRequest, PodcastImageResponse
+import hashlib
+import time
+
+# In-memory character consistency lock per podcast session
+# Key: "{user_id}:{session_key}" -> Value: {"description": str, "created_at": float}
+_CHARACTER_LOCK_CACHE: Dict[str, Dict[str, Any]] = {}
+_CHARACTER_LOCK_TTL_SECONDS = 3600  # 1 hour TTL per podcast generation session
+
+# Deterministic presenter-reference filename pattern (must match presenter_reference.py)
+_PRESENTER_REF_FILENAME_TPL = "presenter_ref_{project_id}.png"
+
+
+def _resolve_presenter_reference_image(
+    user_id: str,
+    project_id: Optional[str],
+    db: Optional[Session],
+) -> Optional[bytes]:
+    """Return bytes of the saved presenter reference image, or None if not yet generated.
+
+    Checks PodcastProject.presenter_reference_url in DB and, if set, loads the file
+    from disk. Returns None gracefully on any error so the caller can fall back to
+    text-only generation without crashing.
+    """
+    if not project_id or not db:
+        return None
+    try:
+        try:
+            from services.podcast_schema_utils import ensure_podcast_projects_columns
+            ensure_podcast_projects_columns(db)
+        except Exception:
+            pass
+
+        from models.podcast_models import PodcastProject
+        project = db.query(PodcastProject).filter(
+            PodcastProject.user_id == user_id,
+            PodcastProject.project_id == project_id,
+        ).first()
+        if not project:
+            return None
+        ref_url = getattr(project, "presenter_reference_url", None)
+        if not ref_url:
+            return None
+        # ref_url is like "/api/podcast/images/presenter_ref_<project_id>.png"
+        ref_filename = _PRESENTER_REF_FILENAME_TPL.format(project_id=project_id)
+        images_dir = get_podcast_media_dir("image", user_id, ensure_exists=False)
+        ref_path = images_dir / ref_filename
+        if not ref_path.exists():
+            logger.warning(f"[PresenterRef] Reference file missing: {ref_path}")
+            return None
+        ref_bytes = ref_path.read_bytes()
+        logger.info(
+            f"[PresenterRef] Loaded presenter reference ({len(ref_bytes)} bytes) "
+            f"for project {project_id}"
+        )
+        return ref_bytes
+    except Exception as exc:
+        logger.warning(f"[PresenterRef] Failed to load reference image (non-fatal): {exc}")
+        return None
+
+
+
+
+def _get_session_key(user_id: str, request: PodcastImageRequest) -> str:
+    """Derive a stable session key from project_id, bible project_id, or idea hash."""
+    if request.project_id and request.project_id.strip():
+        return f"{user_id}:{request.project_id.strip()}"
+    if request.bible and isinstance(request.bible, dict) and request.bible.get("project_id"):
+        return f"{user_id}:{str(request.bible['project_id']).strip()}"
+    # Fallback to hashed idea so all scenes in a generation run share the same character
+    idea_seed = (request.idea or "default_podcast").strip().lower()
+    idea_hash = hashlib.md5(idea_seed.encode("utf-8")).hexdigest()[:12]
+    return f"{user_id}:{idea_hash}"
+
+
+def _is_concrete_anchor(desc: Optional[str]) -> bool:
+    """Return True only if the description has concrete facial/demographic and wardrobe anchors."""
+    if not desc or len(desc.strip()) < 40:
+        return False
+    d = desc.lower().strip()
+    generic_phrases = [
+        "professional individual",
+        "business-casual attire",
+        "business casual attire",
+        "dressed professionally",
+        "professional attire",
+        "standard podcast host",
+        "expert presenter",
+    ]
+    if any(gp in d for gp in generic_phrases) and len(d) < 100:
+        return False
+    has_face_hair = any(k in d for k in ["hair", "eyes", "jawline", "beard", "shaven", "features", "cheekbones"])
+    has_clothing = any(k in d for k in ["blazer", "suit", "shirt", "jacket", "blouse", "hoodie", "sweater", "collar"])
+    return has_face_hair and has_clothing
+
+
+def _resolve_or_create_character_lock(
+    user_id: str,
+    request: PodcastImageRequest,
+    bible_obj: Any,
+    db: Optional[Session] = None,
+) -> str:
+    """
+    Return a locked character visual description for the session.
+    First checks in-memory cache, then checks DB (PodcastProject) for cross-worker persistence,
+    and generates/stores a concrete character description if none exists yet.
+    """
+    now = time.time()
+    session_key = _get_session_key(user_id, request)
+
+    # 1. In-memory cache check (fast path)
+    cached = _CHARACTER_LOCK_CACHE.get(session_key)
+    if cached and (now - cached.get("created_at", 0)) < _CHARACTER_LOCK_TTL_SECONDS:
+        if _is_concrete_anchor(cached.get("description")):
+            return cached["description"]
+
+    # 2. Check DB PodcastProject if project_id and db are available (cross-worker persistence)
+    locked_desc = None
+    project = None
+    if db and request.project_id:
+        try:
+            try:
+                from services.podcast_schema_utils import ensure_podcast_projects_columns
+                ensure_podcast_projects_columns(db)
+            except Exception:
+                pass
+
+            from models.podcast_models import PodcastProject
+            project = db.query(PodcastProject).filter(
+                PodcastProject.user_id == user_id,
+                PodcastProject.project_id == request.project_id
+            ).first()
+            if project and project.bible and isinstance(project.bible, dict):
+                host_dict = project.bible.get("host")
+                if host_dict and isinstance(host_dict, dict) and host_dict.get("look"):
+                    candidate_look = host_dict["look"].strip()
+                    if _is_concrete_anchor(candidate_look):
+                        locked_desc = candidate_look
+        except Exception as db_err:
+            logger.debug(f"[CharacterLock] DB lookup non-critical error: {db_err}")
+
+    # 3. If not found in DB, check bible_obj or generate concrete anchor
+    if not locked_desc:
+        if bible_obj and getattr(bible_obj, "host", None) and bible_obj.host.look:
+            candidate = bible_obj.host.look.strip()
+            if _is_concrete_anchor(candidate):
+                locked_desc = candidate
+
+        if not locked_desc:
+            # Deterministic character anchor generation based on session_key with concrete facial/demographic anchors
+            seed_val = int(hashlib.md5(session_key.encode("utf-8")).hexdigest()[:8], 16)
+            styles = [
+                "East Asian male tech lead, early 30s, clean-shaven, sharp structured jawline, neat short black hair with a subtle side part, warm dark eyes, wearing a tailored navy blazer over a crisp white collared shirt",
+                "South Asian female tech entrepreneur, early 30s, warm almond eyes, defined cheekbones, sleek shoulder-length dark hair tucked behind ears, wearing a tailored dark emerald blazer over a cream blouse",
+                "Hispanic male tech host, early 30s, neatly trimmed light stubble beard, strong square jawline, short textured dark brown hair, wearing a structured charcoal blazer over a white open-collar shirt",
+                "Caucasian female podcast host, early 30s, distinct hazel eyes, clear facial structure, shoulder-length wavy honey brown hair, wearing a tailored midnight blue blazer over a silk ivory top",
+                "Black male tech innovator, early 30s, clean-shaven, sharp defined jawline, short neat fade haircut, expressive confident eyes, wearing a tailored navy suit jacket over a crisp white shirt",
+            ]
+            locked_desc = styles[seed_val % len(styles)]
+
+        # If DB project exists, persist locked look to project.bible so multiple worker processes share it
+        if project and db:
+            try:
+                bible_data = dict(project.bible) if project.bible and isinstance(project.bible, dict) else {}
+                host_data = dict(bible_data.get("host", {}))
+                host_data["look"] = locked_desc
+                bible_data["host"] = host_data
+                project.bible = bible_data
+                db.commit()
+                logger.info(f"[CharacterLock] Persisted concrete character description to DB for project {request.project_id}")
+            except Exception as save_err:
+                logger.warning(f"[CharacterLock] Could not persist to DB (non-blocking): {save_err}")
+                db.rollback()
+
+    # 4. Save to in-memory cache
+    _CHARACTER_LOCK_CACHE[session_key] = {
+        "description": locked_desc,
+        "created_at": now
+    }
+    logger.info(f"[CharacterLock] Locked character description for {session_key}: {locked_desc[:60]}...")
+    return locked_desc
 
 router = APIRouter()
 
@@ -64,8 +245,28 @@ async def generate_podcast_scene_image(
         logger.info(f"[Podcast] custom_prompt={request.custom_prompt}")
         logger.info(f"[Podcast] style={request.style}, rendering_speed={request.rendering_speed}, aspect_ratio={request.aspect_ratio}")
         
-        if request.base_avatar_url:
-            # Load base avatar image for reference
+        # Check user plan tier to determine if Path A (Ideogram Character) is allowed
+        # Free tier is strictly restricted to Path B (FLUX studio generation, $0.04/image)
+        is_free_tier = True
+        try:
+            from services.subscription import PricingService
+            pricing_service = PricingService(db)
+            limits = pricing_service.get_user_limits(user_id)
+            tier = str(limits.get("tier", "free")).lower() if limits else "free"
+            plan_name = str(limits.get("plan_name", "free")).lower() if limits else "free"
+            if tier in ["pro", "enterprise", "basic"] or plan_name in ["pro", "enterprise", "basic"]:
+                is_free_tier = False
+        except Exception as exc:
+            logger.warning(f"[Podcast] Error checking user plan for {user_id}: {exc}")
+            is_free_tier = True
+        
+        if is_free_tier:
+            # Free tier NEVER uses base avatar or Ideogram Character ($0.30)
+            if request.base_avatar_url:
+                logger.info(f"[Podcast] User {user_id} is on Free tier. Bypassing Path A (Ideogram Character, $0.30/image) and forcing Path B (FLUX studio presenter, $0.04/image).")
+            base_avatar_bytes = None
+        elif request.base_avatar_url:
+            # Load base avatar image for reference (Pro / Paid tier)
             from ..utils import load_podcast_image_bytes
             try:
                 logger.info(f"[Podcast] Attempting to load base avatar from: {request.base_avatar_url}")
@@ -83,7 +284,7 @@ async def generate_podcast_scene_image(
                     },
                 )
         else:
-            logger.info(f"[Podcast] No base avatar URL provided, will generate from scratch")
+            logger.info(f"[Podcast] No base avatar URL provided, will generate from scratch (Path B)")
             base_avatar_bytes = None
         
         # Extract Podcast Bible context for hyper-personalization. Seeded from the
@@ -105,14 +306,25 @@ async def generate_podcast_scene_image(
         # content below. An explicit request.custom_prompt always wins.
         image_prompt = ""  # Initialize prompt variable
         
-        # Emotion to lighting mapping for visual tone
+        # Mappings for single continuous recording session
+        # 1. Facial expression and demeanor per emotion
+        emotion_expression = {
+            "happy": "Host facial expression: bright engaging smile, warm and friendly demeanor",
+            "excited": "Host facial expression: enthusiastic animated smile, energized expressive eyes",
+            "serious": "Host facial expression: serious focused expression, thoughtful authoritative gaze, steady demeanor",
+            "curious": "Host facial expression: intrigued inquisitive expression, subtle interested smile",
+            "confident": "Host facial expression: poised confident smile, assertive authoritative presence",
+            "neutral": "Host facial expression: professional balanced expression, direct eye contact"
+        }
+
+        # 2. Bounded lighting tone / mood (maintains calibrated subject skin exposure and 5600K neutral white balance)
         emotion_lighting = {
-            "happy": "warm, bright lighting, cheerful atmosphere",
-            "excited": "dynamic, energetic lighting with highlights",
-            "serious": "professional, balanced lighting, authoritative feel",
-            "curious": "soft, inviting lighting, thoughtful atmosphere",
-            "confident": "strong, dramatic lighting, authoritative look",
-            "neutral": "professional, balanced lighting"
+            "happy": "consistent calibrated studio key lighting, subtle warm background fill, natural skin exposure, 5600K daylight balanced white balance",
+            "excited": "consistent calibrated studio key lighting, clear crisp background accent, natural skin exposure, 5600K daylight balanced white balance",
+            "serious": "consistent calibrated studio key lighting, subtle soft contrast in background set, natural skin exposure, 5600K daylight balanced white balance",
+            "curious": "consistent calibrated studio key lighting, soft focused background illumination, natural skin exposure, 5600K daylight balanced white balance",
+            "confident": "consistent calibrated studio key lighting, clean balanced studio illumination, natural skin exposure, 5600K daylight balanced white balance",
+            "neutral": "consistent calibrated studio key lighting, even balanced studio illumination, natural skin exposure, 5600K daylight balanced white balance"
         }
         
         if base_avatar_bytes:
@@ -123,78 +335,50 @@ async def generate_podcast_scene_image(
                 image_prompt = request.custom_prompt
                 logger.info(f"[Podcast] Using custom prompt from user for scene {request.scene_id}")
             else:
-                # Build scene-specific prompt that respects the base avatar
+                # Build scene-specific prompt that respects the base avatar & fixed studio session
                 prompt_parts = []
                 
-                # Scene context (primary focus)
-                if request.scene_title:
-                    prompt_parts.append(f"Scene: {request.scene_title}")
+                # 1. Host appearance character lock (consistent visual subject, locked skin tone, and locked wardrobe)
+                character_desc = _resolve_or_create_character_lock(user_id, request, bible_obj, db)
+                prompt_parts.append(f"Host Appearance: {character_desc}, identical natural skin tone, same locked wardrobe and outfit")
                 
-                # Use Bible visual style if available
+                # 2. Fixed Studio Environment (Identical set and room across all scenes)
+                env_desc = bible_obj.visual_style.environment if bible_obj else "Professional modern office studio set, fixed studio room and background"
+                prompt_parts.append(f"Studio Set: {env_desc}, identical fixed studio set and background across all scenes")
                 if bible_obj:
                     prompt_parts.append(f"Style: {bible_obj.visual_style.style_preset}")
-                    prompt_parts.append(f"Environment: {bible_obj.visual_style.environment}")
-                    prompt_parts.append(f"Lighting: {bible_obj.visual_style.lighting}")
-                    if bible_obj.host.look:
-                        prompt_parts.append(f"Host Look: {bible_obj.host.look}")
-                
-                # Scene emotion for visual tone
-                emotion_lighting = {
-                    "happy": "warm, bright lighting, cheerful atmosphere",
-                    "excited": "dynamic, energetic lighting with highlights",
-                    "serious": "professional, balanced lighting, authoritative feel",
-                    "curious": "soft, inviting lighting, thoughtful atmosphere",
-                    "confident": "strong, dramatic lighting, authoritative look",
-                    "neutral": "professional, balanced lighting"
+
+                # 3. Dynamic Host Facial Expression (Driven by scene emotion)
+                scene_emotion = (request.scene_emotion or "neutral").lower().strip()
+                prompt_parts.append(emotion_expression.get(scene_emotion, emotion_expression["neutral"]))
+
+                # 4. Bounded Dynamic Lighting Tone (preserves calibrated skin exposure and white balance)
+                lighting_tone = emotion_lighting.get(scene_emotion, emotion_lighting["neutral"])
+                if request.visual_atmosphere and request.visual_atmosphere.strip():
+                    prompt_parts.append(f"Lighting: {lighting_tone}, subtle background ambience: {request.visual_atmosphere.strip()}, constant subject exposure across scenes")
+                else:
+                    prompt_parts.append(f"Lighting: {lighting_tone}")
+
+                # 5. Framing directives — driven by camera_angle from scene JSON with strong positive headroom
+                _camera_angle_map = {
+                    "wide_shot": ["wide shot", "full body visible", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "centered vertical-third", "35mm equivalent"],
+                    "medium_shot": ["medium shot", "chest-up portrait", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "centered vertical-third", "35mm equivalent"],
+                    "close_up": ["medium close-up portrait", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "centered composition", "35mm equivalent"],
+                    "over_shoulder": ["three-quarter angle shot", "slight side angle view of host", "unobstructed clear view of host, no foreground occlusions", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "35mm equivalent"],
                 }
-                scene_emotion = request.scene_emotion
-                if scene_emotion and scene_emotion in emotion_lighting:
-                    prompt_parts.append(emotion_lighting[scene_emotion])
-                
-                # AI Analysis context for visual relevance
-                if request.analysis:
-                    keywords = request.analysis.get("topKeywords", [])[:5]
-                    if keywords:
-                        prompt_parts.append(f"Keywords: {', '.join(keywords)}")
-                    audience = request.analysis.get("audience", "")
-                    if audience:
-                        prompt_parts.append(f"Target: {audience}")
-                
-                # Scene content insights for visual context
-                if request.scene_content:
-                    content_preview = request.scene_content[:200].replace("\n", " ").strip()
-                    # Extract visualizable themes
-                    visual_keywords = []
-                    content_lower = content_preview.lower()
-                    if any(word in content_lower for word in ["data", "statistics", "numbers", "chart", "graph"]):
-                        visual_keywords.append("data visualization background")
-                    if any(word in content_lower for word in ["technology", "tech", "digital", "ai", "software"]):
-                        visual_keywords.append("modern tech studio setting")
-                    if any(word in content_lower for word in ["business", "growth", "strategy", "market"]):
-                        visual_keywords.append("professional business studio")
-                    if any(word in content_lower for word in ["nature", "outdoor", "environment", "green"]):
-                        visual_keywords.append("natural outdoor setting")
-                    if any(word in content_lower for word in ["medical", "health", "wellness"]):
-                        visual_keywords.append("clean medical studio")
-                    if any(word in content_lower for word in ["education", "learning", "students"]):
-                        visual_keywords.append("classroom or educational setting")
-                    if visual_keywords:
-                        prompt_parts.append(", ".join(visual_keywords))
-                
-                # Podcast theme context
-                if request.idea:
-                    idea_preview = request.idea[:60].strip()
-                    prompt_parts.append(f"Topic: {idea_preview}")
-                
-                # Studio setting (maintains podcast aesthetic)
-                if not bible_obj:
-                    prompt_parts.extend([
-                        "Professional podcast recording studio",
-                        "Modern microphone setup",
-                        "Clean background, professional lighting"
-                    ])
-                
-                prompt_parts.append("16:9 aspect ratio, video-optimized composition")
+                scene_camera_angle = (request.camera_angle or "medium_shot").strip()
+                framing_directives = _camera_angle_map.get(scene_camera_angle, _camera_angle_map["medium_shot"])
+                prompt_parts.extend(framing_directives)
+
+                # 6. Technical & Quality Requirements
+                prompt_parts.extend([
+                    "16:9 aspect ratio, video-optimized composition",
+                    "generous headroom above hair, full hairstyle in frame",
+                    "shoulders and chest visible, not cropped",
+                    "center-focused composition",
+                    "consistent color calibration, natural skin tone preservation, constant subject exposure and white balance across scenes",
+                    "continuous podcast recording session in same studio room, high resolution, sharp focus, professional photography quality"
+                ])
                 
                 image_prompt = ", ".join(prompt_parts)
             
@@ -279,104 +463,153 @@ async def generate_podcast_scene_image(
         # this means either loading failed (already raised error) or Ideogram Character failed (already raised error)
         # So this path should only be reached if NO base_avatar_url was provided in the first place
         if not base_avatar_bytes:
-            logger.info(f"[Podcast] No base avatar provided - generating standard image from scratch")
-            # Standard generation from scratch (no base avatar provided)
-            prompt_parts = []
-            
-            # Use Bible visual style if available
-            if bible_obj:
-                prompt_parts.append(f"Style: {bible_obj.visual_style.style_preset}")
-                prompt_parts.append(f"Environment: {bible_obj.visual_style.environment}")
-                prompt_parts.append(f"Lighting: {bible_obj.visual_style.lighting}")
-                if bible_obj.host.look:
-                    prompt_parts.append(f"Host Look: {bible_obj.host.look}")
-            else:
-                # Core podcast studio elements
-                prompt_parts.extend([
-                    "Professional podcast recording studio",
-                    "Modern podcast setup with high-quality microphone",
-                    "Clean, minimalist background suitable for video",
-                    "Professional studio lighting with soft, even illumination",
-                    "Podcast host environment, professional and inviting"
-                ])
-            
-            # Scene-specific context
-            if request.scene_title:
-                prompt_parts.append(f"Scene theme: {request.scene_title}")
-            
-            # Scene emotion for visual tone (no avatar branch)
-            if request.scene_emotion and request.scene_emotion in emotion_lighting:
-                prompt_parts.append(emotion_lighting[request.scene_emotion])
-            
-            # AI Analysis context (no avatar branch)
-            if request.analysis:
-                keywords = request.analysis.get("topKeywords", [])[:5]
-                if keywords:
-                    prompt_parts.append(f"Keywords: {', '.join(keywords)}")
-                audience = request.analysis.get("audience", "")
-                if audience:
-                    prompt_parts.append(f"Target: {audience}")
-            
-            # Content context for visual relevance
-            if request.scene_content:
-                content_preview = request.scene_content[:150].replace("\n", " ").strip()
-                visual_keywords = []
-                content_lower = content_preview.lower()
-                if any(word in content_lower for word in ["data", "statistics", "numbers", "chart", "graph"]):
-                    visual_keywords.append("data visualization elements")
-                if any(word in content_lower for word in ["technology", "tech", "digital", "ai", "software"]):
-                    visual_keywords.append("modern technology aesthetic")
-                if any(word in content_lower for word in ["business", "growth", "strategy", "market"]):
-                    visual_keywords.append("professional business environment")
-                if any(word in content_lower for word in ["nature", "outdoor", "environment"]):
-                    visual_keywords.append("natural outdoor setting")
-                if any(word in content_lower for word in ["medical", "health", "wellness"]):
-                    visual_keywords.append("clean medical studio")
-                if any(word in content_lower for word in ["education", "learning", "students"]):
-                    visual_keywords.append("classroom or educational setting")
-                if visual_keywords:
-                    prompt_parts.append(", ".join(visual_keywords))
-            
-            # Podcast theme context
-            if request.idea:
-                idea_preview = request.idea[:80].strip()
-                prompt_parts.append(f"Podcast topic context: {idea_preview}")
-            
-            # Technical requirements for video generation
-            prompt_parts.extend([
-                "16:9 aspect ratio optimized for video",
-                "Center-focused composition for talking avatar overlay",
-                "Neutral color palette with professional tones",
-                "High resolution, sharp focus, professional photography quality",
-                "No text, no logos, no distracting elements",
-                "Suitable for InfiniteTalk video generation with animated avatar"
-            ])
-            
-            # Style constraints
-            if not bible_obj:
-                prompt_parts.extend([
-                    "Realistic photography style, not illustration or cartoon",
-                    "Professional broadcast quality",
-                    "Warm, inviting atmosphere",
-                    "Clean composition with breathing room for avatar placement"
-                ])
-            
-            image_prompt = ", ".join(prompt_parts)
-            
-            logger.info(f"[Podcast] Generating image for scene {request.scene_id}: {request.scene_title}")
-
-            # Generate image using main_image_generation service
-            image_options = {
-                "provider": None,  # Auto-select provider
-                "width": request.width,
-                "height": request.height,
-            }
-            
-            result = generate_image(
-                prompt=image_prompt,
-                options=image_options,
-                user_id=user_id
+            # ── PATH B: FLUX studio generation ───────────────────────────────
+            # Attempt to load a persisted presenter reference image for img2img anchoring.
+            # If the reference exists, we use FLUX Kontext Pro image edit (identity-preserving)
+            # with a minimal scene-specific prompt (framing + emotion only).
+            # If no reference exists yet, we fall back to the full text-only prompt path.
+            presenter_ref_bytes = _resolve_presenter_reference_image(
+                user_id=user_id,
+                project_id=request.project_id,
+                db=db,
             )
+
+            # ── Build scene-specific prompt parts (framing + emotion) ─────────
+            # These are used regardless of whether we have a reference image.
+            scene_emotion = (request.scene_emotion or "neutral").lower().strip()
+            _camera_angle_map = {
+                "wide_shot": ["wide shot", "full body visible", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "centered vertical-third", "35mm equivalent"],
+                "medium_shot": ["medium shot", "chest-up portrait", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "centered vertical-third", "35mm equivalent"],
+                "close_up": ["medium close-up portrait", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "centered composition", "35mm equivalent"],
+                "over_shoulder": ["three-quarter angle shot", "slight side angle view of host", "unobstructed clear view of host, no foreground occlusions", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "35mm equivalent"],
+            }
+            scene_camera_angle = (request.camera_angle or "medium_shot").strip()
+            framing_directives = _camera_angle_map.get(scene_camera_angle, _camera_angle_map["medium_shot"])
+
+            if presenter_ref_bytes:
+                # ── PATH B1: img2img via FLUX Kontext Pro edit endpoint ──────
+                # Identity is anchored by the reference image — prompt covers only framing
+                # and expression so the model does NOT resample identity from text.
+                logger.info(
+                    f"[Podcast] PATH B1 (img2img) for scene {request.scene_id} "
+                    f"using reference image ({len(presenter_ref_bytes)} bytes)"
+                )
+                edit_prompt_parts = []
+
+                # Expression driven by scene emotion
+                edit_prompt_parts.append(emotion_expression.get(scene_emotion, emotion_expression["neutral"]))
+
+                # Bounded lighting (background-only, calibrated subject exposure)
+                lighting_tone = emotion_lighting.get(scene_emotion, emotion_lighting["neutral"])
+                if request.visual_atmosphere and request.visual_atmosphere.strip():
+                    edit_prompt_parts.append(
+                        f"Lighting: {lighting_tone}, subtle background ambience: {request.visual_atmosphere.strip()}, constant subject exposure across scenes"
+                    )
+                else:
+                    edit_prompt_parts.append(f"Lighting: {lighting_tone}")
+
+                # Camera framing
+                edit_prompt_parts.extend(framing_directives)
+
+                # Anchoring directives — tell the model to preserve the reference identity
+                edit_prompt_parts.extend([
+                    "Keep the presenter's exact appearance, identical skin tone, identical face, identical hair, identical wardrobe",
+                    "Consistent color calibration, natural skin tone preservation, constant subject exposure and white balance",
+                    "16:9 aspect ratio, professional broadcast quality, no text, no logos",
+                ])
+
+                image_prompt = ", ".join(edit_prompt_parts)
+                logger.info(f"[Podcast] PATH B1 edit prompt (len={len(image_prompt)}): {image_prompt[:120]}...")
+
+                # Encode reference image as base64 for generate_image_edit
+                ref_b64 = base64.b64encode(presenter_ref_bytes).decode("utf-8")
+
+                from services.llm_providers.image_generation.edit import generate_image_edit
+                result = generate_image_edit(
+                    image_base64=ref_b64,
+                    prompt=image_prompt,
+                    operation="general_edit",
+                    model="flux-kontext-pro",
+                    options={
+                        "provider": "wavespeed",
+                        "guidance_scale": 3.5,  # Default: preserves reference identity
+                        "width": request.width,
+                        "height": request.height,
+                    },
+                    user_id=user_id,
+                )
+
+            else:
+                # ── PATH B2: text-only generation (no reference image yet) ───
+                # Full character description needed to establish visual identity from scratch.
+                logger.info(f"[Podcast] PATH B2 (text-only) for scene {request.scene_id} — no reference image available yet")
+                prompt_parts = []
+
+                # 1. Host appearance character lock (full description needed)
+                character_desc = _resolve_or_create_character_lock(user_id, request, bible_obj, db)
+                prompt_parts.append(f"Host Appearance: {character_desc}, identical natural skin tone, same locked wardrobe and outfit")
+
+                # 2. Fixed Studio environment and visual style (identical set across all scenes)
+                env_desc = bible_obj.visual_style.environment if bible_obj else "Professional modern office studio set, fixed studio room and background"
+                prompt_parts.append(f"Studio Set: {env_desc}, identical fixed background set across all scenes")
+                if bible_obj:
+                    prompt_parts.append(f"Style: {bible_obj.visual_style.style_preset}")
+                else:
+                    prompt_parts.extend([
+                        "Professional podcast recording studio",
+                        "Modern minimalist studio background"
+                    ])
+
+                # 3. Dynamic Host Facial Expression (Driven by scene emotion)
+                prompt_parts.append(emotion_expression.get(scene_emotion, emotion_expression["neutral"]))
+
+                # 4. Bounded Dynamic Lighting Tone (preserves calibrated skin exposure and white balance)
+                lighting_tone = emotion_lighting.get(scene_emotion, emotion_lighting["neutral"])
+                if request.visual_atmosphere and request.visual_atmosphere.strip():
+                    prompt_parts.append(f"Lighting: {lighting_tone}, subtle background ambience: {request.visual_atmosphere.strip()}, constant subject exposure across scenes")
+                else:
+                    prompt_parts.append(f"Lighting: {lighting_tone}")
+
+                # 5. Framing directives
+                prompt_parts.extend(framing_directives)
+
+                # Technical requirements for video generation
+                prompt_parts.extend([
+                    "16:9 aspect ratio optimized for video",
+                    "Center-focused composition for talking avatar overlay",
+                    "Neutral color palette with professional tones",
+                    "High resolution, sharp focus, professional photography quality",
+                    "No text, no logos, no distracting elements",
+                    "Consistent color calibration, natural skin tone preservation, constant subject exposure and white balance across scenes",
+                    "Suitable for InfiniteTalk video generation with animated avatar",
+                    "Continuous podcast recording session in same studio room with identical background set"
+                ])
+
+                # Style constraints
+                if not bible_obj:
+                    prompt_parts.extend([
+                        "Realistic photography style, not illustration or cartoon",
+                        "Professional broadcast quality",
+                        "Clean composition with breathing room for avatar placement"
+                    ])
+
+                image_prompt = ", ".join(prompt_parts)
+                logger.info(f"[Podcast] PATH B2 text-only prompt (len={len(image_prompt)}): {image_prompt[:80]}...")
+
+                # Generate image using main_image_generation service
+                image_options = {
+                    "provider": None,  # Auto-select provider
+                    "width": request.width,
+                    "height": request.height,
+                    "negative_prompt": "cropped head, cropped face, cut off forehead, cut off chin, out of frame, close-up crop, extreme close-up, distorted features, extra limbs, disfigured, low quality, blurry, watermark, text, logo",
+                }
+
+                result = generate_image(
+                    prompt=image_prompt,
+                    options=image_options,
+                    user_id=user_id
+                )
+
 
         # Save image to podcast images directory (workspace-aware)
         images_dir = get_podcast_media_dir("image", user_id, ensure_exists=True)
@@ -447,7 +680,7 @@ async def generate_podcast_scene_image(
         # Log the full exception for debugging
         error_msg = str(exc)
         error_type = type(exc).__name__
-        logger.error(f"[Podcast] Image generation failed: {error_type}: {error_msg}", exc_info=True)
+        logger.opt(exception=True).error("[Podcast] Image generation failed: {}: {}", error_type, error_msg)
         
         # Create a safe error detail
         raise HTTPException(
