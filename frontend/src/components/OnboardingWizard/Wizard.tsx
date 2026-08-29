@@ -147,7 +147,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   }, [activeStep, furthestAccessibleStep]);
 
   useEffect(() => {
-    if (activeStep < 1) return;
     const fetchTasks = async () => {
       try {
         const res = await longRunningApiClient.get('/api/onboarding/tasks/status');
@@ -159,7 +158,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       }
     };
     fetchTasks();
-    // Faster polling (30s) for active background tasks after website step
+    // Faster polling (30s) for active background tasks
     const interval = setInterval(fetchTasks, 30000);
     return () => clearInterval(interval);
   }, [activeStep]);
@@ -740,6 +739,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         onDataReady={handleWebsiteDataReady}
         email={email}
         onEmailChange={handleEmailChange}
+        backgroundTasks={backgroundTasks}
       />
     );
 
@@ -863,7 +863,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         />
 
         {/* Background tasks status chip (visible after Step 2) */}
-        {backgroundTasks && (!backgroundTasks.all_done || backgroundTasks.failed_count > 0) && (
+        {activeStep > 0 && backgroundTasks && (!backgroundTasks.all_done || backgroundTasks.failed_count > 0) && (
           <SystemStatusChip
             activeTasks={backgroundTasks.total - backgroundTasks.completed_count - backgroundTasks.failed_count}
             totalTasks={backgroundTasks.total}
@@ -872,7 +872,13 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         )}
 
         {/* Content */}
-        <Box sx={{ p: { xs: 2, md: 4 }, pt: { xs: 2, md: 3 }, flexGrow: 1, width: '100%', overflow: 'visible' }}>
+        <Box sx={{
+          p: { xs: 2, md: 4 },
+          pt: activeStep === 0 ? { xs: 1.375, md: 1.625 } : { xs: 2, md: 3 },
+          flexGrow: 1,
+          width: '100%',
+          overflow: 'visible',
+        }}>
           <Fade in={true} timeout={400}>
             <Box sx={{ width: '100%', overflow: 'visible' }}>
               {renderStepContent(activeStep)}
