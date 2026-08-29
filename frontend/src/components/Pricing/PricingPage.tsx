@@ -24,7 +24,8 @@ import { useNavigate, useSearchParams, Link as RouterLink } from 'react-router-d
 import { useClerk, useAuth } from '@clerk/clerk-react';
 import { apiClient, getApiUrl } from '../../api/client';
 import { saveNavigationState, restoreNavigationState, saveCurrentPhaseForTool } from '../../utils/navigationState';
-import { getEnabledFeatures, getDefaultLandingRoute } from '../../utils/demoMode';
+import { getEnabledFeatures, getDefaultLandingRoute, shouldSkipOnboarding, isFeatureOnlyMode } from '../../utils/demoMode';
+import { useOnboarding } from '../../contexts/OnboardingContext';
 import PricingPageLayout from './PricingPageLayout';
 import PricingComparisonGrid from './PricingComparisonGrid';
 import PricingJsonLd from './PricingJsonLd';
@@ -164,6 +165,7 @@ const PricingPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { openSignIn } = useClerk();
   const { isSignedIn: clerkIsSignedIn, userId: clerkUserId } = useAuth();
+  const { isOnboardingComplete } = useOnboarding();
 
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -197,7 +199,6 @@ const PricingPage: React.FC = () => {
     const podcastOnlyDemoMode = (localStorage.getItem('podcast_only_demo_mode') || '').toLowerCase();
     const envAppMode = (process.env.REACT_APP_APP_MODE || '').toLowerCase();
     const envDemoMode = (process.env.REACT_APP_DEMO_MODE || '').toLowerCase();
-    const enabledFeatures = getEnabledFeatures();
 
     return (
       appMode === 'demo' ||
@@ -207,7 +208,8 @@ const PricingPage: React.FC = () => {
       envAppMode === 'demo' ||
       envDemoMode === 'true' ||
       envDemoMode === '1' ||
-      (Array.isArray(enabledFeatures) && enabledFeatures.length > 0 && !enabledFeatures.includes('all'))
+      shouldSkipOnboarding() ||
+      isFeatureOnlyMode()
     );
   };
 
@@ -229,8 +231,8 @@ const PricingPage: React.FC = () => {
       return;
     }
 
-    const onboardingComplete = localStorage.getItem('onboarding_complete') === 'true';
-    navigate(onboardingComplete ? '/dashboard' : '/onboarding');
+    const isComplete = isOnboardingComplete || localStorage.getItem('onboarding_complete') === 'true';
+    navigate(isComplete ? '/dashboard' : '/onboarding');
   };
 
   const fetchPlans = async () => {
@@ -432,8 +434,8 @@ const PricingPage: React.FC = () => {
         if (isFeatureLimitedMode()) {
           navigate(getDefaultLandingRoute());
         } else {
-          const onboardingComplete = localStorage.getItem('onboarding_complete') === 'true';
-          if (onboardingComplete) {
+          const isComplete = isOnboardingComplete || localStorage.getItem('onboarding_complete') === 'true';
+          if (isComplete) {
             const navState = restoreNavigationState();
             if (navState?.path && navState.path !== '/pricing') {
               if (navState.tool === 'blog-writer' && navState.phase) {
