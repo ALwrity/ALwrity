@@ -24,4 +24,8 @@ export { default as ContentTypeAnalysisSection } from './ContentTypeAnalysisSect
 export { default as BrandAnalysisSection } from './BrandAnalysisSection';
 export { default as CrawlResultSections } from './CrawlResultSections';
 export { default as WebsiteIntegrationsSection } from './WebsiteIntegrationsSection';
+export { default as OnboardingTabBar } from './OnboardingTabBar';
+export { default as YouTubeIntegrationTab } from './YouTubeIntegrationTab';
+export { default as LinkedInIntegrationTab } from './LinkedInIntegrationTab';
+export { default as WebsiteStepHeader } from './WebsiteStepHeader';
 export type { Competitor } from './CompetitorsGrid';

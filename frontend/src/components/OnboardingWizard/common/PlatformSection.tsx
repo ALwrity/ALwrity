@@ -188,20 +188,55 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
                     />
                   </Stack>
 
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    fullWidth
-                    disabled={!platform.isEnabled}
-                    sx={{
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      borderColor: '#E2E8F0',
-                      color: '#94A3B8'
-                    }}
-                  >
-                    Coming Soon
-                  </Button>
+                  {platform.status === 'connected' ? (
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      size="small"
+                      fullWidth
+                      onClick={() => onDisconnect && onDisconnect(platform.id)}
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 600,
+                      }}
+                    >
+                      Disconnect
+                    </Button>
+                  ) : platform.status === 'available' ? (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      size="small"
+                      fullWidth
+                      onClick={() => onConnect(platform.id)}
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                        boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%)',
+                        }
+                      }}
+                    >
+                      Connect {platform.name}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      fullWidth
+                      disabled={true}
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        borderColor: '#E2E8F0',
+                        color: '#94A3B8'
+                      }}
+                    >
+                      Coming Soon
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ) : (
