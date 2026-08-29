@@ -2,32 +2,21 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import {
   Box,
-  Button,
-  TextField,
-  Typography,
-  Alert,
-  CircularProgress,
-  Chip,
-  Paper,
   Dialog,
-  DialogTitle,
   DialogContent,
-  DialogActions,
-  DialogContentText
 } from '@mui/material';
-import AnalyticsIcon from '@mui/icons-material/Analytics';
-import HistoryIcon from '@mui/icons-material/History';
-import BusinessIcon from '@mui/icons-material/Business';
-import LinkedInIcon from '@mui/icons-material/LinkedIn';
 
 // Extracted components
-import { AnalysisResultsDisplay, AnalysisProgressDisplay, WebsiteIntegrationsSection, OnboardingTabBar, YouTubeIntegrationTab, LinkedInIntegrationTab, WebsiteStepHeader } from './WebsiteStep/components';
+import {
+  WebsiteAnalysisTabContent,
+  AnalysisProgressDisplay,
+  OnboardingTabBar,
+  YouTubeIntegrationTab,
+  LinkedInIntegrationTab,
+  WebsiteStepHeader,
+  ExistingAnalysisDialog,
+} from './WebsiteStep/components';
 import type { StyleAnalysis } from './WebsiteStep/components/AnalysisResultsDisplay';
-import { BackgroundSetupCard } from './WebsiteStep/BackgroundSetupCard';
-import { ContentAuditSummaryCard } from './WebsiteStep/ContentAuditSummaryCard';
-import { SiteHealthSummaryCard } from './WebsiteStep/SiteHealthSummaryCard';
-import PlatformSection from './common/PlatformSection';
-import PlatformAnalytics from '../shared/PlatformAnalytics';
 
 // Import API client for saving
 import { apiClient } from '../../api/client';
@@ -115,7 +104,6 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
 
   const linkedinConnected = connectedPlatforms.includes('linkedin');
   const youtubeConnected = connectedPlatforms.includes('youtube');
-  const analyticsPlatforms = useMemo(() => ['gsc', 'bing'], []);
 
   // Fetch LinkedIn profile summary when connected or from initialData
   useEffect(() => {
@@ -127,8 +115,8 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
     let cancelled = false;
     const fetchProfile = async () => {
       try {
-        const { apiClient } = await import('../../api/client');
-        const resp = await apiClient.get('/api/linkedin-social/profile/summary');
+        const { apiClient: client } = await import('../../api/client');
+        const resp = await client.get('/api/linkedin-social/profile/summary');
         if (!cancelled && resp.data?.analyzed) {
           setLinkedinProfile(resp.data);
         }
@@ -139,6 +127,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
     const timer = setTimeout(fetchProfile, 3000);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [linkedinConnected, initialData?.linkedin_profile]);
+
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [progress, setProgress] = useState<AnalysisProgress[]>([
     { step: 1, message: 'Validating website URL & connection', subMessage: 'Ensuring your site is accessible and ready for analysis', completed: false },
@@ -203,7 +192,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
             setDomainName(result.domainName);
           }
         }
-      } catch (error) {
+      } catch (err) {
         // Silently fail - non-critical pre-fill
         console.warn('Could not pre-fill from last analysis (non-critical)');
       }
@@ -363,9 +352,6 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
     // Store in localStorage for Step 3 (Competitor Analysis)
     localStorage.setItem('website_url', fixedUrl);
     localStorage.setItem('website_analysis_data', JSON.stringify(result.analysis));
-
-    // DO NOT call onContinue() here - let user review the analysis first
-    // User will click "Continue" button when ready to proceed
   };
 
   const handleNewAnalysis = async () => {
@@ -492,77 +478,25 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
 
       {/* Website Tab Content */}
       {activeTab === 'website' && (
-        <Box sx={{ position: 'relative', mb: 2 }}>
-          <TextField
-            label="Your website URL (e.g., www.example.com)"
-            value={website}
-            onChange={e => setWebsite(e.target.value)}
-            fullWidth
-            placeholder="Enter your URL to instantly capture your brand voice."
-            disabled={loading}
-            InputLabelProps={{ shrink: true }}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 3,
-                bgcolor: '#F8FAFC',
-                pr: '136px',
-                '& fieldset': { borderColor: '#CBD5E1' },
-                '&:hover fieldset': { borderColor: '#3B82F6' },
-                '&.Mui-focused fieldset': { borderColor: '#3B82F6', borderWidth: 2 },
-              },
-              '& .MuiInputLabel-root': {
-                color: '#64748B',
-                fontWeight: 500,
-                '&.Mui-focused': { color: '#2563EB' },
-              },
-              '& .MuiInputBase-input': {
-                color: '#1E293B',
-              },
-            }}
-          />
-          <Button
-            variant="contained"
-            onClick={handleAnalyze}
-            disabled={!website || loading}
-            startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <AnalyticsIcon />}
-              sx={{
-                position: 'absolute',
-                right: 6,
-                top: 6,
-                bottom: 6,
-                borderRadius: '10px',
-                textTransform: 'none',
-                px: 2.5,
-                py: 0,
-                background: analysis
-                  ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
-                  : 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
-                color: '#FFFFFF',
-                fontWeight: 600,
-                fontSize: '0.875rem',
-                boxShadow: analysis
-                  ? '0 2px 8px rgba(245, 158, 11, 0.3)'
-                  : '0 2px 8px rgba(59, 130, 246, 0.3)',
-                zIndex: 1,
-                '&:hover': {
-                  background: analysis
-                    ? 'linear-gradient(135deg, #D97706 0%, #B45309 100%)'
-                    : 'linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)',
-                  boxShadow: analysis
-                    ? '0 4px 12px rgba(245, 158, 11, 0.4)'
-                    : '0 4px 12px rgba(59, 130, 246, 0.4)',
-                },
-                '&.Mui-disabled': {
-                  background: analysis
-                    ? 'rgba(245, 158, 11, 0.3)'
-                    : 'rgba(59, 130, 246, 0.3)',
-                  color: 'rgba(255,255,255,0.5)',
-                },
-              }}
-          >
-            {loading ? 'Analyzing...' : analysis ? 'Re-Analyze' : 'Analyze'}
-          </Button>
-        </Box>
+        <WebsiteAnalysisTabContent
+          website={website}
+          setWebsite={setWebsite}
+          loading={loading}
+          error={error}
+          success={success}
+          analysis={analysis}
+          crawlResult={crawlResult}
+          domainName={domainName}
+          useAnalysisForGenAI={useAnalysisForGenAI}
+          setUseAnalysisForGenAI={setUseAnalysisForGenAI}
+          analysisWarning={analysisWarning}
+          handleAnalyze={handleAnalyze}
+          handleAnalysisUpdate={handleAnalysisUpdate}
+          saveAnalysis={saveAnalysis}
+          handleIntegrationChange={handleIntegrationChange}
+          connectedPlatforms={connectedPlatforms}
+          setConnectedPlatforms={setConnectedPlatforms}
+        />
       )}
 
       {/* LinkedIn Tab Content */}
@@ -605,72 +539,13 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
       </Dialog>
 
       {/* Confirmation Dialog for Existing Analysis */}
-      <Dialog
+      <ExistingAnalysisDialog
         open={showConfirmationDialog}
         onClose={() => setShowConfirmationDialog(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            bgcolor: '#EFF6FF',
-            border: '1px solid #CBD5E1',
-          }
-        }}
-      >
-        <DialogTitle>
-          <Box display="flex" alignItems="center" gap={1}>
-            <HistoryIcon sx={{ color: '#2563EB' }} />
-            <Typography sx={{ color: '#1E293B', fontWeight: 600 }}>Previous Analysis Found</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ color: '#475569' }}>
-            We found a previous analysis for this website from{' '}
-            {existingAnalysis?.analysis_date ? 
-              new Date(existingAnalysis.analysis_date).toLocaleDateString() : 
-              'a previous session'
-            }.
-          </DialogContentText>
-          <DialogContentText sx={{ mt: 2, color: '#475569' }}>
-            Would you like to load the previous analysis or perform a new one?
-          </DialogContentText>
-          {existingAnalysis?.summary && (
-            <Box sx={{ mt: 2, p: 2, bgcolor: '#EFF6FF', borderRadius: 1, border: '1px solid #BFDBFE' }}>
-              <Typography variant="subtitle2" gutterBottom sx={{ color: '#1E40AF' }}>
-                Previous Analysis Summary:
-              </Typography>
-              {existingAnalysis.summary.writing_style?.tone && (
-                <Typography variant="body2" sx={{ color: '#1E293B' }}>
-                  Tone: {existingAnalysis.summary.writing_style.tone}
-                </Typography>
-              )}
-              {existingAnalysis.summary.target_audience?.expertise_level && (
-                <Typography variant="body2" sx={{ color: '#1E293B' }}>
-                  Target Audience: {existingAnalysis.summary.target_audience.expertise_level}
-                </Typography>
-              )}
-              {existingAnalysis.summary.content_type?.primary_type && (
-                <Typography variant="body2" sx={{ color: '#1E293B' }}>
-                  Content Type: {existingAnalysis.summary.content_type.primary_type}
-                </Typography>
-              )}
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowConfirmationDialog(false)} sx={{ color: '#64748B' }}>
-            Cancel
-          </Button>
-          <Button onClick={handleLoadExistingConfirm} variant="outlined" startIcon={<HistoryIcon />}
-            sx={{ borderColor: '#BFDBFE', color: '#2563EB', '&:hover': { borderColor: '#3B82F6', backgroundColor: '#EFF6FF' } }}>
-            Load Previous
-          </Button>
-          <Button onClick={handleNewAnalysis} variant="contained" startIcon={<AnalyticsIcon />}
-            sx={{ background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)', boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)', '&:hover': { background: 'linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%)', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.4)' } }}>
-            New Analysis
-          </Button>
-        </DialogActions>
-      </Dialog>
+        existingAnalysis={existingAnalysis}
+        handleLoadExistingConfirm={handleLoadExistingConfirm}
+        handleNewAnalysis={handleNewAnalysis}
+      />
     </Box>
   );
 };
