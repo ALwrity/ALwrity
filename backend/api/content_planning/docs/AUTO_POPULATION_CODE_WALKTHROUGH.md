@@ -33,13 +33,11 @@ Backend: EnhancedStrategyService._get_onboarding_data()
   ↓
 Backend: DataProcessorService.get_onboarding_data()
   ↓
-Backend: AutoFillService.get_autofill()
+Backend: OnboardingDataIntegrationService.process_onboarding_data() (Raw data with 13 sources)
   ↓
-Backend: OnboardingDataIntegrationService.process_onboarding_data() (Database Queries)
+Backend: AutoFillService.generate() → Normalizers + Transformers
   ↓
-Backend: AutoFillService.get_autofill() → Normalizers + Transformers
-  ↓
-Backend: AIStructuredAutofillService.generate_autofill_fields() (AI Generation)
+Backend: AIStructuredAutofillService.generate_autofill_fields() (AI Generation with all 13 sources)
   ↓
 Backend: AIServiceManager.execute_structured_json_call() (AI API Call)
   ↓
@@ -484,3 +482,39 @@ const [autoPopulateAttempted, setAutoPopulateAttempted] = useState(false);
 - **AI-Enhanced Flow**: Slower (AI API calls, ~2-5 seconds per call)
 - **Retries**: Can add up to 2x-3x latency if retries are needed
 - **Caching**: Onboarding data is cached (TTL: 30 minutes)
+
+---
+
+## Appendix: Data Flow Updates (February 2024)
+
+### Critical Bug Fix
+- **Fixed**: `data_processors.py` - Changed `service.get_autofill(user_id)` to `service.generate(user_id)`
+- **Bug**: Method `get_autofill()` did not exist, would cause AttributeError
+- **Commit**: `eb30cd38`
+
+### Expanded Data Sources
+- AI strategy generation now receives **all 13 onboarding data sources** (previously only 4):
+  - website_analysis, research_preferences, onboarding_session
+  - persona_data, competitor_analysis, deep_competitor_analysis
+  - linkedin_profile, platform_integrations
+  - gsc_analytics, bing_analytics
+  - canonical_profile, data_quality
+
+### Fail-Fast Guard
+- Strategy generation returns **409 Conflict** if onboarding context is missing
+- Validates: website_url OR persona_data OR completed session before generation
+- Prevents: ungrounded generic output when user hasn't completed onboarding
+
+### Quality Gates Enhancement
+- New grounding validation functions in `quality_gates.py`:
+  - `validate_persona_grounding()` - content reflects persona role/goals/pain_points
+  - `validate_competitor_grounding()` - real competitors referenced
+  - `validate_analytics_consistency()` - predictions match GSC/Bing data
+  - `validate_data_quality_grounding()` - uses completeness/freshness scores
+  - `validate_strategy_grounding()` - comprehensive check combining all
+
+### Observability
+- Added data source coverage logging in `_build_context_summary()`:
+  - Logs which sources are present (9 total tracked)
+  - Warning when data quality score < 0.5
+  - Helps diagnose grounding issues in production

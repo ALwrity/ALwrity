@@ -191,3 +191,111 @@ class TestContentGuardianIntegration:
         assert result["is_compliant"] is False
         assert result["quality_gate"]["is_compliant"] is False
         assert result["issues"]
+
+
+class TestOnboardingDataGroundingGates:
+    """Tests for the new onboarding data grounding quality gates."""
+
+    def test_validate_persona_grounding_with_matching_content(self):
+        """Content that includes persona role/goals should pass."""
+        from services.intelligence.agents.quality_gates import validate_persona_grounding
+
+        persona = {"core_persona": {"role": "CTO", "goals": ["scalability", "performance"]}}
+        content = "As a CTO focused on scalability, I need high-performance solutions."
+
+        result = validate_persona_grounding(content, persona)
+
+        assert result["score"] > 0.5
+        assert result["status"] == "checked"
+
+    def test_validate_persona_grounding_no_persona_data(self):
+        """No persona data should return unavailable (pass)."""
+        from services.intelligence.agents.quality_gates import validate_persona_grounding
+
+        result = validate_persona_grounding("Some content", None)
+
+        assert result["passed"] is True
+        assert result["status"] == "unavailable"
+
+    def test_validate_competitor_grounding_with_references(self):
+        """Content referencing real competitors should pass."""
+        from services.intelligence.agents.quality_gates import validate_competitor_grounding
+
+        competitors = [{"domain": "competitor.com", "name": "Competitor Inc"}]
+        content = "Unlike Competitor Inc, we offer better pricing."
+
+        result = validate_competitor_grounding(content, competitors)
+
+        assert result["score"] > 0.5
+
+    def test_validate_competitor_grounding_no_competitors(self):
+        """No competitor data should return unavailable (pass)."""
+        from services.intelligence.agents.quality_gates import validate_competitor_grounding
+
+        result = validate_competitor_grounding("Some content", [])
+
+        assert result["passed"] is True
+        assert result["status"] == "unavailable"
+
+    def test_validate_analytics_consistency_realistic_prediction(self):
+        """Realistic growth predictions should pass."""
+        from services.intelligence.agents.quality_gates import validate_analytics_consistency
+
+        gsc = {"total_clicks": 1000, "total_queries": 500}
+        predictions = {"predicted_growth": "20%"}
+
+        result = validate_analytics_consistency(predictions, gsc, None)
+
+        assert result["score"] > 0.5
+
+    def test_validate_analytics_consistency_unrealistic_prediction(self):
+        """Unrealistic predictions (100x growth) should warn."""
+        from services.intelligence.agents.quality_gates import validate_analytics_consistency
+
+        gsc = {"total_clicks": 100}
+        predictions = {"predicted_growth": "100x"}
+
+        result = validate_analytics_consistency(predictions, gsc, None)
+
+        assert len(result["warnings"]) > 0
+
+    def test_validate_data_quality_grounding_high_quality(self):
+        """High quality data should pass."""
+        from services.intelligence.agents.quality_gates import validate_data_quality_grounding
+
+        quality = {"completeness": 0.9, "freshness": 0.85, "overall_score": 0.88}
+
+        result = validate_data_quality_grounding(quality, None)
+
+        assert result["passed"] is True
+        assert result["score"] > 0.7
+
+    def test_validate_data_quality_grounding_low_quality(self):
+        """Low quality data should fail."""
+        from services.intelligence.agents.quality_gates import validate_data_quality_grounding
+
+        quality = {"completeness": 0.3, "freshness": 0.2}
+
+        result = validate_data_quality_grounding(quality, None)
+
+        assert result["passed"] is False
+        assert len(result["violations"]) > 0
+
+    def test_validate_strategy_grounding_comprehensive(self):
+        """Full strategy grounding check with all data."""
+        from services.intelligence.agents.quality_gates import validate_strategy_grounding
+
+        strategy = {"content": "As a CEO, I want to beat competitor.com with better ROI."}
+        context = {
+            "persona_data": {"core_persona": {"role": "CEO", "goals": ["ROI"]}},
+            "competitor_analysis": [{"domain": "competitor.com"}],
+            "gsc_analytics": {"total_clicks": 500},
+            "data_quality": {"completeness": 0.8, "freshness": 0.9, "overall_score": 0.85}
+        }
+
+        result = validate_strategy_grounding(strategy, context)
+
+        assert result["score"] > 0.5
+        assert result["status"] == "checked"
+        assert "persona_grounding" in result["details"]
+        assert "competitor_grounding" in result["details"]

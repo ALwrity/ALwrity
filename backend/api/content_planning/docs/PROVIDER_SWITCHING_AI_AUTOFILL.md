@@ -208,3 +208,40 @@ To verify provider switching works:
 ## Summary
 
 **AI autofill already supports provider switching** - no code changes are required. The system uses the same provider selection pattern as blog writer and story writer, routing through `llm_text_gen()` from `main_text_generation.py`, which respects the `GPT_PROVIDER` environment variable and supports both Gemini and HuggingFace providers.
+
+---
+
+## Appendix: Data Flow Updates (2024)
+
+*Added: February 2024*
+
+### Critical Bug Fix
+- Fixed `data_processors.py` - Changed `service.get_autofill(user_id)` (non-existent method) to `service.generate(user_id)`
+- Commit: `eb30cd38`
+
+### Expanded AI Context
+- AI strategy generation now receives **all 13 onboarding data sources**:
+  - website_analysis, research_preferences, onboarding_session
+  - persona_data, competitor_analysis, deep_competitor_analysis
+  - linkedin_profile, platform_integrations
+  - gsc_analytics, bing_analytics
+  - canonical_profile, data_quality
+
+### Context Unwrapping
+- `_build_context_summary()` now unwraps nested `context['onboarding_data']` for strategy generation
+- Both autofill path and strategy generation path use the same data sources
+
+### Quality Gates
+- Enhanced quality gates with persona/competitor/analytics grounding validation:
+  - `validate_persona_grounding()` - checks content reflects persona role/goals/pain_points
+  - `validate_competitor_grounding()` - validates real competitors are referenced
+  - `validate_analytics_consistency()` - ensures predictions match GSC/Bing data
+  - `validate_strategy_grounding()` - comprehensive grounding check
+
+### Fail-Fast Guard
+- Strategy generation returns 409 Conflict when onboarding context is missing
+- Validates website_url OR persona_data OR completed session exists before generation
+
+### Observability
+- Added data source coverage logging showing which sources are used
+- Warning logged when data quality score < 0.5
