@@ -39,15 +39,59 @@ class Step3ResearchService:
         self.service_name = "step3_research"
         logger.info(f"Initialized {self.service_name}")
     
-    async def _discover_content_pillars_with_fallback(self, user_url: str) -> Optional[Dict[str, Any]]:
-        """Discover content pillars via Answer API (fast, structured JSON)."""
+    async def _discover_content_pillars_with_fallback(self, user_url: str) -> Dict[str, Any]:
+        """Discover content pillars via Answer API, normalized into a status envelope.
+
+        Returns a dict with: ``success`` (bool), ``error`` (str|None),
+        ``content_pillars`` (raw dict|None) and ``timestamp`` (ISO string).
+        Never returns an ambiguous ``None`` so callers can tell a real failure
+        apart from an in-flight / empty state.
+        """
+        timestamp = datetime.utcnow().isoformat()
         logger.info(f"[research] Content pillar discovery starting for {user_url}")
         result = await self.exa_service._discover_content_pillars_via_answer(user_url)
-        if result:
+        if result and isinstance(result, dict):
             logger.info(f"[research] Content pillars from Answer API: {list(result.keys())}")
-        else:
-            logger.warning(f"[research] Content pillar discovery returned None — no pillars data")
-        return result
+            return {
+                "success": True,
+                "error": None,
+                "content_pillars": result,
+                "timestamp": timestamp,
+            }
+        error = (
+            "Content pillar discovery returned no data. "
+            "Exa credits may be exhausted or the API found no structured pillars."
+        )
+        logger.warning(f"[research] Content pillar discovery failed for {user_url}: {error}")
+        return {
+            "success": False,
+            "error": error,
+            "content_pillars": None,
+            "timestamp": timestamp,
+        }
+
+    @staticmethod
+    def _pillars_payload(envelope: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Normalize a discovery envelope into the value persisted and returned.
+
+        Success -> the raw Exa pillars dict tagged with ``status: "complete"``
+        plus timestamp. Failure -> a minimal ``{status: "failed", error,
+        timestamp}`` dict so reloads show a retryable error instead of an
+        eternal "pending".
+        """
+        if not envelope or not isinstance(envelope, dict):
+            return None
+        raw = envelope.get("content_pillars")
+        if envelope.get("success") and isinstance(raw, dict):
+            payload = dict(raw)
+            payload.setdefault("status", "complete")
+            payload.setdefault("timestamp", envelope.get("timestamp"))
+            return payload
+        return {
+            "status": "failed",
+            "error": envelope.get("error") or "Content pillar discovery failed",
+            "timestamp": envelope.get("timestamp") or datetime.utcnow().isoformat(),
+        }
 
     async def discover_competitors_for_onboarding(
         self,
@@ -122,8 +166,14 @@ class Step3ResearchService:
                 return competitor_results
             if isinstance(social_media_results, Exception) or not social_media_results.get("success"):
                 social_media_results = {"success": False, "social_media_accounts": {}, "citations": []}
-            if isinstance(pillars_results, Exception) or not pillars_results:
-                pillars_results = None
+            if isinstance(pillars_results, Exception):
+                pillars_results = {
+                    "success": False,
+                    "error": f"Content pillar discovery raised: {pillars_results}",
+                    "content_pillars": None,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            pillars_payload = self._pillars_payload(pillars_results) if isinstance(pillars_results, dict) else None
             
             # Process and enhance competitor data
             enhanced_competitors = await self._enhance_competitor_data(
@@ -154,14 +204,14 @@ class Step3ResearchService:
                         enhanced_competitors, 
                         industry_context, 
                         db, 
-                        content_pillars=pillars_results,
+                        content_pillars=pillars_payload,
                         research_summary=research_summary,
                         social_media_citations=social_media_citations
                     )
                     db.close()
                     logger.info(f"Competitor analysis persisted for user {user_id}")
             except Exception as persist_err:
-                logger.warning(f"Failed to persist competitor analysis for user {user_id}: {persist_err}")
+                logger.exception(f"Failed to persist competitor analysis for user {user_id}: {persist_err}")
             
             logger.info(f"Successfully discovered {len(enhanced_competitors)} competitors for user {user_id}")
 
@@ -172,7 +222,7 @@ class Step3ResearchService:
                 "competitors": enhanced_competitors,
                 "social_media_accounts": social_media_results.get("social_media_accounts", {}),
                 "social_media_citations": social_media_citations,
-                "content_pillars": pillars_results,
+                "content_pillars": pillars_payload,
                 "research_summary": research_summary,
                 "total_competitors": len(enhanced_competitors),
                 "industry_context": industry_context,

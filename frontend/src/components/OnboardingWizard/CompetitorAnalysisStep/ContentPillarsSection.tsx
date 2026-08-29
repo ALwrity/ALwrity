@@ -7,7 +7,12 @@ import ExpandLess from '@mui/icons-material/ExpandLess';
 import ErrorIcon from '@mui/icons-material/Error';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
+export type ContentPillarsStatus = 'complete' | 'failed' | 'pending';
+
 export interface ContentPillarData {
+  status?: ContentPillarsStatus;
+  error?: string | null;
+  timestamp?: string;
   target_company?: {
     domain: string;
     content_pillars: string[];
@@ -52,8 +57,30 @@ const SectionHeader: React.FC<{ onRefresh?: () => void; isLoading?: boolean }> =
   </Typography>
 );
 
+function hasPillars(data: ContentPillarData): boolean {
+  return !!(
+    data.target_company?.content_pillars?.length ||
+    data.competitors?.some((c) => c.content_pillars?.length)
+  );
+}
+
+function getPillarStatus(
+  data: ContentPillarData | null,
+  _error?: string | null
+): ContentPillarsStatus {
+  if (!data) return 'pending';
+  if (data.status === 'failed' || data.status === 'complete') return data.status;
+  // Back-compat payloads predate the status key.
+  if (data.error) return 'failed';
+  if (hasPillars(data)) return 'complete';
+  return 'pending';
+}
+
 export const ContentPillarsSection: React.FC<ContentPillarsSectionProps> = ({ data, isLoading, error, onRefresh }) => {
   const [compExpanded, setCompExpanded] = React.useState(true);
+
+  const pillarStatus = getPillarStatus(data, error);
+  const failureMessage = String(data?.error || error || 'Content pillar discovery failed');
 
   if (isLoading) {
     return (
@@ -64,24 +91,45 @@ export const ContentPillarsSection: React.FC<ContentPillarsSectionProps> = ({ da
     );
   }
 
-  if (error && !data) {
-    const isCreditExhausted = error.toLowerCase().includes('credit') || error.toLowerCase().includes('402');
+  if (pillarStatus === 'failed') {
+    const isCreditExhausted = failureMessage.toLowerCase().includes('credit') || failureMessage.toLowerCase().includes('402');
     return (
       <Box mt={4} mb={3}>
         <SectionHeader onRefresh={onRefresh} />
         <Paper sx={{ p: 2.5, borderRadius: 2, bgcolor: '#fef2f2', border: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <ErrorIcon sx={{ color: '#ef4444', fontSize: 20, flexShrink: 0 }} />
-          <Typography variant="body2" sx={{ color: '#991b1b' }}>
-            {isCreditExhausted
-              ? 'Exa API credits exhausted — top up at dashboard.exa.ai to enable content pillar discovery.'
-              : `Content pillar discovery failed: ${error}`}
-          </Typography>
+          <Box flex={1}>
+            <Typography variant="body2" sx={{ color: '#991b1b' }}>
+              {isCreditExhausted
+                ? 'Exa API credits exhausted — top up at dashboard.exa.ai to enable content pillar discovery.'
+                : `Content pillar discovery failed: ${failureMessage}`}
+            </Typography>
+            {data?.timestamp && (
+              <Typography variant="caption" sx={{ color: '#b91c1c', display: 'block', mt: 0.5 }}>
+                Last attempted {new Date(data.timestamp).toLocaleString()}
+              </Typography>
+            )}
+          </Box>
         </Paper>
+        {onRefresh && (
+          <Box mt={1}>
+            <Button
+              size="small"
+              variant="text"
+              startIcon={<RefreshIcon />}
+              onClick={onRefresh}
+              disabled={isLoading}
+              sx={{ color: '#667eea', textTransform: 'none' }}
+            >
+              Retry content pillar detection
+            </Button>
+          </Box>
+        )}
       </Box>
     );
   }
 
-  if (!data) {
+  if (pillarStatus === 'pending' || !data) {
     return (
       <Box mt={4} mb={3}>
         <SectionHeader onRefresh={onRefresh} />
@@ -94,11 +142,7 @@ export const ContentPillarsSection: React.FC<ContentPillarsSectionProps> = ({ da
 
   const { target_company, competitors } = data;
 
-  const hasTarget = target_company?.content_pillars?.length;
-  const hasCompetitorPillars = competitors?.some((c) => c.content_pillars?.length);
-  const hasPillars = hasTarget || hasCompetitorPillars;
-  
-  if (!hasPillars) {
+  if (!hasPillars(data)) {
     return (
       <Box mt={4} mb={3}>
         <SectionHeader onRefresh={onRefresh} />
@@ -112,6 +156,12 @@ export const ContentPillarsSection: React.FC<ContentPillarsSectionProps> = ({ da
   return (
     <Box mt={4} mb={3}>
       <SectionHeader onRefresh={onRefresh} />
+      {error && (
+        <Paper sx={{ p: 1.5, borderRadius: 2, bgcolor: '#fff7ed', border: '1px solid #fdba74', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ErrorIcon sx={{ color: '#ea580c', fontSize: 18, flexShrink: 0 }} />
+          <Typography variant="caption" sx={{ color: '#9a3412' }}>{error}</Typography>
+        </Paper>
+      )}
 
       <Box display="grid" gridTemplateColumns={{ xs: '1fr', md: '1fr 1fr' }} gap={3}>
         {/* Target Company */}
