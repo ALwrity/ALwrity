@@ -5,10 +5,8 @@ import {
   Button,
   Typography
 } from '@mui/material';
-import {
-  Refresh as RefreshIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import InfoIcon from '@mui/icons-material/Info';
 import { ErrorAlertProps } from '../types/contentStrategy.types';
 
 const ErrorAlert: React.FC<ErrorAlertProps> = ({

@@ -67,6 +67,7 @@ export const TodayGrowthWalkthrough: React.FC<TodayGrowthWalkthroughProps> = ({
     (s) => s.generateDailyWorkflow,
   );
   const completeTask = useWorkflowStore((s) => s.completeTask);
+  const executeTask = useWorkflowStore((s) => s.executeTask);
   const skipTask = useWorkflowStore((s) => s.skipTask);
   const storeLoading = useWorkflowStore((s) => s.isLoading);
   const storeError = useWorkflowStore((s) => s.error);
@@ -450,7 +451,42 @@ export const TodayGrowthWalkthrough: React.FC<TodayGrowthWalkthroughProps> = ({
       }
     };
 
-    if (ta === "brainstorm" && isPlan) {
+    const executableActionTypes = new Set(["create_content", "seo_analyze", "social_draft", "facebook_draft", "linkedin_draft", "calendar_insert", "create_seo_task"]);
+    if (executableActionTypes.has(task.actionType)) {
+      btnLabel = ["seo_analyze", "calendar_insert", "create_seo_task"].includes(task.actionType)
+        ? "Run action →"
+        : "Generate draft →";
+      btnTitle = "Run this recommendation with ALwrity";
+      onClick = () => {
+        void (async () => {
+          setTaskLoading(task.id);
+          setErrMsg(null);
+          try {
+            const execution = await executeTask(task.id, {
+              action_type: task.actionType,
+              parameters: task.metadata?.context_data || {},
+            });
+            const executionData = execution?.execution || {};
+            if (executionData.requires_approval) {
+              navigate("/approvals");
+            } else if (task.actionUrl) {
+              navigate(task.actionUrl, {
+                state: {
+                  workflowTaskId: task.id,
+                  generatedArtifact: executionData,
+                  ...(executionData.asset_id ? { restoreBlogAssetId: executionData.asset_id } : {}),
+                },
+              });
+            }
+            closeDropdown();
+          } catch (error) {
+            setErrMsg(error instanceof Error ? error.message : "Task execution failed");
+          } finally {
+            setTaskLoading(null);
+          }
+        })();
+      };
+    } else if (ta === "brainstorm" && isPlan) {
       btnLabel = "Brainstorm →";
       btnTitle = "Open Brainstorm tool";
       onClick = () => {

@@ -14,13 +14,11 @@ import {
   Button,
   Chip,
 } from '@mui/material';
-import {
-  OpenInNew,
-  PhotoLibrary,
-  Refresh,
-  Favorite,
-  FavoriteBorder,
-} from '@mui/icons-material';
+import OpenInNew from '@mui/icons-material/OpenInNew';
+import PhotoLibrary from '@mui/icons-material/PhotoLibrary';
+import Refresh from '@mui/icons-material/Refresh';
+import Favorite from '@mui/icons-material/Favorite';
+import FavoriteBorder from '@mui/icons-material/FavoriteBorder';
 import { motion } from 'framer-motion';
 import { useContentAssets, ContentAsset } from '../../../hooks/useContentAssets';
 import { useNavigate } from 'react-router-dom';

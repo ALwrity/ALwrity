@@ -17,16 +17,14 @@ import {
   Paper,
   Grid
 } from '@mui/material';
-import {
-  DataUsage as DataUsageIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  CheckCircle as CheckCircleIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Timeline as TimelineIcon,
-  TrendingUp as TrendingUpIcon,
-  Schedule as ScheduleIcon
-} from '@mui/icons-material';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 import { motion } from 'framer-motion';
 
 interface DataSourceTransparencyProps {

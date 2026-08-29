@@ -29,12 +29,10 @@ import {
   Paper,
   Button,
 } from "@mui/material";
-import {
-  Info as InfoIcon,
-  HelpOutline as HelpOutlineIcon,
-  Close as CloseIcon,
-  Palette as PaletteIcon,
-} from "@mui/icons-material";
+import InfoIcon from '@mui/icons-material/Info';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import CloseIcon from '@mui/icons-material/Close';
+import PaletteIcon from '@mui/icons-material/Palette';
 
 import {
   ImageGenerationModalProps,
@@ -48,9 +46,6 @@ import {
   DEFAULT_THEME,
   DEFAULT_MODELS,
 } from './ImageGenerationModal.types';
-import {
-  IMAGE_GENERATION_DIALOG_Z_INDEX,
-} from './imageGenerationSelectMenuProps';
 import { createImageGenerationModalStyles } from './imageGenerationModalStyles';
 
 export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
@@ -146,7 +141,6 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
       onClose={onClose}
       maxWidth="md"
       fullWidth
-      sx={{ zIndex: IMAGE_GENERATION_DIALOG_Z_INDEX }}
       scroll="paper"
       PaperProps={{
         sx: styles.dialogPaperSx,

@@ -18,15 +18,13 @@ import {
   Tooltip,
   IconButton
 } from '@mui/material';
-import {
-  Map as MapIcon,
-  TrendingUp as TrendingUpIcon,
-  Schedule as ScheduleIcon,
-  Lightbulb as LightbulbIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import MapIcon from '@mui/icons-material/Map';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import InfoIcon from '@mui/icons-material/Info';
 
 const safeStr = (val: any): string => {
   if (val == null) return '';
@@ -92,18 +90,21 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-        <MapIcon color="primary" sx={{ mr: 1 }} />
-        <Typography variant="h6">
-          Sitemap Analysis for {domainName}
-        </Typography>
+      {/* Compact header: title + subtitle + URL count in one row */}
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <MapIcon color="primary" />
+          <Typography variant="h6">
+            Sitemap Analysis for {domainName}
+          </Typography>
+        </Box>
         <Tooltip title="The total count of indexable pages found. A higher count suggests more content authority, provided the quality is high.">
-          <Chip 
-            label={`${sitemapAnalysis.total_urls || 0} URLs Found`} 
-            size="small" 
-            color="primary" 
-            variant="outlined" 
-            sx={{ ml: 2, cursor: 'help' }} 
+          <Chip
+            label={`${sitemapAnalysis.total_urls || 0} URLs Found`}
+            size="small"
+            color="primary"
+            variant="outlined"
+            sx={{ cursor: 'help' }}
           />
         </Tooltip>
       </Box>
@@ -254,8 +255,22 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
               </Box>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {Object.entries(structure_analysis?.url_patterns || {}).map(([pattern, count]: [string, any]) => (
-                  <Chip key={pattern} label={`${pattern}: ${count}`} size="small" />
+                  <Chip
+                    key={pattern}
+                    label={`${pattern}: ${count}`}
+                    size="small"
+                    sx={{
+                      bgcolor: '#f1f5f9',
+                      border: '1px solid #cbd5e1',
+                      color: '#1e293b !important',
+                      fontWeight: 500,
+                      '& .MuiChip-label': { color: '#1e293b !important' },
+                    }}
+                  />
                 ))}
+                {Object.keys(structure_analysis?.url_patterns || {}).length === 0 && (
+                  <Typography variant="caption" color="text.secondary">No URL patterns detected</Typography>
+                )}
               </Box>
             </Grid>
             <Grid item xs={12} md={6}>
@@ -267,8 +282,23 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
               </Box>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                 {Object.entries(structure_analysis?.file_types || {}).map(([type, count]: [string, any]) => (
-                  <Chip key={type} label={`${type}: ${count}`} size="small" variant="outlined" />
+                  <Chip
+                    key={type}
+                    label={`${type}: ${count}`}
+                    size="small"
+                    variant="outlined"
+                    sx={{
+                      bgcolor: '#f1f5f9',
+                      border: '1px solid #cbd5e1',
+                      color: '#1e293b !important',
+                      fontWeight: 500,
+                      '& .MuiChip-label': { color: '#1e293b !important' },
+                    }}
+                  />
                 ))}
+                {Object.keys(structure_analysis?.file_types || {}).length === 0 && (
+                  <Typography variant="caption" color="text.secondary">No file types detected</Typography>
+                )}
               </Box>
             </Grid>
             <Grid item xs={12}>
@@ -314,11 +344,44 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
                 </Box>
                 <List dense>
                     {ai_insights?.content_gaps?.map((gap: any, idx: number) => (
-                        <ListItem key={idx}>
-                            <ListItemIcon><WarningIcon color="warning" fontSize="small" /></ListItemIcon>
-                            <ListItemText primary={safeStr(gap)} />
+                        <ListItem key={idx} alignItems="flex-start" sx={{ px: 0, py: 0.5 }}>
+                            <ListItemIcon sx={{ minWidth: 28 }}>
+                                <WarningIcon color="warning" fontSize="small" />
+                            </ListItemIcon>
+                            <ListItemText
+                                primary={
+                                    <Box>
+                                        <Typography variant="body2" fontWeight={600}>
+                                            {gap.topic || gap.action || `Gap ${idx + 1}`}
+                                        </Typography>
+                                        {gap.keywords && (
+                                            <Typography variant="caption" color="text.secondary" display="block">
+                                                Keywords: {Array.isArray(gap.keywords) ? gap.keywords.join(', ') : String(gap.keywords)}
+                                            </Typography>
+                                        )}
+                                        {gap.impact && (
+                                            <Typography variant="caption" color="text.secondary" display="block">
+                                                Impact: {String(gap.impact)}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                }
+                                secondary={gap.recommendation || gap.rationale || null}
+                            />
+                            {gap.priority && (
+                                <Chip
+                                    size="small"
+                                    label={String(gap.priority)}
+                                    color={gap.priority === 'high' ? 'error' : gap.priority === 'low' ? 'default' : 'warning'}
+                                    variant="outlined"
+                                    sx={{ ml: 1, flexShrink: 0 }}
+                                />
+                            )}
                         </ListItem>
                     ))}
+                    {(!ai_insights?.content_gaps || ai_insights.content_gaps.length === 0) && (
+                        <Typography variant="caption" color="text.secondary">No content gaps detected</Typography>
+                    )}
                 </List>
             </Grid>
           </Grid>
@@ -326,53 +389,137 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
 
         {/* Publishing Tab */}
         <TabPanel value={tabValue} index={2}>
-          <Alert severity="info" sx={{ mb: 2, bgcolor: '#eff6ff', color: '#1e40af' }}>
-             <Typography variant="subtitle2" fontWeight="bold">Historical Intelligence</Typography>
-             <Typography variant="body2">
-                We're currently analyzing your publishing cadence based on recent data. Long-term strategic intelligence will populate as the full site audit completes.
-             </Typography>
-          </Alert>
           <Grid container spacing={2}>
-                <Grid item xs={12}>
-                    <Box display="flex" alignItems="center" mb={1}>
-                        <Typography variant="subtitle2">Strategic Recommendations</Typography>
-                        <Tooltip title="AI-generated steps to optimize your crawl budget and improve content discovery.">
-                            <IconButton size="small"><InfoIcon fontSize="small" /></IconButton>
-                        </Tooltip>
-                    </Box>
-                    <List dense>
-                        {ai_insights?.strategic_recommendations?.map((rec: any, idx: number) => (
-                            <ListItem key={idx}>
-                                <ListItemIcon><CheckCircleIcon color="success" fontSize="small" /></ListItemIcon>
-                                <ListItemText primary={safeStr(rec)} />
-                            </ListItem>
-                        ))}
-                    </List>
-                </Grid>
-                {publishing_patterns && (
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Publishing Patterns</Typography>
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                      {publishing_patterns.priority_distribution && Object.entries(publishing_patterns.priority_distribution).map(([k, v]) => (
-                        <Chip key={k} size="small" label={`${k}: ${v}`} variant="outlined" />
-                      ))}
-                    </Box>
-                  </Grid>
-                )}
-                {seo_recommendations && seo_recommendations.length > 0 && (
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" sx={{ mb: 0.5 }}>SEO Recommendations</Typography>
-                    <List dense>
-                      {seo_recommendations.map((rec: any, idx: number) => (
-                        <ListItem key={idx}>
-                          <ListItemIcon><CheckCircleIcon color="success" fontSize="small" /></ListItemIcon>
-                          <ListItemText primary={safeStr(rec)} />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </Grid>
-                )}
-            </Grid>
+            {content_trends?.date_range && (
+              <Grid item xs={12} md={6}>
+                <Box display="flex" alignItems="center" mb={1}>
+                  <Typography variant="subtitle2">Publishing History</Typography>
+                  <Tooltip title="Date range and cadence derived from sitemap lastmod entries.">
+                    <IconButton size="small"><InfoIcon fontSize="small" /></IconButton>
+                  </Tooltip>
+                </Box>
+                <Typography variant="body2" color="text.secondary">
+                  Earliest: {content_trends.date_range.earliest?.split('T')[0]}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Latest: {content_trends.date_range.latest?.split('T')[0]}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Span: {content_trends.date_range.span_days} days · {content_trends.total_dated_urls} dated URLs
+                </Typography>
+              </Grid>
+            )}
+            {publishing_patterns?.changefreq_distribution && Object.keys(publishing_patterns.changefreq_distribution).length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Box display="flex" alignItems="center" mb={1}>
+                  <Typography variant="subtitle2">Change Frequency</Typography>
+                  <Tooltip title="How often sitemap URLs claim to be updated.">
+                    <IconButton size="small"><InfoIcon fontSize="small" /></IconButton>
+                  </Tooltip>
+                </Box>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {Object.entries(publishing_patterns.changefreq_distribution).map(([freq, count]: [string, any]) => (
+                    <Chip
+                      key={freq}
+                      size="small"
+                      label={`${freq}: ${count}`}
+                      sx={{
+                        bgcolor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        color: '#1e293b !important',
+                        fontWeight: 500,
+                        '& .MuiChip-label': { color: '#1e293b !important' },
+                      }}
+                    />
+                  ))}
+                </Box>
+              </Grid>
+            )}
+            {publishing_patterns?.priority_distribution && Object.keys(publishing_patterns.priority_distribution).length > 0 && (
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Priority Distribution</Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {Object.entries(publishing_patterns.priority_distribution).map(([k, v]) => (
+                    <Chip
+                      key={k}
+                      size="small"
+                      label={`${k}: ${v}`}
+                      sx={{
+                        bgcolor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        color: '#1e293b !important',
+                        fontWeight: 500,
+                        '& .MuiChip-label': { color: '#1e293b !important' },
+                      }}
+                    />
+                  ))}
+                </Box>
+              </Grid>
+            )}
+            {content_trends?.monthly_distribution && Object.keys(content_trends.monthly_distribution).length > 0 && (
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Monthly Distribution</Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {Object.entries(content_trends.monthly_distribution).map(([month, count]: [string, any]) => (
+                    <Chip
+                      key={month}
+                      size="small"
+                      label={`${month}: ${count}`}
+                      variant="outlined"
+                      sx={{
+                        bgcolor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        color: '#1e293b !important',
+                        fontWeight: 500,
+                        '& .MuiChip-label': { color: '#1e293b !important' },
+                      }}
+                    />
+                  ))}
+                </Box>
+              </Grid>
+            )}
+            {publishing_patterns?.optimization_opportunities && publishing_patterns.optimization_opportunities.length > 0 && (
+              <Grid item xs={12}>
+                <Box display="flex" alignItems="center" mb={1}>
+                  <Typography variant="subtitle2">Optimization Opportunities</Typography>
+                  <Tooltip title="AI-generated steps to optimize your crawl budget and improve content discovery.">
+                    <IconButton size="small"><InfoIcon fontSize="small" /></IconButton>
+                  </Tooltip>
+                </Box>
+                <List dense>
+                  {publishing_patterns.optimization_opportunities.map((rec: any, idx: number) => (
+                    <ListItem key={idx}>
+                      <ListItemIcon><CheckCircleIcon color="success" fontSize="small" /></ListItemIcon>
+                      <ListItemText primary={safeStr(rec)} />
+                    </ListItem>
+                  ))}
+                </List>
+              </Grid>
+            )}
+            {seo_recommendations && seo_recommendations.length > 0 && (
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" sx={{ mb: 0.5 }}>SEO Recommendations</Typography>
+                <List dense>
+                  {seo_recommendations.map((rec: any, idx: number) => (
+                    <ListItem key={idx}>
+                      <ListItemIcon><CheckCircleIcon color="success" fontSize="small" /></ListItemIcon>
+                      <ListItemText primary={safeStr(rec)} />
+                    </ListItem>
+                  ))}
+                </List>
+              </Grid>
+            )}
+            {!publishing_patterns?.changefreq_distribution && !content_trends?.date_range && (
+              <Grid item xs={12}>
+                <Alert severity="info" sx={{ bgcolor: '#eff6ff', color: '#1e40af' }}>
+                  <Typography variant="subtitle2" fontWeight="bold">Historical Intelligence</Typography>
+                  <Typography variant="body2">
+                    We're currently analyzing your publishing cadence based on recent data. Long-term strategic intelligence will populate as the full site audit completes.
+                  </Typography>
+                </Alert>
+              </Grid>
+            )}
+          </Grid>
         </TabPanel>
       </Paper>
     </Box>

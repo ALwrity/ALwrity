@@ -17,13 +17,11 @@ import {
   Tooltip,
   Alert
 } from '@mui/material';
-import {
-  AutoAwesome as AutoAwesomeIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Warning as WarningIcon,
-  Refresh as RefreshIcon
-} from '@mui/icons-material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import WarningIcon from '@mui/icons-material/Warning';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import axios from 'axios';
 import { GlassCard } from '../../shared/styled';
 

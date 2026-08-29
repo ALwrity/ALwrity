@@ -1,41 +1,26 @@
 import React from 'react';
-import {
-  // Plan pillar icons
-  Assignment as PlanIcon,
-  PersonAdd as OnboardingIcon,
-  Business as StrategyIcon,
-  CalendarMonth as CalendarIcon,
-  RateReview as ReviewIcon,
-  
-  // Generate pillar icons
-  AutoAwesome as GenerateIcon,
-  ThumbUp as GoodIcon,
-  ThumbDown as BadIcon,
-  Warning as UglyIcon,
-  
-  // Publish pillar icons
-  Publish as PublishIcon,
-  
-  // Analyze pillar icons
-  Analytics as AnalyzeIcon,
-  
-  // Engage pillar icons
-  Campaign as EngageIcon,
-  
-  // Remarket pillar icons
-  Psychology as RemarketIcon,
-  
-  // Task icons
-  Facebook as FacebookIcon,
-  LinkedIn as LinkedInIcon,
-  Language as WebsiteIcon,
-  ChatBubbleOutline as ChatIcon,
-  Assessment as AssessmentIcon,
-  Share as ShareIcon,
-  ThumbUp as ThumbUpIcon,
-  Refresh as RefreshIcon,
-  Article as ArticleIcon
-} from '@mui/icons-material';
+import PlanIcon from '@mui/icons-material/Assignment';
+import OnboardingIcon from '@mui/icons-material/PersonAdd';
+import StrategyIcon from '@mui/icons-material/Business';
+import CalendarIcon from '@mui/icons-material/CalendarMonth';
+import ReviewIcon from '@mui/icons-material/RateReview';
+import GenerateIcon from '@mui/icons-material/AutoAwesome';
+import GoodIcon from '@mui/icons-material/ThumbUp';
+import BadIcon from '@mui/icons-material/ThumbDown';
+import UglyIcon from '@mui/icons-material/Warning';
+import PublishIcon from '@mui/icons-material/Publish';
+import AnalyzeIcon from '@mui/icons-material/Analytics';
+import EngageIcon from '@mui/icons-material/Campaign';
+import RemarketIcon from '@mui/icons-material/Psychology';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import WebsiteIcon from '@mui/icons-material/Language';
+import ChatIcon from '@mui/icons-material/ChatBubbleOutline';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import ShareIcon from '@mui/icons-material/Share';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ArticleIcon from '@mui/icons-material/Article';
 import { TodayTask } from '../../../types/workflow';
 
 // Define the chip interface

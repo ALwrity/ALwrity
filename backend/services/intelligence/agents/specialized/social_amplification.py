@@ -7,6 +7,7 @@ from loguru import logger
 from .base import SIFBaseAgent, TXTAI_AVAILABLE, Agent
 from services.intelligence.agents.core_agent_framework import BaseALwrityAgent, TaskProposal
 from services.database import has_onboarding_session
+from services.intelligence.agents.tool_contracts import unavailable_tool
 
 try:
     from services.intelligence.sif_integration import SIFIntegrationService
@@ -77,12 +78,7 @@ class SocialAmplificationAgent(BaseALwrityAgent):
         Args:
             context: Dictionary containing monitoring criteria like 'topics' or 'platforms'.
         """
-        # Stub implementation
-        return {
-            "trends": ["AI in marketing", "Content automation"],
-            "source": "stub",
-            "timestamp": datetime.utcnow().isoformat()
-        }
+        return unavailable_tool("social", "Social monitoring provider is not connected")
 
     def _content_adapter_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -91,8 +87,7 @@ class SocialAmplificationAgent(BaseALwrityAgent):
         Args:
             context: Dictionary containing 'content' and 'platform' (e.g., 'linkedin', 'twitter').
         """
-        # Stub implementation
-        return {"adapted_content": "Social post"}
+        return unavailable_tool("social", "Platform-specific content adaptation provider is unavailable")
 
     def _engagement_optimizer_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -101,12 +96,7 @@ class SocialAmplificationAgent(BaseALwrityAgent):
         Args:
             context: Dictionary containing 'content' to optimize.
         """
-        # Stub implementation
-        return {
-            "optimization_suggestions": ["Use questions"],
-            "estimated_engagement_score": 8.5,
-            "timestamp": datetime.utcnow().isoformat()
-        }
+        return unavailable_tool("social", "Engagement optimization requires platform analytics")
 
     def _distribution_manager_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -115,23 +105,18 @@ class SocialAmplificationAgent(BaseALwrityAgent):
         Args:
             context: Dictionary containing 'post_content' and 'schedule_time'.
         """
-        # Stub implementation
-        return {
-            "distribution_plan": [],
-            "status": "scheduled",
-            "timestamp": datetime.utcnow().isoformat()
-        }
+        return unavailable_tool("social", "Distribution manager is not connected to a publishing provider")
 
     async def propose_daily_tasks(self, context: Dict[str, Any]) -> List[TaskProposal]:
         """
         Propose social media tasks based on user's onboarding context.
         Derives platforms and content types from user data.
         """
-        proposals = []
+        default_proposals = []
 
         onboarding = context.get("onboarding_data", {})
         if not isinstance(onboarding, dict):
-            return proposals
+            return default_proposals
 
         # Extract selected platforms from onboarding step 5
         selected_platforms = []
@@ -162,7 +147,7 @@ class SocialAmplificationAgent(BaseALwrityAgent):
         target_platforms = [p for p in selected_platforms if p.lower() in platform_urls]
         if not target_platforms:
             # No known platforms configured — generic engage task
-            proposals.append(TaskProposal(
+            default_proposals.append(TaskProposal(
                 title="Share content on social media",
                 description="Promote your latest published piece across your social channels.",
                 pillar_id="engage",
@@ -173,11 +158,11 @@ class SocialAmplificationAgent(BaseALwrityAgent):
                 action_type="navigate",
                 action_url="/linkedin-studio",
             ))
-            return proposals
+            return default_proposals
 
         platform = target_platforms[0]
         platform_label = platform.capitalize()
-        proposals.append(TaskProposal(
+        default_proposals.append(TaskProposal(
             title=f"Share content on {platform_label}",
             description=f"Adapt and publish your latest content as a {platform_label} post to drive engagement.",
             pillar_id="engage",
@@ -192,7 +177,7 @@ class SocialAmplificationAgent(BaseALwrityAgent):
 
         if len(target_platforms) > 1:
             platform2 = target_platforms[1]
-            proposals.append(TaskProposal(
+            default_proposals.append(TaskProposal(
                 title=f"Cross-post to {platform2.capitalize()}",
                 description=f"Repurpose your latest content for your {platform2.capitalize()} audience.",
                 pillar_id="engage",
@@ -205,4 +190,13 @@ class SocialAmplificationAgent(BaseALwrityAgent):
                 context_data={"platform": platform2.lower()},
             ))
 
-        return proposals
+        return await self._synthesize_task_proposals(
+            context,
+            default_proposals,
+            instructions=(
+                "Propose the next social-distribution actions for this brand based on its connected "
+                "platforms, content types, posting cadence, brand voice, and target audience. Each task "
+                "must have a pillar_id from [plan, generate, publish, analyze, engage, remarket] and an "
+                "action_url pointing to a relevant studio (e.g. /linkedin-studio, /facebook-writer)."
+            ),
+        )

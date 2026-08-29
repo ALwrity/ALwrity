@@ -1,5 +1,6 @@
 import json
 import os
+import hashlib
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -11,8 +12,28 @@ from models.daily_workflow_models import DailyWorkflowPlan, DailyWorkflowTask
 from models.agent_activity_models import AgentAlert
 from models.content_planning import CalendarEvent, ContentStrategy
 from services.agent_activity_service import AgentActivityService, build_agent_event_payload
+from services.daily_meeting_persistence import attach_daily_meeting_tasks, finish_daily_meeting, start_daily_meeting
+from services.task_memory_service import TaskMemoryService
+from services.agent_schedule_service import evaluate_agent_schedule
+from services.daily_meeting_preflight import build_agent_evidence, run_daily_meeting_preflight
+from services.daily_meeting_review import prioritize_proposals, review_proposals
+from services.intelligence.agents.team_catalog import AGENT_TEAM_CATALOG
+
+
+class _NoopActivity:
+    """Activity sink used by lightweight planning calls without a tenant DB."""
+
+    def start_run(self, *args, **kwargs):
+        return type("Run", (), {"id": None})()
+
+    def log_event(self, *args, **kwargs):
+        return None
+
+    def finish_run(self, *args, **kwargs):
+        return None
 from services.llm_providers.main_text_generation import llm_text_gen
 from services.database import get_session_for_user
+from services.intelligence.agents.output_contracts import resolve_recommendation_action
 from loguru import logger
 
 
@@ -68,217 +89,58 @@ PILLAR_IDS = _load_pillar_ids()
 MIN_TASK_EVIDENCE_LINKS = 1
 PLAN_CONTEXT_THRESHOLD = _load_plan_context_threshold()
 
-# Calendar → Workflow mapping. Previously every calendar event was
-# bucketed under the "generate" pillar regardless of content type,
-# which made LinkedIn posts look like generic content generation
-# and SEO audits look like content drafts. Each entry maps a
-# content_type (or platform) to the lifecycle pillar the task
-# actually belongs to.
-#
-# Resolution order in _resolve_calendar_pillar():
-#   1. content_type (e.g. "blog_post", "linkedin_post")
-#   2. platform fallback (e.g. "linkedin" → "engage")
-#   3. default ("generate") so unmapped events still get a pillar
-_CALENDAR_CONTENT_PILLAR = {
-    # Content creation → generate
-    "blog_post": "generate",
-    "video": "generate",
-    "podcast": "generate",
-    # Distribution → engage / publish
-    "linkedin_post": "engage",
-    "facebook_post": "engage",
-    "twitter_post": "engage",
-    "instagram_post": "engage",
-    "tiktok_post": "engage",
-    # SEO → analyze
-    "seo_page": "analyze",
-    # Direct publishing → publish
-    "youtube": "publish",
-}
-
-_CALENDAR_PLATFORM_PILLAR = {
-    "linkedin": "engage",
-    "facebook": "engage",
-    "twitter": "engage",
-    "instagram": "engage",
-    "tiktok": "engage",
-    "youtube": "publish",
-}
-
-CALENDAR_DEFAULT_PILLAR = "generate"
+# --- Calendar utilities (implementation in today_workflow_calendar.py) ---
+from services.today_workflow_calendar import (  # noqa: E402
+    _CALENDAR_CONTENT_PILLAR,
+    _CALENDAR_PLATFORM_PILLAR,
+    CALENDAR_DEFAULT_PILLAR,
+    _PLATFORM_ACTION_URL,
+    _CONTENT_ACTION_URL,
+    _CONTENT_ESTIMATED_TIME,
+    _GENERIC_FALLBACK_ACTION_URL,
+    _resolve_calendar_pillar,
+    _resolve_calendar_action_url,
+    _resolve_calendar_estimated_time,
+    _generate_calendar_event_plan,
+)
 
 # Kept for backwards-compat callers that read this constant.
 # New code should use _resolve_calendar_pillar() instead.
 CALENDAR_CONTENT_PILLAR = CALENDAR_DEFAULT_PILLAR
 
 
-def _resolve_calendar_pillar(content_type: str, platform: str) -> str:
-    """Pick the right workflow pillar for a calendar event.
+def _resolve_recommendation_action_type(proposal):
+    "Assign an explicit, user-triggered action to executable recommendations."
+    return str(resolve_recommendation_action(proposal)["action_type"])
 
-    Resolution order:
-      1. ``_CALENDAR_CONTENT_PILLAR`` by content_type
-      2. ``_CALENDAR_PLATFORM_PILLAR`` by platform
-      3. ``CALENDAR_DEFAULT_PILLAR`` (generate) as a safe fallback
+
+def _recommendation_id(proposal, date):
+    import hashlib
+    source = str(getattr(proposal, "source_agent", "") or "workflow")
+    pillar = str(getattr(proposal, "pillar_id", "") or "")
+    title = str(getattr(proposal, "title", "") or "")
+    digest = hashlib.sha256(f"{date}|{source}|{pillar}|{title}".encode()).hexdigest()
+    return f"rec-{digest[:24]}"
+
+
+def _stamp_synthesis_mode(tasks: List[Dict[str, Any]], mode: str) -> List[Dict[str, Any]]:
+    """Tag task dicts that lack a synthesis_mode with the producing path's mode.
+
+    Existing per-task values are never overwritten; only anonymous dicts
+    (e.g. raw LLM-generated tasks) get stamped.
     """
-    ct_lower = (content_type or "").strip().lower()
-    if ct_lower in _CALENDAR_CONTENT_PILLAR:
-        return _CALENDAR_CONTENT_PILLAR[ct_lower]
-    p_lower = (platform or "").strip().lower()
-    if p_lower in _CALENDAR_PLATFORM_PILLAR:
-        return _CALENDAR_PLATFORM_PILLAR[p_lower]
-    return CALENDAR_DEFAULT_PILLAR
-
-
-_PLATFORM_ACTION_URL = {
-    "linkedin": "/linkedin-studio",
-    "facebook": "/facebook-writer",
-    "twitter": "/twitter-writer",
-    "instagram": "/instagram-writer",
-    "youtube": "/youtube-writer",
-    "tiktok": "/tiktok-writer",
-}
-
-_CONTENT_ACTION_URL = {
-    "blog_post": "/blog-writer",
-    "linkedin_post": "/linkedin-studio",
-    "facebook_post": "/facebook-writer",
-    "seo_page": "/seo-dashboard",
-    "video": "/video-writer",
-}
-
-_CONTENT_ESTIMATED_TIME = {
-    "blog_post": 45, "linkedin_post": 20, "facebook_post": 15,
-    "twitter_post": 10, "instagram_post": 15, "seo_page": 30, "video": 60,
-}
-
-# Generic fallback URL for any calendar event whose content_type / platform
-# does not match a known writer. Prevents the event from being silently
-# dropped from the daily plan.
-_GENERIC_FALLBACK_ACTION_URL = "/content-planning"
-
-
-def _resolve_calendar_action_url(content_type: str, platform: str) -> str:
-    platform_lower = (platform or "").strip().lower()
-    if platform_lower in _PLATFORM_ACTION_URL:
-        return _PLATFORM_ACTION_URL[platform_lower]
-    ct_lower = (content_type or "").strip().lower()
-    if ct_lower in _CONTENT_ACTION_URL:
-        return _CONTENT_ACTION_URL[ct_lower]
-    logger.warning(
-        "No action_url mapping for calendar event content_type={!r} platform={!r} — falling back to {}",
-        content_type, platform, _GENERIC_FALLBACK_ACTION_URL,
-    )
-    return _GENERIC_FALLBACK_ACTION_URL
-
-
-def _resolve_calendar_estimated_time(content_type: str) -> int:
-    return _CONTENT_ESTIMATED_TIME.get((content_type or "").strip().lower(), 30)
-
-
-def _generate_calendar_event_plan(date: str, grounding: Dict[str, Any]) -> Dict[str, Any]:
-    calendar_events = grounding.get("calendar_events_today", [])
-    if not calendar_events:
-        return {"date": date, "tasks": []}
-
-    tasks = []
-    for event in calendar_events:
-        content_type = event.get("content_type", "")
-        platform = event.get("platform", "")
-        action_url = _resolve_calendar_action_url(content_type, platform)
-        pillar_id = _resolve_calendar_pillar(content_type, platform)
-
-        task = {
-            "pillarId": pillar_id,
-            "title": (event.get("title") or "Untitled").strip()[:255],
-            "description": (event.get("description") or "").strip(),
-            "priority": "high",
-            "estimatedTime": _resolve_calendar_estimated_time(content_type),
-            "actionType": "navigate",
-            "actionUrl": action_url,
-            "enabled": True,
-            "dependencies": [],
-            "metadata": {
-                "source": "calendar_event",
-                "source_event_id": event.get("id"),
-                "calendar_title": event.get("title"),
-                "content_type": event.get("content_type"),
-                "platform": event.get("platform"),
-            },
-        }
-        tasks.append(task)
-
-    return {"date": date, "tasks": tasks}
+    for task in tasks or []:
+        if not isinstance(task, dict):
+            continue
+        metadata = task.get("metadata") if isinstance(task.get("metadata"), dict) else {}
+        if not metadata.get("synthesis_mode"):
+            metadata["synthesis_mode"] = mode
+        task["metadata"] = metadata
+    return tasks
 
 
 def _today_date_str() -> str:
     return datetime.now(timezone.utc).date().isoformat()
-
-
-def _coerce_priority(value: Any) -> str:
-    v = str(value or "medium").lower().strip()
-    if v in {"high", "medium", "low"}:
-        return v
-    logger.warning(
-        f"Coercing invalid priority value {value!r} -> 'medium' "
-        f"(SIF-3 Issue #623 #16: expected one of high|medium|low)"
-    )
-    return "medium"
-
-
-def _coerce_status(value: Any) -> str:
-    v = str(value or "pending").lower().strip()
-    if v in {"pending", "in_progress", "completed", "skipped", "dismissed"}:
-        return "skipped" if v == "dismissed" else v
-    return "pending"
-
-
-def _proposal_priority_rank(priority: str) -> int:
-    return {"low": 0, "medium": 1, "high": 2}.get(str(priority or "").lower(), 1)
-
-
-def _proposal_order_key(proposal: Any) -> tuple:
-    return (
-        str(getattr(proposal, "source_agent", "") or "").lower(),
-        str(getattr(proposal, "title", "") or "").lower(),
-        str(getattr(proposal, "description", "") or "").lower(),
-        str(getattr(proposal, "action_url", "") or "").lower(),
-    )
-
-
-
-def _is_coverage_guardrail_enabled(grounding: Dict[str, Any]) -> bool:
-    workflow_config = grounding.get("workflow_config", {}) if isinstance(grounding, dict) else {}
-    if not isinstance(workflow_config, dict):
-        return True
-    if workflow_config.get("disable_pillar_coverage_guardrail") is True:
-        return False
-    if workflow_config.get("enforce_pillar_coverage") is False:
-        return False
-    return True
-
-
-def _sanitize_task(task: Dict[str, Any], agent_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    if not isinstance(task, dict):
-        return None
-
-    pillar_id = str(task.get("pillarId") or "").lower().strip()
-    title = str(task.get("title") or "").strip()
-    if pillar_id not in PILLAR_IDS or not title:
-        reason = "empty title" if not title else f"invalid pillar_id={pillar_id!r}"
-        logger.warning(f"Rejected task from agent {agent_name or 'unknown'}: {reason}")
-        return None
-
-    sanitized = dict(task)
-    sanitized["pillarId"] = pillar_id
-    sanitized["title"] = title
-    sanitized["description"] = str(task.get("description") or "").strip()
-    sanitized["priority"] = _coerce_priority(task.get("priority"))
-    sanitized["estimatedTime"] = max(5, int(task.get("estimatedTime") or 15))
-    sanitized["actionType"] = str(task.get("actionType") or "navigate").strip() or "navigate"
-    sanitized["actionUrl"] = str(task.get("actionUrl") or "").strip() or None
-    sanitized["enabled"] = bool(task.get("enabled", True))
-    return sanitized
-
 
 def _derive_onboarding_evidence_links(onboarding_data: Dict[str, Any], limit: int = 2) -> List[str]:
     if not isinstance(onboarding_data, dict):
@@ -389,132 +251,6 @@ def validate_plan_contextuality(plan: Dict[str, Any], grounding: Dict[str, Any])
         "min_evidence_links": MIN_TASK_EVIDENCE_LINKS,
     }
 
-
-def _resolve_backfill_provider(user_id: str) -> tuple:
-    """Resolve the (provider, model) the user's tenant config prefers.
-
-    The pillar backfill runs after the agent committee, so it should
-    use the same provider+model the rest of the workflow uses. This
-    is a thin wrapper around the same config the LLM committee
-    functions consult; if the config can't be resolved (e.g. tenant
-    provider not configured), returns ``(None, None)`` so the
-    underlying ``llm_text_gen`` falls back to its default selection.
-
-    Returning a tuple rather than an opaque dict keeps the call site
-    small and matches the ``llm_text_gen`` parameter shape.
-    """
-    try:
-        from services.llm_providers.tenant_provider_config import (
-            tenant_provider_config_resolver,
-        )
-        provider_cfg = tenant_provider_config_resolver.resolve(user_id)
-        provider = None
-        if provider_cfg.selected_providers:
-            first = provider_cfg.selected_providers[0]
-            if first in ("google", "gemini"):
-                provider = "google"
-            elif first in ("huggingface", "hf_response_api", "hf"):
-                provider = "huggingface"
-            elif first in ("wavespeed", "wave"):
-                provider = "wavespeed"
-            elif first in ("openai", "gpt"):
-                provider = "openai"
-        model = provider_cfg.model_policy.get("default_model") if provider_cfg.model_policy else None
-        return provider, model
-    except Exception as e:
-        logger.debug(
-            f"Could not resolve tenant provider config for user {user_id}: {e}"
-        )
-        return None, None
-
-
-def _build_single_task_for_missing_pillar(
-    user_id: str,
-    date: str,
-    pillar_id: str,
-    grounding: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
-    schema = {
-        "type": "object",
-        "properties": {
-            "pillarId": {"type": "string"},
-            "title": {"type": "string"},
-            "description": {"type": "string"},
-            "priority": {"type": "string"},
-            "estimatedTime": {"type": "number"},
-            "actionType": {"type": "string"},
-            "actionUrl": {"type": "string"},
-            "enabled": {"type": "boolean"},
-            "metadata": {"type": "object"},
-        },
-        "required": ["pillarId", "title", "description", "priority", "estimatedTime", "actionType", "enabled"],
-    }
-    prompt = (
-        "Generate exactly one actionable JSON task for today's workflow.\n"
-        f"Date: {date}\n"
-        f"Required pillarId: {pillar_id}\n"
-        "Constraints:\n"
-        "- Return a single JSON object only.\n"
-        "- Keep title concise and practical.\n"
-        "- Task must be completable today.\n"
-        "- Use actionType='navigate' and a valid ALwrity route when possible.\n"
-        f"User context: {json.dumps(grounding.get('onboarding_data', {}), indent=2)}\n"
-    )
-    # Resolve the (provider, model) the tenant's LLM committee uses,
-    # so backfill tasks don't silently use a different (possibly
-    # inferior) model than the rest of the workflow.
-    preferred_provider, preferred_model = _resolve_backfill_provider(user_id)
-    try:
-        raw = llm_text_gen(
-            prompt=prompt,
-            json_struct=schema,
-            user_id=user_id,
-            preferred_provider=preferred_provider,
-            model=preferred_model,
-        )
-        candidate = raw if isinstance(raw, dict) else json.loads(raw)
-    except Exception as e:
-        logger.warning(f"Failed to generate pillar backfill task for {pillar_id}: {e}")
-        return None
-
-    candidate = _sanitize_task(candidate)
-    if candidate:
-        candidate["pillarId"] = pillar_id
-        metadata = candidate.get("metadata") if isinstance(candidate.get("metadata"), dict) else {}
-        metadata["source"] = "llm_pillar_backfill"
-        # Mark the backfill as coming from the same provider the
-        # committee uses, for transparency in operator dashboards.
-        if preferred_provider or preferred_model:
-            metadata["backfill_provider"] = preferred_provider
-            metadata["backfill_model"] = preferred_model
-        candidate["metadata"] = metadata
-    return candidate
-
-
-def _ensure_pillar_coverage(
-    tasks: List[Dict[str, Any]],
-    user_id: str,
-    date: str,
-    grounding: Dict[str, Any],
-) -> List[Dict[str, Any]]:
-    sanitized_tasks = [t for t in (_sanitize_task(task) for task in tasks) if t]
-    if not _is_coverage_guardrail_enabled(grounding):
-        return sanitized_tasks
-
-    covered_pillars = {task["pillarId"] for task in sanitized_tasks}
-
-    for pillar_id in PILLAR_IDS:
-        if pillar_id in covered_pillars:
-            continue
-
-        generated = _build_single_task_for_missing_pillar(user_id, date, pillar_id, grounding)
-        if generated:
-            sanitized_tasks.append(generated)
-            covered_pillars.add(pillar_id)
-
-    return sanitized_tasks
-
-
 def build_grounding_context(db: Session, user_id: str, date: str) -> Dict[str, Any]:
     # 1. Fetch unread alerts
     unread_agent_alerts = (
@@ -585,34 +321,51 @@ def build_grounding_context(db: Session, user_id: str, date: str) -> Dict[str, A
                 "platform": event.platform,
                 "status": event.status,
                 "scheduled_date": event.scheduled_date.isoformat() if event.scheduled_date else None,
+                "owner_agent": event.owner_agent,
+                "recommendation_id": event.recommendation_id,
+                "task_id": event.task_id,
+                "meeting_id": event.meeting_id,
+                "kpi": event.kpi,
+                "deadline": event.deadline,
+                "action_type": event.action_type,
+                "action_parameters": event.action_parameters,
+                "evidence": event.evidence,
+                "expected_outcome": event.expected_outcome,
+                "user_approval_state": event.user_approval_state,
+                "user_timezone": event.user_timezone,
             }
             for event in calendar_events_today
         ],
     }
 
 
-_orchestration_service = None
-_orchestration_service_checked = False
+class _LazyOrchestrationService:
+    """Compatibility facade that defers heavy orchestrator imports until use."""
+
+    def __init__(self):
+        self._target = None
+
+    def _load(self):
+        if self._target is None:
+            from services.intelligence.agents.agent_orchestrator import AgentOrchestrationService
+
+            self._target = AgentOrchestrationService()
+        return self._target
+
+    async def get_or_create_orchestrator(self, *args, **kwargs):
+        return await self._load().get_or_create_orchestrator(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._load(), name)
+
+
+# Kept as a public compatibility seam for existing tests and integrations.
+orchestration_service = _LazyOrchestrationService()
 
 
 def _get_orchestration_service():
-    """Lazy-load agent orchestrator so lean LinkedIn-only startup avoids SIF/SEO deps."""
-    global _orchestration_service, _orchestration_service_checked
-    if _orchestration_service_checked:
-        return _orchestration_service
-
-    _orchestration_service_checked = True
-    try:
-        from services.intelligence.agents.agent_orchestrator import AgentOrchestrationService
-
-        _orchestration_service = AgentOrchestrationService()
-    except Exception as _orch_init_err:
-        logger.error(
-            f"AgentOrchestrationService init failed at module load; "
-            f"agent committee will be disabled: {_orch_init_err}"
-        )
-        _orchestration_service = None
-    return _orchestration_service
+    """Return the lazy facade without initializing SIF/SEO dependencies."""
+    return orchestration_service
 
 
 async def generate_agent_enhanced_plan(
@@ -621,13 +374,81 @@ async def generate_agent_enhanced_plan(
     date: str,
     grounding: Optional[Dict[str, Any]] = None,
     strict_contextuality: bool = False,
+    allow_preview: bool = False,
+    manual_override: bool = False,
 ) -> Dict[str, Any]:
     import asyncio
-    from services.task_memory_service import TaskMemoryService
 
-    activity = AgentActivityService(db, user_id)
+    activity = AgentActivityService(db, user_id) if db is not None else _NoopActivity()
     grounding = grounding or build_grounding_context(db, user_id, date)
     memory_service = TaskMemoryService(user_id, db)
+    proposal_review = {"normalized_proposals": [], "summary": {}}
+    guardian_review = {"status": "not_run", "decisions": [], "summary": {}}
+    workflow_config = grounding.get("workflow_config", {}) if isinstance(grounding, dict) else {}
+    onboarding = grounding.get("onboarding_data", {}) if isinstance(grounding, dict) else {}
+    tenant_timezone = (
+        workflow_config.get("timezone") or workflow_config.get("time_zone") or
+        onboarding.get("timezone") or onboarding.get("time_zone") or "UTC"
+    ) if isinstance(workflow_config, dict) and isinstance(onboarding, dict) else "UTC"
+    meeting = start_daily_meeting(
+        db,
+        user_id,
+        date,
+        source="manual" if manual_override else "scheduled",
+        tenant_timezone=tenant_timezone,
+    )
+    meeting_id = meeting.meeting_id if meeting else None
+
+    def finish_meeting(result: Dict[str, Any], status: str = "completed", error_message: Optional[str] = None) -> Dict[str, Any]:
+        result = dict(result)
+        result["meeting_id"] = meeting_id
+        result["meeting_status"] = status
+        finish_daily_meeting(db, meeting, status, result, error_message=error_message)
+        
+        # Enqueue daily digest email (non-blocking)
+        # Import here to avoid circular imports
+        try:
+            from services.daily_email_digest import enqueue_digest
+            from models.onboarding import OnboardingSession
+            
+            # Get user's contact email and timezone from onboarding
+            onboarding = db.query(OnboardingSession).filter(
+                OnboardingSession.user_id == user_id
+            ).first()
+            contact_email = onboarding.contact_email if onboarding and onboarding.contact_email else None
+            
+            if contact_email and (onboarding.email_digest_opt_in if onboarding else False):
+                # Enqueue asynchronously (non-blocking)
+                enqueue_digest(user_id, date, contact_email)
+                logger.info(f"Enqueued daily digest for user {user_id} to {contact_email}")
+            elif onboarding and not onboarding.email_digest_opt_in:
+                logger.debug(f"User {user_id} has opted out of email digest")
+            else:
+                logger.debug(f"No contact email for user {user_id}, skipping digest")
+        except Exception as e:
+            # Never fail the meeting flow if digest fails
+            logger.warning(f"Failed to enqueue digest for user {user_id}: {e}")
+        
+        return result
+
+    meeting_preflight = run_daily_meeting_preflight(user_id, db, grounding, date)
+    activity.log_event(
+        event_type="meeting_preflight",
+        severity="warning" if meeting_preflight["limitations"] else "info",
+        message="Daily meeting data preflight completed",
+        payload=meeting_preflight,
+    )
+    if meeting_preflight["blocking"]:
+        return finish_meeting({
+            "date": date,
+            "tasks": [],
+            "committee_agent_count": 0,
+            "agent_evidence": [],
+                    "proposal_review": proposal_review,
+                    "guardian_review": guardian_review,
+                    "meeting_preflight": meeting_preflight,
+            "limitations": meeting_preflight["limitations"],
+        }, status="limited")
 
     # 1. Get Orchestrator
     orchestration_service = _get_orchestration_service()
@@ -641,15 +462,38 @@ async def generate_agent_enhanced_plan(
         # render the "AI-Assisted" provenance label. Returning an
         # empty tasks list with no flag would silently hide the
         # committee outage from operators.
-        return {"date": date, "tasks": [], "fallback_used": True}
+        return finish_meeting({
+            "date": date,
+            "tasks": [],
+            "fallback_used": True,
+            "agent_evidence": [],
+            "proposal_review": proposal_review,
+            "meeting_preflight": meeting_preflight,
+            "limitations": [*meeting_preflight["limitations"], "Agent orchestrator is unavailable."],
+        }, status="failed", error_message="Agent orchestrator unavailable")
     try:
-        orchestrator = await orchestration_service.get_or_create_orchestrator(user_id)
+        if allow_preview:
+            orchestrator = await orchestration_service.get_or_create_orchestrator(
+                user_id, allow_preview_init=True
+            )
+        else:
+            # Preserve the original one-argument call shape for lightweight
+            # integrations and existing orchestration implementations.
+            orchestrator = await orchestration_service.get_or_create_orchestrator(user_id)
     except Exception as e:
         logger.error(f"Failed to get orchestrator: {e}")
         # Same fallback flag — the orchestrator raised. Downstream
         # ``_ensure_pillar_coverage`` will LLM-backfill empty pillars
         # so the user still gets a usable plan.
-        return {"date": date, "tasks": [], "fallback_used": True}
+        return finish_meeting({
+            "date": date,
+            "tasks": [],
+            "fallback_used": True,
+            "agent_evidence": [],
+            "proposal_review": proposal_review,
+            "meeting_preflight": meeting_preflight,
+            "limitations": [*meeting_preflight["limitations"], "Agent orchestrator failed to initialize."],
+        }, status="failed", error_message=str(e))
 
     # 2. Parallel "Committee" Proposal Gathering
     logger.info(f"Gathering daily task proposals from agent committee for user {user_id}")
@@ -661,19 +505,62 @@ async def generate_agent_enhanced_plan(
     agents_polled_count: int = 0
     
     agent_tasks = []
+    agent_evidence = []
     try:
         # Define agents to poll
-        agents_to_poll = [
-            orchestrator.agents.get('content'),      # ContentStrategyAgent
-            orchestrator.agents.get('strategy'),     # StrategyArchitectAgent
-            orchestrator.agents.get('seo'),          # SEOOptimizationAgent
-            orchestrator.agents.get('social'),       # SocialAmplificationAgent
-            orchestrator.agents.get('competitor'),   # CompetitorResponseAgent
-            orchestrator.agents.get('content_gap_radar'),  # ContentGapRadarAgent
+        candidate_agents = [
+            ("content_strategist", orchestrator.agents.get('content')),
+            ("strategy_architect", orchestrator.agents.get('strategy')),
+            ("seo_specialist", orchestrator.agents.get('seo')),
+            ("social_media_manager", orchestrator.agents.get('social')),
+            ("competitor_analyst", orchestrator.agents.get('competitor')),
+            ("content_gap_radar", orchestrator.agents.get('content_gap_radar')),
         ]
-        
-        # Filter out None agents (disabled/failed init)
-        active_agents = [a for a in agents_to_poll if a]
+        profiles_by_key = {}
+        try:
+            from models.agent_activity_models import AgentProfile
+            profiles_by_key = {
+                profile.agent_key: {
+                    "enabled": profile.enabled,
+                    "schedule": profile.schedule,
+                }
+                for profile in db.query(AgentProfile).filter(AgentProfile.user_id == user_id).all()
+            } if db is not None else {}
+        except Exception as exc:
+            logger.warning("Could not load agent schedule profiles for user_id={} error={}", user_id, exc)
+
+        catalog_by_key = {entry["agent_key"]: entry for entry in AGENT_TEAM_CATALOG}
+        workflow_config = grounding.get("workflow_config", {}) if isinstance(grounding, dict) else {}
+        onboarding = grounding.get("onboarding_data", {}) if isinstance(grounding, dict) else {}
+        tenant_timezone = (
+            workflow_config.get("timezone") or workflow_config.get("time_zone") or
+            onboarding.get("timezone") or onboarding.get("time_zone") or "UTC"
+        ) if isinstance(workflow_config, dict) and isinstance(onboarding, dict) else "UTC"
+        tenant_pause = workflow_config if isinstance(workflow_config, dict) else {}
+        schedule_now = datetime.now(timezone.utc)
+        schedule_decisions = []
+        active_agents = []
+        effective_manual_override = manual_override or db is None
+        for agent_key, agent in candidate_agents:
+            catalog = catalog_by_key.get(agent_key, {})
+            decision = evaluate_agent_schedule(
+                agent_key,
+                profile=profiles_by_key.get(agent_key),
+                defaults=catalog.get("defaults", {}),
+                tenant_timezone=tenant_timezone,
+                now=schedule_now,
+                manual_override=effective_manual_override,
+                tenant_pause=tenant_pause,
+            )
+            decision["agent_available"] = agent is not None
+            if agent is None and decision["eligible"]:
+                decision["eligible"] = False
+                decision["reason"] = "agent unavailable or failed initialization"
+            decision["participates"] = bool(decision["eligible"] and agent is not None)
+            schedule_decisions.append(decision)
+            if decision["participates"]:
+                active_agents.append(agent)
+
         agents_polled_count = len(active_agents)
         
         # Execute propose_daily_tasks in parallel
@@ -684,60 +571,148 @@ async def generate_agent_enhanced_plan(
         
         # Collect successful proposals
         raw_proposals = []
-        for res in results:
+        raw_agent_keys = []
+        active_pairs = [
+            (agent_key, agent)
+            for (agent_key, agent), decision in zip(candidate_agents, schedule_decisions)
+            if decision["participates"]
+        ]
+        for (agent_key, _agent), res in zip(active_pairs, results):
+            if isinstance(res, Exception):
+                agent_evidence.append({
+                    "agent": agent_key,
+                    "evidence": [],
+                    "analysis": "",
+                    "proposed_tasks": [],
+                    "confidence": 0.0,
+                    "expected_impact": [],
+                    "effort": [],
+                    "kpi": [],
+                    "required_action_parameters": [],
+                    "error": str(res),
+                })
+                logger.warning(f"Agent proposal failed: {res}")
+                continue
+            agent_evidence.append(build_agent_evidence(agent_key, res))
             if isinstance(res, list):
                 raw_proposals.extend(res)
-            elif isinstance(res, Exception):
-                logger.warning(f"Agent proposal failed: {res}")
+                raw_agent_keys.extend([agent_key] * len(res))
 
-        # 3. Filter Redundant Proposals (Self-Learning)
-        # Note: We need to ensure we don't filter out essential recurring tasks if they were completed long ago
-        # But for now, we filter exact duplicates from recent history (last 7 days)
-        # We can implement semantic filtering later
-        
-        # Simple deduplication based on title+pillar
-        unique_map = {}
-        for p in raw_proposals:
-            key = f"{p.pillar_id}:{p.title}"
-            if key not in unique_map:
-                unique_map[key] = p
-                continue
-
-            existing = unique_map[key]
-            if _proposal_priority_rank(p.priority) > _proposal_priority_rank(existing.priority):
-                unique_map[key] = p
-                continue
-
-            # Deterministic tie-breaker for equal priority proposals.
-            if (
-                _proposal_priority_rank(p.priority) == _proposal_priority_rank(existing.priority)
-                and _proposal_order_key(p) < _proposal_order_key(existing)
-            ):
-                unique_map[key] = p
-                
-        agent_tasks = list(unique_map.values())
-        
-        # Phase 3: Check memory for rejections (Semantic Filter)
-        agent_tasks = await memory_service.filter_redundant_proposals(agent_tasks)
+        # 3. Normalize and review proposals without silently discarding any.
+        proposal_review = await review_proposals(
+            raw_proposals,
+            memory_service=memory_service,
+            capacity_minutes=(workflow_config.get("daily_capacity_minutes", 240)
+                              if isinstance(workflow_config, dict) else 240),
+            agent_keys=raw_agent_keys,
+        )
+        agent_tasks = proposal_review["accepted_proposals"]
+        guardian_agent = orchestrator.agents.get("guardian")
+        accepted_normalized = [
+            decision for decision in proposal_review["normalized_proposals"]
+            if decision.get("status") == "accepted"
+        ]
+        if guardian_agent and hasattr(guardian_agent, "review_normalized_proposals"):
+            try:
+                guardian_review = await guardian_agent.review_normalized_proposals(accepted_normalized)
+                guardian_by_id = {
+                    decision["recommendation_id"]: decision
+                    for decision in guardian_review.get("decisions", [])
+                }
+                for decision in proposal_review["normalized_proposals"]:
+                    guardian_decision = guardian_by_id.get(decision["recommendation_id"])
+                    if guardian_decision:
+                        decision["guardian_outcome"] = guardian_decision["guardian_outcome"]
+                        decision["guardian_reasons"] = guardian_decision["guardian_reasons"]
+                approved_ids = {
+                    decision["recommendation_id"]
+                    for decision in guardian_review.get("decisions", [])
+                    if decision.get("guardian_outcome") in {"approved", "approved_with_warning"}
+                }
+                agent_tasks = [
+                    proposal for proposal, decision in zip(agent_tasks, accepted_normalized)
+                    if decision["recommendation_id"] in approved_ids
+                ]
+            except Exception as exc:
+                guardian_review = {
+                    "status": "error",
+                    "decisions": [],
+                    "summary": {},
+                    "limitations": [f"Guardian review failed; proposals were not released: {exc}"],
+                }
+                agent_tasks = []
+        elif db is not None:
+            guardian_review = {
+                "status": "unavailable",
+                "decisions": [],
+                "summary": {},
+                "limitations": ["Guardian review was unavailable; proposals were not released for execution."],
+            }
+            agent_tasks = []
+        approved_for_selection = [
+            decision for decision in proposal_review.get("normalized_proposals", [])
+            if decision.get("status") == "accepted"
+            and decision.get("guardian_outcome") in {None, "approved", "approved_with_warning"}
+        ]
+        prioritized = prioritize_proposals(approved_for_selection, grounding, meeting_preflight)
+        prioritized_by_key = {
+            (item.get("title"), item.get("description"), item.get("pillar")): item
+            for item in prioritized
+        }
+        for decision in proposal_review.get("normalized_proposals", []):
+            selected = prioritized_by_key.get(
+                (decision.get("title"), decision.get("description"), decision.get("pillar"))
+            )
+            if selected:
+                decision["selection_score"] = selected["selection_score"]
+                decision["selection_factors"] = selected["selection_factors"]
+        agent_tasks = sorted(
+            agent_tasks,
+            key=lambda proposal: -prioritized_by_key.get(
+                (proposal.title, proposal.description, proposal.pillar_id),
+                {"selection_score": 0.0},
+            )["selection_score"],
+        )
+        # Persist accepted proposal timing after filtering. This records the
+        # first/last proposal timestamps without making the current proposal
+        # look like an already-seen duplicate during this pass.
+        for proposal in agent_tasks:
+            await memory_service.record_task_proposal(proposal)
 
         # Log committee meeting event for frontend transparency
         try:
             accepted_ids = {f"{p.pillar_id}:{p.title}" for p in agent_tasks}
             proposals_log = []
-            for p in raw_proposals:
+            for index, p in enumerate(raw_proposals):
                 valid = p.pillar_id in PILLAR_IDS
                 key = f"{p.pillar_id}:{p.title}"
+                reviewed = proposal_review.get("normalized_proposals", [])[index] if index < len(proposal_review.get("normalized_proposals", [])) else {}
+                participates = (
+                    reviewed.get("status") == "accepted"
+                    and reviewed.get("guardian_outcome") in {None, "approved", "approved_with_warning"}
+                )
                 proposals_log.append({
-                    "agent": p.source_agent,
+                    "recommendation_id": reviewed.get("recommendation_id"),
+                    "agent": reviewed.get("agent") or p.source_agent,
                     "title": p.title,
                     "pillar_id": p.pillar_id,
                     "priority": p.priority,
                     "valid": valid,
-                    "accepted": key in accepted_ids,
-                    "rejected_reason": None if valid else f"pillar_id '{p.pillar_id}' not in {PILLAR_IDS}",
+                    "accepted": participates,
+                    "review_status": reviewed.get("status", "rejected"),
+                    "review_reasons": reviewed.get("review_reasons", []),
+                    "guardian_outcome": reviewed.get("guardian_outcome"),
+                    "guardian_reasons": reviewed.get("guardian_reasons", []),
+                    "selection_score": reviewed.get("selection_score"),
+                    "selection_factors": reviewed.get("selection_factors", {}),
+                    "rejected_reason": None if valid and participates else (
+                        f"pillar_id '{p.pillar_id}' not in {PILLAR_IDS}"
+                        if not valid else (reviewed.get("review_reasons") or ["proposal was not accepted"])[0]
+                    ),
                     "reasoning": p.reasoning,
                     "estimated_time": p.estimated_time,
-                    "action_type": p.action_type,
+                    "action_type": _resolve_recommendation_action_type(p),
+                    "synthesis_mode": getattr(p, "synthesis_mode", None),
                 })
                 if not valid:
                     logger.warning(
@@ -754,6 +729,10 @@ async def generate_agent_enhanced_plan(
                     "accepted_count": len(agent_tasks),
                     "rejected_count": len(raw_proposals) - len(agent_tasks),
                     "proposals": proposals_log,
+                    "proposal_review": proposal_review,
+                    "guardian_review": guardian_review,
+                    "meeting_preflight": meeting_preflight,
+                    "agent_evidence": agent_evidence,
                 },
             )
         except Exception as e:
@@ -836,38 +815,114 @@ async def generate_agent_enhanced_plan(
         # Continue to fallback or LLM generation if committee fails
 
     # 4. Final Selection
-    # If we have agent tasks, use them. Otherwise fall back to LLM generation.
+    # Use grounded committee tasks; tenant-backed empty meetings stay limited.
     if agent_tasks and not strict_contextuality:
         logger.info(f"Generated {len(agent_tasks)} tasks via Agent Committee")
         
         # Convert TaskProposal objects to dicts for frontend
         final_tasks = []
+        review_ids = {
+            (item.get("title"), item.get("description"), item.get("pillar")): item.get("recommendation_id")
+            for item in proposal_review.get("normalized_proposals", [])
+            if item.get("recommendation_id")
+        }
         for prop in agent_tasks:
+            action_contract = resolve_recommendation_action(prop)
+            resolved_action_type = action_contract["action_type"]
+            recommendation_id = review_ids.get(
+                (prop.title, prop.description, prop.pillar_id),
+                _recommendation_id(prop, date),
+            )
+            selected_review = next(
+                (
+                    item for item in proposal_review.get("normalized_proposals", [])
+                    if (item.get("title"), item.get("description"), item.get("pillar"))
+                    == (prop.title, prop.description, prop.pillar_id)
+                ),
+                {},
+            )
             final_tasks.append({
                 "pillarId": prop.pillar_id,
                 "title": prop.title,
                 "description": prop.description,
+                "recommendation": prop.recommendation or prop.description,
+                "nextAction": prop.next_action or (
+                    f"Open {prop.action_url}" if prop.action_url else "Review and choose the next action"
+                ),
+                "ownerAgent": prop.owner_agent or prop.source_agent,
+                "kpi": prop.kpi,
+                "deadline": prop.deadline,
                 "priority": prop.priority,
                 "estimatedTime": prop.estimated_time,
-                "actionType": prop.action_type,
-                "actionUrl": prop.action_url,
-                "enabled": True,
+                    "actionType": resolved_action_type,
+                    "actionUrl": prop.action_url,
+                    "evidence": prop.evidence,
+                    "expectedImpact": prop.expected_impact,
+                    "effort": prop.effort,
+                    "riskLevel": prop.risk_level,
+                    "measurement": prop.measurement,
+                    "enabled": True,
                 "metadata": {
+                    "recommendation_id": recommendation_id,
                     "source_agent": prop.source_agent,
                     "reasoning": prop.reasoning,
                     "context_data": prop.context_data,
+                    "action_parameters": action_contract["parameters"],
+                    "action_contract": action_contract,
+                    "selection_score": selected_review.get("selection_score"),
+                    "selection_factors": selected_review.get("selection_factors", {}),
+                    "selection_reason": selected_review.get("selection_reason", []),
+                    "confidence": selected_review.get("confidence", 0.0),
+                    "required_action": prop.next_action or prop.action_url,
                     "evidence_links": _derive_onboarding_evidence_links(grounding.get("onboarding_data", {}), limit=2),
+                    "synthesis_mode": getattr(prop, "synthesis_mode", None),
                 }
             })
             
-        final_tasks = _ensure_pillar_coverage(final_tasks, user_id, date, grounding)
-        return {
+        final_tasks = await _ensure_pillar_coverage(final_tasks, user_id, date, grounding)
+        return finish_meeting({
             "date": date,
             "tasks": final_tasks,
             # The actual count of agents that participated, not the
             # count of distinct source_agent values on surviving tasks.
             "committee_agent_count": agents_polled_count,
-        }
+            "schedule_decisions": schedule_decisions,
+            "meeting_preflight": meeting_preflight,
+            "agent_evidence": agent_evidence,
+            "proposal_review": proposal_review,
+            "guardian_review": guardian_review,
+            "limitations": meeting_preflight["limitations"],
+        })
+
+    if db is not None:
+        limitation = (
+            "No eligible agent produced a proposal; the meeting recorded evidence and limitations "
+            "instead of generating an ungrounded fallback task."
+        )
+        meeting_preflight["limitations"] = [*meeting_preflight["limitations"], limitation]
+        activity.log_event(
+            event_type="meeting_limited",
+            severity="warning",
+            message="Daily meeting produced no grounded proposals",
+            payload={
+                "meeting_preflight": meeting_preflight,
+                "agent_evidence": agent_evidence,
+                "proposal_review": proposal_review,
+                "guardian_review": guardian_review,
+                "limitations": meeting_preflight["limitations"],
+            },
+        )
+        return finish_meeting({
+            "date": date,
+            "tasks": [],
+            "committee_agent_count": agents_polled_count,
+            "schedule_decisions": schedule_decisions,
+            "meeting_preflight": meeting_preflight,
+            "agent_evidence": agent_evidence,
+            "proposal_review": proposal_review,
+            "guardian_review": guardian_review,
+            "limitations": meeting_preflight["limitations"],
+        })
 
     # Fallback to original LLM generation if agents returned nothing
     logger.info("Agent committee returned no tasks, falling back to LLM generation")
@@ -960,13 +1015,19 @@ async def generate_agent_enhanced_plan(
     tasks = result.get("tasks") if isinstance(result, dict) else None
     if not isinstance(tasks, list):
         tasks = []
+    covered_tasks = await _ensure_pillar_coverage(
+        _stamp_synthesis_mode(tasks, "llm"), user_id, date, grounding
+    )
     result = {
         "date": date,
-        "tasks": _ensure_pillar_coverage(tasks, user_id, date, grounding),
+        "tasks": covered_tasks,
         # LLM-only fallback path: zero agents participated. The plan
         # row will see this and render "AI Personalized Guide" instead
         # of "Personalized by Agents".
         "committee_agent_count": 0,
+        "meeting_preflight": meeting_preflight,
+        "agent_evidence": agent_evidence,
+        "limitations": meeting_preflight["limitations"],
     }
 
     activity.log_event(
@@ -978,7 +1039,7 @@ async def generate_agent_enhanced_plan(
         agent_type="TodayWorkflowGenerator",
     )
     activity.finish_run(run.id, success=True, result_summary=json.dumps({"date": date, "tasks": result.get("tasks", [])})[:4000])
-    return result
+    return finish_meeting(result)
 
 
 async def get_or_create_daily_workflow_plan(
@@ -986,6 +1047,8 @@ async def get_or_create_daily_workflow_plan(
     user_id: str,
     date: Optional[str] = None,
     creation_source: str = "manual",
+    allow_preview: bool = False,
+    manual_override: Optional[bool] = None,
 ) -> tuple[DailyWorkflowPlan, bool]:
     from starlette.concurrency import run_in_threadpool
 
@@ -1021,7 +1084,11 @@ async def get_or_create_daily_workflow_plan(
     calendar_task_titles = {t.get("title") for t in calendar_plan.get("tasks", []) if t.get("title")}
 
     # Step 2: Agent committee → proposals for plan + analyze + engage + publish + remarket
-    agent_plan_data = await generate_agent_enhanced_plan(db, user_id, date_str, grounding=grounding, strict_contextuality=False)
+    agent_plan_data = await generate_agent_enhanced_plan(
+        db, user_id, date_str, grounding=grounding, strict_contextuality=False,
+        allow_preview=allow_preview,
+        manual_override=(creation_source in {"manual", "preview"}) if manual_override is None else manual_override,
+    )
     # ``fallback_used`` is set by the committee function when the
     # orchestrator raises or is uninitialised. Surface it here so
     # the plan row reflects the degraded path even if a later step
@@ -1059,7 +1126,7 @@ async def get_or_create_daily_workflow_plan(
     calendar_source = bool(calendar_plan.get("tasks"))
 
     # Step 4: Pillar coverage — LLM backfill for any pillar still uncovered
-    all_tasks = _ensure_pillar_coverage(all_tasks, user_id, date_str, grounding)
+    all_tasks = await _ensure_pillar_coverage(all_tasks, user_id, date_str, grounding)
 
     # Step 5: Validation
     plan_data = {**agent_plan_data, "tasks": all_tasks}
@@ -1162,6 +1229,12 @@ async def get_or_create_daily_workflow_plan(
             thread_db.close()
 
     plan, created = await run_in_threadpool(_create_plan)
+    if created:
+        attach_daily_meeting_tasks(
+            db,
+            plan_data.get("meeting_id"),
+            plan.id,
+        )
     return plan, created
 
 
@@ -1258,8 +1331,6 @@ def sync_workflow_tasks_from_calendar_event(
         target_task_status = "completed"
     elif calendar_event.status == "cancelled":
         target_task_status = "dismissed"
-    else:
-        return 0
 
     try:
         # Find non-decided workflow tasks sourced from this calendar event.
@@ -1274,16 +1345,21 @@ def sync_workflow_tasks_from_calendar_event(
         )
         updated = 0
         for task in tasks:
-            metadata = task.metadata_json if isinstance(task.metadata_json, dict) else {}
-            if (
+            metadata = dict(task.metadata_json) if isinstance(task.metadata_json, dict) else {}
+            linked = (
                 metadata.get("source") == "calendar_event"
                 and metadata.get("source_event_id") == calendar_event.id
-            ):
-                task.status = target_task_status
-                task.decided_at = datetime.utcnow()
-                task.completion_notes = (
-                    f"Auto-updated from calendar event status={calendar_event.status}"
-                )
+            ) or metadata.get("calendar_event_id") == calendar_event.id or calendar_event.task_id == task.id
+            if linked:
+                metadata["calendar_status"] = calendar_event.status
+                metadata["calendar_scheduled_date"] = calendar_event.scheduled_date.isoformat() if calendar_event.scheduled_date else None
+                task.metadata_json = dict(metadata)
+                if target_task_status:
+                    task.status = target_task_status
+                    task.decided_at = datetime.utcnow()
+                    task.completion_notes = (
+                        f"Auto-updated from calendar event status={calendar_event.status}"
+                    )
                 db.add(task)
                 updated += 1
         if updated:
@@ -1344,3 +1420,17 @@ def update_task_status(
                 logger.warning(f"Failed to update calendar event {source_event_id} on task completion: {e}")
 
     return task
+
+# --- Pillar coverage utilities (implementation in today_workflow_pillar.py) ---
+from services.today_workflow_pillar import (  # noqa: E402
+    _coerce_priority,
+    _coerce_status,
+    _is_coverage_guardrail_enabled,
+    _sanitize_task,
+    _resolve_backfill_provider,
+    _build_single_task_for_missing_pillar,
+    _controlled_pillar_fallback,
+    _ensure_pillar_coverage,
+)
+
+

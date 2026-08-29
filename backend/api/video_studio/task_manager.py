@@ -4,7 +4,8 @@ from datetime import datetime
 from loguru import logger
 from sqlalchemy.orm import sessionmaker
 from services.database import get_engine_for_user
-from models.video_models import VideoGenerationTask, VideoTaskStatus, Base
+from models.video_models import VideoGenerationTask, VideoTaskStatus
+
 
 class TaskManager:
     def __init__(self):
@@ -16,9 +17,6 @@ class TaskManager:
         
         try:
             engine = get_engine_for_user(user_id)
-            # Ensure table exists
-            Base.metadata.create_all(bind=engine)
-            
             SessionLocal = sessionmaker(bind=engine)
             db = SessionLocal()
             

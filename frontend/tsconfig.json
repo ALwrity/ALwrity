@@ -14,7 +14,7 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "module": "esnext",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
@@ -24,7 +24,7 @@
       "./node_modules/@types",
       "./src/types"
     ],
-    "types": ["node", "jest"]
+    "types": ["node"]
   },
   "include": [
     "src"

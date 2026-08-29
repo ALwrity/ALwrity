@@ -11,12 +11,10 @@ import {
   TextField,
   IconButton,
 } from '@mui/material';
-import {
-  Edit as EditIcon,
-  Save as SaveIcon,
-  Cancel as CancelIcon,
-  Info as InfoIcon,
-} from '@mui/icons-material';
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
+import CancelIcon from '@mui/icons-material/Cancel';
+import InfoIcon from '@mui/icons-material/Info';
 import { Tooltip } from '@mui/material';
 import { ResearchIntent } from '../../../types/intent.types';
 

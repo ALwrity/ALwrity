@@ -1,6 +1,11 @@
 """YouTube planner video-type and duration configuration."""
 
-from typing import Any, Dict
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
+
+from utils.logger_utils import get_service_logger
+
+logger = get_service_logger("youtube.planner_config")
 
 
 VIDEO_TYPE_CONFIGS = {
@@ -114,3 +119,172 @@ DURATION_CONTEXTS: Dict[str, Dict[str, Any]] = {
 def get_duration_context(duration_type: str) -> Dict[str, Any]:
     """Get duration-specific context and constraints."""
     return DURATION_CONTEXTS.get(duration_type, DURATION_CONTEXTS["medium"])
+
+
+SPOKEN_WORDS_PER_MINUTE = 150
+DURATION_MAIN_BEAT_COUNT: Dict[str, int] = {
+    "shorts": 3,
+    "medium": 4,
+    "long": 5,
+}
+
+
+def get_main_beat_count(duration_type: str) -> int:
+    """Exact main-content beat count so shorts are not expanded from 5 pitch beats."""
+    try:
+        if duration_type in DURATION_MAIN_BEAT_COUNT:
+            return DURATION_MAIN_BEAT_COUNT[duration_type]
+        logger.warning(
+            "[YouTubePlanner] Unknown duration_type for beat count; using medium duration={}",
+            duration_type,
+        )
+        return DURATION_MAIN_BEAT_COUNT["medium"]
+    except Exception:
+        logger.exception("[YouTubePlanner] Beat count lookup failed; using medium")
+        return DURATION_MAIN_BEAT_COUNT["medium"]
+
+
+def get_spoken_word_budget(duration_type: str) -> Dict[str, int]:
+    """150 WPM spoken budget from duration split. Hook/outro/CTA share the same budget."""
+    try:
+        ctx = get_duration_context(duration_type)
+        target_seconds = int(ctx["target_seconds"])
+        beat_count = get_main_beat_count(duration_type)
+        wpm = SPOKEN_WORDS_PER_MINUTE
+        max_spoken_words = round(target_seconds * wpm / 60)
+        hook_words = round(int(ctx["hook_seconds"]) * wpm / 60)
+        main_words = round(int(ctx["main_seconds"]) * wpm / 60)
+        cta_outro_words = round(int(ctx["cta_seconds"]) * wpm / 60)
+        per_beat_words = max(1, round(main_words / beat_count))
+        return {
+            "max_spoken_words": max_spoken_words,
+            "beat_count": beat_count,
+            "hook_words": hook_words,
+            "main_words": main_words,
+            "cta_outro_words": cta_outro_words,
+            "per_beat_words": per_beat_words,
+            "target_seconds": target_seconds,
+        }
+    except Exception:
+        logger.exception(
+            "[YouTubePlanner] Spoken word budget failed duration={}; using medium",
+            duration_type,
+        )
+        ctx = DURATION_CONTEXTS["medium"]
+        return {
+            "max_spoken_words": round(int(ctx["target_seconds"]) * SPOKEN_WORDS_PER_MINUTE / 60),
+            "beat_count": DURATION_MAIN_BEAT_COUNT["medium"],
+            "hook_words": round(int(ctx["hook_seconds"]) * SPOKEN_WORDS_PER_MINUTE / 60),
+            "main_words": round(int(ctx["main_seconds"]) * SPOKEN_WORDS_PER_MINUTE / 60),
+            "cta_outro_words": round(int(ctx["cta_seconds"]) * SPOKEN_WORDS_PER_MINUTE / 60),
+            "per_beat_words": round(
+                int(ctx["main_seconds"]) * SPOKEN_WORDS_PER_MINUTE / 60
+                / DURATION_MAIN_BEAT_COUNT["medium"]
+            ),
+            "target_seconds": int(ctx["target_seconds"]),
+        }
+
+
+# Matches frontend YOUTUBE_CONTENT_LANGUAGE_OPTIONS labels (code → display name).
+CONTENT_LANGUAGE_LABELS: Dict[str, str] = {
+    "en": "English",
+    "es": "Spanish",
+    "fr": "French",
+    "de": "German",
+    "pt": "Portuguese",
+    "it": "Italian",
+    "hi": "Hindi",
+    "ar": "Arabic",
+    "ru": "Russian",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "zh": "Chinese",
+    "vi": "Vietnamese",
+    "id": "Indonesian",
+    "tr": "Turkish",
+    "nl": "Dutch",
+    "pl": "Polish",
+    "th": "Thai",
+}
+
+DEFAULT_CONTENT_LANGUAGE_CODE = "en"
+DEFAULT_CONTENT_LANGUAGE_LABEL = "English"
+
+
+@dataclass(frozen=True)
+class ContentLanguageResolution:
+    """Normalized pitch/expand content language. Codes are not secrets."""
+
+    code: str
+    label: str
+    requested: str
+    used_fallback: bool
+
+
+def _normalize_language_token(language_code: Optional[str]) -> str:
+    """Strip, lowercase, and take the BCP-47 primary subtag (hi-IN → hi)."""
+    raw = (language_code or "").strip().lower()
+    if not raw:
+        return ""
+    primary = raw.replace("_", "-").split("-", 1)[0].strip()
+    return primary[:16]
+
+
+def _english_fallback(requested: str) -> ContentLanguageResolution:
+    return ContentLanguageResolution(
+        code=DEFAULT_CONTENT_LANGUAGE_CODE,
+        label=DEFAULT_CONTENT_LANGUAGE_LABEL,
+        requested=requested,
+        used_fallback=True,
+    )
+
+
+def resolve_content_language(language_code: Optional[str]) -> ContentLanguageResolution:
+    """Resolve Step-1 language to a known code + display label.
+
+    Empty or unknown values fall back to English so the LLM always gets an
+    explicit language. Accepts ISO codes (hi), BCP-47 tags (hi-IN), and
+    display names (Hindi). Logs codes/labels only — never the video idea.
+    """
+    requested = _normalize_language_token(language_code)
+    if not requested:
+        logger.debug("[YouTubePlanner] Content language omitted; using English")
+        return _english_fallback("")
+
+    known_label = CONTENT_LANGUAGE_LABELS.get(requested)
+    if known_label:
+        return ContentLanguageResolution(
+            code=requested,
+            label=known_label,
+            requested=requested,
+            used_fallback=False,
+        )
+
+    labels_to_codes = {
+        label.lower(): code for code, label in CONTENT_LANGUAGE_LABELS.items()
+    }
+    mapped_code = labels_to_codes.get(requested)
+    if mapped_code:
+        mapped_label = CONTENT_LANGUAGE_LABELS[mapped_code]
+        logger.info(
+            "[YouTubePlanner] Content language display name mapped to code={} label={}",
+            mapped_code,
+            mapped_label,
+        )
+        return ContentLanguageResolution(
+            code=mapped_code,
+            label=mapped_label,
+            requested=requested,
+            used_fallback=False,
+        )
+
+    logger.warning(
+        "[YouTubePlanner] Unknown content language; using English. requested={}",
+        requested,
+    )
+    return _english_fallback(requested)
+
+
+def resolve_content_language_label(language_code: Optional[str]) -> str:
+    """Map a Step-1 language value to a prompt label (e.g. hi → Hindi)."""
+    return resolve_content_language(language_code).label

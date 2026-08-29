@@ -6,8 +6,8 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { LinkedInEmojiPicker } from "../components/LinkedInEmojiPicker";
 
-jest.mock("emoji-picker-react", () => {
-  const React = require("react");
+vi.mock("emoji-picker-react", async () => {
+  const React = await vi.importActual<typeof import("react")>("react");
   const MockPicker = ({
     onEmojiClick,
   }: {
@@ -38,8 +38,8 @@ jest.mock("emoji-picker-react", () => {
 
 describe("LinkedInEmojiPicker", () => {
   it("opens picker and inserts selected emoji via onSelect", () => {
-    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
-    const onSelect = jest.fn();
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const onSelect = vi.fn();
     render(React.createElement(LinkedInEmojiPicker, { onSelect }));
 
     fireEvent.click(screen.getByRole("button", { name: "Add emoji" }));
@@ -50,7 +50,7 @@ describe("LinkedInEmojiPicker", () => {
   });
 
   it("does not open when disabled", () => {
-    const onSelect = jest.fn();
+    const onSelect = vi.fn();
     render(
       React.createElement(LinkedInEmojiPicker, { onSelect, disabled: true }),
     );

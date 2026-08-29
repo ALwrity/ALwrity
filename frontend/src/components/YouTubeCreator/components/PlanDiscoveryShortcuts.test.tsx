@@ -1,11 +1,11 @@
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { PlanDiscoveryShortcuts } from "./PlanDiscoveryShortcuts";
 
-const mockOpenYouTubePlanFromCreator = jest.fn();
+const mockOpenYouTubePlanFromCreator = vi.fn();
 
-jest.mock("../dashboard/youtubeStudioEvents", () => ({
+vi.mock("../dashboard/youtubeStudioEvents", () => ({
   openYouTubePlanFromCreator: (...args: unknown[]) => mockOpenYouTubePlanFromCreator(...args),
 }));
 

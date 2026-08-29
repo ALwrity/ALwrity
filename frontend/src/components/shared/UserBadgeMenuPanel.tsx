@@ -2,12 +2,10 @@ import React from 'react';
 import {
   Box, Typography, Tooltip, Chip, Divider, IconButton, CircularProgress,
 } from '@mui/material';
-import {
-  DeleteForever as DeleteForeverIcon,
-  ExpandMore as ExpandMoreIcon,
-  ChevronRight as ChevronRightIcon,
-  Refresh as RefreshIcon,
-} from '@mui/icons-material';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import SystemStatusIndicator from '../ContentPlanningDashboard/components/SystemStatusIndicator';
 import UsageDashboard from './UsageDashboard';
 import AlertsBadge from './AlertsBadge';
@@ -37,6 +35,7 @@ interface UserBadgeMenuPanelProps {
   onClose: () => void;
   onRefreshPlan: () => void;
   onToggleAdvanced: () => void;
+  onEmailPreferences?: () => void;
   onResetOpen: () => void;
   onDeleteOpen: () => void;
   onManageSubscription: () => void;
@@ -126,6 +125,7 @@ export const UserBadgeMenuPanel: React.FC<UserBadgeMenuPanelProps> = ({
   onManageSubscription,
   onViewCosting,
   onGifMaker,
+  onEmailPreferences,
   onSignOut,
 }) => (
   <Box onClick={(e) => e.stopPropagation()}>
@@ -166,6 +166,13 @@ export const UserBadgeMenuPanel: React.FC<UserBadgeMenuPanelProps> = ({
     <UserBadgeMenuSection label="Manage Subscription" headerOnly onClick={onManageSubscription} />
     <UserBadgeMenuSection label="View Costing Details" headerOnly onClick={onViewCosting} />
     <UserBadgeMenuSection label="GIF Maker" headerOnly onClick={onGifMaker} />
+    
+    {/* Email Preferences - for Daily Digest opt-out */}
+    <UserBadgeMenuSection 
+      label="Email Preferences" 
+      headerOnly 
+      onClick={() => onEmailPreferences?.()}
+    />
 
     <Box
       component="button"

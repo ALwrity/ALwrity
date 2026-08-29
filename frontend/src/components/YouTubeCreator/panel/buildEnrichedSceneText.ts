@@ -1,6 +1,76 @@
 import type { Scene } from "../../../services/youtubeApi";
+import { resolveYoutubeSceneVideoDuration } from "../utils/buildYoutubeSceneVideoPromptPreview";
 
-/** Build WaveSpeed narration with delivery hints. Extracted from the Video Creator panel. */
+/** Matches backend planner_config.SPOKEN_WORDS_PER_MINUTE. */
+export const YOUTUBE_SPOKEN_WORDS_PER_MINUTE = 150;
+
+/**
+ * Text WaveSpeed TTS must speak: the scene script paragraph only.
+ * Never add title prefixes or [bracket] stage directions.
+ */
+export function buildYoutubeSceneSpeechText(scene: Scene): string {
+  try {
+    return (scene?.narration || "").trim();
+  } catch (error) {
+    console.error("[YouTubeSceneAudio] Failed to read scene narration", {
+      sceneNumber: scene?.scene_number,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return "";
+  }
+}
+
+/** Estimate spoken seconds at 150 WPM (same clock as expand / parse). */
+export function estimateYoutubeSpeechSeconds(speechText: string): number {
+  try {
+    const words = (speechText || "").trim().split(/\s+/).filter(Boolean).length;
+    if (words <= 0) {
+      return 0;
+    }
+    return Math.max(1, Math.round((words * 60) / YOUTUBE_SPOKEN_WORDS_PER_MINUTE));
+  } catch (error) {
+    console.error("[YouTubeSceneAudio] Failed to estimate speech seconds", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return 0;
+  }
+}
+
+/**
+ * Log when estimated speech length exceeds the WAN clip for this scene.
+ * Does not rewrite narration (word caps are Phase 4).
+ */
+export function warnIfYoutubeSpeechExceedsClip(
+  speechText: string,
+  durationEstimate?: number | null,
+): { clipSeconds: number; speechSeconds: number } {
+  try {
+    const clipSeconds = resolveYoutubeSceneVideoDuration(durationEstimate);
+    const speechSeconds = estimateYoutubeSpeechSeconds(speechText);
+    const wordCount = (speechText || "").trim().split(/\s+/).filter(Boolean).length;
+    if (speechSeconds > clipSeconds) {
+      console.warn("[YouTubeSceneAudio] Speech longer than WAN clip; WaveSpeed will keep the first clip seconds only", {
+        clipSeconds,
+        speechSeconds,
+        wordCount,
+      });
+    } else {
+      console.info("[YouTubeSceneAudio] Speech clock ok", {
+        clipSeconds,
+        speechSeconds,
+        wordCount,
+      });
+    }
+    return { clipSeconds, speechSeconds };
+  } catch (error) {
+    console.error("[YouTubeSceneAudio] Speech clock failed; defaulting to 5s clip", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return { clipSeconds: 5, speechSeconds: 0 };
+  }
+}
+
+/** UI-only delivery notes. Must not be sent to WaveSpeed. */
 export function buildEnrichedSceneText(scene: Scene): string {
   let enrichedText = scene.narration;
 

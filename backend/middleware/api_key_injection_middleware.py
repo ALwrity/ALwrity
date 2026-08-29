@@ -97,7 +97,7 @@ class APIKeyInjectionMiddleware:
                     # Try different possible keys for user_id
                     user_id = user.get('user_id') or user.get('clerk_user_id') or user.get('id')
                     if user_id:
-                        logger.info(f"[API Key Injection] Extracted user_id: {user_id}")
+                        logger.debug(f"[API Key Injection] Extracted user_id: {user_id}")
                         
                         # Store user_id in request.state for monitoring middleware
                         request.state.user_id = user_id

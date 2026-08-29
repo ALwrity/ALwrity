@@ -8,14 +8,12 @@ import {
   Paper,
   IconButton,
 } from "@mui/material";
-import {
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Topic as TopicIcon,
-  Link as LinkIcon,
-  AccountTree as BudgetIcon,
-  CheckCircle as CheckIcon,
-} from "@mui/icons-material";
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import TopicIcon from '@mui/icons-material/Topic';
+import LinkIcon from '@mui/icons-material/Link';
+import BudgetIcon from '@mui/icons-material/AccountTree';
+import CheckIcon from '@mui/icons-material/CheckCircle';
 import MetricTooltip from "../../shared/MetricTooltip";
 import { getMetricTooltip } from "../../shared/metricTooltips";
 
@@ -70,16 +68,24 @@ function formatTimeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// Plain-language status for a 0-100 score.
+function statusFor(score: number, invert = false): { label: string; color: string } {
+  const s = invert ? 100 - score : score;
+  if (s >= 80) return { label: "Good", color: "#10b981" };
+  if (s >= 50) return { label: "Needs work", color: "#f59e0b" };
+  return { label: "Needs attention", color: "#ef4444" };
+}
+
 const ScoreBar: React.FC<{ value: number; label: string }> = ({ value, label }) => {
   const pct = Math.min(value, 100);
   const color = pct >= 80 ? "#10b981" : pct >= 50 ? "#f59e0b" : "#ef4444";
   return (
     <Box sx={{ mb: 0.75 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.25 }}>
-        <Typography variant="caption" sx={{ color: "rgba(0,0,0,0.55)" }}>
+        <Typography variant="caption" sx={{ color: "#64748b" }}>
           {label}
         </Typography>
-        <Typography variant="caption" sx={{ fontWeight: 600 }}>
+        <Typography variant="caption" sx={{ fontWeight: 600, color: "#1e293b" }}>
           {value}
         </Typography>
       </Box>
@@ -87,7 +93,7 @@ const ScoreBar: React.FC<{ value: number; label: string }> = ({ value, label }) 
         sx={{
           height: 4,
           borderRadius: 2,
-          bgcolor: "rgba(0,0,0,0.06)",
+          bgcolor: "#e2e8f0",
           overflow: "hidden",
         }}
       >
@@ -105,20 +111,78 @@ const ScoreBar: React.FC<{ value: number; label: string }> = ({ value, label }) 
   );
 };
 
+// A single metric with a value, a plain-language message, and an info tooltip.
 const MetricBox: React.FC<{
   label: string;
   value: string | number;
-  color?: string;
-  tooltip?: string;
-}> = ({ label, value, color, tooltip }) => (
-  <Box sx={{ p: 1, bgcolor: "rgba(0,0,0,0.02)", borderRadius: 2, textAlign: "center", minWidth: 0 }}>
-    <Typography variant="caption" sx={{ color: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", gap: 0.25, mb: 0.25, whiteSpace: "nowrap" }}>
+  message: string;
+  status?: { label: string; color: string };
+  tooltipKey?: string;
+}> = ({ label, value, message, status, tooltipKey }) => (
+  <Box sx={{ p: 1, bgcolor: "#f8fafc", borderRadius: 2, minWidth: 0, height: "100%" }}>
+    <Typography variant="caption" sx={{ color: "#64748b", display: "flex", alignItems: "center", justifyContent: "center", gap: 0.25, mb: 0.25, whiteSpace: "nowrap" }}>
       {label}
-      {tooltip ? <MetricTooltip title={tooltip} /> : null}
+      {tooltipKey ? <MetricTooltip title={getMetricTooltip(tooltipKey)} /> : null}
     </Typography>
-    <Typography variant="subtitle2" sx={{ color: color || "text.primary", fontWeight: 600 }}>
-      {value}
+    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0.5, flexWrap: "wrap" }}>
+      <Typography variant="subtitle2" sx={{ color: "#0f172a", fontWeight: 700 }}>
+        {value}
+      </Typography>
+      {status && (
+        <Chip
+          label={status.label}
+          size="small"
+          sx={{ height: 18, fontSize: "0.6rem", fontWeight: 600, bgcolor: status.color + "1a", color: status.color }}
+        />
+      )}
+    </Box>
+    <Typography variant="caption" sx={{ color: "#475569", display: "block", mt: 0.5, lineHeight: 1.35 }}>
+      {message}
     </Typography>
+  </Box>
+);
+
+// A titled card section with a header (icon + label + tooltip) and body.
+const SectionCard: React.FC<{
+  icon: React.ReactNode;
+  title: string;
+  tooltipKey: string;
+  children: React.ReactNode;
+}> = ({ icon, title, tooltipKey, children }) => (
+  <Box sx={{ mb: 1.5, p: 1.25, bgcolor: "#f8fafc", borderRadius: 2, border: "1px solid #eef2f7" }}>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
+      {icon}
+      <Typography variant="caption" sx={{ fontWeight: 700, color: "#1e293b" }}>{title}</Typography>
+      <MetricTooltip title={getMetricTooltip(tooltipKey)} />
+    </Box>
+    {children}
+  </Box>
+);
+
+// A small labelled stat within a SectionCard, with a plain-language hint.
+const MiniStat: React.FC<{
+  label: string;
+  value: string | number | undefined;
+  hint?: string;
+  status?: { label: string; color: string };
+}> = ({ label, value, hint, status }) => (
+  <Box sx={{ p: 0.75, bgcolor: "#fff", borderRadius: 1.5, border: "1px solid #eef2f7", minWidth: 0 }}>
+    <Typography variant="caption" sx={{ color: "#64748b", display: "block" }}>{label}</Typography>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
+      <Typography variant="body2" sx={{ color: "#0f172a", fontWeight: 700 }}>{value}</Typography>
+      {status && (
+        <Chip
+          label={status.label}
+          size="small"
+          sx={{ height: 16, fontSize: "0.58rem", fontWeight: 600, bgcolor: status.color + "1a", color: status.color }}
+        />
+      )}
+    </Box>
+    {hint && (
+      <Typography variant="caption" sx={{ color: "#475569", display: "block", mt: 0.25, lineHeight: 1.3 }}>
+        {hint}
+      </Typography>
+    )}
   </Box>
 );
 
@@ -136,6 +200,11 @@ export const ContentAuditSummaryCard: React.FC<ContentAuditSummaryCardProps> = (
   const pages = data.page_status;
   const fresh = data.freshness;
   const lastAudit = data.last_advertools_audit;
+
+  const freshScore = fresh?.freshness_score ?? 0;
+  const stalePct = fresh?.stale_content_percentage ?? 0;
+  const wastePct = budgetData?.waste_percentage ?? 0;
+  const optScore = budgetData?.optimization_score ?? 0;
 
   return (
     <Paper
@@ -194,49 +263,55 @@ export const ContentAuditSummaryCard: React.FC<ContentAuditSummaryCardProps> = (
           {/* Quick metrics row */}
           <Grid container spacing={1} sx={{ mb: 1.5 }}>
             {linkData?.total_links_found ? (
-              <Grid item xs={4}>
+              <Grid item xs={6} sm={4}>
                 <MetricBox
-                  label={`Links (${linkData.internal_link_percentage || 0}% int)`}
+                  label="Links"
                   value={linkData.total_links_found}
-                  tooltip={getMetricTooltip("total_links")}
+                  message={`${linkData.internal_link_percentage || 0}% point to pages on your own site.`}
+                  tooltipKey="total_links"
                 />
               </Grid>
             ) : null}
             {budgetData?.pages_crawled ? (
-              <Grid item xs={4}>
+              <Grid item xs={6} sm={4}>
                 <MetricBox
                   label="Pages Crawled"
                   value={budgetData.pages_crawled}
-                  tooltip={getMetricTooltip("pages_crawled")}
+                  message="How many pages we found and analyzed on your site."
+                  tooltipKey="pages_crawled"
                 />
               </Grid>
             ) : null}
             {budgetData?.waste_percentage !== undefined ? (
-              <Grid item xs={4}>
+              <Grid item xs={6} sm={4}>
                 <MetricBox
                   label="Crawl Waste"
-                  value={`${budgetData.waste_percentage || 0}%`}
-                  color={(budgetData.waste_percentage || 0) > 20 ? "#ef4444" : undefined}
-                  tooltip={getMetricTooltip("crawl_waste")}
+                  value={`${wastePct}%`}
+                  message="Wasted crawl requests. Lower is better."
+                  status={statusFor(wastePct, true)}
+                  tooltipKey="crawl_waste"
                 />
               </Grid>
             ) : null}
             {fresh?.freshness_score !== undefined ? (
-              <Grid item xs={4}>
+              <Grid item xs={6} sm={4}>
                 <MetricBox
                   label="Freshness"
-                  value={fresh.freshness_score}
-                  tooltip={getMetricTooltip("freshness_score")}
+                  value={freshScore}
+                  message="How recently your content was updated. Higher is better."
+                  status={statusFor(freshScore)}
+                  tooltipKey="freshness_score"
                 />
               </Grid>
             ) : null}
             {fresh?.stale_content_percentage !== undefined ? (
-              <Grid item xs={4}>
+              <Grid item xs={6} sm={4}>
                 <MetricBox
                   label="Stale Content"
-                  value={`${fresh.stale_content_percentage}%`}
-                  color={(fresh.stale_content_percentage || 0) > 30 ? "#ef4444" : undefined}
-                  tooltip={getMetricTooltip("stale_content")}
+                  value={`${stalePct}%`}
+                  message="Pages not updated in 6+ months. Lower is better."
+                  status={statusFor(stalePct, true)}
+                  tooltipKey="stale_content"
                 />
               </Grid>
             ) : null}
@@ -244,35 +319,51 @@ export const ContentAuditSummaryCard: React.FC<ContentAuditSummaryCardProps> = (
 
           {/* Link health detail */}
           {linkData?.total_links_found ? (
-            <Box sx={{ mb: 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
-                <LinkIcon sx={{ fontSize: 16, color: "#0ea5e9" }} />
-                <Typography variant="caption" sx={{ fontWeight: 600 }}>Link Health</Typography>
-                <MetricTooltip title={getMetricTooltip("link_health")} />
-              </Box>
+            <SectionCard
+              icon={<LinkIcon sx={{ fontSize: 16, color: "#0ea5e9" }} />}
+              title="Link Health"
+              tooltipKey="link_health"
+            >
               <Grid container spacing={1}>
                 <Grid item xs={6}>
-                  <Typography variant="caption" sx={{ color: "rgba(0,0,0,0.5)" }}>
-                    Internal: {linkData.internal_link_count} · External: {linkData.external_link_count}
-                  </Typography>
+                  <MiniStat
+                    label="Internal Links"
+                    value={linkData.internal_link_count}
+                    hint="Links to your own pages — help visitors and search engines find content."
+                  />
                 </Grid>
                 <Grid item xs={6}>
-                  <Typography variant="caption" sx={{ color: "rgba(0,0,0,0.5)" }}>
-                    Nofollow: {linkData.nofollow_link_count} · Avg/page: {linkData.avg_links_per_page}
-                  </Typography>
+                  <MiniStat
+                    label="External Links"
+                    value={linkData.external_link_count}
+                    hint="Links out to other websites. High-quality ones add credibility."
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <MiniStat
+                    label="Nofollow"
+                    value={linkData.nofollow_link_count}
+                    hint="Links search engines won't count. Normal for ads and comments."
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <MiniStat
+                    label="Avg per Page"
+                    value={linkData.avg_links_per_page}
+                    hint="Average links on each page. A healthy amount aids navigation."
+                  />
                 </Grid>
               </Grid>
-            </Box>
+            </SectionCard>
           ) : null}
 
           {/* Page status */}
           {pages && Object.keys(pages).length > 0 ? (
-            <Box sx={{ mb: 2 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.75 }}>
-                <CheckIcon sx={{ fontSize: 16, color: "#10b981" }} />
-                <Typography variant="caption" sx={{ fontWeight: 600 }}>Page Status</Typography>
-                <MetricTooltip title={getMetricTooltip("page_status")} />
-              </Box>
+            <SectionCard
+              icon={<CheckIcon sx={{ fontSize: 16, color: "#10b981" }} />}
+              title="Page Status"
+              tooltipKey="page_status"
+            >
               <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
                 {Object.entries(pages).map(([code, count]) => (
                   <Chip
@@ -296,34 +387,43 @@ export const ContentAuditSummaryCard: React.FC<ContentAuditSummaryCardProps> = (
                   />
                 ))}
               </Box>
-            </Box>
+              <Typography variant="caption" sx={{ color: "#475569", display: "block", mt: 0.75, lineHeight: 1.4 }}>
+                200 means a page loaded correctly; 404 means it's missing; 5xx means a server error.
+              </Typography>
+            </SectionCard>
           ) : null}
 
           {/* Crawl budget score */}
           {budgetData?.success ? (
-            <Box sx={{ mb: 1.5 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.75 }}>
-                <BudgetIcon sx={{ fontSize: 16, color: "#f59e0b" }} />
-                <Typography variant="caption" sx={{ fontWeight: 600 }}>Crawl Budget</Typography>
-                <MetricTooltip title={getMetricTooltip("crawl_budget")} />
+            <SectionCard
+              icon={<BudgetIcon sx={{ fontSize: 16, color: "#f59e0b" }} />}
+              title="Crawl Budget"
+              tooltipKey="crawl_budget"
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                <Typography variant="subtitle2" sx={{ color: "#0f172a", fontWeight: 700 }}>
+                  {optScore}
+                </Typography>
+                <Chip
+                  label={statusFor(optScore).label}
+                  size="small"
+                  sx={{ height: 18, fontSize: "0.6rem", fontWeight: 600, bgcolor: statusFor(optScore).color + "1a", color: statusFor(optScore).color }}
+                />
               </Box>
-              <ScoreBar value={budgetData.optimization_score || 0} label="Optimization Score" />
-              <Typography variant="caption" sx={{ color: "rgba(0,0,0,0.4)" }}>
-                {budgetData.pages_crawled} of {budgetData.sitemap_total_urls} sitemap URLs crawled
+              <ScoreBar value={optScore} label="Optimization Score" />
+              <Typography variant="caption" sx={{ color: "#475569", display: "block", lineHeight: 1.4 }}>
+                Search engines have a limited crawl budget. {budgetData.pages_crawled} of {budgetData.sitemap_total_urls} sitemap URLs were crawled — a higher score means your important pages are easier to find.
               </Typography>
-            </Box>
+            </SectionCard>
           ) : null}
 
           {/* Top themes */}
           {data.augmented_themes && data.augmented_themes.length > 0 ? (
-            <Box>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.75 }}>
-                <TopicIcon sx={{ fontSize: 16, color: "#8b5cf6" }} />
-                <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                  Top Content Themes
-                </Typography>
-                <MetricTooltip title={getMetricTooltip("top_themes")} />
-              </Box>
+            <SectionCard
+              icon={<TopicIcon sx={{ fontSize: 16, color: "#8b5cf6" }} />}
+              title="Top Content Themes"
+              tooltipKey="top_themes"
+            >
               <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
                 {data.augmented_themes.slice(0, 12).map((t, i) => (
                   <Chip
@@ -339,12 +439,15 @@ export const ContentAuditSummaryCard: React.FC<ContentAuditSummaryCardProps> = (
                   />
                 ))}
               </Box>
-            </Box>
+              <Typography variant="caption" sx={{ color: "#475569", display: "block", mt: 0.75, lineHeight: 1.4 }}>
+                The topics that appear most often in your content — this is what search engines think your site is about.
+              </Typography>
+            </SectionCard>
           ) : null}
 
           {/* View full report hint */}
-          <Box sx={{ mt: 2, pt: 1.5, borderTop: "1px solid rgba(0,0,0,0.06)" }}>
-            <Typography variant="caption" sx={{ color: "rgba(0,0,0,0.4)" }}>
+          <Box sx={{ mt: 2, pt: 1.5, borderTop: "1px solid #e2e8f0" }}>
+            <Typography variant="caption" sx={{ color: "#64748b" }}>
               Full report with redirect audit, image SEO, robots.txt, and crawl details available on the SEO Dashboard after onboarding.
             </Typography>
           </Box>

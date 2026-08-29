@@ -1,7 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import "./youtube-dashboard-layout.css";
-import "./youtube-rail-controls.css";
-import "./youtube-mobile-landing.css";
 import { YouTubeRadialWorkflow } from "./YouTubeRadialWorkflow";
 import { YouTubeMobileWorkflowGrid } from "./YouTubeMobileWorkflowGrid";
 import { YouTubeChannelHub } from "./YouTubeChannelHub";
@@ -126,6 +123,7 @@ export function YouTubeStudioHub({
       connected={connected}
       onConnect={onConnect}
       onCreateVideo={() => openYouTubeCreator({ step: 0 })}
+      isLoading={oauthLoading}
     />
   );
 
@@ -255,6 +253,9 @@ export function YouTubeStudioHub({
                     onConnect={onConnect}
                     needsAnalyticsReconnect={needsAnalyticsReconnect}
                   />
+                  <div className="yt-studio-hub-connect-anchor yt-studio-hub-connect-anchor--in-canvas">
+                    {hubCta}
+                  </div>
                 </div>
               )}
             </div>

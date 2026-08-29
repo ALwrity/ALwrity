@@ -9,22 +9,20 @@ import {
   Tooltip,
   Alert
 } from '@mui/material';
-import {
-  Language as GlobeIcon,
-  CheckCircle as CheckIcon,
-  Cancel as CrossIcon,
-  GitHub as GitHubIcon,
-  LinkedIn as LinkedInIcon,
-  YouTube as YouTubeIcon,
-  Twitter as TwitterIcon,
-  Facebook as FacebookIcon,
-  Instagram as InstagramIcon,
-  Business as BusinessIcon,
-  Email as EmailIcon,
-  Phone as PhoneIcon,
-  Image as ImageIcon,
-  Info as InfoIcon,
-} from '@mui/icons-material';
+import GlobeIcon from '@mui/icons-material/Language';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import CrossIcon from '@mui/icons-material/Cancel';
+import GitHubIcon from '@mui/icons-material/GitHub';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import YouTubeIcon from '@mui/icons-material/YouTube';
+import TwitterIcon from '@mui/icons-material/Twitter';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import BusinessIcon from '@mui/icons-material/Business';
+import EmailIcon from '@mui/icons-material/Email';
+import PhoneIcon from '@mui/icons-material/Phone';
+import ImageIcon from '@mui/icons-material/Image';
+import InfoIcon from '@mui/icons-material/Info';
 import SectionHeader from './SectionHeader';
 
 interface CrawlResultSectionsProps {

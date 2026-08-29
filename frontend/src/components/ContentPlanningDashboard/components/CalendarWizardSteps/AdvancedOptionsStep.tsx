@@ -19,14 +19,12 @@ import {
   Switch,
   Divider
 } from '@mui/material';
-import {
-  AutoAwesome as AIIcon,
-  Analytics as AnalyticsIcon,
-  TrendingUp as TrendingIcon,
-  Psychology as PsychologyIcon,
-  Info as InfoIcon,
-  Assessment as AssessmentIcon
-} from '@mui/icons-material';
+import AIIcon from '@mui/icons-material/AutoAwesome';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import TrendingIcon from '@mui/icons-material/TrendingUp';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import InfoIcon from '@mui/icons-material/Info';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 
 interface AdvancedOptionsStepProps {
   calendarConfig: any;

@@ -1,13 +1,11 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createTheme, ThemeProvider, Paper, IconButton, Tooltip, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography, Box, TextField, Chip } from '@mui/material';
-import {
-  AutoAwesome as AutoAwesomeIcon,
-  MoreHoriz as MoreHorizIcon,
-  BarChart as BarChartIcon,
-  Hub as HubIcon,
-  FactCheck as FactCheckIcon,
-  Visibility as VisibilityIcon,
-} from '@mui/icons-material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import HubIcon from '@mui/icons-material/Hub';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { BlogOutlineSection, BlogResearchResponse, blogWriterApi } from '../../../services/blogWriterApi';
 import BlogSection from './BlogSection';
 import EditorSidebar from './EditorSidebar';

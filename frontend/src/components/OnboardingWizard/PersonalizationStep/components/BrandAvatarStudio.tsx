@@ -25,25 +25,19 @@ import {
   InputLabel,
   FormHelperText
 } from '@mui/material';
-import {
-  CloudUpload,
-  // // Refresh,
-  PhotoCamera,
-  AutoFixHigh,
-  InfoOutlined,
-  Close,
-  // PlayArrow,
-  HelpOutline,
-  // Palette,
-  Psychology,
-  // AutoFixNormal,
-  Create,
-  CheckCircle,
-  Fullscreen,
-  Lightbulb,
-  RestartAlt,
-  Undo
-} from '@mui/icons-material';
+import CloudUpload from '@mui/icons-material/CloudUpload';
+import PhotoCamera from '@mui/icons-material/PhotoCamera';
+import AutoFixHigh from '@mui/icons-material/AutoFixHigh';
+import InfoOutlined from '@mui/icons-material/InfoOutlined';
+import Close from '@mui/icons-material/Close';
+import HelpOutline from '@mui/icons-material/HelpOutline';
+import Psychology from '@mui/icons-material/Psychology';
+import Create from '@mui/icons-material/Create';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Fullscreen from '@mui/icons-material/Fullscreen';
+import Lightbulb from '@mui/icons-material/Lightbulb';
+import RestartAlt from '@mui/icons-material/RestartAlt';
+import Undo from '@mui/icons-material/Undo';
 import { OperationButton } from '../../../shared/OperationButton';
 import {
   getLatestBrandAvatar,

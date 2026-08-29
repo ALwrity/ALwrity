@@ -1,14 +1,12 @@
 import React, { useCallback } from "react";
 import { Stack, Typography, Chip, Divider, Box, alpha, Paper, CircularProgress, Tooltip } from "@mui/material";
-import {
-  Insights as InsightsIcon,
-  Search as SearchIcon,
-  EditNote as EditNoteIcon,
-  Article as ArticleIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  ArrowForward as ArrowForwardIcon,
-  HelpOutline as HelpOutlineIcon,
-} from "@mui/icons-material";
+import InsightsIcon from '@mui/icons-material/Insights';
+import SearchIcon from '@mui/icons-material/Search';
+import EditNoteIcon from '@mui/icons-material/EditNote';
+import ArticleIcon from '@mui/icons-material/Article';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { Research, ResearchInsight, Fact } from "../types";
 import { GlassyCard, glassyCardSx, PrimaryButton } from "../ui";
 import { FactCard } from "../FactCard";

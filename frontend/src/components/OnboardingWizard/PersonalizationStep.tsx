@@ -8,12 +8,10 @@ import {
   CircularProgress,
   Backdrop,
 } from '@mui/material';
-import {
-  InfoOutlined,
-  Psychology as PsychologyIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Assessment as AssessmentIcon,
-} from '@mui/icons-material';
+import InfoOutlined from '@mui/icons-material/InfoOutlined';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import { 
   getPersonalizationConfigurationOptions,
 } from '../../api/componentLogic';
@@ -33,7 +31,6 @@ import { Step4Hero } from './PersonaStep/Step4Hero';
 
 interface PersonalizationStepProps {
   onContinue: (data?: any) => void;
-  updateHeaderContent: (content: { title: string; description: string }) => void;
   onValidationChange?: (isValid: boolean) => void;
   onDataChange?: (data: any) => void;
   onboardingType?: string;
@@ -86,7 +83,6 @@ function persistPlatformPersonaToCache(platformId: string, persona: any) {
 
 const PersonalizationStep: React.FC<PersonalizationStepProps> = ({ 
   onContinue: _onContinue, 
-  updateHeaderContent, 
   onValidationChange,
   onDataChange,
   onboardingType,
@@ -103,11 +99,12 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Persona data
-  const [corePersona, setCorePersona] = useState<any>(null);
-  const [platformPersonas, setPlatformPersonas] = useState<Record<string, any>>({});
-  const [qualityMetrics, setQualityMetrics] = useState<QualityMetrics | null>(null);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['linkedin', 'blog']);
+  // Persona data — seed from stepData so the first onDataChange call writes
+  // valid data instead of nulls (prevents AI re-generation on back-navigation).
+  const [corePersona, setCorePersona] = useState<any>(stepData?.corePersona ?? null);
+  const [platformPersonas, setPlatformPersonas] = useState<Record<string, any>>(stepData?.platformPersonas ?? {});
+  const [qualityMetrics, setQualityMetrics] = useState<QualityMetrics | null>(stepData?.qualityMetrics ?? null);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(stepData?.selectedPlatforms ?? ['linkedin', 'blog']);
   // Phase 2: deterministic completeness + data-sufficiency scores.
   // Backed by the backend's `PersonaPromptBuilder.compute_completeness` +
   // `OnboardingDataCollector.calculate_data_sufficiency`. Optional — when
@@ -460,9 +457,7 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
   });
 
   const { initialize } = usePersonaInitialization({
-    onboardingData,
     stepData,
-    updateHeaderContent,
     setCorePersona,
     setPlatformPersonas,
     setQualityMetrics,
@@ -484,12 +479,6 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
     initRef.current = true;
     
     const initSequence = async () => {
-      // Set initial header
-      updateHeaderContent({
-        title: 'Define Your Brand Persona',
-        description: 'Go beyond text. Define how your brand sounds, looks, and speaks. Configure your brand voice, generate an AI avatar, and prepare for voice cloning.'
-      });
-
       // Load configuration options first (lightweight)
       try {
         const options = await getPersonalizationConfigurationOptions();
@@ -511,7 +500,7 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
     };
 
     initSequence();
-  }, [updateHeaderContent, initialize]);
+  }, [initialize]);
 
   const handleRegenerate = () => {
     setShowPreview(false);

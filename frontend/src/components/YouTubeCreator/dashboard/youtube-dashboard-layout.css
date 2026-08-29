@@ -70,6 +70,14 @@ body.youtube-studio-view #root {
   flex-direction: column;
 }
 
+/*
+ * Phase 4 stacking (Problem 1):
+ * Do not isolate `.yt-studio-hub-main`. Isolation trapped in-tree z-index so
+ * Hub content could not paint over the sibling Channel Pulse rail (z-index 24).
+ * Hub main and rail now share `.yt-studio-hub`'s stacking context.
+ * Leaf wedges still portal to body (YouTubeActionModal) to sit above Knowledge
+ * Centre (12000), not to beat the rail.
+ */
 .yt-studio-hub {
   width: 100%;
   display: flex;
@@ -89,12 +97,12 @@ body.youtube-studio-view #root {
   flex-direction: column;
   gap: 0;
   position: relative;
-  isolation: isolate;
   padding: 0 8px;
   padding-bottom: 90px;
   box-sizing: border-box;
 }
 
+/* In-tree Hub chrome (not a body overlay). 25 > rail 24 if they overlap. */
 .yt-studio-hub-toolbar {
   position: absolute;
   top: 8px;
@@ -192,7 +200,9 @@ body.youtube-studio-view #root {
 
 @media (min-width: 601px) {
   body.youtube-studio-view .yt-studio-hub {
-    display: block;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
     flex: 1 1 auto;
     min-height: 0;
     height: 100%;
@@ -200,12 +210,15 @@ body.youtube-studio-view #root {
   }
 
   body.youtube-studio-view .yt-studio-hub-main {
-    width: 100%;
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
     min-height: 0;
     height: 100%;
     padding-bottom: 0;
     display: flex;
     flex-direction: column;
+    overflow: visible;
   }
 
   body.youtube-studio-view .yt-studio-hub-hero-stage {
@@ -218,8 +231,9 @@ body.youtube-studio-view #root {
     align-items: stretch;
     padding-top: clamp(8px, 2vh, 24px);
     padding-left: clamp(4px, 1vw, 12px);
-    padding-bottom: 30px;
+    padding-bottom: 36px;
     position: relative;
+    overflow: visible;
   }
 
   body.youtube-studio-view .yt-studio-hub-hero {
@@ -236,7 +250,7 @@ body.youtube-studio-view #root {
   body.youtube-studio-view .yt-studio-hub-connect-anchor--hub-bottom {
     position: absolute !important;
     left: var(--yt-hub-center-left, 50%) !important;
-    bottom: 12px !important;
+    bottom: 14px !important;
     top: auto !important;
     transform: translateX(-50%) !important;
     z-index: 25;
@@ -245,6 +259,9 @@ body.youtube-studio-view #root {
     justify-content: center;
     align-items: center;
     min-width: 0;
+    width: auto;
+    max-width: none;
+    overflow: visible;
   }
 
   body.youtube-studio-view .yt-studio-bottom-dock {
@@ -271,13 +288,16 @@ body.youtube-studio-view #root {
     flex: 0 0 auto;
   }
 
+  /* In-tree rail chrome only. Hub leaf modals do not raise z-index to beat this. */
   body.youtube-studio-view .yt-studio-right-rail {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 24;
+    position: relative !important;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    flex: 0 0 340px;
+    z-index: 2;
     pointer-events: auto;
+    overflow: hidden;
   }
 }
 
@@ -467,16 +487,19 @@ body.youtube-studio-view #root {
   background: #fff;
 }
 
+/*
+ * Hub leaf backdrop. z-index comes from YouTubeActionModal inline YT_Z_MODAL
+ * (beats Knowledge Centre). Do not isolate — z-index already stacks this layer.
+ * Do not duplicate 13000 here (Phase 4 unified source of truth).
+ */
 .yt-modal-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.38);
-  z-index: 13000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
-  isolation: isolate;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -489,7 +512,8 @@ body.youtube-studio-view #root {
   border-radius: 16px;
   border: 1px solid #e5e5e5;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
-  padding: 20px;
+  display: flex;
+  flex-direction: column;
 }
 
 .yt-modal-card--wedge {
@@ -548,9 +572,11 @@ body.youtube-studio-view #root {
   line-height: 1.2;
   cursor: pointer;
   color: #64748b;
-  padding: 2px 0;
+  padding: 4px 0 4px 0;
+  margin: 0;
   font-weight: 600;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .yt-modal-back:hover {
@@ -566,14 +592,106 @@ body.youtube-studio-view #root {
 
 .yt-modal-close {
   border: none;
-  background: #f1f5f9;
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
+  background: #f0f0f0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
   cursor: pointer;
-  font-size: 1.1rem;
+  font-size: 20px;
   line-height: 1;
   flex-shrink: 0;
+  color: #666666;
+  transition: background 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.yt-modal-close:hover {
+  background: #e8e8e8;
+}
+
+/* YouTube wedge modal header — centered title layout with YouTube branding */
+.yt-modal-header-container {
+  padding: 16px 20px;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+/* Modal body with content padding */
+.yt-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px;
+}
+
+.yt-modal-header-title {
+  margin: 0;
+  font-weight: 700;
+  color: #ff0000;
+  letter-spacing: -0.01em;
+}
+
+.yt-modal-header-title--default {
+  font-size: 15px;
+}
+
+.yt-modal-header-title--lg {
+  font-size: 18px;
+}
+
+.yt-modal-header-title--xl {
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+
+/* Centered row layout: back left, title center, close right */
+.yt-modal-header-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: 12px;
+  min-height: 44px;
+}
+
+.yt-modal-header-side {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.yt-modal-header-side--start {
+  grid-column: 1;
+  justify-self: start;
+  padding-left: 0;
+}
+
+.yt-modal-header-side--end {
+  grid-column: 3;
+  justify-self: end;
+  padding-right: 0;
+}
+
+.yt-modal-header-title--centered {
+  grid-column: 2;
+  justify-self: center;
+  align-self: center;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .yt-modal-header-title--centered {
+    max-width: min(100%, 240px);
+    font-size: 20px !important;
+  }
 }
 
 @media (max-width: 600px) {
@@ -658,6 +776,7 @@ body.youtube-studio-view #root {
     display: none !important;
   }
 
+  /* In-tree mobile chrome (YT_Z_MOBILE_FAB). Below MUI modal 1300. */
   .yt-studio-mobile-copilot-fab {
     display: block;
     position: fixed;
@@ -675,7 +794,7 @@ body.youtube-studio-view #root {
 
 /* Plan wedge START HERE bookmark — matches LinkedIn radial hero (desktop only) */
 @media (min-width: 601px) {
-  .workflow-wedge-bookmark-badge {
+  body.youtube-studio-view .workflow-wedge-bookmark-badge {
     --bookmark-accent: var(--bookmark-ribbon-color, #b9faf8);
     position: absolute;
     top: 0;
@@ -694,7 +813,7 @@ body.youtube-studio-view #root {
     animation: workflowBookmarkBadgeFloat 2.8s ease-in-out infinite;
   }
 
-  .workflow-wedge-bookmark-badge__svg {
+  body.youtube-studio-view .workflow-wedge-bookmark-badge__svg {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -702,14 +821,14 @@ body.youtube-studio-view #root {
     overflow: visible;
   }
 
-  .workflow-wedge-bookmark-badge__path {
+  body.youtube-studio-view .workflow-wedge-bookmark-badge__path {
     stroke: rgba(255, 255, 255, 0.85);
     stroke-width: 1.2;
     stroke-linejoin: round;
     paint-order: stroke fill;
   }
 
-  .workflow-wedge-bookmark-badge__text {
+  body.youtube-studio-view .workflow-wedge-bookmark-badge__text {
     position: absolute;
     inset: 0;
     z-index: 1;
@@ -723,7 +842,7 @@ body.youtube-studio-view #root {
     padding-bottom: 6px;
   }
 
-  .workflow-wedge-bookmark-badge__line {
+  body.youtube-studio-view .workflow-wedge-bookmark-badge__line {
     display: block;
     font-size: 7px;
     font-weight: 800;
@@ -733,7 +852,7 @@ body.youtube-studio-view #root {
     text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
   }
 
-  .workflow-wedge-bookmark-badge__line--bold {
+  body.youtube-studio-view .workflow-wedge-bookmark-badge__line--bold {
     font-size: 8px;
     font-weight: 900;
     letter-spacing: 0.02em;
@@ -751,8 +870,81 @@ body.youtube-studio-view #root {
 }
 
 @media (min-width: 601px) and (prefers-reduced-motion: reduce) {
-  .workflow-wedge-bookmark-badge {
+  body.youtube-studio-view .workflow-wedge-bookmark-badge {
     animation: none;
     transform: translateX(-50%);
   }
+}
+
+/* Phase 2: Full Creator dedicated surface (below MUI modal, not YT_Z_MODAL). */
+.yt-creator-surface {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.yt-creator-surface-header {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px 8px;
+  width: 100%;
+}
+
+.yt-creator-surface-header-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  grid-column: 2;
+  justify-self: center;
+}
+
+.yt-creator-surface-header .yt-modal-back {
+  grid-column: 1;
+  justify-self: start;
+}
+
+.yt-creator-surface-header .yt-modal-close {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.yt-creator-surface-header-main h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #ff0000;
+}
+
+.yt-creator-surface-intro {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.yt-creator-surface-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 16px 16px;
+}
+
+body.yt-creator-surface-active {
+  overflow: hidden;
+}
+
+body.yt-creator-surface-active .yt-studio-right-rail,
+body.yt-creator-surface-active .yt-knowledge-center-portal,
+body.yt-creator-surface-active .yt-studio-bottom-dock,
+body.yt-creator-surface-active .yt-studio-mobile-copilot-fab {
+  visibility: hidden !important;
+  pointer-events: none !important;
 }

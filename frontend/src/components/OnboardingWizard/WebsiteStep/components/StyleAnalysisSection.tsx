@@ -16,15 +16,11 @@ import {
   Tooltip,
   TextField
 } from '@mui/material';
-import {
-  Analytics as AnalyticsIcon,
-  // AutoAwesome as AutoAwesomeIcon,
-  Psychology as PsychologyIcon,
-  Info as InfoIcon,
-  // MenuBook as MenuBookIcon,
-  Timeline as TimelineIcon,
-  Star as StarIcon
-} from '@mui/icons-material';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import InfoIcon from '@mui/icons-material/Info';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import StarIcon from '@mui/icons-material/Star';
 import SectionHeader from './SectionHeader';
 
 interface StyleAnalysisSectionProps {

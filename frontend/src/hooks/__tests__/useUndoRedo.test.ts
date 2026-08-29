@@ -87,7 +87,7 @@ describe("useUndoRedo", () => {
   });
 
   it("does not register keyboard shortcuts when disabled", () => {
-    const addSpy = jest.spyOn(window, "addEventListener");
+    const addSpy = vi.spyOn(window, "addEventListener");
 
     renderHook(() =>
       useUndoRedo("", { enableKeyboardShortcuts: false }),

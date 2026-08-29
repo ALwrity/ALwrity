@@ -1,4 +1,5 @@
 import { buildToolbarImageSeedFromDraft } from "../utils/linkedInToolbarImageSeed";
+import * as linkedInPublishFormatters from "../utils/linkedInPublishFormatters";
 import {
   LINKEDIN_IMAGE_EMPTY_SEED_FALLBACK,
   LINKEDIN_IMAGE_SEED_MAX_CHARS,
@@ -6,12 +7,12 @@ import {
 
 describe("linkedInToolbarImageSeed", () => {
   beforeEach(() => {
-    jest.spyOn(console, "debug").mockImplementation(() => {});
-    jest.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "debug").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it("uses full formatted draft text, not a 200-char slice", () => {
@@ -59,11 +60,8 @@ describe("linkedInToolbarImageSeed", () => {
   });
 
   it("returns fallback on formatter failure", () => {
-    const formatSpy = jest
-      .spyOn(
-        require("../utils/linkedInPublishFormatters"),
-        "formatDraftForPublish",
-      )
+    const formatSpy = vi
+      .spyOn(linkedInPublishFormatters, "formatDraftForPublish")
       .mockImplementation(() => {
         throw new Error("format failed");
       });

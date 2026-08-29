@@ -1,7 +1,7 @@
 /**
  * linkedInArticleDraftUtils unit tests.
  * Run manually:
- *   npx react-scripts test --watchAll=false --testPathPattern=linkedInArticleDraftUtils
+ *   npx vitest run linkedInArticleDraftUtils
  */
 
 import type { ArticleContent } from "../../../services/linkedInWriterApi";

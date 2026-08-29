@@ -10,12 +10,10 @@ import {
   ListItemIcon,
   Divider
 } from '@mui/material';
-import {
-  ShowChart as ShowChartIcon,
-  TrendingUp as TrendingUpIcon,
-  Timeline as TimelineIcon,
-  Assessment as AssessmentIcon
-} from '@mui/icons-material';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import { StrategyData } from '../types/strategy.types';
 import {
   ANALYSIS_CARD_STYLES,

@@ -13,13 +13,11 @@ import {
   CardContent,
   Collapse,
 } from '@mui/material';
-import { 
-  Psychology, 
-  TrendingUp, 
-  Speed, 
-  CheckCircle,
-  ArrowForward
-} from '@mui/icons-material';
+import Psychology from '@mui/icons-material/Psychology';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import Speed from '@mui/icons-material/Speed';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import ArrowForward from '@mui/icons-material/ArrowForward';
 import { motion } from 'framer-motion';
 import { useClerk } from '@clerk/clerk-react';
 import { ScrambleText } from '../ScrambleText';

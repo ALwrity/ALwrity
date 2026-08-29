@@ -13,16 +13,14 @@ import {
   AccordionDetails,
   Popover
 } from '@mui/material';
-import {
-  TrendingUp as TrendingUpIcon,
-  ExpandMore as ExpandMoreIcon,
-  Business as BusinessIcon,
-  Star as StarIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  Lightbulb as LightbulbIcon
-} from '@mui/icons-material';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import BusinessIcon from '@mui/icons-material/Business';
+import StarIcon from '@mui/icons-material/Star';
+import WarningIcon from '@mui/icons-material/Warning';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import { StrategyData } from '../types/strategy.types';
 import {
   ANALYSIS_CARD_STYLES,

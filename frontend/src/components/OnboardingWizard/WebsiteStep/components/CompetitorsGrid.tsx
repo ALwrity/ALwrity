@@ -23,14 +23,12 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
   ToggleButtonGroup, ToggleButton,
 } from '@mui/material';
-import {
-  Business as BusinessIcon,
-  OpenInNew as OpenInNewIcon,
-  Delete as DeleteIcon,
-  Add as AddIcon,
-  ViewModule as CardViewIcon,
-  ViewList as ListViewIcon,
-} from '@mui/icons-material';
+import BusinessIcon from '@mui/icons-material/Business';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
+import CardViewIcon from '@mui/icons-material/ViewModule';
+import ListViewIcon from '@mui/icons-material/ViewList';
 
 export interface Competitor {
   url: string;
@@ -39,17 +37,32 @@ export interface Competitor {
   summary: string;
   relevance_score: number;
   highlights?: string[];
+  subpages?: string[];
   favicon?: string;
   image?: string;
   published_date?: string;
   author?: string;
   competitive_insights: {
+    threat_level?: string;
+    competitive_strengths?: string[];
+    competitive_weaknesses?: string[];
+    market_share_estimate?: string;
+    differentiation_opportunities?: string[];
     business_model: string;
     target_audience: string;
   };
   content_insights: {
     content_focus: string;
+    target_audience?: string;
+    content_types?: string[];
+    publishing_frequency?: string;
     content_quality: string;
+  };
+  market_positioning?: {
+    market_tier?: string;
+    pricing_position?: string;
+    brand_positioning?: string;
+    competitive_advantage?: string;
   };
 }
 

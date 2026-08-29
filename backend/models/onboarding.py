@@ -10,6 +10,9 @@ class OnboardingSession(Base):
     user_id = Column(String(255), nullable=False)  # Clerk user ID (string)
     current_step = Column(Integer, default=1)
     progress = Column(Float, default=0.0)
+    timezone = Column(String(50), nullable=True)  # IANA timezone, e.g. "America/New_York"
+    contact_email = Column(String(255), nullable=True)  # User's email for notifications
+    email_digest_opt_in = Column(Boolean, default=False)  # Explicit opt-in for daily digest
     started_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     payload = Column(JSON, nullable=True)  # Task scheduling manifest
@@ -153,7 +156,10 @@ class ResearchPreferences(Base):
     content_characteristics = Column(JSON)  # Sentence structure, vocabulary from analysis
     target_audience = Column(JSON)  # Demographics, expertise level from analysis
     recommended_settings = Column(JSON)  # AI-generated recommendations from analysis
-    
+    content_pillars = Column(JSON, nullable=True)  # Discovered content pillars from competitor analysis
+    research_summary = Column(JSON, nullable=True)  # Market insights, key findings, recommendations from competitor analysis
+    social_media_citations = Column(JSON, nullable=True)  # Social media citations discovered during competitor analysis
+
     # Metadata
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -177,6 +183,9 @@ class ResearchPreferences(Base):
             'content_characteristics': self.content_characteristics,
             'target_audience': self.target_audience,
             'recommended_settings': self.recommended_settings,
+            'content_pillars': self.content_pillars,
+            'research_summary': self.research_summary,
+            'social_media_citations': self.social_media_citations,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         } 

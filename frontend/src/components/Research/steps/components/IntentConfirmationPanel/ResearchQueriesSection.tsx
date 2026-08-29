@@ -18,11 +18,9 @@ import {
   Chip,
   Tooltip,
 } from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  Search as SearchIcon,
-  Info as InfoIcon,
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import SearchIcon from '@mui/icons-material/Search';
+import InfoIcon from '@mui/icons-material/Info';
 import {
   ResearchQuery,
 } from '../../../types/intent.types';

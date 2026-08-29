@@ -8,18 +8,16 @@ import {
   Divider,
   LinearProgress
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Info as InfoIcon,
-  HelpOutline as HelpOutlineIcon,
-  Lightbulb as LightbulbIcon,
-  RecordVoiceOver as RecordVoiceOverIcon,
-  CompareArrows as CompareArrowsIcon,
-  Tune as TuneIcon,
-  Spellcheck as SpellcheckIcon,
-  Insights as InsightsIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import InfoIcon from '@mui/icons-material/Info';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import TuneIcon from '@mui/icons-material/Tune';
+import SpellcheckIcon from '@mui/icons-material/Spellcheck';
+import InsightsIcon from '@mui/icons-material/Insights';
 import { motion } from 'framer-motion';
 import {
   RadialBarChart,

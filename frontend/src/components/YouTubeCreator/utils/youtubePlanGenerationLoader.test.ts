@@ -11,7 +11,7 @@ describe("youtubePlanGenerationLoader", () => {
     const copy = getPlanGenerationLoaderCopy(false);
     expect(copy.messages.some((m) => m.toLowerCase().includes("exa"))).toBe(false);
     expect(copy.steps).not.toContain("Search the web via Exa");
-    expect(copy.steps).toContain("Generate the plan with llm_text_gen");
+    expect(copy.steps).toContain("Generate the pitch with llm_text_gen");
   });
 
   it("caps progress at 95 percent", () => {

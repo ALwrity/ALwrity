@@ -26,8 +26,11 @@ def get_engine_for_user(user_id: str):
         "echo": False,
         "pool_pre_ping": True,
         "pool_recycle": 300,
-        "pool_size": int(os.getenv("DB_POOL_SIZE", "20")),
-        "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "40")),
+        # SQLite is single-writer; a large pool only creates lock contention.
+        # Use a single connection per engine and let SQLite's file locking
+        # serialize writers across threads/processes.
+        "pool_size": int(os.getenv("DB_POOL_SIZE", "1")),
+        "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "0")),
         "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),
         "connect_args": {"check_same_thread": False},
     }
@@ -35,11 +38,13 @@ def get_engine_for_user(user_id: str):
     engine = create_engine(database_url, **engine_kwargs)
     _user_engines[user_id] = engine
 
-    # Enable WAL mode for SQLite — allows concurrent reads with one writer
+    # Enable WAL mode for SQLite — allows concurrent reads with one writer.
+    # Increase busy_timeout so writers wait longer for the lock instead of
+    # failing immediately under load.
     try:
         with engine.connect() as conn:
             conn.execute(text("PRAGMA journal_mode=WAL"))
-            conn.execute(text("PRAGMA busy_timeout=5000"))
+            conn.execute(text("PRAGMA busy_timeout=30000"))
             conn.commit()
     except Exception:
         pass

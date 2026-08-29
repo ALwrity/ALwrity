@@ -1,24 +1,25 @@
+import type { Mock } from 'vitest';
 import { getLatestBrandAvatar, getLatestVoiceClone } from '../brandAssets';
 import { apiClient } from '../client';
 
-jest.mock('../client', () => ({
+vi.mock('../client', () => ({
   apiClient: {
-    get: jest.fn(),
-    post: jest.fn(),
+    get: vi.fn(),
+    post: vi.fn(),
   },
   aiApiClient: {
-    get: jest.fn(),
-    post: jest.fn(),
+    get: vi.fn(),
+    post: vi.fn(),
   },
 }));
 
 describe('brandAssets API', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('calls latest brand avatar endpoint via /api path', async () => {
-    (apiClient.get as jest.Mock).mockResolvedValue({
+    (apiClient.get as Mock).mockResolvedValue({
       status: 200,
       data: { success: true, image_url: '/api/youtube/images/avatars/test.png' },
     });
@@ -32,7 +33,7 @@ describe('brandAssets API', () => {
   });
 
   it('maps 404 brand avatar response to no-avatar payload', async () => {
-    (apiClient.get as jest.Mock).mockResolvedValue({
+    (apiClient.get as Mock).mockResolvedValue({
       status: 404,
       data: { detail: 'Not Found' },
     });
@@ -43,7 +44,7 @@ describe('brandAssets API', () => {
   });
 
   it('calls latest voice clone endpoint via /api path', async () => {
-    (apiClient.get as jest.Mock).mockResolvedValue({
+    (apiClient.get as Mock).mockResolvedValue({
       status: 200,
       data: { success: true, custom_voice_id: 'vc_123' },
     });

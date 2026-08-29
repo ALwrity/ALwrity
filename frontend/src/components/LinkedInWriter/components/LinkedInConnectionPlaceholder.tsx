@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { LinkedIn as LinkedInIcon } from "@mui/icons-material";
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import { CircularProgress } from "@mui/material";
 import { useLinkedInSocialConnection } from "../../../hooks/useLinkedInSocialConnection";
 import { LinkedInProfileSetupPanel } from "./ProfileCompletion/LinkedInProfileSetupPanel";

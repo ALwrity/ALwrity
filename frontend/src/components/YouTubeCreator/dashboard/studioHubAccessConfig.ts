@@ -1,43 +1,32 @@
 /**
- * Studio Hub access control — single source of truth for wedge/tile gates.
- * Flip STUDIO_HUB_UNLOCK_ALL_FOR_TESTING to false to restore production OAuth gates.
+ * Studio Hub access control — landing wedges stay open; OAuth is enforced inside
+ * sub-features (publish, analytics tiles, etc.) when data is required.
  */
 
-/** When true, wedges and modal tiles skip connect / coming-soon UI gates. */
-export const STUDIO_HUB_UNLOCK_ALL_FOR_TESTING = true;
-
-const DEFAULT_CONNECT_GATED_WEDGE_IDS = [
+const LEGACY_CONNECT_GATED_WEDGE_IDS = [
   "analysis",
   "engagement",
   "remarket",
 ] as const;
 
-export type ConnectGatedWedgeId = (typeof DEFAULT_CONNECT_GATED_WEDGE_IDS)[number];
+export type ConnectGatedWedgeId = (typeof LEGACY_CONNECT_GATED_WEDGE_IDS)[number];
 
-/** Wedges that require YouTube OAuth when disconnected (empty while testing unlock is on). */
-export const CONNECT_GATED_WORKFLOW_IDS: readonly ConnectGatedWedgeId[] =
-  STUDIO_HUB_UNLOCK_ALL_FOR_TESTING ? [] : DEFAULT_CONNECT_GATED_WEDGE_IDS;
+/** Empty — hero wedges are never connect-gated on the landing page. */
+export const CONNECT_GATED_WORKFLOW_IDS: readonly ConnectGatedWedgeId[] = [];
 
-export function isStudioHubTestingUnlockEnabled(): boolean {
-  return STUDIO_HUB_UNLOCK_ALL_FOR_TESTING;
+/** Hero wedges are always navigable from the radial / mobile grid. */
+export function isWedgeConnectGated(_wedgeId: string, _connected: boolean): boolean {
+  return false;
 }
 
-export function isWedgeConnectGated(wedgeId: string, connected: boolean): boolean {
-  if (STUDIO_HUB_UNLOCK_ALL_FOR_TESTING) return false;
-  return (
-    !connected &&
-    (DEFAULT_CONNECT_GATED_WEDGE_IDS as readonly string[]).includes(wedgeId)
-  );
-}
-
-/** True when Plan wedge tiles should show coming-soon / notify flow. */
+/** Plan modal tiles use their own coming-soon / notify flows — not OAuth gates. */
 export function arePlanComingSoonTilesLocked(): boolean {
-  return !STUDIO_HUB_UNLOCK_ALL_FOR_TESTING;
+  return false;
 }
 
-/** True when a modal tile should route to connect instead of its action. */
-export function isTileConnectGated(connected: boolean): boolean {
-  return !STUDIO_HUB_UNLOCK_ALL_FOR_TESTING && !connected;
+/** Modal rail tiles are not blocked at the hub landing layer. */
+export function isTileConnectGated(_connected: boolean): boolean {
+  return false;
 }
 
 export const OAUTH_SUB_MODAL_ACTIONS = [
@@ -62,7 +51,6 @@ export function logOAuthSubModalOpen(
   if (!connected) {
     console.info("[StudioHub] Opening OAuth-backed sub-modal while disconnected", {
       action,
-      testingUnlock: STUDIO_HUB_UNLOCK_ALL_FOR_TESTING,
     });
   }
 }

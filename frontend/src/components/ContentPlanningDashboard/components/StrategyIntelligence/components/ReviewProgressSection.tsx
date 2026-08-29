@@ -8,11 +8,9 @@ import {
   Badge,
   Button
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  AutoAwesome as AutoAwesomeIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { motion } from 'framer-motion';
 import { StrategyData } from '../types/strategy.types';
 import { useStrategyReviewStore, StrategyComponent } from '../../../../../stores/strategyReviewStore';

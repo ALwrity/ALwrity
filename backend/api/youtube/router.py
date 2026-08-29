@@ -33,6 +33,7 @@ from .schemas import (  # noqa: F401
     CostEstimateResponse,
     ExpandRequest,
     ExpandResponse,
+    PitchPreviewResponse,
     PitchRequest,
     PitchResponse,
     SceneBuildRequest,
@@ -57,6 +58,7 @@ from .handlers.plan import (  # noqa: F401
 from .handlers.plan_pitch import (  # noqa: F401
     create_video_pitch,
     expand_video_pitch,
+    preview_video_pitch,
 )
 from .handlers.render import (  # noqa: F401
     combine_scene_videos,
@@ -105,6 +107,7 @@ __all__ = [
     "task_manager",
     "create_video_plan",
     "create_video_pitch",
+    "preview_video_pitch",
     "expand_video_pitch",
     "build_scenes",
     "update_scene",

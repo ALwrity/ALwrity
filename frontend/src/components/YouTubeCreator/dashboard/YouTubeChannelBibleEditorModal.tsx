@@ -111,6 +111,8 @@ export const YouTubeChannelBibleEditorModal: React.FC<
       maxWidth={resolvedShell.maxWidth}
       onBack={resolvedShell.onBack}
       backLabel={resolvedShell.backLabel}
+      titleSize={resolvedShell.titleSize}
+      headerLayout={resolvedShell.headerLayout}
     >
       <ChannelBiblePanel
         bible={channelBible}

@@ -7,15 +7,13 @@ import {
   Collapse,
   IconButton,
 } from '@mui/material';
-import {
-  WarningAmber as WarningIcon,
-  Error as ErrorIcon,
-  InfoOutlined as InfoIcon,
-  CheckCircle as CheckCircleIcon,
-  Close as CloseIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-} from '@mui/icons-material';
+import WarningIcon from '@mui/icons-material/WarningAmber';
+import ErrorIcon from '@mui/icons-material/Error';
+import InfoIcon from '@mui/icons-material/InfoOutlined';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { apiClient } from '../../api/client';
 import { AgentAlertItem, AgentApprovalItem } from '../../hooks/useAgentHuddleFeed';
 

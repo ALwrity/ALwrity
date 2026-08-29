@@ -158,8 +158,10 @@ async def run_content_audit(
 
         advertools_service = AdvertoolsService()
 
-        # Phase 1: sitemap analysis (freshness, URL structure, sample URLs)
-        sitemap_result = await advertools_service.analyze_sitemap(effective_url)
+        # Phase 1: sitemap analysis (freshness, URL structure, sample URLs).
+        # max_retries=1 so a rate-limited origin (429) fails fast instead of
+        # blocking the synchronous request with 4 attempts × 30s backoff.
+        sitemap_result = await advertools_service.analyze_sitemap(effective_url, max_retries=1)
 
         audit_urls = []
         url_structure = {}
@@ -325,7 +327,7 @@ async def run_site_health(
 
         advertools_service = AdvertoolsService()
 
-        sitemap_result = await advertools_service.analyze_sitemap(effective_url)
+        sitemap_result = await advertools_service.analyze_sitemap(effective_url, max_retries=1)
 
         if not sitemap_result.get("success"):
             logger.warning(f"[SiteHealth] Sitemap analysis failed for {effective_url}: {sitemap_result.get('error')}")

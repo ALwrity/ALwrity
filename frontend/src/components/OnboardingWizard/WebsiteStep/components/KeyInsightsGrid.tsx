@@ -12,18 +12,16 @@ import {
   Tooltip,
   Chip,
 } from '@mui/material';
-import {
-  Info as InfoIcon,
-  Palette as PaletteIcon,
-  Speed as SpeedIcon,
-  Language as LanguageIcon,
-  TrendingUp as TrendingUpIcon,
-  Business as BusinessIcon,
-  Psychology as PsychologyIcon,
-  Group as GroupIcon,
-  Explore as ExploreIcon,
-  Article as ArticleIcon,
-} from '@mui/icons-material';
+import InfoIcon from '@mui/icons-material/Info';
+import PaletteIcon from '@mui/icons-material/Palette';
+import SpeedIcon from '@mui/icons-material/Speed';
+import LanguageIcon from '@mui/icons-material/Language';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import BusinessIcon from '@mui/icons-material/Business';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import GroupIcon from '@mui/icons-material/Group';
+import ExploreIcon from '@mui/icons-material/Explore';
+import ArticleIcon from '@mui/icons-material/Article';
 
 interface WritingStyle {
   tone?: string;

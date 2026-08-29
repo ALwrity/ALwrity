@@ -1,12 +1,10 @@
 import React from 'react';
-import {
-  Business as BusinessIcon,
-  People as PeopleIcon,
-  TrendingUp as TrendingUpIcon,
-  ContentPaste as ContentIcon,
-  Analytics as AnalyticsIcon,
-  Help as HelpIcon
-} from '@mui/icons-material';
+import BusinessIcon from '@mui/icons-material/Business';
+import PeopleIcon from '@mui/icons-material/People';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import ContentIcon from '@mui/icons-material/ContentPaste';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import HelpIcon from '@mui/icons-material/Help';
 
 export const getCategoryIcon = (categoryId: string): React.ReactElement => {
   switch (categoryId) {

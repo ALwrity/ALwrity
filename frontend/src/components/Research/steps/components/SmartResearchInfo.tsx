@@ -23,16 +23,14 @@ import {
   Chip,
   Divider,
 } from '@mui/material';
-import {
-  Info as InfoIcon,
-  Psychology as BrainIcon,
-  CheckCircle as CheckIcon,
-  TrendingUp as TrendIcon,
-  FormatQuote as QuoteIcon,
-  BarChart as StatsIcon,
-  School as CaseStudyIcon,
-  Close as CloseIcon,
-} from '@mui/icons-material';
+import InfoIcon from '@mui/icons-material/Info';
+import BrainIcon from '@mui/icons-material/Psychology';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import TrendIcon from '@mui/icons-material/TrendingUp';
+import QuoteIcon from '@mui/icons-material/FormatQuote';
+import StatsIcon from '@mui/icons-material/BarChart';
+import CaseStudyIcon from '@mui/icons-material/School';
+import CloseIcon from '@mui/icons-material/Close';
 
 interface SmartResearchInfoProps {
   variant?: 'tooltip' | 'button' | 'icon';

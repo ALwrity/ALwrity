@@ -40,7 +40,7 @@ describe("workflowWedgeNavigation", () => {
 
   describe("openWorkflowWedge", () => {
     it("dispatches resolved detail for legacy engagement pulse deep link", () => {
-      const handler = jest.fn();
+      const handler = vi.fn();
       window.addEventListener(OPEN_WORKFLOW_WEDGE_EVENT, handler);
 
       openWorkflowWedge({ wedge: "engagement", sub: "pulse" });
@@ -55,7 +55,7 @@ describe("workflowWedgeNavigation", () => {
 
   describe("openPerformancePulse", () => {
     it("opens remarket pulse with Content Analytics return target", () => {
-      const handler = jest.fn();
+      const handler = vi.fn();
       window.addEventListener(OPEN_WORKFLOW_WEDGE_EVENT, handler);
 
       openPerformancePulse();
@@ -72,7 +72,7 @@ describe("workflowWedgeNavigation", () => {
     });
 
     it("preserves Analysis wedge context in return target", () => {
-      const handler = jest.fn();
+      const handler = vi.fn();
       window.addEventListener(OPEN_WORKFLOW_WEDGE_EVENT, handler);
 
       openPerformancePulse({ fromAnalysisWedge: true });

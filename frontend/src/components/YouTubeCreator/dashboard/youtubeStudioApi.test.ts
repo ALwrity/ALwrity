@@ -1,20 +1,20 @@
 import { youtubeStudioApi } from "../../../services/youtubeStudioApi";
 import { apiClient } from "../../../api/client";
 
-jest.mock("../../../api/client", () => ({
+vi.mock("../../../api/client", () => ({
   apiClient: {
-    get: jest.fn(),
-    post: jest.fn(),
+    get: vi.fn(),
+    post: vi.fn(),
   },
 }));
 
 describe("youtubeStudioApi", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it("loads channel pulse from /api/youtube/analytics/pulse", async () => {
-    jest.mocked(apiClient.get).mockResolvedValueOnce({
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
       data: { success: false, message: "Reconnect YouTube with Analytics scope" },
     });
     const result = await youtubeStudioApi.getChannelPulse({ days: 28 });
@@ -26,7 +26,7 @@ describe("youtubeStudioApi", () => {
   });
 
   it("loads comment inbox from /api/youtube/comments/inbox", async () => {
-    jest.mocked(apiClient.get).mockResolvedValueOnce({
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
       data: { success: true, comments: [] },
     });
     const result = await youtubeStudioApi.getCommentInbox({ max_results: 20 });

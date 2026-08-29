@@ -14,10 +14,8 @@ import {
   Tab,
   Paper,
 } from '@mui/material';
-import {
-  CameraAlt as CameraIcon,
-  CloudUpload as UploadIcon,
-} from '@mui/icons-material';
+import CameraIcon from '@mui/icons-material/CameraAlt';
+import UploadIcon from '@mui/icons-material/CloudUpload';
 import { useScreenCapture } from './hooks/useScreenCapture';
 import type { Frame } from './types';
 import { captureFrameMetadata } from './utils';

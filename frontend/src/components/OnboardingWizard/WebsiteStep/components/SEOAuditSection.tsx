@@ -25,21 +25,18 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon,
-  Speed as SpeedIcon,
-  Security as SecurityIcon,
-  Code as CodeIcon,
-  Description as DescriptionIcon,
-  AccessibilityNew as AccessibilityIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  // Info as InfoIcon,
-  PlayArrow as PlayArrowIcon,
-  Schedule as ScheduleIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import ErrorIcon from '@mui/icons-material/Error';
+import SpeedIcon from '@mui/icons-material/Speed';
+import SecurityIcon from '@mui/icons-material/Security';
+import CodeIcon from '@mui/icons-material/Code';
+import DescriptionIcon from '@mui/icons-material/Description';
+import AccessibilityIcon from '@mui/icons-material/AccessibilityNew';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 
 const METRIC_TOOLTIPS: { [key: string]: string } = {
   // Meta Data
@@ -427,44 +424,7 @@ const SEOAuditSection: React.FC<SEOAuditSectionProps> = ({
                              {displayValue}
                          </Typography>
                     )}
-         </Box>
-         
-         {/* Warnings Summary */}
-         {displayAudit.summary?.warnings && displayAudit.summary.warnings.length > 0 && (
-           <Box sx={{ p: 2, bgcolor: '#FFFBEB', borderBottom: '1px solid #FDE68A' }}>
-              <Box 
-                display="flex" 
-                justifyContent="space-between" 
-                alignItems="center" 
-                onClick={() => setExpandedWarnings(!expandedWarnings)}
-                sx={{ cursor: 'pointer' }}
-              >
-                <Box display="flex" alignItems="center" gap={1}>
-                   <WarningIcon color="warning" fontSize="small" />
-                   <Typography variant="subtitle2" fontWeight="bold" color="#92400E">
-                     {displayAudit.summary.warnings.length} Warnings
-                   </Typography>
                 </Box>
-                {expandedWarnings ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-              </Box>
-              
-              <Collapse in={expandedWarnings}>
-                <List dense sx={{ mt: 1 }}>
-                  {displayAudit.summary.warnings.map((warning: any, i: number) => (
-                    <ListItem key={i} disablePadding sx={{ py: 0.5 }}>
-                      <ListItemIcon sx={{ minWidth: 24 }}>
-                        <WarningIcon fontSize="small" color="warning" />
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary={typeof warning === 'string' ? warning : warning.message}
-                        primaryTypographyProps={{ variant: 'body2', color: '#78350F' }}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              </Collapse>
-           </Box>
-         )}
               </Box>
             </Tooltip>
           );
@@ -472,6 +432,7 @@ const SEOAuditSection: React.FC<SEOAuditSectionProps> = ({
       </Box>
     </Box>
   );
+
 
   return (
     <Card sx={{ mb: 4, overflow: 'visible', border: '1px solid #E5E7EB', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
@@ -544,7 +505,44 @@ const SEOAuditSection: React.FC<SEOAuditSectionProps> = ({
                )}
              </List>
            </Collapse>
-        </Box>
+         </Box>
+
+        {/* Warnings Summary - global to the audit, shown once */}
+        {displayAudit.summary?.warnings && displayAudit.summary.warnings.length > 0 && (
+          <Box sx={{ p: 2, bgcolor: '#FFFBEB', borderBottom: '1px solid #FDE68A' }}>
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              alignItems="center"
+              onClick={() => setExpandedWarnings(!expandedWarnings)}
+              sx={{ cursor: 'pointer' }}
+            >
+              <Box display="flex" alignItems="center" gap={1}>
+                <WarningIcon color="warning" fontSize="small" />
+                <Typography variant="subtitle2" fontWeight="bold" color="#92400E">
+                  {displayAudit.summary.warnings.length} Warnings
+                </Typography>
+              </Box>
+              {expandedWarnings ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+            </Box>
+
+            <Collapse in={expandedWarnings}>
+              <List dense sx={{ mt: 1 }}>
+                {displayAudit.summary.warnings.map((warning: any, i: number) => (
+                  <ListItem key={i} disablePadding sx={{ py: 0.5 }}>
+                    <ListItemIcon sx={{ minWidth: 24 }}>
+                      <WarningIcon fontSize="small" color="warning" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={typeof warning === 'string' ? warning : warning.message}
+                      primaryTypographyProps={{ variant: 'body2', color: '#78350F' }}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </Collapse>
+          </Box>
+        )}
 
         <Box sx={{ width: '100%' }}>
           <Tabs 

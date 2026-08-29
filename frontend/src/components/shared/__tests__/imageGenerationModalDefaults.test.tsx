@@ -13,8 +13,8 @@ describe("ImageGenerationModal default model", () => {
     render(
       <ImageGenerationModal
         open
-        onClose={jest.fn()}
-        onGenerate={jest.fn()}
+        onClose={vi.fn()}
+        onGenerate={vi.fn()}
         initialPrompt="LinkedIn post about AI"
         showModelSelection
         availableModels={LINKEDIN_IMAGE_MODELS}
@@ -26,7 +26,7 @@ describe("ImageGenerationModal default model", () => {
   });
 
   it("resets to defaultModel when the modal is reopened", async () => {
-    const onClose = jest.fn();
+    const onClose = vi.fn();
 
     const Harness = () => {
       const [open, setOpen] = useState(false);
@@ -41,7 +41,7 @@ describe("ImageGenerationModal default model", () => {
               onClose();
               setOpen(false);
             }}
-            onGenerate={jest.fn()}
+            onGenerate={vi.fn()}
             initialPrompt="LinkedIn post about AI"
             showModelSelection
             availableModels={LINKEDIN_IMAGE_MODELS}

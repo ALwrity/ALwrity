@@ -5,9 +5,7 @@ import {
   Tooltip
 } from '@mui/material';
 import { motion } from 'framer-motion';
-import {
-  Today as TodayIcon
-} from '@mui/icons-material';
+import TodayIcon from '@mui/icons-material/Today';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import { TodayTask } from '../../../types/workflow';
 import EnhancedTodayModal from './EnhancedTodayModal';

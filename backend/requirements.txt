@@ -13,6 +13,7 @@ pydantic>=2.5.2,<3.0.0
 typing-extensions>=4.8.0
 
 reportlab==4.5.1
+alembic>=1.13.0 
 
 # Auth
 PyJWT>=2.8.0
@@ -21,7 +22,6 @@ fastapi-clerk-auth>=0.0.7
 
 # Database
 sqlalchemy>=2.0.25
-alembic>=1.13.0
 
 # Payment
 stripe>=8.0.0

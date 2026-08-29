@@ -13,11 +13,9 @@ import {
   AccordionSummary,
   AccordionDetails
 } from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  CheckCircle as CheckCircleIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import InfoIcon from '@mui/icons-material/Info';
 
 // Import calendar-specific types
 import { type CalendarConfig } from './types';

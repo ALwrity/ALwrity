@@ -1,5 +1,4 @@
 import React, { useMemo } from "react";
-import "./youtubeChannelHub.css";
 
 interface YouTubeChannelHubProps {
   hubSize: number;

@@ -166,6 +166,37 @@ class OnboardingManager:
                 logger.error(f"Error in onboarding_tasks_status: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
+        # Email preferences endpoints (daily email digest opt-in)
+        from api.onboarding_utils.email_preferences import (
+            get_email_preferences,
+            update_email_preferences,
+        )
+
+        @self.app.get("/api/onboarding/email-preferences")
+        async def onboarding_email_preferences_get(current_user: dict = Depends(get_current_user)):
+            """Get the user's business email + daily digest opt-in preferences."""
+            try:
+                return get_email_preferences(current_user)
+            except HTTPException as he:
+                raise he
+            except Exception as e:
+                logger.error(f"Error in email_preferences_get: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.put("/api/onboarding/email-preferences")
+        async def onboarding_email_preferences_update(
+            payload: Dict[str, Any],
+            current_user: dict = Depends(get_current_user),
+        ):
+            """Update the user's business email + daily digest opt-in preferences."""
+            try:
+                return update_email_preferences(current_user, payload)
+            except HTTPException as he:
+                raise he
+            except Exception as e:
+                logger.error(f"Error in email_preferences_update: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
         # Configuration endpoints
         @self.app.get("/api/onboarding/config")
         async def onboarding_config():

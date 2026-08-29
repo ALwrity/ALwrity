@@ -7,22 +7,20 @@ import {
   Tooltip,
   CircularProgress
 } from '@mui/material';
-import {
-  Share as ShareIcon,
-  Facebook as FacebookIcon,
-  Instagram as InstagramIcon,
-  LinkedIn as LinkedInIcon,
-  YouTube as YouTubeIcon,
-  Twitter as TwitterIcon,
-  MusicNote as MusicNoteIcon,
-  Pinterest as PinterestIcon,
-  GitHub as GitHubIcon,
-  Edit as EditIcon,
-  Check as CheckIcon,
-  Close as CloseIcon,
-  Refresh as RefreshIcon,
-  OpenInNew as OpenInNewIcon
-} from '@mui/icons-material';
+import ShareIcon from '@mui/icons-material/Share';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
+import YouTubeIcon from '@mui/icons-material/YouTube';
+import TwitterIcon from '@mui/icons-material/Twitter';
+import MusicNoteIcon from '@mui/icons-material/MusicNote';
+import PinterestIcon from '@mui/icons-material/Pinterest';
+import GitHubIcon from '@mui/icons-material/GitHub';
+import EditIcon from '@mui/icons-material/Edit';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 interface SocialMediaPresenceSectionProps {
   socialMediaAccounts: { [key: string]: string };

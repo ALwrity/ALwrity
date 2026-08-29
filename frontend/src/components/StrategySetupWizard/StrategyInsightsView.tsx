@@ -13,18 +13,16 @@ import {
   CircularProgress,
   Divider,
 } from '@mui/material';
-import {
-  AutoAwesome as StrategyIcon,
-  CheckCircle as ActiveIcon,
-  RadioButtonUnchecked as InactiveIcon,
-  PlayArrow as GenerateIcon,
-  Refresh as RefreshIcon,
-  Psychology as InsightsIcon,
-  Timeline as PredictionsIcon,
-  Assessment as AnalysisIcon,
-  Flag as RoadmapIcon,
-  Warning as RiskIcon,
-} from '@mui/icons-material';
+import StrategyIcon from '@mui/icons-material/AutoAwesome';
+import ActiveIcon from '@mui/icons-material/CheckCircle';
+import InactiveIcon from '@mui/icons-material/RadioButtonUnchecked';
+import GenerateIcon from '@mui/icons-material/PlayArrow';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import InsightsIcon from '@mui/icons-material/Psychology';
+import PredictionsIcon from '@mui/icons-material/Timeline';
+import AnalysisIcon from '@mui/icons-material/Assessment';
+import RoadmapIcon from '@mui/icons-material/Flag';
+import RiskIcon from '@mui/icons-material/Warning';
 import { apiClient } from '../../api/client';
 import { useStrategySetupState } from '../../hooks/useStrategySetupState';
 

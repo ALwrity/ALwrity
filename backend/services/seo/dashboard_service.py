@@ -443,7 +443,9 @@ class SEODashboardService:
                 # Get all sites for user
                 sites = self._get_gsc_sites(user_id)
                 if sites:
-                    gsc_data = self.gsc_service.get_search_analytics(user_id, sites[0])
+                    first_site = sites[0]
+                    resolved_site = first_site.get('siteUrl') if isinstance(first_site, dict) else first_site
+                    gsc_data = self.gsc_service.get_search_analytics(user_id, resolved_site)
                 else:
                     return {"error": "No GSC sites found", "data": [], "status": "disconnected"}
             

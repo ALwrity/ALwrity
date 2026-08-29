@@ -7,14 +7,12 @@ import {
   Collapse,
   IconButton,
 } from "@mui/material";
-import {
-  ExpandLess,
-  ExpandMore,
-  AutoAwesome,
-  RestartAlt,
-  CheckCircle,
-  Close,
-} from "@mui/icons-material";
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import AutoAwesome from '@mui/icons-material/AutoAwesome';
+import RestartAlt from '@mui/icons-material/RestartAlt';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import Close from '@mui/icons-material/Close';
 import { VoiceAvatarPlaceholder } from "../OnboardingWizard/PersonalizationStep/components/VoiceAvatarPlaceholder";
 
 export interface VoiceClonePanelProps {

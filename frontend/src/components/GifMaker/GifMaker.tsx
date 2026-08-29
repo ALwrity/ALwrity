@@ -15,10 +15,8 @@ import {
   Paper,
   Typography,
 } from '@mui/material';
-import {
-  ArrowBack as BackIcon,
-  ArrowForward as NextIcon,
-} from '@mui/icons-material';
+import BackIcon from '@mui/icons-material/ArrowBack';
+import NextIcon from '@mui/icons-material/ArrowForward';
 
 import { CapturePanel } from './CapturePanel';
 import { FrameGallery } from './FrameGallery';

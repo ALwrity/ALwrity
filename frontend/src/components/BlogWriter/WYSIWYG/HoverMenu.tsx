@@ -7,18 +7,16 @@ import {
   Divider,
   Chip
 } from '@mui/material';
-import {
-  AutoAwesome as AutoAwesomeIcon,
-  Edit as EditIcon,
-  Add as AddIcon,
-  DeleteOutline as DeleteOutlineIcon,
-  GpsFixed as GpsFixedIcon,
-  BarChart as BarChartIcon,
-  Link as LinkIcon,
-  CheckCircle as CheckCircleIcon,
-  ContentCopy as ContentCopyIcon,
-  TrendingUp as TrendingUpIcon,
-} from '@mui/icons-material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import EditIcon from '@mui/icons-material/Edit';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import GpsFixedIcon from '@mui/icons-material/GpsFixed';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import LinkIcon from '@mui/icons-material/Link';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 interface HoverMenuProps {
   anchorEl: HTMLElement | null;

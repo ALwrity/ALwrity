@@ -12,12 +12,10 @@ import {
   Alert,
   Typography,
 } from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  PlayArrow as PlayIcon,
-  Info as InfoIcon,
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import PlayIcon from '@mui/icons-material/PlayArrow';
+import InfoIcon from '@mui/icons-material/Info';
 
 interface ActionButtonsProps {
   showDetails: boolean;

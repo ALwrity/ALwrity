@@ -13,15 +13,13 @@ import {
   Checkbox,
   Box,
 } from '@mui/material';
-import {
-  Download,
-  Share,
-  Delete,
-  Favorite,
-  FavoriteBorder,
-  Upload,
-  MoreVert,
-} from '@mui/icons-material';
+import Download from '@mui/icons-material/Download';
+import Share from '@mui/icons-material/Share';
+import Delete from '@mui/icons-material/Delete';
+import Favorite from '@mui/icons-material/Favorite';
+import FavoriteBorder from '@mui/icons-material/FavoriteBorder';
+import Upload from '@mui/icons-material/Upload';
+import MoreVert from '@mui/icons-material/MoreVert';
 import { ContentAsset } from '../../../hooks/useContentAssets';
 import { getStatusChip, formatDate, getModelName } from './utils';
 import { AssetPreview } from './AssetPreview';

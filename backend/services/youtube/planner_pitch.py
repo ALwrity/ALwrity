@@ -13,7 +13,12 @@ from fastapi import HTTPException
 
 from services.llm_providers.json_parsing import robust_json_loads
 from services.llm_providers.main_text_generation import llm_text_gen
-from services.youtube.planner_config import VIDEO_TYPE_CONFIGS, get_duration_context
+from services.youtube.planner_config import (
+    VIDEO_TYPE_CONFIGS,
+    ContentLanguageResolution,
+    get_duration_context,
+    resolve_content_language,
+)
 from services.youtube.planner_generation import attach_plan_generation_metadata
 from services.youtube.planner_pitch_prompts import (
     EXPANSION_SYSTEM_PROMPT,
@@ -35,6 +40,35 @@ if TYPE_CHECKING:
     from services.youtube.planner import YouTubePlannerService
 
 logger = get_service_logger("youtube.planner_pitch")
+
+
+def _resolved_content_language(
+    language: Optional[str],
+    *,
+    operation: str,
+) -> ContentLanguageResolution:
+    """Resolve once per pitch/expand call. Logs code/label only."""
+    try:
+        resolved = resolve_content_language(language)
+    except Exception:
+        logger.exception(
+            "[YouTubePlanner] Content language resolve failed on {}; using English",
+            operation,
+        )
+        resolved = ContentLanguageResolution(
+            code="en",
+            label="English",
+            requested="",
+            used_fallback=True,
+        )
+    logger.info(
+        "[YouTubePlanner] {} language={} code={} fallback={}",
+        operation,
+        resolved.label,
+        resolved.code,
+        resolved.used_fallback,
+    )
+    return resolved
 
 
 def _unwrap_provider_payload(response: Any) -> Any:
@@ -168,6 +202,7 @@ async def _optional_research(
     target_audience: str,
     user_id: Optional[str],
     enable_research: bool,
+    language: Optional[str] = None,
 ) -> tuple[str, List[Dict[str, Any]], bool]:
     if not enable_research:
         logger.info("[YouTubePlanner] Research disabled for pitch/expand")
@@ -180,6 +215,7 @@ async def _optional_research(
             video_type=video_type,
             target_audience=target_audience,
             user_id=user_id or "",
+            language=language,
         )
         logger.info(
             "[YouTubePlanner] Research complete source_count={} context_len={}",
@@ -214,6 +250,7 @@ async def generate_youtube_pitch(
     source_article_title: Optional[str] = None,
     source_article_summary: Optional[str] = None,
     channel_bible_context: str = "",
+    language: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Generate one lightweight pitch. flow_type=youtube_pitch (same llm_text_gen path as generate_plan)."""
     idea = (user_idea or "").strip()
@@ -226,11 +263,13 @@ async def generate_youtube_pitch(
             detail="Please select or enter a creative strategy angle.",
         )
 
+    resolved_language = _resolved_content_language(language, operation="generate_pitch")
     logger.info(
-        "[YouTubePlanner] generate_pitch entry duration={} angle_len={} idea_len={}",
+        "[YouTubePlanner] generate_pitch entry duration={} angle_len={} idea_len={} language={}",
         duration_type,
         len(angle),
         len(idea),
+        resolved_language.label,
     )
 
     duration_context = planner._get_duration_context(duration_type)
@@ -246,26 +285,39 @@ async def generate_youtube_pitch(
         target_audience=default_audience,
         user_id=user_id,
         enable_research=enable_research,
+        language=resolved_language.code,
     )
 
-    user_prompt = build_pitch_user_prompt(
-        user_idea=idea,
-        creative_angle=angle,
-        duration_type=duration_type,
-        video_type=video_type,
-        target_audience=target_audience,
-        video_goal=video_goal,
-        brand_style=brand_style,
-        persona_context=persona_context,
-        channel_bible_context=channel_bible_context or "",
-        research_context=research_context,
-        source_article_title=source_article_title,
-        source_article_summary=source_article_summary,
-    )
+    try:
+        user_prompt = build_pitch_user_prompt(
+            user_idea=idea,
+            creative_angle=angle,
+            duration_type=duration_type,
+            video_type=video_type,
+            target_audience=target_audience,
+            video_goal=video_goal,
+            brand_style=brand_style,
+            persona_context=persona_context,
+            channel_bible_context=channel_bible_context or "",
+            research_context=research_context,
+            source_article_title=source_article_title,
+            source_article_summary=source_article_summary,
+            language=resolved_language.code,
+        )
+    except Exception:
+        logger.exception(
+            "[YouTubePlanner] Failed to build pitch user prompt language={}",
+            resolved_language.code,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to prepare the pitch prompt. Please try again.",
+        )
     json_struct = build_pitch_json_struct()
 
     def _parse_and_validate(raw: Any) -> Dict[str, Any]:
-        return validate_pitch(_parse_llm_json(raw, label="pitch"), creative_angle=angle)
+        parsed = _parse_llm_json(raw, label="pitch")
+        return validate_pitch(parsed, creative_angle=angle, duration_type=duration_type)
 
     pitch = _generate_with_one_retry(
         label="pitch",
@@ -284,6 +336,7 @@ async def generate_youtube_pitch(
     pitch["research_enabled"] = research_enabled
     pitch["research_sources"] = research_sources
     pitch["research_sources_count"] = len(research_sources)
+    pitch["research_prompt_block"] = research_context
     if video_type_config:
         pitch["video_type"] = video_type
 
@@ -301,7 +354,11 @@ async def generate_youtube_pitch(
             meta_err,
         )
 
-    logger.info("[YouTubePlanner] Pitch generated successfully")
+    logger.info(
+        "[YouTubePlanner] Pitch generated successfully language={} code={}",
+        resolved_language.label,
+        resolved_language.code,
+    )
     return pitch
 
 
@@ -319,6 +376,7 @@ async def expand_pitch_to_script(
     user_id: Optional[str] = None,
     enable_research: bool = True,
     channel_bible_context: str = "",
+    language: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Expand an approved pitch. flow_type=youtube_script_expand (same llm_text_gen path as generate_plan)."""
     idea = (user_idea or "").strip()
@@ -329,35 +387,67 @@ async def expand_pitch_to_script(
     ).strip():
         raise HTTPException(status_code=400, detail="An approved pitch is required to expand.")
 
+    resolved_language = _resolved_content_language(
+        language, operation="expand_pitch_to_script"
+    )
     logger.info(
-        "[YouTubePlanner] expand_pitch_to_script entry duration={} title_len={}",
+        "[YouTubePlanner] expand_pitch_to_script entry duration={} title_len={} language={}",
         duration_type,
         len(str(approved_pitch.get("selected_title") or "")),
+        resolved_language.label,
     )
 
     persona_context = planner._build_persona_context(persona_data)
     default_audience = target_audience or "General YouTube audience"
-    research_context, research_sources, research_enabled = await _optional_research(
-        planner,
-        user_idea=idea,
-        video_type=video_type,
-        target_audience=default_audience,
-        user_id=user_id,
-        enable_research=enable_research,
-    )
+    reused_block = str(approved_pitch.get("research_prompt_block") or "").strip()
+    if reused_block:
+        reused_sources = approved_pitch.get("research_sources")
+        research_context = reused_block
+        research_sources = reused_sources if isinstance(reused_sources, list) else []
+        research_enabled = True
+        logger.info(
+            "[YouTubePlanner] Expand reusing pitch research_prompt_block len={} source_count={} skip_exa=True",
+            len(research_context),
+            len(research_sources),
+        )
+    else:
+        if enable_research:
+            logger.info(
+                "[YouTubePlanner] Expand missing research_prompt_block; running one compact Exa pass"
+            )
+        research_context, research_sources, research_enabled = await _optional_research(
+            planner,
+            user_idea=idea,
+            video_type=video_type,
+            target_audience=default_audience,
+            user_id=user_id,
+            enable_research=enable_research,
+            language=resolved_language.code,
+        )
 
-    user_prompt = build_expansion_user_prompt(
-        user_idea=idea,
-        approved_pitch=approved_pitch,
-        duration_type=duration_type,
-        video_type=video_type,
-        target_audience=target_audience,
-        video_goal=video_goal,
-        brand_style=brand_style,
-        persona_context=persona_context,
-        channel_bible_context=channel_bible_context or "",
-        research_context=research_context,
-    )
+    try:
+        user_prompt = build_expansion_user_prompt(
+            user_idea=idea,
+            approved_pitch=approved_pitch,
+            duration_type=duration_type,
+            video_type=video_type,
+            target_audience=target_audience,
+            video_goal=video_goal,
+            brand_style=brand_style,
+            persona_context=persona_context,
+            channel_bible_context=channel_bible_context or "",
+            research_context=research_context,
+            language=resolved_language.code,
+        )
+    except Exception:
+        logger.exception(
+            "[YouTubePlanner] Failed to build expansion user prompt language={}",
+            resolved_language.code,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to prepare the script prompt. Please try again.",
+        )
     json_struct = build_expansion_json_struct()
 
     def _parse_and_validate(raw: Any) -> Dict[str, Any]:
@@ -400,5 +490,10 @@ async def expand_pitch_to_script(
             meta_err,
         )
 
-    logger.info("[YouTubePlanner] Pitch expanded to script successfully")
+    logger.info(
+        "[YouTubePlanner] Pitch expanded ok language={} spoken_words={} beats={}",
+        resolved_language.label,
+        len(str(expansion.get("full_script") or "").split()),
+        len(expansion.get("main_content_outline") or []),
+    )
     return expansion

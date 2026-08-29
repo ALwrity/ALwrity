@@ -115,38 +115,15 @@ class YouTubeOAuthService(OAuthProviderBase):
         }
 
     def _init_db(self, user_id: str):
+        """Ensure the per-user schema exists (owned by Alembic migrations)."""
+        try:
+            from services.database import get_engine_for_user
+
+            get_engine_for_user(user_id)
+        except Exception as ensure_error:
+            logger.warning(f"Could not ensure Alembic schema for user {user_id}: {ensure_error}")
         db_path = self._get_db_path(user_id)
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-
-        with sqlite3.connect(db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS youtube_oauth_tokens (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT NOT NULL,
-                    access_token TEXT NOT NULL,
-                    refresh_token TEXT,
-                    token_type TEXT DEFAULT 'bearer',
-                    expires_at TIMESTAMP,
-                    scope TEXT,
-                    channel_id TEXT,
-                    channel_name TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    is_active BOOLEAN DEFAULT TRUE
-                )
-            """)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS youtube_oauth_states (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    state TEXT NOT NULL UNIQUE,
-                    user_id TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    expires_at TIMESTAMP DEFAULT (datetime('now', '+10 minutes'))
-                )
-            """)
-            conn.commit()
-            logger.debug(f"YouTube OAuth tables initialized for user {user_id}")
 
     def generate_authorization_url(self, user_id: str) -> Optional[str]:
         """Generate Google OAuth authorization URL for YouTube scopes."""

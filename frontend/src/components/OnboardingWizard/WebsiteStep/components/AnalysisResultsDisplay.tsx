@@ -18,13 +18,9 @@ import {
   Button,
   Chip,
 } from '@mui/material';
-import {
-  AutoAwesome as AutoAwesomeIcon,
-  Verified as VerifiedIcon,
-  Analytics as AnalyticsIcon,
-  Link as LinkIcon,
-  Save as SaveIcon
-} from '@mui/icons-material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import SaveIcon from '@mui/icons-material/Save';
 
 // Import extracted components
 import { 
@@ -107,6 +103,8 @@ export interface StyleAnalysis {
   content_strategy_insights?: any;
   style_guidelines?: any;
   style_patterns?: any;
+  style_consistency?: string;
+  unique_elements?: string[];
   seo_audit?: any;
   sitemap_analysis?: any;
   best_practices?: string[];
@@ -161,7 +159,6 @@ const AnalysisResultsDisplay: React.FC<AnalysisResultsDisplayProps> = ({
 
   const warningParts = warning ? warning.split('|').map(part => part.trim()).filter(Boolean) : [];
   const guidelineWarning = warningParts.find(part => part.toLowerCase().startsWith('guidelines generation failed'));
-  const sitemapWarning = warningParts.find(part => part.toLowerCase().startsWith('sitemap analysis failed'));
 
   // Helper to handle section updates
   const handleSectionUpdate = (section: string, fieldPath: string, value: any) => {
@@ -242,116 +239,104 @@ const AnalysisResultsDisplay: React.FC<AnalysisResultsDisplayProps> = ({
       {/* Main Analysis Results */}
       <Card sx={styles.analysisHeaderCard}>
         <CardContent sx={styles.analysisCardContent}>
-          <Box sx={{ mb: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                <VerifiedIcon sx={{ ...styles.analysisHeaderIcon, fontSize: 32 }} />
-                <Box>
-                  <Typography 
-                    variant="h4" 
-                    sx={{
-                      ...styles.analysisHeaderTitle,
-                      color: '#1a202c !important',
-                      fontWeight: '700 !important',
-                      mb: 0.5
-                    }} 
-                  >
-                    {domainName} Style Analysis
-                  </Typography>
-                  <Typography 
-                    variant="body1" 
-                    sx={{ color: '#4a5568 !important' }}
-                  >
-                    AI-powered analysis of your brand voice and content strategy
-                  </Typography>
-                </Box>
-              </Box>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                {onSave && (
-                  <Button
-                    startIcon={<SaveIcon />}
-                    variant="contained"
-                    onClick={onSave}
-                    sx={{
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      color: 'white',
-                      '&:hover': {
-                         background: 'linear-gradient(135deg, #5a6fd6 0%, #663d91 100%)',
-                      }
-                    }}
-                  >
-                    Save Analysis
-                  </Button>
-                )}
-                {onAnalysisUpdate && (
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={isEditable}
-                        onChange={(e) => setIsEditable(e.target.checked)}
-                        color="primary"
-                      />
-                    }
-                    label="Edit Mode"
-                    sx={{ 
-                      '& .MuiTypography-root': { color: '#4a5568 !important' } 
-                    }}
-                  />
-                )}
-              </Box>
+          {/* Compact header: title, description, edit toggle and save in one row */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', md: 'row' },
+              alignItems: { xs: 'flex-start', md: 'center' },
+              justifyContent: 'space-between',
+              gap: 2,
+              mb: 2,
+            }}
+          >
+            <Box>
+              <Typography
+                variant="h4"
+                sx={{
+                  ...styles.analysisHeaderTitle,
+                  color: '#1a202c !important',
+                  fontWeight: '700 !important',
+                  mb: 0.5,
+                }}
+              >
+                Style Analysis
+              </Typography>
+              <Typography variant="body1" sx={{ color: '#4a5568 !important' }}>
+                AI-powered analysis of your brand voice and content strategy.
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748b !important', mt: 0.5 }}>
+                AI Analysis Complete — we've analyzed your content to understand your brand voice,
+                audience, and strategy. Use these insights to generate on-brand content automatically.
+              </Typography>
             </Box>
 
-            <Alert 
-              severity="info" 
-              icon={<AutoAwesomeIcon />}
-              sx={{ 
-                mb: 3, 
-                borderRadius: 2,
-                '& .MuiAlert-message': { color: '#1e293b' },
-                '& .MuiAlert-icon': { color: '#3b82f6' }
-              }}
-            >
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                AI Analysis Complete
-              </Typography>
-              <Typography variant="body2">
-                We've analyzed your content to understand your brand voice, audience, and strategy. 
-                Use these insights to generate on-brand content automatically.
-              </Typography>
-            </Alert>
-
-            {typeof onUseAnalysisChange === 'function' && (
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={useAnalysisForGenAI ?? false}
-                    onChange={(e) => onUseAnalysisChange(e.target.checked)}
-                    color="primary"
-                    sx={{ '&.Mui-checked': { color: '#764ba2' } }}
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1f2937 !important' }}>
-                      Use this analysis for AI generation
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#4b5563 !important' }}>
-                      Apply these style guidelines to all future content generated by ALwrity
-                    </Typography>
-                  </Box>
-                }
-                sx={{ 
-                  mt: 1,
-                  p: 2,
-                  borderRadius: 2,
-                  bgcolor: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  width: '100%',
-                  ml: 0
-                }}
-              />
-            )}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+              {onAnalysisUpdate && (
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={isEditable}
+                      onChange={(e) => setIsEditable(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label="Edit Mode"
+                  sx={{
+                    '& .MuiTypography-root': { color: '#4a5568 !important' },
+                  }}
+                />
+              )}
+              {onSave && (
+                <Button
+                  startIcon={<SaveIcon />}
+                  variant="contained"
+                  onClick={onSave}
+                  sx={{
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #5a6fd6 0%, #663d91 100%)',
+                    },
+                  }}
+                >
+                  Save Analysis
+                </Button>
+              )}
+            </Box>
           </Box>
+
+          {typeof onUseAnalysisChange === 'function' && (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={useAnalysisForGenAI ?? false}
+                  onChange={(e) => onUseAnalysisChange(e.target.checked)}
+                  color="primary"
+                  sx={{ '&.Mui-checked': { color: '#764ba2' } }}
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1f2937 !important' }}>
+                    Use this analysis for AI generation
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#4b5563 !important' }}>
+                    Apply these style guidelines to all future content generated by ALwrity
+                  </Typography>
+                </Box>
+              }
+              sx={{
+                mb: 2,
+                p: 2,
+                borderRadius: 2,
+                bgcolor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                width: '100%',
+                ml: 0,
+              }}
+            />
+          )}
 
           <Divider sx={{ my: 3 }} />
 
@@ -369,27 +354,97 @@ const AnalysisResultsDisplay: React.FC<AnalysisResultsDisplayProps> = ({
                 <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
                   AI Generation Settings
                 </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
                   {analysis.recommended_settings.writing_tone && (
-                    <Chip size="small" label={`Tone: ${analysis.recommended_settings.writing_tone}`} variant="outlined" />
+                    <Chip
+                      size="small"
+                      label={`Tone: ${analysis.recommended_settings.writing_tone}`}
+                      sx={{
+                        bgcolor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        color: '#1e293b !important',
+                        fontWeight: 500,
+                        '& .MuiChip-label': { color: '#1e293b !important' },
+                      }}
+                    />
                   )}
                   {analysis.recommended_settings.target_audience && (
-                    <Chip size="small" label={`Audience: ${analysis.recommended_settings.target_audience}`} variant="outlined" />
+                    <Chip
+                      size="small"
+                      label={`Audience: ${analysis.recommended_settings.target_audience}`}
+                      sx={{
+                        bgcolor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        color: '#1e293b !important',
+                        fontWeight: 500,
+                        '& .MuiChip-label': { color: '#1e293b !important' },
+                      }}
+                    />
                   )}
                   {analysis.recommended_settings.content_type && (
-                    <Chip size="small" label={`Type: ${analysis.recommended_settings.content_type}`} variant="outlined" />
+                    <Chip
+                      size="small"
+                      label={`Type: ${analysis.recommended_settings.content_type}`}
+                      sx={{
+                        bgcolor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        color: '#1e293b !important',
+                        fontWeight: 500,
+                        '& .MuiChip-label': { color: '#1e293b !important' },
+                      }}
+                    />
                   )}
                   {analysis.recommended_settings.creativity_level && (
-                    <Chip size="small" label={`Creativity: ${analysis.recommended_settings.creativity_level}`} variant="outlined" />
+                    <Chip
+                      size="small"
+                      label={`Creativity: ${analysis.recommended_settings.creativity_level}`}
+                      sx={{
+                        bgcolor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        color: '#1e293b !important',
+                        fontWeight: 500,
+                        '& .MuiChip-label': { color: '#1e293b !important' },
+                      }}
+                    />
                   )}
                   {analysis.recommended_settings.geographic_location && (
-                    <Chip size="small" label={`Location: ${analysis.recommended_settings.geographic_location}`} variant="outlined" />
+                    <Chip
+                      size="small"
+                      label={`Location: ${analysis.recommended_settings.geographic_location}`}
+                      sx={{
+                        bgcolor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        color: '#1e293b !important',
+                        fontWeight: 500,
+                        '& .MuiChip-label': { color: '#1e293b !important' },
+                      }}
+                    />
                   )}
                   {analysis.recommended_settings.industry_context && (
-                    <Chip size="small" label={`Industry: ${analysis.recommended_settings.industry_context}`} variant="outlined" />
+                    <Chip
+                      size="small"
+                      label={`Industry: ${analysis.recommended_settings.industry_context}`}
+                      sx={{
+                        bgcolor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        color: '#1e293b !important',
+                        fontWeight: 500,
+                        '& .MuiChip-label': { color: '#1e293b !important' },
+                      }}
+                    />
                   )}
                   {analysis.recommended_settings.brand_alignment && (
-                    <Chip size="small" label={`Brand: ${analysis.recommended_settings.brand_alignment}`} variant="outlined" />
+                    <Chip
+                      size="small"
+                      label={`Brand: ${analysis.recommended_settings.brand_alignment}`}
+                      sx={{
+                        bgcolor: '#f1f5f9',
+                        border: '1px solid #cbd5e1',
+                        color: '#1e293b !important',
+                        fontWeight: 500,
+                        '& .MuiChip-label': { color: '#1e293b !important' },
+                      }}
+                    />
                   )}
                 </Box>
               </Paper>
@@ -398,7 +453,7 @@ const AnalysisResultsDisplay: React.FC<AnalysisResultsDisplayProps> = ({
 
           {/* Brand Analysis Section — shown via CombinedAnalysisSection tab */}
 
-          {(analysis.guidelines || guidelineWarning) && (
+          {(analysis.guidelines || analysis.style_guidelines) && (
             <Box sx={{ mt: 4 }}>
               <SectionHeader 
                 title="Style Guidelines" 
@@ -409,18 +464,16 @@ const AnalysisResultsDisplay: React.FC<AnalysisResultsDisplayProps> = ({
                   {guidelineWarning}
                 </Alert>
               )}
-              {analysis.guidelines && (
-                <EnhancedGuidelinesSection 
-                  guidelines={analysis.guidelines}
-                  domainName={domainName}
-                  bestPractices={analysis.best_practices}
-                  avoidElements={analysis.avoid_elements}
-                  contentTemplates={analysis.content_templates}
-                  headlineFormulas={analysis.headline_formulas}
-                  contentBriefs={analysis.content_briefs}
-                  competitiveAngles={analysis.competitive_angles}
-                />
-              )}
+              <EnhancedGuidelinesSection 
+                guidelines={analysis.guidelines || analysis.style_guidelines}
+                domainName={domainName}
+                bestPractices={analysis.best_practices}
+                avoidElements={analysis.avoid_elements}
+                contentTemplates={analysis.content_templates}
+                headlineFormulas={analysis.headline_formulas}
+                contentBriefs={analysis.content_briefs}
+                competitiveAngles={analysis.competitive_angles}
+              />
             </Box>
           )}
 
@@ -437,21 +490,10 @@ const AnalysisResultsDisplay: React.FC<AnalysisResultsDisplayProps> = ({
              />
           </Box>
 
-          <Box sx={{ mt: 4 }}>
-             <SectionHeader 
-              title="Sitemap Analysis" 
-              icon={<LinkIcon />} 
-            />
-             {sitemapWarning && (
-               <Alert severity="warning" sx={{ mb: 2 }}>
-                 {sitemapWarning}
-               </Alert>
-             )}
-             <SitemapAnalysisSection
-               sitemapAnalysis={analysis.sitemap_analysis}
-               domainName={domainName}
-             />
-          </Box>
+          <SitemapAnalysisSection
+            sitemapAnalysis={analysis.sitemap_analysis}
+            domainName={domainName}
+          />
 
           {/* Combined Analysis Section (Legacy Support) */}
           <Box sx={{ mt: 4 }}>
@@ -469,11 +511,13 @@ const AnalysisResultsDisplay: React.FC<AnalysisResultsDisplayProps> = ({
           {/* Combined Strategy Section (Legacy Support) */}
           <Box sx={{ mt: 4 }}>
              <CombinedStrategySection 
-                contentStrategy={analysis.strategic_insights?.content_strategy}
-                competitiveAdvantages={analysis.strategic_insights?.competitive_advantages}
-                contentCalendarSuggestions={analysis.strategic_insights?.content_calendar_suggestions}
-                aiGenerationTips={analysis.strategic_insights?.ai_generation_tips}
+                contentStrategy={analysis.content_strategy || analysis.strategic_insights?.content_strategy}
+                competitiveAdvantages={analysis.competitive_advantages || analysis.strategic_insights?.competitive_advantages}
+                contentCalendarSuggestions={analysis.content_calendar_suggestions || analysis.strategic_insights?.content_calendar_suggestions}
+                aiGenerationTips={analysis.ai_generation_tips || analysis.strategic_insights?.ai_generation_tips}
                stylePatterns={analysis.style_patterns}
+               styleConsistency={analysis.style_consistency}
+               uniqueElements={analysis.unique_elements}
                domainName={domainName}
                isEditable={isEditable}
                onUpdate={handleSectionUpdate}

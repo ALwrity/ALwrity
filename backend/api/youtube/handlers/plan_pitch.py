@@ -4,21 +4,38 @@ Thin routes: validation, personalization, then planner_pitch services.
 Does not change generate_plan / Build Scenes.
 """
 
+import time
 from typing import Any, Dict, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from middleware.auth_middleware import get_current_user
+from services.persona.youtube.youtube_persona_service import YouTubePersonaService
 from services.persona_data_service import PersonaDataService
 from services.youtube.planner import YouTubePlannerService
 from services.youtube.planner_pitch import expand_pitch_to_script, generate_youtube_pitch
+from services.youtube.planner_pitch_prompts import (
+    PITCH_RESEARCH_PLACEHOLDER,
+    build_pitch_preview_prompts,
+)
 from services.youtube.planner_pitch_validate import PitchValidationError
 from utils.logger_utils import get_service_logger
 from ..deps import require_authenticated_user
-from ..schemas import ExpandRequest, ExpandResponse, PitchRequest, PitchResponse
+from ..schemas import (
+    ExpandRequest,
+    ExpandResponse,
+    PitchPreviewResponse,
+    PitchRequest,
+    PitchResponse,
+)
 
 router = APIRouter(tags=["youtube"])
 logger = get_service_logger("api.youtube.plan_pitch")
+
+
+def _inbound_language_log(language: Optional[str]) -> str:
+    """Safe inbound language for logs (code only, never idea text)."""
+    return (language or "").strip() or "en"
 
 
 def _load_plan_personalization(
@@ -102,11 +119,12 @@ async def create_video_pitch(
         angle = (request.creative_angle or "").strip()
         logger.info(
             "[YouTubeAPI] Creating pitch: idea_len={} duration={} angle_len={} "
-            "enable_research={} user={}",
+            "enable_research={} language={} user={}",
             len(request.user_idea or ""),
             request.duration_type,
             len(angle),
             request.enable_research,
+            _inbound_language_log(request.language),
             user_id,
         )
 
@@ -141,17 +159,155 @@ async def create_video_pitch(
             source_article_title=request.source_article_title,
             source_article_summary=request.source_article_summary,
             channel_bible_context=channel_bible_context,
+            language=request.language,
         )
-        logger.info("[YouTubeAPI] Pitch generated successfully")
+        logger.info("[YouTubeAPI] Pitch generated successfully language={}", _inbound_language_log(request.language))
         return PitchResponse(success=True, pitch=pitch, message="Pitch generated successfully")
     except HTTPException:
         raise
     except PitchValidationError as exc:
-        logger.warning("[YouTubeAPI] Pitch generation rejected: {}", exc)
+        logger.warning(
+            "[YouTubeAPI] Pitch generation rejected: {} language={}",
+            exc,
+            _inbound_language_log(request.language),
+        )
         return PitchResponse(success=False, message=str(exc))
     except Exception as exc:
-        logger.error("[YouTubeAPI] Error creating pitch: {}", exc, exc_info=True)
+        logger.error(
+            "[YouTubeAPI] Error creating pitch: {} language={}",
+            exc,
+            _inbound_language_log(request.language),
+            exc_info=True,
+        )
         return PitchResponse(success=False, message="Failed to generate pitch. Please try again.")
+
+
+@router.post("/plan/pitch/preview", response_model=PitchPreviewResponse)
+async def preview_video_pitch(
+    request: PitchRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> PitchPreviewResponse:
+    """Return the exact pitch prompts without calling the LLM or Exa."""
+    try:
+        user_id = require_authenticated_user(current_user)
+        idea = (request.user_idea or "").strip()
+        angle = (request.creative_angle or "").strip()
+        if not idea:
+            raise HTTPException(status_code=400, detail="Please enter your video idea.")
+        if not angle:
+            raise HTTPException(
+                status_code=400,
+                detail="Please select or enter a creative strategy angle.",
+            )
+
+        logger.info(
+            "[YouTubeAPI] Pitch prompt preview idea_len={} duration={} angle_len={} "
+            "enable_research={} language={} user={}",
+            len(idea),
+            request.duration_type,
+            len(angle),
+            request.enable_research,
+            _inbound_language_log(request.language),
+            user_id,
+        )
+
+        (
+            target_audience,
+            video_goal,
+            brand_style,
+            _reference,
+            channel_bible_context,
+            persona_data,
+        ) = _load_plan_personalization(
+            user_id,
+            target_audience=request.target_audience,
+            video_goal=request.video_goal,
+            brand_style=request.brand_style,
+            reference_image_description=request.reference_image_description,
+        )
+
+        try:
+            persona_context = YouTubePersonaService.build_prompt_context(persona_data)
+        except Exception:
+            logger.exception(
+                "[YouTubeAPI] Pitch preview persona context failed; continuing without it"
+            )
+            persona_context = ""
+
+        try:
+            prompts = build_pitch_preview_prompts(
+                user_idea=idea,
+                creative_angle=angle,
+                duration_type=request.duration_type,
+                video_type=request.video_type,
+                target_audience=target_audience,
+                video_goal=video_goal,
+                brand_style=brand_style,
+                persona_context=persona_context,
+                channel_bible_context=channel_bible_context,
+                source_article_title=request.source_article_title,
+                source_article_summary=request.source_article_summary,
+                language=request.language,
+                enable_research=bool(request.enable_research),
+            )
+        except Exception:
+            logger.exception(
+                "[YouTubeAPI] Failed to build pitch preview prompts language={}",
+                _inbound_language_log(request.language),
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to prepare the pitch prompt preview. Please try again.",
+            )
+
+        system_prompt = (prompts or {}).get("system_prompt") if isinstance(prompts, dict) else None
+        user_prompt = (prompts or {}).get("user_prompt") if isinstance(prompts, dict) else None
+        if not isinstance(system_prompt, str) or not system_prompt.strip():
+            logger.error(
+                "[YouTubeAPI] Pitch preview missing system_prompt language={}",
+                _inbound_language_log(request.language),
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to prepare the pitch prompt preview. Please try again.",
+            )
+        if not isinstance(user_prompt, str) or not user_prompt.strip():
+            logger.error(
+                "[YouTubeAPI] Pitch preview missing user_prompt language={}",
+                _inbound_language_log(request.language),
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to prepare the pitch prompt preview. Please try again.",
+            )
+
+        logger.info(
+            "[YouTubeAPI] Pitch prompt preview ready language={} has_research_placeholder={} "
+            "system_len={} user_len={}",
+            _inbound_language_log(request.language),
+            PITCH_RESEARCH_PLACEHOLDER in user_prompt,
+            len(system_prompt),
+            len(user_prompt),
+        )
+        return PitchPreviewResponse(
+            success=True,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            message="Pitch prompt preview ready",
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            "[YouTubeAPI] Error creating pitch prompt preview: {} language={}",
+            exc,
+            _inbound_language_log(request.language),
+            exc_info=True,
+        )
+        return PitchPreviewResponse(
+            success=False,
+            message="Failed to preview the pitch prompt. Please try again.",
+        )
 
 
 @router.post("/plan/expand", response_model=ExpandResponse)
@@ -161,15 +317,17 @@ async def expand_video_pitch(
 ) -> ExpandResponse:
     """Expand an approved pitch into a full production script."""
     try:
+        expand_started = time.perf_counter()
         user_id = require_authenticated_user(current_user)
         title = str((request.approved_pitch or {}).get("selected_title") or "")
         logger.info(
             "[YouTubeAPI] Expanding pitch: idea_len={} duration={} title_len={} "
-            "enable_research={} user={}",
+            "enable_research={} language={} user={}",
             len(request.user_idea or ""),
             request.duration_type,
             len(title),
             request.enable_research,
+            _inbound_language_log(request.language),
             user_id,
         )
 
@@ -202,9 +360,19 @@ async def expand_video_pitch(
             user_id=user_id,
             enable_research=bool(request.enable_research),
             channel_bible_context=channel_bible_context,
+            language=request.language,
         )
         full_script = expansion.get("full_script") if isinstance(expansion, dict) else None
-        logger.info("[YouTubeAPI] Pitch expanded successfully")
+        logger.info(
+            "[YouTubeAPI] Pitch expanded successfully language={} duration_ms={} "
+            "script_len={} beats={}",
+            _inbound_language_log(request.language),
+            int((time.perf_counter() - expand_started) * 1000),
+            len(full_script or ""),
+            len((expansion or {}).get("main_content_outline") or [])
+            if isinstance(expansion, dict)
+            else 0,
+        )
         return ExpandResponse(
             success=True,
             expansion=expansion,
@@ -214,8 +382,19 @@ async def expand_video_pitch(
     except HTTPException:
         raise
     except PitchValidationError as exc:
-        logger.warning("[YouTubeAPI] Pitch expansion rejected: {}", exc)
+        logger.warning(
+            "[YouTubeAPI] Pitch expansion rejected: {} language={} duration_ms={}",
+            exc,
+            _inbound_language_log(request.language),
+            int((time.perf_counter() - expand_started) * 1000),
+        )
         return ExpandResponse(success=False, message=str(exc))
     except Exception as exc:
-        logger.error("[YouTubeAPI] Error expanding pitch: {}", exc, exc_info=True)
+        logger.error(
+            "[YouTubeAPI] Error expanding pitch: {} language={} duration_ms={}",
+            exc,
+            _inbound_language_log(request.language),
+            int((time.perf_counter() - expand_started) * 1000),
+            exc_info=True,
+        )
         return ExpandResponse(success=False, message="Failed to expand pitch. Please try again.")

@@ -11,16 +11,14 @@ import {
   Paper,
   Chip,
 } from '@mui/material';
-import {
-  Psychology as PsychologyIcon,
-  Analytics as AnalyticsIcon,
-  TrendingUp as TrendingUpIcon,
-  Language as LanguageIcon,
-  Web as WebIcon,
-  Business as BusinessIcon,
-  Group as GroupIcon,
-  Lightbulb as LightbulbIcon
-} from '@mui/icons-material';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import LanguageIcon from '@mui/icons-material/Language';
+import WebIcon from '@mui/icons-material/Web';
+import BusinessIcon from '@mui/icons-material/Business';
+import GroupIcon from '@mui/icons-material/Group';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
 
 // Import rendering utilities
 import { renderGuidelinesCard } from '../utils/renderUtils';

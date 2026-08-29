@@ -2,9 +2,9 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { PlanWedgeModal } from "../modals/PlanWedgeModal";
 import { WEDGE_MODAL_INTROS } from "../youtubeWorkflowConfig";
-import { queueYouTubePlanDrillDown } from "../youtubePlanDrillDown";
+import { queueYouTubePlanDrillDown, consumeYouTubePlanDrillDown } from "../youtubePlanDrillDown";
 
-jest.mock("../../hooks/useYouTubePlanBrainstorm", () => ({
+vi.mock("../../hooks/useYouTubePlanBrainstorm", () => ({
   useYouTubePlanBrainstorm: () => ({
     phase: "idle",
     ideas: [],
@@ -18,15 +18,15 @@ jest.mock("../../hooks/useYouTubePlanBrainstorm", () => ({
     savedListError: null,
     isUsingCache: false,
     loaderMessageIndex: 0,
-    run: jest.fn(),
-    save: jest.fn(),
-    loadSaved: jest.fn(),
+    run: vi.fn(),
+    save: vi.fn(),
+    loadSaved: vi.fn(),
     hashPrompt: (p: string) => p,
   }),
 }));
 
-jest.mock("../modals/YouTubePlanSavedIdeasModal", () => ({
-  fetchYouTubeSavedIdeasCount: jest.fn().mockResolvedValue(3),
+vi.mock("../modals/YouTubePlanSavedIdeasModal", () => ({
+  fetchYouTubeSavedIdeasCount: vi.fn().mockResolvedValue(3),
   YouTubePlanSavedIdeasModal: ({
     open,
     onBack,
@@ -43,7 +43,7 @@ jest.mock("../modals/YouTubePlanSavedIdeasModal", () => ({
     ) : null,
 }));
 
-jest.mock("../modals/YouTubePlanUrlImportModal", () => ({
+vi.mock("../modals/YouTubePlanUrlImportModal", () => ({
   YouTubePlanUrlImportModal: ({
     open,
     onClose,
@@ -66,7 +66,7 @@ jest.mock("../modals/YouTubePlanUrlImportModal", () => ({
     ) : null,
 }));
 
-jest.mock("../../components/PlanBrainstormSourceChips", () => ({
+vi.mock("../../components/PlanBrainstormSourceChips", () => ({
   PlanBrainstormSourceChips: ({
     onOpenChannelBible,
   }: {
@@ -81,7 +81,7 @@ jest.mock("../../components/PlanBrainstormSourceChips", () => ({
     ),
 }));
 
-jest.mock("../YouTubeChannelBibleEditorModal", () => ({
+vi.mock("../YouTubeChannelBibleEditorModal", () => ({
   YouTubeChannelBibleEditorModal: ({
     open,
     onClose,
@@ -103,16 +103,23 @@ jest.mock("../YouTubeChannelBibleEditorModal", () => ({
     ) : null,
 }));
 
-jest.mock("../../components/PlanBrainstormLoadingPanel", () => ({
+vi.mock("../../components/PlanBrainstormLoadingPanel", () => ({
   PlanBrainstormLoadingPanel: () => null,
 }));
 
 describe("PlanWedgeModal", () => {
+  beforeEach(() => {
+    // Clear any drill-down queued by a previous test (module-level state + sessionStorage).
+    consumeYouTubePlanDrillDown();
+    // baseProps is shared across tests; reset call history so assertions stay isolated.
+    vi.clearAllMocks();
+  });
+
   const baseProps = {
     open: true,
-    onClose: jest.fn(),
-    goCreate: jest.fn(),
-    markNotify: jest.fn(),
+    onClose: vi.fn(),
+    goCreate: vi.fn(),
+    markNotify: vi.fn(),
     notifyKeys: {},
   };
 

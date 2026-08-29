@@ -17,19 +17,17 @@ import {
   IconButton,
   Divider,
 } from '@mui/material';
-import {
-  ExpandMore as ExpandMoreIcon,
-  Refresh as RefreshIcon,
-  Explore as ExploreIcon,
-  TrendingUp as TrendingUpIcon,
-  Search as SearchIcon,
-  Store as StoreIcon,
-  Speed as SpeedIcon,
-  Flag as FlagIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  ContentCopy as ContentCopyIcon,
-  Close as CloseIcon,
-} from '@mui/icons-material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ExploreIcon from '@mui/icons-material/Explore';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SearchIcon from '@mui/icons-material/Search';
+import StoreIcon from '@mui/icons-material/Store';
+import SpeedIcon from '@mui/icons-material/Speed';
+import FlagIcon from '@mui/icons-material/Flag';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import CloseIcon from '@mui/icons-material/Close';
 import { useNavigate } from 'react-router-dom';
 import { GlassCard } from '../../shared/styled';
 import { apiClient } from '../../../api/client';

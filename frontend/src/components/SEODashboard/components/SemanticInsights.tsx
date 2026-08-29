@@ -23,19 +23,17 @@ import {
   AccordionSummary,
   AccordionDetails
 } from '@mui/material';
-import {
-  Psychology as PsychologyIcon,
-  TrendingUp as TrendingUpIcon,
-  Lightbulb as LightbulbIcon,
-  Warning as WarningIcon,
-  Assessment as AssessmentIcon,
-  ExpandMore as ExpandMoreIcon,
-  Info as InfoIcon,
-  CheckCircle as CheckCircleIcon,
-  PriorityHigh as PriorityHighIcon,
-  Stars as StarsIcon,
-  Face as AgentIcon
-} from '@mui/icons-material';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import WarningIcon from '@mui/icons-material/Warning';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import InfoIcon from '@mui/icons-material/Info';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PriorityHighIcon from '@mui/icons-material/PriorityHigh';
+import StarsIcon from '@mui/icons-material/Stars';
+import AgentIcon from '@mui/icons-material/Face';
 
 // TypeScript interfaces for semantic insights
 export interface ContentPillar {

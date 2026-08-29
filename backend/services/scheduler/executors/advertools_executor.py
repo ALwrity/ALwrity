@@ -56,8 +56,13 @@ class AdvertoolsExecutor(TaskExecutor):
 
             result = {}
             if task_type == 'content_audit':
-                # Phase 1: Get sitemap analysis (freshness, URL structure, pillars)
-                sitemap_result = await self.advertools_service.analyze_sitemap(effective_url)
+                # Phase 1: Get sitemap analysis (freshness, URL structure, pillars).
+                # max_retries=1 so a rate-limited origin (HTTP 429) degrades fast
+                # instead of blocking the audit with 4 attempts × 30s backoff per
+                # sub-sitemap.
+                sitemap_result = await self.advertools_service.analyze_sitemap(
+                    effective_url, max_retries=1
+                )
                 
                 audit_urls = []
                 url_structure = {}
@@ -122,8 +127,10 @@ class AdvertoolsExecutor(TaskExecutor):
                     await self._update_persona_augmentation(user_id, website_url, result, db)
                     
             elif task_type == 'site_health':
-                # Site health: freshness, velocity, URL structure
-                result = await self.advertools_service.analyze_sitemap(effective_url)
+                # Site health: freshness, velocity, URL structure. Fast-fail on 429s.
+                result = await self.advertools_service.analyze_sitemap(
+                    effective_url, max_retries=1
+                )
                 
                 if result.get('success'):
                     await self._update_site_health_metrics(user_id, website_url, result, db)

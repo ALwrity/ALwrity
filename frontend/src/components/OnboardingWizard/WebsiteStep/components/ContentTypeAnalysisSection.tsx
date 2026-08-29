@@ -18,14 +18,12 @@ import {
   Chip,
   TextField
 } from '@mui/material';
-import {
-  AutoAwesome as AutoAwesomeIcon,
-  TrendingUp as TrendingUpIcon,
-  Analytics as AnalyticsIcon,
-  Lightbulb as LightbulbIcon,
-  Business as BusinessIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import BusinessIcon from '@mui/icons-material/Business';
+import InfoIcon from '@mui/icons-material/Info';
 import SectionHeader from './SectionHeader';
 
 interface ContentType {

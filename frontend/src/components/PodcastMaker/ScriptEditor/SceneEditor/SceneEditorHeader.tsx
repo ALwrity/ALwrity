@@ -1,10 +1,8 @@
 import React from "react";
 import { Box, Typography, Stack, Chip } from "@mui/material";
-import {
-  EditNote as EditNoteIcon,
-  CheckCircle as CheckCircleIcon,
-  RadioButtonUnchecked as RadioButtonUncheckedIcon,
-} from "@mui/icons-material";
+import EditNoteIcon from '@mui/icons-material/EditNote';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import { Scene } from "../../types";
 
 interface SceneEditorHeaderProps {

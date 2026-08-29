@@ -1,14 +1,12 @@
 import { ReactElement } from 'react';
-import {
-  LinkedIn,
-  Facebook,
-  Twitter,
-  Instagram,
-  YouTube,
-  Podcasts,
-  Article,
-  Email,
-} from '@mui/icons-material';
+import LinkedIn from '@mui/icons-material/LinkedIn';
+import Facebook from '@mui/icons-material/Facebook';
+import Twitter from '@mui/icons-material/Twitter';
+import Instagram from '@mui/icons-material/Instagram';
+import YouTube from '@mui/icons-material/YouTube';
+import Podcasts from '@mui/icons-material/Podcasts';
+import Article from '@mui/icons-material/Article';
+import Email from '@mui/icons-material/Email';
 
 /**
  * Frontend-only presentation metadata (icons/colors) keyed by platform id.

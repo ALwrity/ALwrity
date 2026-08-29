@@ -83,6 +83,8 @@ export const StaleRefreshModal: React.FC<
       maxWidth={shell?.maxWidth ?? YOUTUBE_WEDGE_MODAL_MAX_WIDTH}
       onBack={shell?.onBack}
       backLabel={shell?.backLabel}
+      titleSize={shell?.titleSize}
+      headerLayout={shell?.headerLayout}
     >
       {loading && <p className="yt-modal-intro">Working…</p>}
       {status && <p className="yt-modal-intro">{status}</p>}

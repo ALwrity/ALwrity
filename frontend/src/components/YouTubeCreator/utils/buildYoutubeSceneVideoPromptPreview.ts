@@ -27,6 +27,15 @@ export interface YoutubeSceneVideoRequestPreview {
   audioNote: string;
 }
 
+/** Mirror resolve_youtube_scene_video_duration: WAN 2.5 is 5s or 10s. */
+export function resolveYoutubeSceneVideoDuration(durationEstimate?: number | null): number {
+  const estimate = Number(durationEstimate);
+  if (!Number.isFinite(estimate)) {
+    return 5;
+  }
+  return estimate <= 7 ? 5 : 10;
+}
+
 function safeMediaRef(url?: string): string {
   if (!url) {
     return "";
@@ -43,7 +52,7 @@ export function buildYoutubeSceneVideoPromptPreview(
   const promptSource = enhanced ? "enhanced_visual_prompt" : "visual_prompt";
   const estimate = Number(input.duration_estimate);
   const durationEstimate = Number.isFinite(estimate) ? estimate : null;
-  const duration = durationEstimate == null || durationEstimate <= 7 ? 5 : 10;
+  const duration = resolveYoutubeSceneVideoDuration(durationEstimate);
   const imageUrl = safeMediaRef(input.imageUrl);
   const audioUrl = safeMediaRef(input.audioUrl);
 

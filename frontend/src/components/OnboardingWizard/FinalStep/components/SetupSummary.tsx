@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Box,
   Paper,
@@ -8,20 +8,15 @@ import {
   Card,
   CardContent,
   Chip,
-  Tooltip,
-  IconButton
+  Divider
 } from '@mui/material';
-import {
-  CheckCircle,
-  Security,
-  TrendingUp,
-  Settings,
-  Web,
-  Psychology,
-  LockOpen,
-  Visibility,
-  VisibilityOff
-} from '@mui/icons-material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import Settings from '@mui/icons-material/Settings';
+import Web from '@mui/icons-material/Web';
+import Psychology from '@mui/icons-material/Psychology';
+import LockOpen from '@mui/icons-material/LockOpen';
+import Lock from '@mui/icons-material/Lock';
 import { OnboardingData, Capability } from '../types';
 
 interface SetupSummaryProps {
@@ -40,7 +35,6 @@ export const SetupSummary: React.FC<SetupSummaryProps> = ({
   onboardingType
 }) => {
   const isLinkedIn = onboardingType === 'linkedin';
-  const [showApiKeys, setShowApiKeys] = useState(false);
   const unlockedCapabilities = capabilities.filter(cap => cap.unlocked);
 
   return (
@@ -57,19 +51,12 @@ export const SetupSummary: React.FC<SetupSummaryProps> = ({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <CheckCircle sx={{ color: 'success.main', fontSize: 32 }} />
             <Typography variant="h4" color="success.main" sx={{ fontWeight: 600 }}>
-              Setup Summary
+              Setup Summary & Capabilities
             </Typography>
           </Box>
           
           {/* Stats Chips */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-            <Chip 
-              label={isLinkedIn ? `${Object.keys(onboardingData.apiKeys).length} AI Providers (optional)` : `${Object.keys(onboardingData.apiKeys).length} AI Providers`}
-              color="primary"
-              variant="filled"
-              size="small"
-              icon={<Security />}
-            />
             <Chip 
               label={`${unlockedCapabilities.length}/${capabilities.length} Capabilities`}
               color="success"
@@ -116,35 +103,10 @@ export const SetupSummary: React.FC<SetupSummaryProps> = ({
                   color: '#000000 !important'
                 }}>
                   <Settings sx={{ color: 'primary.main' }} />
-                  Configuration Details
+                  Configuration & Capabilities
                 </Typography>
                 
                 <Grid container spacing={2}>
-                  {/* API Keys */}
-                  <Grid item xs={6} sm={3}>
-                    <Box 
-                      sx={{ 
-                        p: 2, 
-                        border: '1px solid rgba(0,0,0,0.1)', 
-                        borderRadius: 1,
-                        background: 'rgba(255,255,255,0.5)',
-                        cursor: 'pointer',
-                        '&:hover': { background: 'rgba(255,255,255,0.7)' }
-                      }}
-                      onClick={() => setExpandedSection(expandedSection === 'api-keys' ? null : 'api-keys')}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                        <Security sx={{ color: 'primary.main', fontSize: 18 }} />
-                         <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#000000' }}>
-                           API Keys
-                         </Typography>
-                       </Box>
-                       <Typography variant="body2" sx={{ color: '#000000' }}>
-                         {Object.keys(onboardingData.apiKeys).length} configured
-                       </Typography>
-                    </Box>
-                  </Grid>
-
                   {/* Website / LinkedIn Profile Analysis */}
                   <Grid item xs={6} sm={3}>
                     <Box 
@@ -222,50 +184,13 @@ export const SetupSummary: React.FC<SetupSummaryProps> = ({
                 </Grid>
 
                 {/* Expandable Details */}
-                {(expandedSection === 'api-keys' || expandedSection === 'website' || expandedSection === 'research' || expandedSection === 'personalization') && (
+                {(expandedSection === 'website' || expandedSection === 'research' || expandedSection === 'personalization') && (
                   <Box sx={{ mt: 3 }}>
                     <Paper elevation={0} sx={{ 
                       background: 'rgba(255, 255, 255, 0.9)', 
                       borderRadius: 2,
                       p: 3
                     }}>
-                      {/* API Keys Details */}
-                      {expandedSection === 'api-keys' && (
-                        <Box>
-                           <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1, color: '#000000' }}>
-                            <Security sx={{ color: 'primary.main' }} />
-                            API Keys ({Object.keys(onboardingData.apiKeys).length} configured)
-                          </Typography>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            {Object.entries(onboardingData.apiKeys).map(([provider, key]) => (
-                              <Box key={provider} sx={{ 
-                                p: 2, 
-                                border: '1px solid rgba(0,0,0,0.1)', 
-                                borderRadius: 1,
-                                background: 'rgba(255,255,255,0.5)'
-                              }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                                  <Typography variant="subtitle2" sx={{ fontWeight: 600, textTransform: 'capitalize' }}>
-                                    {provider}
-                                  </Typography>
-                                  <Tooltip title={showApiKeys ? 'Hide key' : 'Show key'}>
-                                    <IconButton 
-                                      size="small" 
-                                      onClick={() => setShowApiKeys(!showApiKeys)}
-                                    >
-                                      {showApiKeys ? <VisibilityOff /> : <Visibility />}
-                                    </IconButton>
-                                  </Tooltip>
-                                </Box>
-                                <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                                  {showApiKeys ? key : '••••••••••••••••••••••••••••••••'}
-                                </Typography>
-                              </Box>
-                            ))}
-                          </Box>
-                        </Box>
-                      )}
-
                       {/* Website / LinkedIn Profile Analysis Details */}
                       {expandedSection === 'website' && (
                         <Box>
@@ -348,6 +273,58 @@ export const SetupSummary: React.FC<SetupSummaryProps> = ({
                     </Paper>
                   </Box>
                 )}
+
+                {/* Capabilities */}
+                <Divider sx={{ my: 3 }} />
+                <Grid container spacing={2}>
+                  {capabilities.map((capability) => (
+                    <Grid item xs={12} sm={6} md={4} key={capability.id}>
+                      <Card elevation={0} sx={{ 
+                        background: capability.unlocked ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.05)',
+                        border: `1px solid ${capability.unlocked ? 'rgba(16, 185, 129, 0.3)' : 'rgba(0, 0, 0, 0.1)'}`,
+                        borderRadius: 2,
+                        opacity: capability.unlocked ? 1 : 0.6,
+                        height: '100%'
+                      }}>
+                        <CardContent>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                            <Box sx={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: '50%',
+                              background: capability.unlocked 
+                                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                                : 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              {React.cloneElement(capability.icon, { 
+                                sx: { color: 'white', fontSize: 20 } 
+                              })}
+                            </Box>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1, color: '#000000 !important' }}>
+                              {capability.title}
+                              {capability.unlocked ? (
+                                <CheckCircle sx={{ color: 'success.main', fontSize: 16 }} />
+                              ) : (
+                                <Lock sx={{ color: '#666666 !important', fontSize: 16 }} />
+                              )}
+                            </Typography>
+                          </Box>
+                          <Typography variant="body2" sx={{ mb: capability.unlocked ? 0 : 2, color: '#000000 !important' }}>
+                            {capability.description}
+                          </Typography>
+                          {!capability.unlocked && capability.required && (
+                            <Typography variant="caption" sx={{ color: '#000000 !important' }}>
+                              Requires: {capability.required.join(', ')}
+                            </Typography>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
               </CardContent>
             </Card>
           </Grid>

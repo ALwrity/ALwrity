@@ -21,14 +21,12 @@ import {
   ListItemIcon,
   ListItemText
 } from '@mui/material';
-import {
-  Psychology as PsychologyIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  TrendingUp as TrendingUpIcon,
-  Search as SearchIcon,
-  CheckCircle as CheckCircleIcon,
-  Close as CloseIcon
-} from '@mui/icons-material';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SearchIcon from '@mui/icons-material/Search';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
 import { refreshResearchPersona } from '../../api/researchConfig';
 import { triggerSubscriptionError } from '../../api/client';
 

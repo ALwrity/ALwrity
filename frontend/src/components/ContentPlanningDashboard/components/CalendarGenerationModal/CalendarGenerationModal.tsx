@@ -14,15 +14,13 @@ import {
   IconButton,
   CircularProgress
 } from '@mui/material';
-import {
-  Close as CloseIcon,
-  Schedule as ScheduleIcon,
-  TrendingUp as TrendingUpIcon,
-  School as SchoolIcon,
-  DataUsage as DataUsageIcon,
-  ViewModule as ViewModuleIcon,
-  Devices as DevicesIcon
-} from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SchoolIcon from '@mui/icons-material/School';
+import DataUsageIcon from '@mui/icons-material/DataUsage';
+import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import DevicesIcon from '@mui/icons-material/Devices';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Import existing components for reuse

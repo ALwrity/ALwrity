@@ -60,6 +60,18 @@ class CalendarEvent(Base):
     scheduled_date = Column(DateTime, nullable=False)
     status = Column(String(20), default="draft")  # draft, scheduled, published, cancelled
     ai_recommendations = Column(JSON, nullable=True)  # Store AI recommendations for the event
+    owner_agent = Column(String(100), nullable=True, index=True)
+    recommendation_id = Column(String(255), nullable=True, index=True)
+    task_id = Column(Integer, ForeignKey("daily_workflow_tasks.id"), nullable=True, index=True)
+    meeting_id = Column(String(255), nullable=True, index=True)
+    kpi = Column(String(255), nullable=True)
+    deadline = Column(String(255), nullable=True)
+    action_type = Column(String(50), nullable=True)
+    action_parameters = Column(JSON, nullable=True)
+    evidence = Column(JSON, nullable=True)
+    expected_outcome = Column(Text, nullable=True)
+    user_approval_state = Column(String(30), nullable=False, default="pending")
+    user_timezone = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -87,6 +99,18 @@ class CalendarEvent(Base):
             'scheduled_date': self.scheduled_date.isoformat() if self.scheduled_date else None,
             'status': self.status,
             'ai_recommendations': self.ai_recommendations,
+            'owner_agent': self.owner_agent,
+            'recommendation_id': self.recommendation_id,
+            'task_id': self.task_id,
+            'meeting_id': self.meeting_id,
+            'kpi': self.kpi,
+            'deadline': self.deadline,
+            'action_type': self.action_type,
+            'action_parameters': self.action_parameters,
+            'evidence': self.evidence,
+            'expected_outcome': self.expected_outcome,
+            'user_approval_state': self.user_approval_state,
+            'user_timezone': self.user_timezone,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

@@ -11,15 +11,13 @@ import {
   useTheme
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  ArrowBack as BackIcon,
-  ArrowForward as ForwardIcon,
-  PlayArrow as PlayIcon,
-  Pause as PauseIcon,
-  SkipNext as SkipIcon,
-  CheckCircle as CompleteIcon,
-  Navigation as NavigationIcon
-} from '@mui/icons-material';
+import BackIcon from '@mui/icons-material/ArrowBack';
+import ForwardIcon from '@mui/icons-material/ArrowForward';
+import PlayIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
+import SkipIcon from '@mui/icons-material/SkipNext';
+import CompleteIcon from '@mui/icons-material/CheckCircle';
+import NavigationIcon from '@mui/icons-material/Navigation';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import { taskNavigationService } from '../../../services/TaskNavigationService';
 import { taskDependencyManager } from '../../../services/TaskDependencyManager';

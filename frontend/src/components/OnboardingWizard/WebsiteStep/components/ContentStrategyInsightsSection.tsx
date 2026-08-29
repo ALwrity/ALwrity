@@ -13,16 +13,14 @@ import {
   Chip,
   TextField
 } from '@mui/material';
-import {
-  Analytics as AnalyticsIcon,
-  CheckCircle as StrengthsIcon,
-  Cancel as WeaknessesIcon,
-  TrendingUp as OpportunitiesIcon,
-  Warning as ThreatsIcon,
-  Build as ImprovementsIcon,
-  Rule as GapsIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import StrengthsIcon from '@mui/icons-material/CheckCircle';
+import WeaknessesIcon from '@mui/icons-material/Cancel';
+import OpportunitiesIcon from '@mui/icons-material/TrendingUp';
+import ThreatsIcon from '@mui/icons-material/Warning';
+import ImprovementsIcon from '@mui/icons-material/Build';
+import GapsIcon from '@mui/icons-material/Rule';
+import InfoIcon from '@mui/icons-material/Info';
 import SectionHeader from './SectionHeader';
 
 export interface ContentStrategyInsights {

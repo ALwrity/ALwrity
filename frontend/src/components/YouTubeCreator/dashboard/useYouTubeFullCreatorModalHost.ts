@@ -1,6 +1,9 @@
 /**
- * Opens Full Creator modal when Hub is mounted and openYouTubeCreator fires,
+ * Opens Full Creator surface when Hub is mounted and openYouTubeCreator fires,
  * or when a deep-link left a pending prefill (Blog / ?tab=creator).
+ *
+ * Phase 2: this is a surface host, not a YouTubeActionModal host. Event names
+ * stay the same so existing open/close callers do not change.
  */
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -42,7 +45,7 @@ export function useYouTubeFullCreatorModalHost(onCloseWedges: () => void): {
     const openModal = (source: string) => {
       onCloseWedges();
       setFullCreatorOpen(true);
-      console.info("[useYouTubeFullCreatorModalHost] Opening Full Creator modal", {
+      console.info("[useYouTubeFullCreatorModalHost] Opening Full Creator surface", {
         source,
       });
     };
@@ -52,7 +55,7 @@ export function useYouTubeFullCreatorModalHost(onCloseWedges: () => void): {
     const onCloseCreator = () => {
       consumePendingOpenCreator();
       setFullCreatorOpen(false);
-      console.info("[useYouTubeFullCreatorModalHost] Closed Full Creator modal", {
+      console.info("[useYouTubeFullCreatorModalHost] Closed Full Creator surface", {
         source: YT_CLOSE_CREATOR_EVENT,
       });
     };

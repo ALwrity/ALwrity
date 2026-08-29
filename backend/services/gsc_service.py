@@ -18,10 +18,25 @@ from services.analytics_cache_service import analytics_cache
 from dotenv import load_dotenv
 
 class GSCService:
-    """Service for Google Search Console integration."""
-    
+    """Service for Google Search Console integration.
+
+    Stateless (config-only) service. A single process-wide instance is shared
+    across all callers via ``__new__`` so initialization — including its log
+    output — happens exactly once, instead of on every request.
+    """
+    _instance: Optional["GSCService"] = None
+
+    def __new__(cls, db_path: str = None):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
     def __init__(self, db_path: str = None):
-        """Initialize GSC service."""
+        """Initialize GSC service (runs once per process)."""
+        if getattr(self, '_initialized', False):
+            return
+
         # db_path is deprecated in favor of dynamic user_id based paths
         self.db_path = db_path
         
@@ -38,19 +53,22 @@ class GSCService:
         # Load client config from file or environment variables
         self.client_config = self._load_client_config()
         
-        if self.client_config:
-            logger.info("GSC client configuration loaded successfully")
-        else:
-            logger.warning(f"GSC credentials not found in {self.credentials_file} or environment variables")
-            
         self.scopes = ['https://www.googleapis.com/auth/webmasters.readonly']
         # Note: Tables are initialized lazily per user
-        logger.info("GSC Service initialized successfully")
+
+        if self.client_config:
+            logger.info(f"GSC Service initialized (credentials: {self._credential_source})")
+        else:
+            logger.warning(f"GSC credentials not found in {self.credentials_file} or environment variables")
+
+        self._initialized = True
 
     def _load_client_config(self) -> Optional[Dict[str, Any]]:
         """Load Google client configuration from environment variables or file."""
         # Reload environment variables to catch any runtime changes (e.g. .env updates)
         load_dotenv(override=True)
+
+        self._credential_source = "none"
 
         # 1. Check Environment Variables (Priority)
         client_id = os.getenv("GOOGLE_CLIENT_ID")
@@ -58,7 +76,7 @@ class GSCService:
         
         if client_id and client_secret:
             redirect_uri = os.getenv('GSC_REDIRECT_URI', 'http://localhost:8000/gsc/callback')
-            logger.info("Loading GSC credentials from environment variables")
+            self._credential_source = "environment variables"
             # Construct the config dictionary expected by google_auth_oauthlib
             return {
                 "web": {
@@ -84,7 +102,7 @@ class GSCService:
             try:
                 with open(self.credentials_file, 'r') as f:
                     config = json.load(f)
-                    logger.info(f"Loading GSC credentials from file: {self.credentials_file}")
+                    self._credential_source = f"file ({self.credentials_file})"
                     return config
             except Exception as e:
                 logger.warning(f"Failed to load GSC credentials from file: {e}")
@@ -95,53 +113,15 @@ class GSCService:
         return get_user_db_path(user_id)
     
     def _init_gsc_tables(self, user_id: str):
-        """Initialize GSC-related database tables."""
+        """Ensure the per-user schema exists (owned by Alembic migrations)."""
         try:
-            db_path = self._get_db_path(user_id)
-            os.makedirs(os.path.dirname(db_path), exist_ok=True)
-            
-            with sqlite3.connect(db_path) as conn:
-                cursor = conn.cursor()
-                
-                # GSC credentials table
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS gsc_credentials (
-                        user_id TEXT PRIMARY KEY,
-                        credentials_json TEXT NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
-                
-                # GSC data cache table
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS gsc_data_cache (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id TEXT NOT NULL,
-                        site_url TEXT NOT NULL,
-                        data_type TEXT NOT NULL,
-                        data_json TEXT NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        expires_at TIMESTAMP NOT NULL,
-                        FOREIGN KEY (user_id) REFERENCES gsc_credentials (user_id)
-                    )
-                ''')
-                
-                # GSC OAuth states table
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS gsc_oauth_states (
-                        state TEXT PRIMARY KEY,
-                        user_id TEXT NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
-                
-                conn.commit()
-                # logger.debug(f"GSC database tables initialized for user {user_id}")
-                
-        except Exception as e:
-            logger.error(f"Error initializing GSC tables for user {user_id}: {e}")
-            raise
+            from services.database import get_engine_for_user
+
+            get_engine_for_user(user_id)
+        except Exception as ensure_error:
+            logger.warning(f"Could not ensure Alembic schema for user {user_id}: {ensure_error}")
+        db_path = self._get_db_path(user_id)
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
     
     def save_user_credentials(self, user_id: str, credentials: Credentials) -> bool:
         """Save user's GSC credentials to database."""
@@ -173,7 +153,7 @@ class GSCService:
                 ''', (user_id, credentials_json))
                 conn.commit()
             
-            logger.info(f"GSC credentials saved for user: {user_id}")
+            logger.debug(f"GSC credentials saved for user: {user_id}")
             return True
             
         except Exception as e:
@@ -264,7 +244,9 @@ class GSCService:
                 state=state
             )
             
-            # Store state for verification in the user-specific DB
+            # Ensure the per-user schema exists (Alembic-owned) before storing
+            # the OAuth state, so state storage and the callback lookup resolve
+            # to the same file.
             self._init_gsc_tables(user_id)
             db_path = self._get_db_path(user_id)
             
@@ -425,6 +407,19 @@ class GSCService:
                            start_date: str = None, end_date: str = None) -> Dict[str, Any]:
         """Get search analytics data from GSC."""
         try:
+            # Normalize site_url: some callers pass the full GSC site resource dict
+            # ({'siteUrl': ..., 'permissionLevel': ...}) instead of the URL string,
+            # which breaks both the API call and DB caching.
+            if isinstance(site_url, dict):
+                site_url = (
+                    site_url.get('siteUrl')
+                    or site_url.get('site_url')
+                    or next(iter(site_url.values()), None)
+                )
+                logger.warning(f"get_search_analytics received dict for site_url; extracted: {site_url}")
+            if not isinstance(site_url, str):
+                site_url = str(site_url) if site_url else ''
+
             # Set default date range (last 30 days)
             if not end_date:
                 end_date = datetime.now().strftime('%Y-%m-%d')

@@ -28,24 +28,22 @@ import {
   alpha,
   Slider,
 } from '@mui/material';
-import {
-  AutoAwesome,
-  PhotoLibrary,
-  Refresh,
-  Download,
-  Favorite,
-  FavoriteBorder,
-  ZoomIn,
-  Close,
-  ExpandMore,
-  ExpandLess,
-  AttachMoney,
-  Info,
-  TrendingUp,
-  Star,
-  Bolt,
-  Image as ImageIcon,
-} from '@mui/icons-material';
+import AutoAwesome from '@mui/icons-material/AutoAwesome';
+import PhotoLibrary from '@mui/icons-material/PhotoLibrary';
+import Refresh from '@mui/icons-material/Refresh';
+import Download from '@mui/icons-material/Download';
+import Favorite from '@mui/icons-material/Favorite';
+import FavoriteBorder from '@mui/icons-material/FavoriteBorder';
+import ZoomIn from '@mui/icons-material/ZoomIn';
+import Close from '@mui/icons-material/Close';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import AttachMoney from '@mui/icons-material/AttachMoney';
+import Info from '@mui/icons-material/Info';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import Star from '@mui/icons-material/Star';
+import Bolt from '@mui/icons-material/Bolt';
+import ImageIcon from '@mui/icons-material/Image';
 import { motion, AnimatePresence, type Variants, type Easing } from 'framer-motion';
 import { useImageStudio } from '../../hooks/useImageStudio';
 import { TemplateSelector } from './TemplateSelector';

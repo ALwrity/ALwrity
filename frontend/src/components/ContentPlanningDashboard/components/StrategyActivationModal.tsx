@@ -20,20 +20,18 @@ import {
   ListItemText,
   Chip
 } from '@mui/material';
-import {
-  AutoAwesome as AutoAwesomeIcon,
-  Assessment as AssessmentIcon,
-  PlayArrow as PlayArrowIcon,
-  SmartToy as SmartToyIcon,
-  Person as PersonIcon,
-  TrendingUp as TrendingUpIcon,
-  ThumbUp as ThumbUpIcon,
-  MonetizationOn as MonetizationOnIcon,
-  CheckCircle as CheckCircleIcon,
-  Star as StarIcon,
-  EmojiEvents as EmojiEventsIcon,
-  People as PeopleIcon
-} from '@mui/icons-material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import PersonIcon from '@mui/icons-material/Person';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import StarIcon from '@mui/icons-material/Star';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import PeopleIcon from '@mui/icons-material/People';
 import { strategyMonitoringApi, MonitoringPlan } from '../../../services/strategyMonitoringApi';
 
 interface StrategyActivationModalProps {

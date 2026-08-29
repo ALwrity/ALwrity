@@ -7,14 +7,12 @@ import {
   CircularProgress,
   Tooltip,
 } from '@mui/material';
-import {
-  CheckCircle as CheckIcon,
-  WarningAmber as WarningIcon,
-  Error as ErrorIcon,
-  Gavel as GavelIcon,
-  Shield as ShieldIcon,
-  Security as SecurityIcon,
-} from '@mui/icons-material';
+import CheckIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/WarningAmber';
+import ErrorIcon from '@mui/icons-material/Error';
+import GavelIcon from '@mui/icons-material/Gavel';
+import ShieldIcon from '@mui/icons-material/Shield';
+import SecurityIcon from '@mui/icons-material/Security';
 import { apiClient } from '../../../api/client';
 
 interface QualityScore {

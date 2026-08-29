@@ -25,7 +25,6 @@ from .wordpress_content import WordPressContentManager
 from .wordpress_oauth_content import WordPressOAuthContentManager
 import sqlite3
 
-
 from services.database import get_user_db_path
 
 class WordPressPublisher:
@@ -140,47 +139,7 @@ class WordPressPublisher:
             ),
             'legacy',
         )
-    
-    def _init_db(self, user_id: str):
-        """Initialize database tables for published posts."""
-        db_path = self._get_db_path(user_id)
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        
-        with sqlite3.connect(db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS wordpress_posts (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id TEXT NOT NULL,
-                    wp_post_id INTEGER NOT NULL,
-                    wp_url TEXT NOT NULL,
-                    title TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            conn.commit()
-    
-    def save_post_info(self, user_id: str, wp_post_id: int, wp_url: str, title: str, status: str) -> bool:
-        """Save information about a published post."""
-        try:
-            self._init_db(user_id)
-            db_path = self._get_db_path(user_id)
-            
-            with sqlite3.connect(db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute('''
-                    INSERT INTO wordpress_posts (user_id, wp_post_id, wp_url, title, status) 
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (user_id, wp_post_id, wp_url, title, status))
-                conn.commit()
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error saving WordPress post info: {e}")
-            return False
-    
+
     def publish_blog_post(self, user_id: str, site_id: int,
                          title: str, content: str,
                          excerpt: str = "",

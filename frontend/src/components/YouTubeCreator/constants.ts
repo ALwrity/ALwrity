@@ -62,6 +62,32 @@ export const YOUTUBE_CONTENT_LANGUAGE_OPTIONS: Array<{
   { value: 'th', label: 'Thai', languageBoost: 'Thai' },
 ];
 
+const CONTENT_LANGUAGE_CODES = new Set(
+  YOUTUBE_CONTENT_LANGUAGE_OPTIONS.map((option) => option.value),
+);
+
+/** Normalize Plan Your Video language for pitch/expand. Unknown values become English. */
+export function resolveYoutubeContentLanguageCode(
+  language: string | undefined | null,
+): YouTubeContentLanguage {
+  const raw = (language || "").trim().toLowerCase();
+  if (!raw) {
+    return "en";
+  }
+  const primary = raw.replace(/_/g, "-").split("-")[0];
+  if (CONTENT_LANGUAGE_CODES.has(primary as YouTubeContentLanguage)) {
+    return primary as YouTubeContentLanguage;
+  }
+  const byLabel = YOUTUBE_CONTENT_LANGUAGE_OPTIONS.find(
+    (option) => option.label.toLowerCase() === raw,
+  );
+  if (byLabel) {
+    return byLabel.value;
+  }
+  console.warn("[YouTubeCreator] Unknown content language; using English", { requested: raw });
+  return "en";
+}
+
 export const VIDEO_TYPES = [
   'tutorial',
   'review',

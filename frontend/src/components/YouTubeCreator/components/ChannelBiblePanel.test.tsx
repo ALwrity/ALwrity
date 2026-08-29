@@ -1,5 +1,6 @@
+import type { Mock } from 'vitest';
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ChannelBiblePanel } from "./ChannelBiblePanel";
 import { YouTubeChannelBible } from "../../../services/youtubeApi";
@@ -25,9 +26,9 @@ const emptyBible: YouTubeChannelBible = {
 function renderPanel(
   profile: YouTubeChannelBible,
   handlers: {
-    onChange: jest.Mock;
-    onSave: jest.Mock;
-    onApplyToThisVideo: jest.Mock;
+    onChange: Mock;
+    onSave: Mock;
+    onApplyToThisVideo: Mock;
   },
 ) {
   render(
@@ -42,12 +43,12 @@ function renderPanel(
 }
 
 describe("ChannelBiblePanel", () => {
-  const onChange = jest.fn();
-  const onSave = jest.fn();
-  const onApplyToThisVideo = jest.fn();
+  const onChange = vi.fn();
+  const onSave = vi.fn();
+  const onApplyToThisVideo = vi.fn();
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it("calls onSave when Save channel defaults is clicked", () => {

@@ -9,13 +9,11 @@ import {
   Avatar,
   Chip
 } from '@mui/material';
-import {
-  TrendingUp as TrendingUpIcon,
-  Speed as SpeedIcon,
-  BugReport as BugReportIcon,
-  Storage as StorageIcon,
-  Timeline as TimelineIcon
-} from '@mui/icons-material';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SpeedIcon from '@mui/icons-material/Speed';
+import BugReportIcon from '@mui/icons-material/BugReport';
+import StorageIcon from '@mui/icons-material/Storage';
+import TimelineIcon from '@mui/icons-material/Timeline';
 import { motion } from 'framer-motion';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,

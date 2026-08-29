@@ -23,28 +23,26 @@ import {
   ListItemText,
   Divider
 } from '@mui/material';
-import {
-  Close as CloseIcon,
-  CheckCircle as CheckCircleIcon,
-  AutoAwesome as AutoAwesomeIcon,
-  Psychology as PsychologyIcon,
-  CalendarToday as CalendarIcon,
-  Analytics as AnalyticsIcon,
-  TrendingUp as TrendingUpIcon,
-  Lightbulb as LightbulbIcon,
-  School as SchoolIcon,
-  Rocket as RocketIcon,
-  Security as SecurityIcon,
-  Speed as SpeedIcon,
-  Group as GroupIcon,
-  Timeline as TimelineIcon,
-  Assessment as AssessmentIcon,
-  PlayArrow as PlayArrowIcon,
-  Pause as PauseIcon,
-  Refresh as RefreshIcon,
-  Edit as EditIcon,
-  Add as AddIcon
-} from '@mui/icons-material';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import CalendarIcon from '@mui/icons-material/CalendarToday';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import SchoolIcon from '@mui/icons-material/School';
+import RocketIcon from '@mui/icons-material/Rocket';
+import SecurityIcon from '@mui/icons-material/Security';
+import SpeedIcon from '@mui/icons-material/Speed';
+import GroupIcon from '@mui/icons-material/Group';
+import TimelineIcon from '@mui/icons-material/Timeline';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import EditIcon from '@mui/icons-material/Edit';
+import AddIcon from '@mui/icons-material/Add';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface StrategyOnboardingDialogProps {

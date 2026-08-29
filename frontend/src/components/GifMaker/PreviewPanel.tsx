@@ -15,10 +15,8 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
-import {
-  Download as DownloadIcon,
-  Refresh as ResetIcon,
-} from '@mui/icons-material';
+import DownloadIcon from '@mui/icons-material/Download';
+import ResetIcon from '@mui/icons-material/Refresh';
 import type { GifResult } from './types';
 
 interface PreviewPanelProps {

@@ -26,57 +26,10 @@ class WordPressService:
         # db_path is deprecated in favor of dynamic user_id based paths
         self.db_path = db_path
         self.api_version = "v2"
-        # self._ensure_tables() # Deferred to per-user calls
     
     def _get_db_path(self, user_id: str) -> str:
         return get_user_db_path(user_id)
     
-    def _ensure_tables(self, user_id: str) -> None:
-        """Ensure required database tables exist."""
-        try:
-            db_path = self._get_db_path(user_id)
-            os.makedirs(os.path.dirname(db_path), exist_ok=True)
-            
-            with sqlite3.connect(db_path) as conn:
-                cursor = conn.cursor()
-                
-                # WordPress sites table
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS wordpress_sites (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id TEXT NOT NULL,
-                        site_url TEXT NOT NULL,
-                        site_name TEXT,
-                        username TEXT NOT NULL,
-                        app_password TEXT NOT NULL,
-                        is_active BOOLEAN DEFAULT 1,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        UNIQUE(user_id, site_url)
-                    )
-                ''')
-                
-                # WordPress posts table for tracking published content
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS wordpress_posts (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id TEXT NOT NULL,
-                        site_id INTEGER NOT NULL,
-                        wp_post_id INTEGER NOT NULL,
-                        title TEXT NOT NULL,
-                        status TEXT DEFAULT 'draft',
-                        published_at TIMESTAMP,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (site_id) REFERENCES wordpress_sites (id)
-                    )
-                ''')
-                
-                conn.commit()
-                # logger.info("WordPress database tables ensured")
-                
-        except Exception as e:
-            logger.error(f"Error ensuring WordPress tables for user {user_id}: {e}")
-            raise
     
     def add_site(self, user_id: str, site_url: str, site_name: str, username: str, app_password: str) -> bool:
         """Add a new WordPress site connection."""
@@ -90,7 +43,6 @@ class WordPressService:
                 logger.error(f"Failed to connect to WordPress site: {site_url}")
                 return False
             
-            self._ensure_tables(user_id)
             db_path = self._get_db_path(user_id)
             
             with sqlite3.connect(db_path) as conn:

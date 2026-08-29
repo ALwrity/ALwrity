@@ -9,6 +9,7 @@ export interface OutlineItem {
   section: string;
   description: string;
   duration_estimate: number;
+  visual?: string;
 }
 
 export function createOutlineItemId(): string {
@@ -34,6 +35,7 @@ export function toOutlineItems(
     section: (item.section || "").trim(),
     description: item.description || "",
     duration_estimate: normalizeDuration(item.duration_estimate),
+    visual: (item.visual || "").trim() || undefined,
   }));
 }
 
@@ -42,6 +44,7 @@ export function fromOutlineItems(items: OutlineItem[]): VideoPlan["content_outli
     section: item.section.trim(),
     description: (item.description || "").trim(),
     duration_estimate: normalizeDuration(item.duration_estimate),
+    visual: (item.visual || "").trim() || undefined,
   }));
 }
 

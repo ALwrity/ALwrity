@@ -4,11 +4,9 @@ import {
   Button,
   Alert
 } from '@mui/material';
-import {
-  Check as CheckIcon,
-  CalendarToday as CalendarIcon,
-  Refresh as RefreshIcon
-} from '@mui/icons-material';
+import CheckIcon from '@mui/icons-material/Check';
+import CalendarIcon from '@mui/icons-material/CalendarToday';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { motion } from 'framer-motion';
 import { StrategyData } from '../types/strategy.types';
 import EnhancedStrategyActivationButton from './EnhancedStrategyActivationButton';

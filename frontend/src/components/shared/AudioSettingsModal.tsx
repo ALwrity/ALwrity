@@ -26,13 +26,14 @@ import { Button } from "@mui/material";
 
 // Import language-aware voice mapping (optional - only used in YouTube Creator context)
 let getVoicesForLanguage: ((language?: string) => any[]) | undefined;
-try {
-  const youtubeConstants = require('../../components/YouTubeCreator/constants');
-  getVoicesForLanguage = youtubeConstants.getVoicesForLanguage;
-} catch {
-  // Not in YouTube Creator context - will use fallback English voices
-  getVoicesForLanguage = undefined;
-}
+import('../../components/YouTubeCreator/constants')
+  .then((youtubeConstants) => {
+    getVoicesForLanguage = youtubeConstants.getVoicesForLanguage;
+  })
+  .catch(() => {
+    // Not in YouTube Creator context - will use fallback English voices
+    getVoicesForLanguage = undefined;
+  });
 
 export type AudioGenerationSettings = {
   voiceId: string;

@@ -1,9 +1,10 @@
+import type { Mock } from 'vitest';
 import { boostPerformanceContent } from "../../components/dashboard/performancePulse/boostPerformanceContent";
 import { optimizeForEngagement } from "../../components/dashboard/engagementBoosterApi";
 import type { LinkedInPost } from "../../../../services/postAnalyticsApi";
 
-jest.mock("../../components/dashboard/engagementBoosterApi", () => ({
-  optimizeForEngagement: jest.fn(),
+vi.mock("../../components/dashboard/engagementBoosterApi", () => ({
+  optimizeForEngagement: vi.fn(),
 }));
 
 function makePost(text: string): LinkedInPost {
@@ -28,11 +29,11 @@ function makePost(text: string): LinkedInPost {
 
 describe("boostPerformanceContent", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it("passes content_type to optimizeForEngagement", async () => {
-    (optimizeForEngagement as jest.Mock).mockResolvedValue({
+    (optimizeForEngagement as Mock).mockResolvedValue({
       success: true,
       content: "Improved article caption",
     });

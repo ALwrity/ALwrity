@@ -6,6 +6,7 @@ import {
   YOUTUBE_WORKFLOW_CARDS,
   type YouTubeWorkflowCardId,
 } from "./youtubeWorkflowConfig";
+import { isYouTubePlanWedge } from "./youtubePlanWedgeUi";
 import { ConnectLockBadge } from "../../LinkedInWriter/components/dashboard/ConnectLockIcon";
 
 interface YouTubeMobileWorkflowGridProps {
@@ -61,8 +62,8 @@ export const YouTubeMobileWorkflowGrid: React.FC<
 
       <div className="yt-dashboard-mobile-workflow-grid">
         {YOUTUBE_WORKFLOW_CARDS.map((card) => {
-          const isRecommended =
-            card.id === RECOMMENDED_WORKFLOW_CARD_ID && showPlanHint;
+          const isPlanWedge = isYouTubePlanWedge(card.id);
+          const isRecommended = isPlanWedge && showPlanHint;
           const isConnectLocked = isWedgeConnectGated(card.id, connected);
           const Icon = card.icon;
 
@@ -91,7 +92,7 @@ export const YouTubeMobileWorkflowGrid: React.FC<
                 } as React.CSSProperties
               }
             >
-              {isRecommended && (
+              {isPlanWedge && (
                 <span className="yt-dashboard-mobile-workflow-badge">
                   <span>START</span>
                   <span>HERE</span>

@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "allowJs": false,
+    "composite": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "incremental": true,
+    "outDir": ".cache/types",
+    "tsBuildInfoFile": ".cache/types/tsconfig.check.tsbuildinfo"
+  }
+}

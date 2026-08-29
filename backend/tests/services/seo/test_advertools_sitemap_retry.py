@@ -227,6 +227,42 @@ class TestIndexRecursion:
         assert not df.empty
         assert fake_adv.calls == ["https://tpages.example.com/sitemap.xml"]
 
+    def test_max_urls_stops_recursion_early(self, fake_adv, clock):
+        # A sitemap index listing 4 sub-sitemaps, each holding many page URLs.
+        def handler(url):
+            tag = url.rsplit("/", 1)[-1]
+            if tag == "sitemap.xml":
+                return pd.DataFrame(
+                    {
+                        "loc": [
+                            "https://tmax.example.com/a.xml",
+                            "https://tmax.example.com/b.xml",
+                            "https://tmax.example.com/c.xml",
+                            "https://tmax.example.com/d.xml",
+                        ]
+                    }
+                )
+            return pd.DataFrame(
+                {"loc": [f"{url[:-4]}/p1", f"{url[:-4]}/p2"], "lastmod": ["2026-01-01"] * 2}
+            )
+
+        fake_adv.handler = handler
+
+        df = svc.AdvertoolsService._sitemap_to_df_with_retry(
+            "https://tmax.example.com/sitemap.xml",
+            max_urls=3,
+            _deadline=_no_deadline(clock),
+        )
+
+        # Only a.xml (2 URLs) then b.xml (2 URLs) are fetched before hitting the
+        # max_urls=3 cap — c.xml and d.xml are never requested.
+        fetched = fake_adv.calls
+        assert fetched[0] == "https://tmax.example.com/sitemap.xml"
+        assert "a.xml" in fetched[1]
+        assert "b.xml" in fetched[2]
+        assert not any("c.xml" in c or "d.xml" in c for c in fetched)
+        assert not df.empty
+
 
 class TestBatchDeadline:
     def test_deadline_bounds_fetch(self, fake_adv, clock):

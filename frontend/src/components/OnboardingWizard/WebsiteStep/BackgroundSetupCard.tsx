@@ -40,6 +40,56 @@ interface AdvertoolsStatusResponse {
 
 const TAG = "[BackgroundSetup]";
 
+const STORAGE_KEY_CONTENT_AUDIT = "content_audit_result";
+const STORAGE_KEY_SITE_HEALTH = "site_health_result";
+
+// Gradient button styles — give the primary "Run" actions a vivid gradient and
+// the secondary "View Results" actions a colored outline (no white-on-white).
+const GRADIENT_BUTTON = {
+  textTransform: "none" as const,
+  fontSize: 11,
+  fontWeight: 700,
+  color: "#fff",
+  border: "none",
+  px: 1.5,
+  py: 0.4,
+  borderRadius: 2,
+  boxShadow: "0 2px 6px rgba(0,0,0,0.18)",
+  "&:hover": { filter: "brightness(1.08)", boxShadow: "0 3px 8px rgba(0,0,0,0.25)" },
+  "&:disabled": { color: "#fff", opacity: 0.6 },
+};
+
+const GRADIENTS: Record<string, { bg: string; outlineColor: string; outlineColor2: string }> = {
+  seo: {
+    bg: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+    outlineColor: "#6366f1",
+    outlineColor2: "#8b5cf6",
+  },
+  content: {
+    bg: "linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%)",
+    outlineColor: "#0ea5e9",
+    outlineColor2: "#6366f1",
+  },
+  health: {
+    bg: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+    outlineColor: "#10b981",
+    outlineColor2: "#059669",
+  },
+};
+
+const OUTLINE_BUTTON = (color: string) => ({
+  textTransform: "none" as const,
+  fontSize: 11,
+  fontWeight: 600,
+  color,
+  border: `1px solid ${color}`,
+  px: 1.25,
+  py: 0.3,
+  borderRadius: 2,
+  bgcolor: "transparent",
+  "&:hover": { bgcolor: color + "14", borderColor: color },
+});
+
 const TASK_ICONS: Record<string, string> = {
   seo_audit: "🔍",
   sif_indexing: "🧠",
@@ -137,6 +187,8 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSeoPreview, setShowSeoPreview] = useState(false);
+  const [showSeoResults, setShowSeoResults] = useState(false);
+  const [hasSeoResults, setHasSeoResults] = useState(false);
   const [showContentAudit, setShowContentAudit] = useState(false);
 
   // Advertools task status
@@ -196,6 +248,31 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
     }
   }, [advStatus?.has_results, brandAnalysis, seoAudit, lastRunResult, lastHealthRun]);
 
+  // Restore instantly from localStorage (survives refresh / step navigation).
+  useEffect(() => {
+    try {
+      const cachedAudit = localStorage.getItem(STORAGE_KEY_CONTENT_AUDIT);
+      if (cachedAudit) {
+        const parsed = JSON.parse(cachedAudit);
+        if (parsed?.audit) setLastRunResult(parsed);
+      }
+    } catch {}
+    try {
+      const cachedHealth = localStorage.getItem(STORAGE_KEY_SITE_HEALTH);
+      if (cachedHealth) {
+        const parsed = JSON.parse(cachedHealth);
+        if (parsed?.site_health || parsed?.success) setLastHealthRun(parsed);
+      }
+    } catch {}
+    try {
+      const cachedPreview = localStorage.getItem("seo_preview_result");
+      if (cachedPreview) {
+        const parsed = JSON.parse(cachedPreview);
+        if (parsed?.success && parsed?.pages?.length) setHasSeoResults(true);
+      }
+    } catch {}
+  }, []);
+
   // Save preferences on toggle
   const savePreferences = useCallback(async (updated: Record<string, TaskConfig>) => {
     const payload: Record<string, { enabled: boolean; delay_mins: number }> = {};
@@ -234,6 +311,9 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
       if (res.data?.success || res.data?.audit) {
         setLastRunResult(res.data);
         setShowContentAudit(true);
+        try {
+          localStorage.setItem(STORAGE_KEY_CONTENT_AUDIT, JSON.stringify(res.data));
+        } catch {}
       } else {
         setRunError(res.data?.error || "Content audit returned no results");
       }
@@ -256,6 +336,9 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
       if (res.data?.success || res.data?.site_health) {
         setLastHealthRun(res.data);
         setShowSiteHealth(true);
+        try {
+          localStorage.setItem(STORAGE_KEY_SITE_HEALTH, JSON.stringify(res.data));
+        } catch {}
       } else {
         setHealthError(res.data?.error || "Site health analysis returned no results");
       }
@@ -275,13 +358,13 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
   const mergedBrandAnalysis = useMemo(() => {
     const audit = lastRunResult?.audit;
     if (!audit) return brandAnalysis;
+    // Fresh runs return `themes`; persisted DB rows store `augmented_themes`.
+    // Normalize both so the summary card always renders the themes section.
+    const themes = audit.themes || audit.augmented_themes || brandAnalysis?.augmented_themes;
     return {
       ...(brandAnalysis || {}),
-      augmented_themes: audit.themes || brandAnalysis?.augmented_themes,
-      link_health: audit.link_health || brandAnalysis?.link_health,
-      crawl_budget: audit.crawl_budget || brandAnalysis?.crawl_budget,
-      page_status: audit.page_status || brandAnalysis?.page_status,
-      freshness: audit.freshness || brandAnalysis?.freshness,
+      ...(audit || {}),
+      augmented_themes: themes,
       last_advertools_audit: new Date().toISOString(),
     };
   }, [brandAnalysis, lastRunResult]);
@@ -393,11 +476,32 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
                 {isSeoAudit && task.enabled && (
                   <Button
                     size="small"
-                    variant="outlined"
-                    sx={{ textTransform: "none", fontSize: 11 }}
-                    onClick={() => setShowSeoPreview(!showSeoPreview)}
+                    sx={{ ...GRADIENT_BUTTON, background: GRADIENTS.seo.bg }}
+                    onClick={() => { setShowSeoPreview(true); setShowSeoResults(false); }}
                   >
-                    {showSeoPreview ? "Hide Preview" : "Run Preview"}
+                    Run Preview
+                  </Button>
+                )}
+
+                {/* SEO Audit view previous results */}
+                {isSeoAudit && task.enabled && hasSeoResults && !showSeoPreview && (
+                  <Button
+                    size="small"
+                    sx={OUTLINE_BUTTON(GRADIENTS.seo.outlineColor)}
+                    onClick={() => { setShowSeoResults(true); setShowSeoPreview(false); }}
+                  >
+                    View Results
+                  </Button>
+                )}
+
+                {/* Hide SEO preview/results */}
+                {isSeoAudit && (showSeoPreview || showSeoResults) && (
+                  <Button
+                    size="small"
+                    sx={OUTLINE_BUTTON("#64748b")}
+                    onClick={() => { setShowSeoPreview(false); setShowSeoResults(false); }}
+                  >
+                    Hide
                   </Button>
                 )}
 
@@ -405,10 +509,9 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
                 {isContentAudit && task.enabled && (
                   <Button
                     size="small"
-                    variant="outlined"
                     disabled={runLoading}
-                    startIcon={runLoading ? <CircularProgress size={10} /> : undefined}
-                    sx={{ textTransform: "none", fontSize: 11 }}
+                    startIcon={runLoading ? <CircularProgress size={10} sx={{ color: "#fff" }} /> : undefined}
+                    sx={{ ...GRADIENT_BUTTON, background: GRADIENTS.content.bg }}
                     onClick={runContentAudit}
                   >
                     {runLoading ? "Running..." : "Run Content Audit"}
@@ -419,8 +522,7 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
                 {isContentAudit && !runLoading && (hasAuditResults || lastRunResult) && (
                   <Button
                     size="small"
-                    variant="text"
-                    sx={{ textTransform: "none", fontSize: 11 }}
+                    sx={OUTLINE_BUTTON(GRADIENTS.content.outlineColor)}
                     onClick={() => setShowContentAudit(!showContentAudit)}
                   >
                     {showContentAudit ? "Hide Results" : "View Results"}
@@ -431,10 +533,9 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
                 {isHealth && task.enabled && (
                   <Button
                     size="small"
-                    variant="outlined"
                     disabled={healthLoading}
-                    startIcon={healthLoading ? <CircularProgress size={10} /> : undefined}
-                    sx={{ textTransform: "none", fontSize: 11 }}
+                    startIcon={healthLoading ? <CircularProgress size={10} sx={{ color: "#fff" }} /> : undefined}
+                    sx={{ ...GRADIENT_BUTTON, background: GRADIENTS.health.bg }}
                     onClick={runSiteHealth}
                   >
                     {healthLoading ? "Running..." : "Run Site Health"}
@@ -445,8 +546,7 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
                 {isHealth && !healthLoading && (lastHealthRun || (advStatus?.site_health?.status && advStatus.site_health.status !== "not_created")) && (
                   <Button
                     size="small"
-                    variant="text"
-                    sx={{ textTransform: "none", fontSize: 11 }}
+                    sx={OUTLINE_BUTTON(GRADIENTS.health.outlineColor)}
                     onClick={() => setShowSiteHealth(!showSiteHealth)}
                   >
                     {showSiteHealth ? "Hide Results" : "View Results"}
@@ -477,7 +577,14 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
             {/* SEO Preview — visible on click */}
             {isSeoAudit && showSeoPreview && task.enabled && (
               <Box sx={{ mt: 2 }}>
-                <SeoPreviewCard websiteUrl={websiteUrl} />
+                <SeoPreviewCard websiteUrl={websiteUrl} autoRun />
+              </Box>
+            )}
+
+            {/* SEO Preview results (view-only, no re-run) */}
+            {isSeoAudit && showSeoResults && task.enabled && (
+              <Box sx={{ mt: 2 }}>
+                <SeoPreviewCard websiteUrl={websiteUrl} autoRun={false} />
               </Box>
             )}
 

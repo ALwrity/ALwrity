@@ -15,8 +15,7 @@ from loguru import logger
 from sqlalchemy.orm import Session
 
 from models.youtube_task_models import YouTubeVideoTask, YouTubeTaskType, YouTubeTaskStatus
-from services.database import get_session_for_user, get_engine_for_user
-from models.base import Base
+from services.database import get_session_for_user
 
 
 class YouTubeTaskManager:
@@ -24,30 +23,13 @@ class YouTubeTaskManager:
 
     def __init__(self):
         self.task_storage: Dict[str, Dict[str, Any]] = {}
-        self._ensure_tables()
-
-    def _ensure_tables(self):
-        """Ensure youtube_video_tasks table exists for all initialised users."""
-        try:
-            from services.database import _user_engines
-            for user_id, engine in list(_user_engines.items()):
-                try:
-                    Base.metadata.create_all(bind=engine, checkfirst=True)
-                except Exception:
-                    pass
-        except Exception:
-            pass
 
     def _get_db(self, user_id: str) -> Optional[Session]:
         """Get a DB session for the given user. Returns None on failure."""
         if not user_id:
             return None
         try:
-            session = get_session_for_user(user_id)
-            if session:
-                engine = get_engine_for_user(user_id)
-                Base.metadata.create_all(bind=engine, checkfirst=True)
-            return session
+            return get_session_for_user(user_id)
         except Exception as e:
             logger.warning(f"[YouTubeTaskManager] DB unavailable for user {user_id}: {e}")
             return None

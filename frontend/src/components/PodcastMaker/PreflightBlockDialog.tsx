@@ -11,11 +11,9 @@ import {
   Stack,
   alpha,
 } from '@mui/material';
-import {
-  Block as BlockIcon,
-  Upgrade as UpgradeIcon,
-  Info as InfoIcon,
-} from '@mui/icons-material';
+import BlockIcon from '@mui/icons-material/Block';
+import UpgradeIcon from '@mui/icons-material/Upgrade';
+import InfoIcon from '@mui/icons-material/Info';
 import { PreflightCheckResponse } from '../../services/billingService';
 import { useNavigate } from 'react-router-dom';
 import { saveNavigationState } from '../../utils/navigationState';

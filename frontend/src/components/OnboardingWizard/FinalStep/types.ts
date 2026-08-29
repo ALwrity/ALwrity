@@ -1,5 +1,4 @@
 export interface OnboardingData {
-  apiKeys: Record<string, string>;
   websiteUrl?: string;
   researchPreferences?: any;
   personalizationSettings?: any;

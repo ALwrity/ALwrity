@@ -51,7 +51,7 @@ class TestPitchJsonStruct:
         assert "backend JSON engine" in PITCH_SYSTEM_PROMPT
         assert "Do NOT write a full script" in PITCH_SYSTEM_PROMPT
         assert "≤70 characters" in PITCH_SYSTEM_PROMPT
-        assert "3–5 main beats" in PITCH_SYSTEM_PROMPT
+        assert "exactly the main-beat count from the user message" in PITCH_SYSTEM_PROMPT
         assert "never invent statistics" in PITCH_SYSTEM_PROMPT
         assert '"selected_title"' not in PITCH_SYSTEM_PROMPT
         assert '"video_summary"' not in PITCH_SYSTEM_PROMPT
@@ -66,8 +66,124 @@ class TestPitchJsonStruct:
         )
         assert "Budget travel" in prompt
         assert "Contrarian" in prompt
+        assert "exactly 4 short phrases" in prompt
         assert '"video_summary"' not in prompt
         assert "target_audience" not in prompt.lower() or "do not echo" in prompt.lower()
+
+    def test_user_prompt_uses_hindi_label_for_hi(self):
+        from services.youtube.planner_pitch_prompts import build_pitch_user_prompt
+
+        prompt = build_pitch_user_prompt(
+            user_idea="Budget travel",
+            creative_angle="Contrarian",
+            duration_type="medium",
+            language="hi",
+        )
+        assert "**Content language:** Hindi" in prompt
+        assert "Write every field in Hindi." in prompt
+        assert "\nhi\n" not in prompt
+        assert "**Content language:** English" not in prompt
+
+    def test_user_prompt_uses_english_for_en_and_when_omitted(self):
+        from services.youtube.planner_pitch_prompts import build_pitch_user_prompt
+
+        english = build_pitch_user_prompt(
+            user_idea="Budget travel",
+            creative_angle="Contrarian",
+            duration_type="medium",
+            language="en",
+        )
+        omitted = build_pitch_user_prompt(
+            user_idea="Budget travel",
+            creative_angle="Contrarian",
+            duration_type="medium",
+        )
+        assert "**Content language:** English" in english
+        assert "Write every field in English." in english
+        assert "**Content language:** English" in omitted
+        assert "Hindi" not in english
+        assert "Hindi" not in omitted
+
+    def test_user_prompt_maps_locale_and_display_name_to_hindi(self):
+        from services.youtube.planner_pitch_prompts import build_pitch_user_prompt
+
+        for language in ("hi-IN", "Hindi", "  HI  "):
+            prompt = build_pitch_user_prompt(
+                user_idea="Budget travel",
+                creative_angle="Contrarian",
+                duration_type="medium",
+                language=language,
+            )
+            assert "**Content language:** Hindi" in prompt
+            assert "**Content language:** English" not in prompt
+
+    def test_system_prompt_requires_user_message_content_language(self):
+        from services.youtube.planner_pitch_prompts import PITCH_SYSTEM_PROMPT
+
+        assert "Content language from the user message" in PITCH_SYSTEM_PROMPT
+
+
+class TestPitchPreviewBuilder:
+    def test_preview_uses_pitch_system_prompt_and_creative_angle(self):
+        from services.youtube.planner_pitch_prompts import (
+            PITCH_RESEARCH_PLACEHOLDER,
+            PITCH_SYSTEM_PROMPT,
+            build_pitch_preview_prompts,
+        )
+
+        preview = build_pitch_preview_prompts(
+            user_idea="Budget travel",
+            creative_angle="Contrarian",
+            duration_type="medium",
+            language="hi",
+            enable_research=True,
+        )
+        assert preview["system_prompt"] == PITCH_SYSTEM_PROMPT
+        assert "Create ONE short video pitch" in preview["user_prompt"]
+        assert "Create a YouTube video plan" not in preview["user_prompt"]
+        assert "**Creative angle (primary lens):** Contrarian" in preview["user_prompt"]
+        assert "**Content language:** Hindi" in preview["user_prompt"]
+        assert PITCH_RESEARCH_PLACEHOLDER in preview["user_prompt"]
+
+    def test_preview_omits_placeholder_when_research_off(self):
+        from services.youtube.planner_pitch_prompts import (
+            PITCH_RESEARCH_PLACEHOLDER,
+            build_pitch_preview_prompts,
+        )
+
+        preview = build_pitch_preview_prompts(
+            user_idea="Budget travel",
+            creative_angle="Contrarian",
+            duration_type="shorts",
+            enable_research=False,
+        )
+        assert PITCH_RESEARCH_PLACEHOLDER not in preview["user_prompt"]
+
+    def test_preview_and_generate_share_non_research_prefix(self):
+        from services.youtube.planner_pitch_prompts import (
+            build_pitch_preview_prompts,
+            build_pitch_user_prompt,
+            pitch_user_prompt_non_research_prefix,
+        )
+
+        kwargs = {
+            "user_idea": "Budget travel",
+            "creative_angle": "Contrarian",
+            "duration_type": "shorts",
+            "video_type": "tutorial",
+            "target_audience": "First timers",
+            "language": "hi",
+        }
+        preview = build_pitch_preview_prompts(**kwargs, enable_research=True)
+        generated = build_pitch_user_prompt(
+            **kwargs,
+            research_context="LIVE FACTS FROM EXA — ignore URLs in tests",
+        )
+        assert pitch_user_prompt_non_research_prefix(preview["user_prompt"]) == (
+            pitch_user_prompt_non_research_prefix(generated)
+        )
+        assert "LIVE FACTS FROM EXA" in generated
+        assert "LIVE FACTS FROM EXA" not in preview["user_prompt"]
 
 
 class TestValidatePitch:
@@ -77,6 +193,7 @@ class TestValidatePitch:
         result = validate_pitch(
             _valid_pitch(target_audience="Travelers", tone="Fun"),
             creative_angle="Contrarian",
+            duration_type="shorts",
         )
         assert result["selected_title"] == "Stop Planning Trips Like This"
         assert "target_audience" not in result
@@ -89,11 +206,41 @@ class TestValidatePitch:
             validate_pitch,
         )
 
-        with pytest.raises(PitchValidationError, match="3–5"):
+        with pytest.raises(PitchValidationError, match="exactly 3"):
             validate_pitch(
                 _valid_pitch(main_content_beats=["Only one"]),
                 creative_angle="Contrarian",
+                duration_type="shorts",
             )
+
+    def test_medium_requires_exactly_four_beats(self):
+        from services.youtube.planner_pitch_validate import (
+            PitchValidationError,
+            validate_pitch,
+        )
+
+        with pytest.raises(PitchValidationError, match="exactly 4"):
+            validate_pitch(
+                _valid_pitch(),
+                creative_angle="Contrarian",
+                duration_type="medium",
+            )
+        result = validate_pitch(
+            _valid_pitch(main_content_beats=["One", "Two", "Three", "Four"]),
+            creative_angle="Contrarian",
+            duration_type="medium",
+        )
+        assert len(result["main_content_beats"]) == 4
+
+    def test_long_requires_exactly_five_beats(self):
+        from services.youtube.planner_pitch_validate import validate_pitch
+
+        result = validate_pitch(
+            _valid_pitch(main_content_beats=["One", "Two", "Three", "Four", "Five"]),
+            creative_angle="Contrarian",
+            duration_type="long",
+        )
+        assert len(result["main_content_beats"]) == 5
 
     def test_fills_angle_used_from_requested_angle(self):
         from services.youtube.planner_pitch_validate import validate_pitch
@@ -101,6 +248,7 @@ class TestValidatePitch:
         result = validate_pitch(
             _valid_pitch(angle_used=""),
             creative_angle="Storytelling",
+            duration_type="shorts",
         )
         assert result["angle_used"] == "Storytelling"
 
@@ -129,9 +277,46 @@ class TestGeneratePitch:
         assert result["selected_title"]
         assert result["generation"]["text_gateway"] == "llm_text_gen"
         assert "Contrarian" in result["generation"]["user_prompt"]
+        assert "**Content language:** English" in result["generation"]["user_prompt"]
         llm_mock.assert_called_once()
         assert llm_mock.call_args.kwargs["flow_type"] == "youtube_pitch"
         assert "max_tokens" not in llm_mock.call_args.kwargs
+
+    def test_persists_research_prompt_block_without_urls_in_prompt(self):
+        from services.youtube.planner import YouTubePlannerService
+        from services.youtube.planner_pitch import generate_youtube_pitch
+
+        svc = YouTubePlannerService()
+        block = (
+            "Use only these facts. Do not invent statistics or numbers.\n\n"
+            "1. Carry-on packing\n   Pack three items."
+        )
+        sources = [{"title": f"S{i}", "url": f"https://example.com/{i}"} for i in range(10)]
+        with patch(
+            "services.youtube.planner_pitch.llm_text_gen",
+            return_value=_valid_pitch(),
+        ), patch.object(
+            svc,
+            "_perform_exa_research",
+            new=AsyncMock(return_value=(block, sources)),
+        ) as exa:
+            result = asyncio.run(
+                generate_youtube_pitch(
+                    svc,
+                    user_idea="Budget travel",
+                    duration_type="shorts",
+                    creative_angle="Contrarian",
+                    user_id="user_pitch",
+                    enable_research=True,
+                    language="hi",
+                )
+            )
+
+        assert exa.await_args.kwargs.get("language") == "hi"
+        assert result["research_prompt_block"] == block
+        assert len(result["research_sources"]) == 10
+        assert "http" not in result["generation"]["user_prompt"].lower()
+        assert block in result["generation"]["user_prompt"]
 
     def test_accepts_wavespeed_error_wrapper_with_valid_raw_json(self):
         from services.youtube.planner import YouTubePlannerService
@@ -203,3 +388,37 @@ class TestGeneratePitch:
             )
         assert exc.value.status_code == 400
         assert "angle" in str(exc.value.detail).lower()
+
+
+class TestContentLanguageLabels:
+    def test_hi_maps_to_hindi(self):
+        from services.youtube.planner_config import resolve_content_language
+
+        resolved = resolve_content_language("hi")
+        assert resolved.code == "hi"
+        assert resolved.label == "Hindi"
+        assert resolved.used_fallback is False
+        assert resolve_content_language("HI").code == "hi"
+
+    def test_locale_and_display_name_map_to_code(self):
+        from services.youtube.planner_config import resolve_content_language
+
+        assert resolve_content_language("hi-IN").code == "hi"
+        assert resolve_content_language("Hindi").code == "hi"
+        assert resolve_content_language("hindi").label == "Hindi"
+
+    def test_empty_and_unknown_map_to_english(self):
+        from services.youtube.planner_config import (
+            resolve_content_language,
+            resolve_content_language_label,
+        )
+
+        omitted = resolve_content_language(None)
+        unknown = resolve_content_language("xx")
+        assert omitted.code == "en"
+        assert omitted.label == "English"
+        assert omitted.used_fallback is True
+        assert unknown.requested == "xx"
+        assert unknown.used_fallback is True
+        assert resolve_content_language_label("") == "English"
+        assert resolve_content_language_label("xx") == "English"

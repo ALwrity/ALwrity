@@ -1,7 +1,7 @@
 /**
  * linkedInArticleIntroUtils unit tests.
  * Run manually:
- *   npx react-scripts test --watchAll=false --testPathPattern=linkedInArticleIntroUtils
+ *   npx vitest run linkedInArticleIntroUtils
  */
 
 import type { LinkedInArticleSection } from "../utils/linkedInArticleDraftUtils";

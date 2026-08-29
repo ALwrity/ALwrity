@@ -60,14 +60,14 @@ class StrategyArchitectAgent(SIFBaseAgent):
 
     async def propose_daily_tasks(self, context: Dict[str, Any]) -> List[TaskProposal]:
         """Propose PLAN pillar tasks based on semantic analysis."""
-        proposals = []
+        default_proposals = []
         
         # 1. Pillar Health Check
         try:
             # We use a shorter timeout or cached check if possible, but discover_pillars is fairly fast
             pillars = await self.discover_pillars()
             if not pillars:
-                proposals.append(TaskProposal(
+                default_proposals.append(TaskProposal(
                     title="Establish Content Pillars",
                     description="Your content strategy lacks defined pillars. Let's analyze your niche to find core topics.",
                     pillar_id="plan",
@@ -79,7 +79,7 @@ class StrategyArchitectAgent(SIFBaseAgent):
                     action_url="/content-planning-dashboard"
                 ))
             elif len(pillars) < 3:
-                proposals.append(TaskProposal(
+                default_proposals.append(TaskProposal(
                     title="Expand Content Pillars",
                     description=f"You only have {len(pillars)} active pillars. Consider diversifying your strategy.",
                     pillar_id="plan",
@@ -94,7 +94,7 @@ class StrategyArchitectAgent(SIFBaseAgent):
             logger.warning(f"[{self.__class__.__name__}] Error checking pillars for proposals: {e}")
 
         # 2. Strategy Review (Generic fallback)
-        proposals.append(TaskProposal(
+        default_proposals.append(TaskProposal(
             title="Review Strategic Goals",
             description="Ensure your content output aligns with your quarterly business goals.",
             pillar_id="plan",
@@ -106,7 +106,16 @@ class StrategyArchitectAgent(SIFBaseAgent):
             action_url="/content-planning-dashboard"
         ))
         
-        return proposals
+        return await self._synthesize_task_proposals(
+            context,
+            default_proposals,
+            instructions=(
+                "Propose the next strategic-planning actions for this brand based on its content "
+                "pillars, business goals, target audience, and competitors. Each task must have a "
+                "pillar_id from [plan, generate, publish, analyze, engage, remarket] and an "
+                "action_url pointing to a relevant dashboard (e.g. /content-planning-dashboard)."
+            ),
+        )
 
     async def find_semantic_gaps(self, competitor_indices: List[Any]) -> List[Dict[str, Any]]:
         """Compare user content vs competitor content to find missing topics."""

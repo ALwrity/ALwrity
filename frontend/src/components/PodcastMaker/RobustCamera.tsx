@@ -12,12 +12,10 @@ import {
   IconButton,
   Tooltip
 } from '@mui/material';
-import {
-  CameraAlt,
-  FlipCameraAndroid,
-  Close,
-  Camera
-} from '@mui/icons-material';
+import CameraAlt from '@mui/icons-material/CameraAlt';
+import FlipCameraAndroid from '@mui/icons-material/FlipCameraAndroid';
+import Close from '@mui/icons-material/Close';
+import Camera from '@mui/icons-material/Camera';
 
 interface RobustCameraProps {
   onCapture: (imageDataUrl: string) => void;

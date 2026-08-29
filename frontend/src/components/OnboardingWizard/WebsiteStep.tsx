@@ -15,12 +15,10 @@ import {
   DialogActions,
   DialogContentText
 } from '@mui/material';
-import {
-  Analytics as AnalyticsIcon,
-  History as HistoryIcon,
-  Business as BusinessIcon,
-  LinkedIn as LinkedInIcon
-} from '@mui/icons-material';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import HistoryIcon from '@mui/icons-material/History';
+import BusinessIcon from '@mui/icons-material/Business';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
 
 // Extracted components
 import { AnalysisResultsDisplay, AnalysisProgressDisplay, WebsiteIntegrationsSection } from './WebsiteStep/components';
@@ -29,7 +27,6 @@ import { BackgroundSetupCard } from './WebsiteStep/BackgroundSetupCard';
 import { ContentAuditSummaryCard } from './WebsiteStep/ContentAuditSummaryCard';
 import { SiteHealthSummaryCard } from './WebsiteStep/SiteHealthSummaryCard';
 import PlatformSection from './common/PlatformSection';
-import EmailSection from './common/EmailSection';
 import PlatformAnalytics from '../shared/PlatformAnalytics';
 
 // Import API client for saving
@@ -50,6 +47,7 @@ interface WebsiteStepProps {
   onValidationChange?: (isValid: boolean) => void;
   onDataReady?: (getData: () => any) => void;
   initialData?: any;
+  email?: string;
 }
 
 interface AnalysisProgress {
@@ -75,7 +73,14 @@ interface ExistingAnalysis {
 // MAIN COMPONENT
 // =============================================================================
 
-const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderContent, onValidationChange, onDataReady, initialData }) => {
+const WebsiteStep: React.FC<WebsiteStepProps> = ({ 
+  onContinue, 
+  updateHeaderContent, 
+  onValidationChange, 
+  onDataReady, 
+  initialData,
+  email: propEmail
+}) => {
   const [website, setWebsite] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -95,6 +100,8 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
   const urlWasPreFilledRef = useRef(false);
   const { user } = useUser();
   const [email, setEmail] = useState<string>('');
+  const [emailDigestOptIn, setEmailDigestOptIn] = useState<boolean>(true);
+  const [userTimezone, setUserTimezone] = useState<string>('UTC');
 
   const linkedinConnected = connectedPlatforms.includes('linkedin');
   const analyticsPlatforms = useMemo(() => ['gsc', 'bing'], []);
@@ -135,20 +142,27 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
   useEffect(() => {
     // Update header content when component mounts
     updateHeaderContent({
-      title: 'Analyze Your Website',
+      title: 'Let ALwrity Learn Your Brand',
       description: 'Let Alwrity analyze your website to understand your brand voice, writing style, and content characteristics. This helps us generate content that matches your existing tone and resonates with your audience.'
     });
   }, [updateHeaderContent]);
 
   // Get user email from Clerk
   useEffect(() => {
-    if (user) {
+    if (user && !propEmail) {
       const primaryEmail = user.primaryEmailAddress?.emailAddress;
       const firstEmail = user.emailAddresses?.[0]?.emailAddress;
       const resolvedEmail = primaryEmail || firstEmail || '';
       if (resolvedEmail) setEmail(resolvedEmail);
     }
-  }, [user]);
+  }, [user, propEmail]);
+
+  // Sync email from parent prop when it changes
+  useEffect(() => {
+    if (propEmail !== undefined && propEmail !== '') {
+      setEmail(propEmail);
+    }
+  }, [propEmail]);
 
   // Notify parent when validation state changes (guard against infinite loops)
   const prevValidRef = useRef<boolean | null>(null);
@@ -173,6 +187,9 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
           }
           if (result.analysis) {
             setAnalysis(result.analysis);
+          }
+          if (result.domainName) {
+            setDomainName(result.domainName);
           }
         }
       } catch (error) {
@@ -427,6 +444,8 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
           useAnalysisForGenAI,
           integrations: integrationsPayload,
           email,
+          emailDigestOptIn,
+          userTimezone,
         };
       });
     }
@@ -451,28 +470,12 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
       maxWidth: '100%',
       width: '100%',
       mx: 0,
-      p: 2,
+      p: { xs: 1.5, md: 2 },
       '@keyframes fadeIn': {
         '0%': { opacity: 0, transform: 'translateY(10px)' },
         '100%': { opacity: 1, transform: 'translateY(0)' }
       }
     }}>
-      {/* Header */}
-      <Box sx={{ mb: 3, textAlign: 'center', animation: 'fadeIn 0.6s ease-out' }}>
-        <Typography variant="h4" sx={{
-          fontWeight: 700,
-          mb: 1,
-          background: 'linear-gradient(135deg, #60A5FA 0%, #3B82F6 50%, #1D4ED8 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-        }}>
-          Let ALwrity Learn Your Brand
-        </Typography>
-      </Box>
-
-      {/* Email Section */}
-      <EmailSection email={email} onEmailChange={setEmail} />
-
       {/* Tab Bar */}
       <Box sx={{ display: 'flex', gap: 1.5, mb: 3 }}>
         <Button
@@ -665,7 +668,9 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
                   onSave={() => saveAnalysis(analysis)}
                 />
               </Box>
-              <BackgroundSetupCard websiteUrl={website} brandAnalysis={analysis.brand_analysis} seoAudit={analysis.seo_audit} />
+              <Box id="smart-background-setup">
+                <BackgroundSetupCard websiteUrl={website} brandAnalysis={analysis.brand_analysis} seoAudit={analysis.seo_audit} />
+              </Box>
             </>
           )}
 

@@ -143,8 +143,8 @@ export const YouTubeSceneAssetPromptMeta: React.FC<YouTubeSceneAssetPromptMetaPr
               </Stack>
               {audioGeneration.instructions_stripped ? (
                 <Alert severity="info">
-                  The server removed non-spoken markers like [Pacing: …] before sending text to
-                  speech synthesis.
+                  The server removed leftover title prefixes or [bracket] stage directions before
+                  speech synthesis. The spoken payload should already be scene narration only.
                 </Alert>
               ) : null}
               <PromptBlock label="Input text (from client)" text={audioGeneration.input_text || ""} />

@@ -1,6 +1,6 @@
 /**
  * Unit tests for mobile profile hub swipe helpers.
- * Run manually: npx jest useProfileHubStripSwipe.test.ts
+ * Run manually: npx vitest run useProfileHubStripSwipe.test.ts
  */
 
 import {

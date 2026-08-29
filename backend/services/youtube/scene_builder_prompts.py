@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
 
+from services.youtube.planner_config import (
+    DEFAULT_CONTENT_LANGUAGE_LABEL,
+    get_spoken_word_budget,
+    resolve_content_language,
+)
 from utils.logger_utils import get_service_logger
 
 logger = get_service_logger("youtube.scene_builder_prompts")
@@ -48,6 +53,19 @@ def build_scene_generation_prompts(
     scene_duration_range = duration_metadata.get("scene_duration_range", (5, 15))
     hook_seconds = duration_metadata.get("hook_seconds", 10)
     target_seconds = duration_metadata.get("target_seconds", 150)
+    try:
+        language_label = resolve_content_language(
+            video_plan.get("language") if isinstance(video_plan.get("language"), str) else None
+        ).label
+    except Exception:
+        logger.exception("[YouTubeSceneBuilder] Content language resolve failed; using English")
+        language_label = DEFAULT_CONTENT_LANGUAGE_LABEL
+    try:
+        duration_type = str(video_plan.get("duration_type") or "medium")
+        spoken_budget = get_spoken_word_budget(duration_type)
+    except Exception:
+        logger.exception("[YouTubeSceneBuilder] Spoken word budget failed; using medium")
+        spoken_budget = get_spoken_word_budget("medium")
 
     outline_lines = "\n".join(
         [
@@ -78,6 +96,10 @@ def build_scene_generation_prompts(
 **⏱️ TIMING CONSTRAINTS:**
 • Scene duration: {scene_duration_range[0]}-{scene_duration_range[1]} seconds each
 • Total target: {target_seconds} seconds
+• Spoken word budget: {spoken_budget["max_spoken_words"]} words for all narration (±20% at 150 WPM)
+
+**🌐 CONTENT LANGUAGE:** {language_label}
+Write every narration field in {language_label}. Do not rewrite the script into English.
 
 **🎬 YOUR MISSION - CREATE VIRAL-WORTHY SCENES:**
 

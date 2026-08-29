@@ -9,12 +9,10 @@ import {
   Chip,
   Divider
 } from '@mui/material';
-import {
-  CalendarToday as CalendarIcon,
-  Schedule as ScheduleIcon,
-  Settings as SettingsIcon,
-  CheckCircle as CheckCircleIcon
-} from '@mui/icons-material';
+import CalendarIcon from '@mui/icons-material/CalendarToday';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import SettingsIcon from '@mui/icons-material/Settings';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 // Import calendar-specific types
 import { type CalendarConfig } from './types';

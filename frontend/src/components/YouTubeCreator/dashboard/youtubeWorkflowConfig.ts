@@ -105,6 +105,19 @@ export const YOUTUBE_WORKFLOW_CARDS: YouTubeWorkflowCard[] = CARD_DEFS.map(
   }),
 );
 
+/** Resolves a workflow icon; throws if the card config is missing an icon mapping. */
+export function resolveYouTubeWorkflowIcon(
+  cardId: YouTubeWorkflowCardId,
+): SvgIconComponent {
+  const icon = YOUTUBE_WORKFLOW_ICONS[cardId];
+  if (!icon) {
+    throw new Error(
+      `[YouTubeStudioHub] Missing workflow icon mapping for wedge "${cardId}".`,
+    );
+  }
+  return icon;
+}
+
 export const FRAME_COLOR = "#FECACA";
 export const RECOMMENDED_WORKFLOW_CARD_ID: YouTubeWorkflowCardId = "plan";
 
@@ -112,11 +125,6 @@ export const MOBILE_PRIMARY_WORKFLOW_IDS: readonly YouTubeWorkflowCardId[] = [
   "plan",
   "create",
 ];
-
-export {
-  CONNECT_GATED_WORKFLOW_IDS,
-  STUDIO_HUB_UNLOCK_ALL_FOR_TESTING,
-} from "./studioHubAccessConfig";
 
 export const PLAN_PINNED_HINT_KEY = "youtube_dashboard_plan_hint_dismissed";
 

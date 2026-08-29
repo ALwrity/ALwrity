@@ -141,7 +141,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
       }
       const bingSitesResp: any[] = (statusResponse.platforms?.['bing']?.sites || []);
 
-      // Load analytics data — try DB cache first
+      // Load analytics data — try DB cache first (per platform)
       const end = new Date();
       const start = new Date(end);
       const rDays = rangeDaysRef.current;
@@ -152,16 +152,22 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
       let usedDBCache = false;
       if (activePlatforms.length > 0) {
         try {
-          const firstPlatform = activePlatforms[0];
           const siteUrl = siteUrlRef.current || '';
-          const existing = await cachedAnalyticsAPI.checkExistingAnalytics(firstPlatform, siteUrl);
-          if (existing.exists && existing.analysis_id) {
-            const dbData = await cachedAnalyticsAPI.loadAnalyticsFromDB(existing.analysis_id);
-            if (dbData?.data) {
-              analyticsResponse = dbData;
-              usedDBCache = true;
-              console.log('📦 PlatformAnalytics: Loaded from DB cache');
+          const dbAggregated: { data: Record<string, any>; summary?: any } = { data: {} };
+          for (const platform of activePlatforms) {
+            const existing = await cachedAnalyticsAPI.checkExistingAnalytics(platform, siteUrl);
+            if (existing.exists && existing.analysis_id) {
+              const dbData = await cachedAnalyticsAPI.loadAnalyticsFromDB(existing.analysis_id);
+              if (dbData?.data) {
+                Object.assign(dbAggregated.data, dbData.data);
+                if (dbData.summary) dbAggregated.summary = dbData.summary;
+                usedDBCache = true;
+                console.log(`📦 PlatformAnalytics: Loaded ${platform} from DB cache`);
+              }
             }
+          }
+          if (usedDBCache && Object.keys(dbAggregated.data).length > 0) {
+            analyticsResponse = dbAggregated as any;
           }
         } catch (e) {
           console.debug('PlatformAnalytics: DB cache miss, fetching fresh', e);

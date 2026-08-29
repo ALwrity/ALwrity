@@ -7,6 +7,7 @@ from loguru import logger
 from .base import SIFBaseAgent, TXTAI_AVAILABLE, Agent
 from services.intelligence.agents.core_agent_framework import BaseALwrityAgent, TaskProposal
 from services.database import has_onboarding_session
+from services.intelligence.agents.tool_contracts import unavailable_tool
 
 try:
     from services.intelligence.sif_integration import SIFIntegrationService
@@ -68,17 +69,8 @@ class CompetitorResponseAgent(BaseALwrityAgent):
         """
         competitor_url = context.get("competitor_url", "any")
         if not self.sif_service:
-            return {
-                "status": "unavailable",
-                "changes": [],
-                "message": "SIF not initialized. Use async analyze_competitors() for real data."
-            }
-        return {
-            "status": "sif_available",
-            "competitor_url": competitor_url,
-            "changes": [],
-            "message": "SIF available. Use async analyze_competitors() for detailed analysis."
-        }
+            return unavailable_tool("sif", "SIF not initialized")
+        return unavailable_tool("sif", "Use async analyze_competitors() for detailed competitor data")
     
     def _threat_analyzer_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -86,17 +78,8 @@ class CompetitorResponseAgent(BaseALwrityAgent):
         """
         focus = context.get("focus_area", "general")
         if not self.sif_service:
-            return {
-                "threat_assessment": "unknown",
-                "level": "unknown",
-                "message": "SIF not available. Use async analyze_competitors()."
-            }
-        return {
-            "threat_assessment": "pending",
-            "level": "pending",
-            "focus_area": focus,
-            "message": "SIF available. Use async analyze_competitors(focus_area='{focus}')."
-        }
+            return unavailable_tool("sif", "SIF not initialized")
+        return unavailable_tool("sif", f"Use async analyze_competitors(focus_area='{focus}') for threat data")
 
     # Async entry points
     
@@ -128,7 +111,7 @@ class CompetitorResponseAgent(BaseALwrityAgent):
         """
         Propose tasks based on competitive intel from the SIF index.
         """
-        proposals = []
+        default_proposals = []
         competitor_count = 0
         focus_area = context.get("focus_area", "content strategy")
 
@@ -142,7 +125,7 @@ class CompetitorResponseAgent(BaseALwrityAgent):
                 logger.debug(f"[CompetitorResponseAgent] SIF competitor search failed: {e}")
 
         if competitor_count > 0:
-            proposals.append(TaskProposal(
+            default_proposals.append(TaskProposal(
                 title="Review Competitor Content",
                 description=f"SIF found {competitor_count} competitor pages. Review for gap opportunities.",
                 pillar_id="analyze",
@@ -154,7 +137,7 @@ class CompetitorResponseAgent(BaseALwrityAgent):
                 action_url="/seo-dashboard"
             ))
         else:
-            proposals.append(TaskProposal(
+            default_proposals.append(TaskProposal(
                 title="Research Competitor Topics",
                 description="Search for competitor content in your niche to identify coverage gaps.",
                 pillar_id="analyze",
@@ -166,4 +149,13 @@ class CompetitorResponseAgent(BaseALwrityAgent):
                 action_url="/seo-dashboard"
             ))
 
-        return proposals
+        return await self._synthesize_task_proposals(
+            context,
+            default_proposals,
+            instructions=(
+                "Propose the next competitor-response actions for this brand based on its tracked "
+                "competitors, content pillars, and target audience. Each task must have a pillar_id "
+                "from [plan, generate, publish, analyze, engage, remarket] and an action_url "
+                "pointing to /seo-dashboard."
+            ),
+        )

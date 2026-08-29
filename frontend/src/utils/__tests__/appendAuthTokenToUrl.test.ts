@@ -56,7 +56,7 @@ describe('appendAuthTokenToUrl', () => {
   });
 
   it('falls back to original URL when token getter throws', async () => {
-    const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     setMediaAuthTokenGetter(async () => { throw new Error('Auth error'); });
 
     const url = await appendAuthTokenToUrl('/api/youtube/images/avatars/test.png');

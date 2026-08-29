@@ -8,16 +8,14 @@ import {
   Button,
   LinearProgress,
 } from '@mui/material';
-import {
-  WarningAmber as WarningIcon,
-  Error as ErrorIcon,
-  InfoOutlined as InfoIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Gavel as GavelIcon,
-  ArrowForward as ArrowForwardIcon,
-  OpenInNew as OpenInNewIcon,
-} from '@mui/icons-material';
+import WarningIcon from '@mui/icons-material/WarningAmber';
+import ErrorIcon from '@mui/icons-material/Error';
+import InfoIcon from '@mui/icons-material/InfoOutlined';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import GavelIcon from '@mui/icons-material/Gavel';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { AgentEventItem } from '../../hooks/useAgentHuddleFeed';
 
 interface ReasoningIssue { title: string; reasoning: string; score: number }

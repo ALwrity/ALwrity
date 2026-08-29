@@ -14,13 +14,11 @@ import {
   Tooltip,
   IconButton
 } from '@mui/material';
-import {
-  Web as WixIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Link as LinkIcon,
-  OpenInNew as OpenInNewIcon
-} from '@mui/icons-material';
+import WixIcon from '@mui/icons-material/Web';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import LinkIcon from '@mui/icons-material/Link';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { useWixConnection } from '../../../hooks/useWixConnection';
 import { usePlatformConnections } from './usePlatformConnections';
 

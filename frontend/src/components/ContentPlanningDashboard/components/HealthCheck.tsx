@@ -5,11 +5,9 @@ import {
   Typography,
   CircularProgress
 } from '@mui/material';
-import {
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
-  Warning as WarningIcon
-} from '@mui/icons-material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import WarningIcon from '@mui/icons-material/Warning';
 import { useContentPlanningStore } from '../../../stores/contentPlanningStore';
 
 const HealthCheck: React.FC = () => {

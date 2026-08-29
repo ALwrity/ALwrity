@@ -18,12 +18,10 @@ import {
   Chip,
   Typography,
 } from '@mui/material';
-import {
-  Refresh as RefreshIcon,
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
-  Add as AddIcon,
-} from '@mui/icons-material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import AddIcon from '@mui/icons-material/Add';
 import { RefreshCw } from 'lucide-react'; // Use lucide-react for header icon
 import { billingService } from '../../services/billingService';
 import { SubscriptionRenewal, RenewalHistoryResponse } from '../../types/billing';

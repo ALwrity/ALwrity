@@ -10,12 +10,10 @@ import {
   Divider,
   Paper,
 } from '@mui/material';
-import {
-  AutoAwesome,
-  PhotoCamera,
-  ArrowBack,
-  SmartToy,
-} from '@mui/icons-material';
+import AutoAwesome from '@mui/icons-material/AutoAwesome';
+import PhotoCamera from '@mui/icons-material/PhotoCamera';
+import ArrowBack from '@mui/icons-material/ArrowBack';
+import SmartToy from '@mui/icons-material/SmartToy';
 import { TextField, Chip } from '@mui/material';
 import { ImageStudioLayout } from '../../ImageStudio/ImageStudioLayout';
 import { GlassyCard } from '../../ImageStudio/ui/GlassyCard';

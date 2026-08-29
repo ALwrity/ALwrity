@@ -1,12 +1,10 @@
 import React from "react";
 import { Box, Stepper, Step, StepLabel, Typography, alpha } from "@mui/material";
-import {
-  Psychology as PsychologyIcon,
-  Search as SearchIcon,
-  EditNote as EditNoteIcon,
-  PlayArrow as PlayArrowIcon,
-  CheckCircle as CheckCircleIcon,
-} from "@mui/icons-material";
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import SearchIcon from '@mui/icons-material/Search';
+import EditNoteIcon from '@mui/icons-material/EditNote';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 interface ProgressStepperProps {
   activeStep: number;

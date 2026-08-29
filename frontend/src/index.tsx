@@ -1,3 +1,4 @@
+import './env'; // Must be first: provides process.env shim for Vite while keeping CRA compatibility.
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ThemeProvider, createTheme } from '@mui/material/styles';

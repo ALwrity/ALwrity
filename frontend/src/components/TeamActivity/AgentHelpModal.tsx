@@ -15,12 +15,10 @@ import {
   Tooltip,
   Divider,
 } from '@mui/material';
-import {
-  HelpOutline as HelpIcon,
-  ExpandMore as ExpandMoreIcon,
-  Close as CloseIcon,
-  SmartToy as AgentIcon,
-} from '@mui/icons-material';
+import HelpIcon from '@mui/icons-material/HelpOutline';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CloseIcon from '@mui/icons-material/Close';
+import AgentIcon from '@mui/icons-material/SmartToy';
 import { getAgentTeam, type AgentTeamCatalogEntry } from '../../api/agentsTeam';
 
 const AGENT_DESCRIPTIONS: Record<string, { short: string; long: string }> = {
@@ -60,7 +58,7 @@ const AGENT_DESCRIPTIONS: Record<string, { short: string; long: string }> = {
 
 const SIF_DESCRIPTION = {
   short: 'Semantic Intelligence Framework — the orchestration layer',
-  long: 'The SIF (Semantic Intelligence Framework) is ALwrity\'s orchestration layer for autonomous marketing agents. It coordinates the 6-member committee (StrategyOrchestrator, ContentStrategist, CompetitorAnalyst, SEOSpecialist, SocialMediaManager, ContentGuardian). ContentGuardian is the quality watchdog that audits the committee\'s output rather than proposing tasks. The SIF handles prompt sequencing, context card assembly, and committee voting.',
+  long: 'The SIF (Semantic Intelligence Framework) is ALwrity\'s orchestration layer for autonomous marketing agents. It coordinates the 6-member committee (StrategyArchitect, ContentStrategist, CompetitorAnalyst, SEOSpecialist, SocialMediaManager, ContentGuardian). ContentGuardian is the quality watchdog that audits the committee\'s output rather than proposing tasks. The SIF handles prompt sequencing, context card assembly, and committee voting.',
 };
 
 const AgentHelpModal: React.FC = () => {
@@ -72,7 +70,7 @@ const AgentHelpModal: React.FC = () => {
     if (open) {
       setLoading(true);
       getAgentTeam()
-        .then(setAgents)
+        .then(({ agents }) => setAgents(agents))
         .catch(() => setAgents([]))
         .finally(() => setLoading(false));
     }

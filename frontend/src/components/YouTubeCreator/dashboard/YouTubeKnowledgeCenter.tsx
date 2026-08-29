@@ -196,6 +196,7 @@ export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
           title="Knowledge Centre"
           onClose={() => setExpanded(false)}
           maxWidth={440}
+          titleSize="xl"
         >
           <div className="yt-mobile-analytics-knowledge-grid">
             {features.map((feature) => (
@@ -221,6 +222,7 @@ export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
         intro="Curated YouTube answers + your free-text questions."
         onClose={() => setAskOpen(false)}
         maxWidth={560}
+        titleSize="xl"
       >
         <div className="yt-kc-ask">
           {YOUTUBE_ASK_FAQ.map((faq) => (
@@ -247,6 +249,7 @@ export const YouTubeKnowledgeCenter: React.FC<YouTubeKnowledgeCenterProps> = ({
         intro={infoOpen?.description}
         onClose={() => setInfoOpen(null)}
         maxWidth={480}
+        titleSize="xl"
       >
         <p className="yt-modal-intro">
           ALwrity is AI-first and HITL: we draft, you decide. Use the radial wedges daily to plan,

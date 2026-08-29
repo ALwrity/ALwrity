@@ -9,16 +9,14 @@ import {
   CircularProgress,
   LinearProgress,
 } from '@mui/material';
-import {
-  CheckCircle,
-  Error as ErrorIcon,
-  Warning,
-  Info,
-  AutoAwesome,
-  Image as ImageIcon,
-  TextFields,
-  AttachMoney,
-} from '@mui/icons-material';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import Warning from '@mui/icons-material/Warning';
+import Info from '@mui/icons-material/Info';
+import AutoAwesome from '@mui/icons-material/AutoAwesome';
+import ImageIcon from '@mui/icons-material/Image';
+import TextFields from '@mui/icons-material/TextFields';
+import AttachMoney from '@mui/icons-material/AttachMoney';
 import { PreflightValidationResult } from '../../hooks/useCampaignCreator';
 
 interface PreflightValidationAlertProps {
