@@ -229,9 +229,13 @@ export function useCompetitorDiscovery({
         const mergedAccounts = mergeCrawlSocialMedia(analysisData.social_media_accounts);
         setSocialMediaAccounts(mergedAccounts);
         setResearchSummary(analysisData.research_summary);
-        if (result.content_pillars) {
-          setContentPillars(result.content_pillars);
-        }
+        // The backend now always returns a normalized payload (complete or
+        // failed), so both states are surfaced instead of an eternal pending.
+        setContentPillars(result.content_pillars || {
+          status: 'failed',
+          error: 'Content pillar discovery returned no data',
+          timestamp: new Date().toISOString(),
+        });
 
         try {
           localStorage.setItem('competitor_analysis_data', JSON.stringify({
@@ -275,21 +279,28 @@ export function useCompetitorDiscovery({
       });
 
       const result = response.data;
-      if (result.success && result.content_pillars) {
-        setContentPillars(result.content_pillars);
+      // Always set a truthy payload so the section can render tri-state
+      // (complete / failed / pending). The endpoint returns a complete
+      // payload even when persistence fails, plus an error message.
+      const payload: ContentPillarData = result.content_pillars || {
+        status: 'failed',
+        error: result.error || 'Content pillar discovery failed',
+        timestamp: new Date().toISOString(),
+      };
+      setContentPillars(payload);
+      if (result.error) {
+        setError(result.error);
+      }
 
-        try {
-          const cachedData = localStorage.getItem('competitor_analysis_data');
-          if (cachedData) {
-            const parsedData = JSON.parse(cachedData);
-            parsedData.content_pillars = result.content_pillars;
-            localStorage.setItem('competitor_analysis_data', JSON.stringify(parsedData));
-          }
-        } catch (cacheErr) {
-          console.warn('Failed to update cache with content pillars:', cacheErr);
+      try {
+        const cachedData = localStorage.getItem('competitor_analysis_data');
+        if (cachedData) {
+          const parsedData = JSON.parse(cachedData);
+          parsedData.content_pillars = payload;
+          localStorage.setItem('competitor_analysis_data', JSON.stringify(parsedData));
         }
-      } else {
-        setError(result.error || 'Content pillar discovery failed');
+      } catch (cacheErr) {
+        console.warn('Failed to update cache with content pillars:', cacheErr);
       }
     } catch (err) {
       console.error('Content pillar refresh error:', err);
@@ -343,6 +354,15 @@ export function useCompetitorDiscovery({
         } catch (e) {
           console.warn('Failed to prime cache from backend data', e);
         }
+
+        // Self-heal: only when the DB has *no* pillars at all (e.g. a legacy
+        // session). A persisted "failed" state is left visible with its Retry
+        // button instead of silently re-running Exa on every reload, which
+        // would incur recurring API cost without user intent.
+        const dbPillars = initialData.content_pillars;
+        if (!dbPillars) {
+          await refreshContentPillars();
+        }
         return;
       }
 
@@ -356,7 +376,7 @@ export function useCompetitorDiscovery({
     };
 
     initialize();
-  }, [initialData, loadCachedAnalysis, startCompetitorDiscovery, mergeCrawlSocialMedia]);
+  }, [initialData, loadCachedAnalysis, startCompetitorDiscovery, mergeCrawlSocialMedia, refreshContentPillars]);
 
   return {
     competitors,

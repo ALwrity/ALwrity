@@ -355,14 +355,16 @@ async def discover_content_pillars(
 
         logger.info(f"Content pillar refresh for user {clerk_user_id}, URL: {user_url}")
 
-        pillars = await step3_research_service._discover_content_pillars_with_fallback(user_url)
+        envelope = await step3_research_service._discover_content_pillars_with_fallback(user_url)
+        pillars = step3_research_service._pillars_payload(envelope)
 
-        if not pillars:
-            logger.warning(f"Content pillar refresh returned no data for user {clerk_user_id}")
+        if not envelope.get("success") or not pillars:
+            error = envelope.get("error") or "Content pillar discovery returned no data. Exa credits may be exhausted or the domain returned no results."
+            logger.warning(f"Content pillar refresh failed for user {clerk_user_id}: {error}")
             return ContentPillarsResponse(
                 success=False,
-                message="Content pillar discovery returned no data",
-                error="Content pillar discovery returned no data. Exa credits may be exhausted or the domain returned no results."
+                message="Content pillar discovery failed",
+                error=error
             )
 
         persist_ok = False
@@ -374,15 +376,16 @@ async def discover_content_pillars(
                 persist_ok = svc.save_content_pillars(clerk_user_id, pillars, db)
                 db.close()
         except Exception as persist_err:
-            logger.warning(f"Failed to persist content pillars for user {clerk_user_id}: {persist_err}")
+            logger.exception(f"Failed to persist content pillars for user {clerk_user_id}: {persist_err}")
 
         if not persist_ok:
             logger.warning(f"Content pillar persistence failed for user {clerk_user_id}")
 
         return ContentPillarsResponse(
-            success=True,
-            message="Content pillars discovered",
+            success=persist_ok,
+            message="Content pillars discovered" if persist_ok else "Content pillars discovered but could not be persisted",
             content_pillars=pillars,
+            error=None if persist_ok else "Failed to persist content pillars — refresh may revert to a pending state.",
         )
 
     except Exception as e:
