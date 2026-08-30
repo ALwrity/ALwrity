@@ -127,6 +127,21 @@ function formatSchedule(schedule: any): string {
   return String(mode);
 }
 
+const SCHEDULE_MODES = new Set(["on_demand", "weekly", "daily"]);
+
+function normalizeSchedule(schedule: any): any {
+  // Coerce legacy / LLM-written schedule values to the supported mode set so
+  // the MUI Select never receives an out-of-range value.
+  if (!schedule) return { mode: "on_demand" };
+  if (typeof schedule === "string") {
+    const mode = SCHEDULE_MODES.has(schedule) ? schedule : "on_demand";
+    return { mode };
+  }
+  if (typeof schedule !== "object") return { mode: "on_demand" };
+  const mode = SCHEDULE_MODES.has(schedule?.mode) ? schedule.mode : "on_demand";
+  return { ...schedule, mode };
+}
+
 function buildAgentContextHint(agentKey: string, ctx: Record<string, any>): string | null {
   const competitors = Array.isArray(ctx?.competitors) ? ctx.competitors.filter((c: any) => c) : [];
   const pillars = Array.isArray(ctx?.content_pillars) ? ctx.content_pillars.filter((p: any) => p) : [];
@@ -241,7 +256,7 @@ const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, c
       const key = agent.agent_key;
       const displayName = resolveDisplayName(agent, websiteName);
       const enabled = agent.profile?.enabled ?? agent.defaults?.enabled ?? true;
-      const schedule = agent.profile?.schedule ?? agent.defaults?.schedule ?? { mode: "on_demand" };
+      const schedule = normalizeSchedule(agent.profile?.schedule ?? agent.defaults?.schedule);
       const systemPrompt = agent.profile?.system_prompt ?? getDefaultSystemPrompt(agent);
       const taskPrompt = agent.profile?.task_prompt_template ?? getDefaultTaskPrompt(agent);
       next[key] = {
@@ -285,7 +300,7 @@ const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, c
     setDraftField(key, {
       display_name: displayName,
       enabled: Boolean(defaults.enabled ?? true),
-      schedule: defaults.schedule ?? { mode: "on_demand" },
+      schedule: normalizeSchedule(defaults.schedule),
       system_prompt: String(defaults.rendered_system_prompt || defaults.system_prompt_template || ""),
       task_prompt_template: String(defaults.rendered_task_prompt_template || defaults.task_prompt_template || ""),
     });
@@ -321,7 +336,7 @@ const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, c
       if (parsed && typeof parsed === "object") {
         if (typeof parsed.display_name === "string") patch.display_name = parsed.display_name;
         if (typeof parsed.enabled === "boolean") patch.enabled = parsed.enabled;
-        if (parsed.schedule && typeof parsed.schedule === "object") patch.schedule = parsed.schedule;
+        if (parsed.schedule && typeof parsed.schedule === "object") patch.schedule = normalizeSchedule(parsed.schedule);
         if (typeof parsed.system_prompt === "string") patch.system_prompt = parsed.system_prompt;
         if (typeof parsed.task_prompt_template === "string") patch.task_prompt_template = parsed.task_prompt_template;
       }
@@ -391,7 +406,7 @@ const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, c
           if (parsed && typeof parsed === "object") {
             if (typeof parsed.display_name === "string") patch.display_name = parsed.display_name;
             if (typeof parsed.enabled === "boolean") patch.enabled = parsed.enabled;
-            if (parsed.schedule && typeof parsed.schedule === "object") patch.schedule = parsed.schedule;
+            if (parsed.schedule && typeof parsed.schedule === "object") patch.schedule = normalizeSchedule(parsed.schedule);
             if (typeof parsed.system_prompt === "string") patch.system_prompt = parsed.system_prompt;
             if (typeof parsed.task_prompt_template === "string") patch.task_prompt_template = parsed.task_prompt_template;
           }
@@ -976,7 +991,7 @@ const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, c
                           <InputLabel>Schedule</InputLabel>
                           <Select
                             label="Schedule"
-                            value={draft.schedule?.mode || "on_demand"}
+                            value={SCHEDULE_MODES.has(draft.schedule?.mode) ? draft.schedule?.mode : "on_demand"}
                             onChange={(e) => setDraftField(agent.agent_key, { schedule: { ...(draft.schedule || {}), mode: e.target.value } })}
                           >
                             <MenuItem value="on_demand">On-demand</MenuItem>

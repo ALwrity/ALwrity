@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { bingOAuthAPI, BingOAuthStatus, BingOAuthResponse } from '../api/bingOAuth';
 import { cachedAnalyticsAPI } from '../api/cachedAnalytics';
+import { OAuthEventTypes } from '../utils/oauthEventTypes';
 
 interface UseBingOAuthReturn {
   connected: boolean;
@@ -111,11 +112,11 @@ export const useBingOAuth = (): UseBingOAuthReturn => {
         if (messageHandled) return;
         if (!event?.data || typeof event.data !== 'object') return;
         const { type } = event.data as { type?: string };
-        if (type === 'BING_OAUTH_SUCCESS' || type === 'BING_OAUTH_ERROR') {
+        if (type === OAuthEventTypes.BING.SUCCESS || type === OAuthEventTypes.BING.ERROR) {
           messageHandled = true;
           try { popup.close(); } catch {}
           window.removeEventListener('message', messageHandler);
-          if (type === 'BING_OAUTH_SUCCESS') {
+          if (type === OAuthEventTypes.BING.SUCCESS) {
             setConnected(true);
             cachedAnalyticsAPI.invalidatePlatformStatus();
             (async () => {

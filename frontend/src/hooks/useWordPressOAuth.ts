@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { wordpressOAuthAPI, WordPressOAuthStatus, WordPressOAuthSite } from '../api/wordpressOAuth';
 import { useAuth } from '@clerk/clerk-react';
+import { OAuthEventTypes } from '../utils/oauthEventTypes';
 
 export interface UseWordPressOAuthReturn {
   // Connection state
@@ -120,7 +121,7 @@ export const useWordPressOAuth = (): UseWordPressOAuthReturn => {
           if (event.source !== popup) return;
           if (!trustedOrigins.includes(event.origin)) return;
 
-          if (event.data.type === 'WPCOM_OAUTH_SUCCESS' || event.data.type === 'WPCOM_OAUTH_ERROR') {
+          if (event.data.type === OAuthEventTypes.WORDPRESS.SUCCESS || event.data.type === OAuthEventTypes.WORDPRESS.ERROR) {
             cleanup();
             setTimeout(() => { checkStatus(); }, 1000);
           }

@@ -5,6 +5,7 @@ import { getApiBaseUrl } from '../../../utils/apiUrl';
 import { markConnectionHandled, isAlreadyHandled, clearConnectionHandled } from '../../../utils/wixConnectionDedup';
 import { getLinkedInConnectErrorMessage } from '../../../api/linkedinSocial';
 import { connectWithLinkedInOAuth } from '../../../utils/linkedInOAuthConnect';
+import { OAuthEventTypes } from '../../../utils/oauthEventTypes';
 
 const getTrustedOAuthOrigins = (): string[] => {
   const origins = getWixTrustedOrigins();
@@ -30,7 +31,7 @@ export const usePlatformConnections = () => {
       if (!trusted.includes(event.origin)) return;
       if (!event.data || typeof event.data !== 'object') return;
 
-      if (event.data.type === 'WIX_OAUTH_SUCCESS') {
+      if (event.data.type === OAuthEventTypes.WIX.SUCCESS) {
         if (isAlreadyHandled()) return;
         markConnectionHandled();
         setConnectedPlatforms(prev => {
@@ -40,11 +41,11 @@ export const usePlatformConnections = () => {
         setToastMessage('Wix account connected successfully!');
         setShowToast(true);
       }
-      if (event.data.type === 'WIX_OAUTH_ERROR') {
+      if (event.data.type === OAuthEventTypes.WIX.ERROR) {
         setToastMessage('Wix connection failed. Please try again.');
         setShowToast(true);
       }
-      if (event.data.type === 'LINKEDIN_OAUTH_SUCCESS') {
+      if (event.data.type === OAuthEventTypes.LINKEDIN.SUCCESS) {
         setConnectedPlatforms(prev => {
           if (prev.includes('linkedin')) return prev;
           return [...prev, 'linkedin'];
@@ -52,11 +53,11 @@ export const usePlatformConnections = () => {
         setToastMessage('LinkedIn account connected successfully!');
         setShowToast(true);
       }
-      if (event.data.type === 'LINKEDIN_OAUTH_ERROR') {
+      if (event.data.type === OAuthEventTypes.LINKEDIN.ERROR) {
         setToastMessage('LinkedIn connection failed. Please try again.');
         setShowToast(true);
       }
-      if (event.data.type === 'BING_OAUTH_SUCCESS') {
+      if (event.data.type === OAuthEventTypes.BING.SUCCESS) {
         setConnectedPlatforms(prev => {
           if (prev.includes('bing')) return prev;
           return [...prev, 'bing'];
@@ -64,7 +65,7 @@ export const usePlatformConnections = () => {
         setToastMessage('Bing Webmaster Tools connected successfully!');
         setShowToast(true);
       }
-      if (event.data.type === 'BING_OAUTH_ERROR') {
+      if (event.data.type === OAuthEventTypes.BING.ERROR) {
         setToastMessage('Bing Webmaster Tools connection failed. Please try again.');
         setShowToast(true);
       }

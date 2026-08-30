@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { gscAPI, GSCSite } from '../../../api/gsc';
 import { cachedAnalyticsAPI } from '../../../api/cachedAnalytics';
+import { OAuthEventTypes } from '../../../utils/oauthEventTypes';
 
 export const useGSCConnection = () => {
   const { getToken } = useAuth();
@@ -98,11 +99,11 @@ export const useGSCConnection = () => {
         if (messageHandled) return; // Prevent duplicate handling
         if (!event?.data || typeof event.data !== 'object') return;
         const { type } = event.data as { type?: string };
-        if (type === 'GSC_AUTH_SUCCESS' || type === 'GSC_AUTH_ERROR') {
+        if (type === OAuthEventTypes.GSC.SUCCESS || type === OAuthEventTypes.GSC.ERROR) {
           messageHandled = true;
           try { popup.close(); } catch {}
           window.removeEventListener('message', messageHandler);
-          if (type === 'GSC_AUTH_SUCCESS') {
+          if (type === OAuthEventTypes.GSC.SUCCESS) {
             // Optimistically mark as connected; a later status refresh will confirm
             setConnectedPlatforms(prev => Array.from(new Set([...prev, 'gsc'])));
             // Refresh sites
