@@ -14,7 +14,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import AskAlwrityIcon from '../../assets/images/AskAlwrity-min.ico';
 import { SubscriptionGuard } from '../SubscriptionGuard';
-import { apiClient, longRunningApiClient, isBackendCooldownActive, logBackendCooldownSkipOnce } from '../../api/client';
+import { apiClient } from '../../api/client';
+import { useOnboardingTasksStatus } from '../../hooks/useOnboardingTasksStatus';
 
 // Shared components
 import DashboardHeader from '../shared/DashboardHeader';
@@ -165,47 +166,9 @@ const MainDashboard: React.FC = () => {
     // about.
   }, [sifHealth?.has_task, sifHealth?.status]);
 
-  // Onboarding background tasks status
-  const [onboardingTasks, setOnboardingTasks] = React.useState<{
-    tasks: Record<string, { status: string; started_at: string | null; progress_pct: number }>;
-    total: number;
-    completed_count: number;
-    failed_count: number;
-    all_done: boolean;
-  } | null>(null);
+  // Onboarding background tasks status (shared React Query poller)
+  const { data: onboardingTasks, isError: onboardingTasksError } = useOnboardingTasksStatus();
   const [showOnboardingStatus, setShowOnboardingStatus] = React.useState(true);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    let interval: ReturnType<typeof setInterval> | undefined;
-    const fetchOnboardingTasks = async () => {
-      if (cancelled) return;
-      // Skip when the backend is in its cooling-down period.
-      if (isBackendCooldownActive()) {
-        logBackendCooldownSkipOnce('MainDashboard');
-        return;
-      }
-      try {
-        const res = await longRunningApiClient.get('/api/onboarding/tasks/status');
-        if (cancelled) return;
-        if (res.data.tasks) {
-          setOnboardingTasks(res.data);
-          if (res.data.all_done && interval) {
-            clearInterval(interval);
-            interval = undefined;
-          }
-        }
-      } catch {
-        if (!cancelled) setOnboardingTasks(null);
-      }
-    };
-    fetchOnboardingTasks();
-    interval = setInterval(fetchOnboardingTasks, 60000);
-    return () => {
-      cancelled = true;
-      if (interval) clearInterval(interval);
-    };
-  }, []);
 
   // State to track if we need to start a newly generated workflow
   const [shouldStartWorkflow, setShouldStartWorkflow] = React.useState(false);
@@ -476,7 +439,7 @@ const MainDashboard: React.FC = () => {
 
 
             {/* Onboarding status card — outside SubscriptionGuard so all users see scheduling progress */}
-            {showOnboardingStatus && onboardingTasks && !onboardingTasks.all_done && (
+            {showOnboardingStatus && onboardingTasks && !onboardingTasksError && !onboardingTasks.all_done && (
               <DashboardOnboardingStatus
                 {...onboardingTasks}
                 onDismiss={() => setShowOnboardingStatus(false)}

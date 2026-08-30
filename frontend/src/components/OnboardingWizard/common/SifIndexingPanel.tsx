@@ -2,12 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Box, Typography, Paper, CircularProgress } from '@mui/material';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
-import {
-  apiClient,
-  longRunningApiClient,
-  isBackendCooldownActive,
-  logBackendCooldownSkipOnce,
-} from '../../../api/client';
+import { apiClient } from '../../../api/client';
+import { invalidateOnboardingTasksStatus, useOnboardingTasksStatus } from '../../../hooks/useOnboardingTasksStatus';
+import type { OnboardingSifIndexingDetails } from '../../../api/onboarding';
 
 const PHASE_MAP: Record<string, string> = {
   'harvesting': 'Harvesting website pages...',
@@ -35,7 +32,7 @@ const TEST_QUERIES = [
 
 interface IndexedPage {
   url: string;
-  title: string;
+  title?: string;
 }
 
 export const SifIndexingPanel: React.FC = () => {
@@ -55,9 +52,6 @@ export const SifIndexingPanel: React.FC = () => {
   const [testQuery, setTestQuery] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string>('');
   const [logMessages, setLogMessages] = useState<string[]>([]);
-  // Incrementing this re-runs the status-polling effect (used to restart
-  // polling after a retrigger, since polling stops on a terminal state).
-  const [pollEpoch, setPollEpoch] = useState(0);
 
   const handleTestQuery = async (query: string) => {
     setTestQuery(query);
@@ -78,101 +72,54 @@ export const SifIndexingPanel: React.FC = () => {
     }
   };
 
+  const { data: tasksStatusData } = useOnboardingTasksStatus();
+  const sifTask = tasksStatusData?.tasks?.sif_indexing;
+
   useEffect(() => {
-    let cancelled = false;
-    let inFlight = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let stopPolling = false;
-    // Backoff: poll briskly while indexing is actively progressing, then
-    // slow down when nothing is changing. Stops entirely on a final result.
-    const POLL_DELAYS_MS = [15000, 30000, 60000, 120000];
-    let attempts = 0;
+    if (!sifTask) return;
 
-    const scheduleNext = () => {
-      const delay = POLL_DELAYS_MS[Math.min(attempts, POLL_DELAYS_MS.length - 1)];
-      timer = setTimeout(poll, delay);
-    };
+    const details: OnboardingSifIndexingDetails = sifTask.details ?? {};
 
-    const poll = async () => {
-      if (cancelled) return;
-      // Never start a new request while the backend is cooling down.
-      if (isBackendCooldownActive()) {
-        attempts = Math.min(attempts + 1, POLL_DELAYS_MS.length - 1);
-        logBackendCooldownSkipOnce('SifIndexingPanel');
-        scheduleNext();
-        return;
-      }
-      if (inFlight) return;
-      inFlight = true;
-      try {
-        const res = await longRunningApiClient.get('/api/onboarding/tasks/status');
-        if (cancelled) return;
-        const sifTask = res?.data?.tasks?.sif_indexing;
-        const details = sifTask?.details || {};
-
-        if (sifTask?.status === 'completed' || details.phase === 'complete') {
-          const hasPillars = !!(details.pillars_found && details.pillars_found > 0);
-          const hasPages = details.pages_harvested > 0;
-          setSifStatus(hasPillars ? 'done' : hasPages ? 'partial' : 'done');
-          setSifPhase(hasPillars ? 'complete' : '');
-          setSifPageCount(details.pages_harvested ?? null);
-          setSifPageTotal(details.pages_total ?? null);
-          setSifPillarCount(hasPillars ? details.pillars_found : null);
-          setSifLastIndexed(sifTask.started_at || null);
-          if (details.indexed_pages?.length) setIndexedPages(details.indexed_pages);
-          if (details.harvest_source) setHarvestSource(details.harvest_source);
-          if (details.sitemap_total != null) setSitemapTotal(details.sitemap_total);
-          if (details.log_messages?.length) setLogMessages(details.log_messages);
-          if (sifTask.index_freshness_hours != null) setFreshnessHours(sifTask.index_freshness_hours);
-          stopPolling = true;
-        } else if (sifTask?.status === 'running') {
-          attempts = 0;
-          setSifStatus('indexing');
-          setSifPhase(details.phase || '');
-          setSifPageCount(details.pages_harvested ?? null);
-          setSifPageTotal(details.pages_total ?? null);
-          if (details.log_messages?.length) setLogMessages(details.log_messages);
-          if (sifTask.index_freshness_hours != null) setFreshnessHours(sifTask.index_freshness_hours);
-        } else if (sifTask?.status === 'failed') {
-          setSifStatus('error');
-          setSifErrorReason(sifTask.failure_reason || null);
-          stopPolling = true;
-        } else if (sifTask?.status === 'pending') {
-          attempts = Math.min(attempts + 1, POLL_DELAYS_MS.length - 1);
-          setSifStatus('idle');
-        } else {
-          // No sif_indexing task reported yet — back off and check again later.
-          attempts = Math.min(attempts + 1, POLL_DELAYS_MS.length - 1);
-        }
-      } catch {
-        // Silently ignore poll failures — back off.
-        attempts = Math.min(attempts + 1, POLL_DELAYS_MS.length - 1);
-      } finally {
-        inFlight = false;
-        if (!cancelled && !stopPolling) scheduleNext();
-      }
-    };
-
-    poll();
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [pollEpoch]);
+    if (sifTask.status === 'completed' || details.phase === 'complete') {
+      const hasPillars = !!(details.pillars_found && details.pillars_found > 0);
+      const hasPages = (details.pages_harvested ?? 0) > 0;
+      setSifStatus(hasPillars ? 'done' : hasPages ? 'partial' : 'done');
+      setSifPhase(hasPillars ? 'complete' : '');
+      setSifPageCount(details.pages_harvested ?? null);
+      setSifPageTotal(details.pages_total ?? null);
+      setSifPillarCount(hasPillars ? (details.pillars_found ?? null) : null);
+      setSifLastIndexed(sifTask.started_at || null);
+      if (details.indexed_pages?.length) setIndexedPages(details.indexed_pages);
+      if (details.harvest_source) setHarvestSource(details.harvest_source);
+      if (details.sitemap_total != null) setSitemapTotal(details.sitemap_total);
+      if (details.log_messages?.length) setLogMessages(details.log_messages);
+      if (sifTask.index_freshness_hours != null) setFreshnessHours(sifTask.index_freshness_hours);
+    } else if (sifTask.status === 'running') {
+      setSifStatus('indexing');
+      setSifPhase(details.phase || '');
+      setSifPageCount(details.pages_harvested ?? null);
+      setSifPageTotal(details.pages_total ?? null);
+      if (details.log_messages?.length) setLogMessages(details.log_messages);
+      if (sifTask.index_freshness_hours != null) setFreshnessHours(sifTask.index_freshness_hours);
+    } else if (sifTask.status === 'failed') {
+      setSifStatus('error');
+      setSifErrorReason(sifTask.failure_reason || null);
+    } else if (sifTask.status === 'pending') {
+      setSifStatus('idle');
+    }
+  }, [sifTask]);
 
   const handleRetrigger = async () => {
     if (sifRetriggering) return;
     setSifRetriggering(true);
     setSifErrorReason(null);
     setSifStatus('idle');
-    try { await apiClient.post('/api/onboarding/sif/retrigger'); }
-    catch { /* Non-blocking — poll will pick up status */ }
-    finally {
-      setSifRetriggering(false);
-      // Resume polling (it stops after a terminal state) so the panel picks
-      // up the re-indexing status.
-      setPollEpoch(e => e + 1);
+    try {
+      await apiClient.post('/api/onboarding/sif/retrigger');
+      invalidateOnboardingTasksStatus();
     }
+    catch { /* Non-blocking — poll will pick up status */ }
+    finally { setSifRetriggering(false); }
   };
 
   const bgColor = sifStatus === 'done' ? 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)'

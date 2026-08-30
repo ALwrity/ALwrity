@@ -2,6 +2,8 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { ClerkProvider, useAuth } from '@clerk/clerk-react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './api/queryClient';
 import ProtectedRoute from './components/shared/ProtectedRoute';
 import ErrorBoundary from './components/shared/ErrorBoundary';
 import { OnboardingProvider } from './contexts/OnboardingContext';
@@ -325,13 +327,15 @@ const App: React.FC = () => {
         // TODO: Send to error tracking service (Sentry, LogRocket, etc.)
       }}
     >
-      <ClerkProvider publishableKey={clerkPublishableKey} clerkJSUrl={clerkJSUrl}>
-        <SubscriptionProvider>
-          <OnboardingProvider>
-            {renderApp()}
-          </OnboardingProvider>
-        </SubscriptionProvider>
-      </ClerkProvider>
+      <QueryClientProvider client={queryClient}>
+        <ClerkProvider publishableKey={clerkPublishableKey} clerkJSUrl={clerkJSUrl}>
+          <SubscriptionProvider>
+            <OnboardingProvider>
+              {renderApp()}
+            </OnboardingProvider>
+          </SubscriptionProvider>
+        </ClerkProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 };
