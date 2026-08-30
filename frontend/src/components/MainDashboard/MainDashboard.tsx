@@ -14,7 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import AskAlwrityIcon from '../../assets/images/AskAlwrity-min.ico';
 import { SubscriptionGuard } from '../SubscriptionGuard';
-import { apiClient, longRunningApiClient } from '../../api/client';
+import { apiClient, longRunningApiClient, isBackendCooldownActive, logBackendCooldownSkipOnce } from '../../api/client';
 
 // Shared components
 import DashboardHeader from '../shared/DashboardHeader';
@@ -176,20 +176,35 @@ const MainDashboard: React.FC = () => {
   const [showOnboardingStatus, setShowOnboardingStatus] = React.useState(true);
 
   React.useEffect(() => {
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | undefined;
     const fetchOnboardingTasks = async () => {
+      if (cancelled) return;
+      // Skip when the backend is in its cooling-down period.
+      if (isBackendCooldownActive()) {
+        logBackendCooldownSkipOnce('MainDashboard');
+        return;
+      }
       try {
         const res = await longRunningApiClient.get('/api/onboarding/tasks/status');
+        if (cancelled) return;
         if (res.data.tasks) {
           setOnboardingTasks(res.data);
-          if (res.data.all_done) return;
+          if (res.data.all_done && interval) {
+            clearInterval(interval);
+            interval = undefined;
+          }
         }
       } catch {
-        setOnboardingTasks(null);
+        if (!cancelled) setOnboardingTasks(null);
       }
     };
     fetchOnboardingTasks();
-    const interval = setInterval(fetchOnboardingTasks, 60000);
-    return () => clearInterval(interval);
+    interval = setInterval(fetchOnboardingTasks, 60000);
+    return () => {
+      cancelled = true;
+      if (interval) clearInterval(interval);
+    };
   }, []);
 
   // State to track if we need to start a newly generated workflow

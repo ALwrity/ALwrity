@@ -8,7 +8,7 @@ import {
   useMediaQuery
 } from '@mui/material';
 import { getCurrentStep, setCurrentStep } from '../../api/onboarding';
-import { apiClient, longRunningApiClient } from '../../api/client';
+import { apiClient, longRunningApiClient, isBackendCooldownActive, logBackendCooldownSkipOnce } from '../../api/client';
 import { useOnboarding } from '../../contexts/OnboardingContext';
 import { useUser } from '@clerk/clerk-react';
 import WebsiteStep from './WebsiteStep';
@@ -157,11 +157,24 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
 
   useEffect(() => {
     if (activeStep < 1) return;
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | undefined;
     const fetchTasks = async () => {
+      if (cancelled) return;
+      // Skip when the backend is in its cooling-down period.
+      if (isBackendCooldownActive()) {
+        logBackendCooldownSkipOnce('Wizard');
+        return;
+      }
       try {
         const res = await longRunningApiClient.get('/api/onboarding/tasks/status');
+        if (cancelled) return;
         if (res.data.tasks) {
           setBackgroundTasks(res.data);
+          if (res.data.all_done && interval) {
+            clearInterval(interval);
+            interval = undefined;
+          }
         }
       } catch {
         // Non-critical — wizard continues regardless
@@ -169,8 +182,11 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     };
     fetchTasks();
     // Faster polling (30s) for active background tasks after website step
-    const interval = setInterval(fetchTasks, 30000);
-    return () => clearInterval(interval);
+    interval = setInterval(fetchTasks, 30000);
+    return () => {
+      cancelled = true;
+      if (interval) clearInterval(interval);
+    };
   }, [activeStep]);
 
   // Step validation function

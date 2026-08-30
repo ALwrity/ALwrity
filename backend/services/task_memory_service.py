@@ -325,10 +325,25 @@ class TaskMemoryService:
             return {"status": "error", "error": str(e)}
 
     async def record_task_proposal(self, proposal: Any) -> Dict[str, Any]:
-        """Record proposal timing without replacing a known outcome."""
+        """Record proposal timing without replacing a known outcome.
+        
+        Accepts both TaskProposal objects and dicts with equivalent keys.
+        """
         try:
             now = datetime.utcnow()
-            task_hash = self._compute_hash(proposal.title, proposal.description)
+            # Handle both object attributes and dict keys
+            if isinstance(proposal, dict):
+                title = proposal.get("title", "")
+                description = proposal.get("description", "")
+                pillar_id = proposal.get("pillar_id") or proposal.get("pillar", "")
+                source_agent = proposal.get("source_agent") or proposal.get("agent", None)
+            else:
+                title = proposal.title
+                description = proposal.description
+                pillar_id = proposal.pillar_id
+                source_agent = getattr(proposal, "source_agent", None)
+            
+            task_hash = self._compute_hash(title, description)
             history = (self.db.query(TaskHistory)
                        .filter(TaskHistory.user_id == self.user_id, TaskHistory.task_hash == task_hash)
                        .first())
@@ -336,12 +351,12 @@ class TaskMemoryService:
                 history = TaskHistory(
                     user_id=self.user_id,
                     task_hash=task_hash,
-                    title=proposal.title,
-                    description=proposal.description,
-                    pillar_id=proposal.pillar_id,
+                    title=title,
+                    description=description,
+                    pillar_id=pillar_id,
                     workflow_type="main",
                     status="proposed",
-                    source_agent=getattr(proposal, "source_agent", None),
+                    source_agent=source_agent,
                     created_at=now,
                     first_proposed_at=now,
                     last_proposed_at=now,

@@ -7,8 +7,20 @@ import {
   Chip,
   Stack,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  LinearProgress,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
 } from "@mui/material";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
+import PsychologyIcon from "@mui/icons-material/Psychology";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import EmailIcon from "@mui/icons-material/Email";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import {
   previewTodayPlan,
   generateTodayPlan,
@@ -25,22 +37,122 @@ const AGENT_LABELS: Record<string, string> = {
   ContentGapRadarAgent: "Content Gap Radar",
 };
 
+const AGENT_TEAM_INFO = [
+  {
+    key: "ContentStrategyAgent",
+    label: "Content Strategist",
+    icon: "📝",
+    description: "Analyzes your brand and competitors to recommend content pillars and topics",
+  },
+  {
+    key: "StrategyArchitectAgent", 
+    label: "Strategy Architect",
+    icon: "🏗️",
+    description: "Defines your overall content strategy and business goals alignment",
+  },
+  {
+    key: "SEOOptimizationAgent",
+    label: "SEO Specialist", 
+    icon: "🔍",
+    description: "Optimizes content for search engines and discovers opportunities",
+  },
+  {
+    key: "SocialAmplificationAgent",
+    label: "Social Media Manager",
+    icon: "📱",
+    description: "Creates social media engagement strategies and post ideas",
+  },
+  {
+    key: "CompetitorResponseAgent",
+    label: "Competitor Analyst",
+    icon: "🎯",
+    description: "Monitors competitor activities and suggests response strategies",
+  },
+  {
+    key: "ContentGapRadarAgent",
+    label: "Content Gap Radar",
+    icon: "📡",
+    description: "Identifies content gaps and opportunities in your market",
+  },
+];
+
+const PROGRESS_STAGES = [
+  { key: "initializing", message: "Initializing agent committee...", duration: "5-10s" },
+  { key: "content", message: "Content Strategist analyzing your brand...", duration: "10-20s" },
+  { key: "strategy", message: "Strategy Architect defining goals...", duration: "10-20s" },
+  { key: "seo", message: "SEO Specialist finding opportunities...", duration: "10-20s" },
+  { key: "social", message: "Social Media Manager planning engagement...", duration: "10-20s" },
+  { key: "competitor", message: "Competitor Analyst researching market...", duration: "10-20s" },
+  { key: "gap", message: "Content Gap Radar scanning for opportunities...", duration: "10-20s" },
+  { key: "review", message: "Reviewing and normalizing proposals...", duration: "5-10s" },
+  { key: "finalizing", message: "Finalizing your personalized plan...", duration: "5-10s" },
+  { key: "email", message: "Preparing daily digest email...", duration: "2-5s" },
+];
+
+const STAGE_AGENT_LABELS: Record<string, string> = {
+  initializing: "",
+  content: "Content Strategist",
+  strategy: "Strategy Architect",
+  seo: "SEO Specialist",
+  social: "Social Media Manager",
+  competitor: "Competitor Analyst",
+  gap: "Content Gap Radar",
+  review: "",
+  finalizing: "",
+  email: "",
+};
+
 export const AgentTeamPreview: React.FC = () => {
   const [loading, setLoading] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [preview, setPreview] = React.useState<TodayPlanPreview | null>(null);
+  const [preview, setPreview] = React.useState<TodayPlanPreview | null>(() => {
+    return onboardingCache.getFinalStepData()?.todayPlanPreview ?? null;
+  });
   const [saved, setSaved] = React.useState(false);
 
+  // Progress modal state
+  const [currentStage, setCurrentStage] = React.useState(0);
+  const [progressPercent, setProgressPercent] = React.useState(0);
+  const [completedAgents, setCompletedAgents] = React.useState<string[]>([]);
+  // Mirrors currentStage for use inside the interval callback (pure setters only).
+  const currentStageRef = React.useRef(0);
+
+  // Simulate progress through stages
   React.useEffect(() => {
-    const cached = onboardingCache.getFinalStepData()?.todayPlanPreview;
-    if (cached) {
-      setPreview(cached);
+    if (!loading) {
+      return;
     }
-  }, []);
+
+    const interval = setInterval(() => {
+      const stage = currentStageRef.current;
+      if (stage >= PROGRESS_STAGES.length - 1) {
+        return;
+      }
+      const next = stage + 1;
+      currentStageRef.current = next;
+      setCurrentStage(next);
+      setProgressPercent((next / PROGRESS_STAGES.length) * 100);
+
+      // Track completed agents based on stage
+      const stageInfo = PROGRESS_STAGES[next];
+      const label = stageInfo ? STAGE_AGENT_LABELS[stageInfo.key] : undefined;
+      if (label) {
+        setCompletedAgents((completed) =>
+          completed.includes(label) ? completed : [...completed, label],
+        );
+      }
+    }, 8000); // Update every 8 seconds (rough estimate per agent)
+
+    return () => clearInterval(interval);
+  }, [loading]);
 
   const handlePreview = async () => {
     setLoading(true);
+    currentStageRef.current = 0;
+    setCurrentStage(0);
+    setProgressPercent(0);
+    setCompletedAgents([]);
     setError(null);
     setSaved(false);
     try {
