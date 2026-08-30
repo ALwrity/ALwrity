@@ -19,6 +19,7 @@ from fastapi import HTTPException
 from loguru import logger
 
 from services.wavespeed.client import WaveSpeedClient
+from services.subscription import get_video_model_cost
 from utils.logger_utils import get_service_logger
 from .base import VideoGenerationOptions, VideoGenerationResult
 
@@ -42,7 +43,7 @@ class BaseWaveSpeedTextToVideoService:
         logger.info(f"[{self.MODEL_NAME}] Service initialized")
     
     def calculate_cost(self, resolution: str, duration: int) -> float:
-        """Calculate cost for video generation.
+        """Calculate cost for video generation from pricing.yaml.
         
         Args:
             resolution: Output resolution (480p, 720p, 1080p)
@@ -51,9 +52,12 @@ class BaseWaveSpeedTextToVideoService:
         Returns:
             Cost in USD
         """
-        # Default implementation - override in subclasses if needed
-        cost_per_second = self.DEFAULT_COST
-        return cost_per_second * duration
+        return get_video_model_cost(
+            self.MODEL_NAME,
+            duration_sec=duration,
+            resolution=resolution,
+            default=self.DEFAULT_COST * duration,
+        )
     
     async def generate_video(
         self,

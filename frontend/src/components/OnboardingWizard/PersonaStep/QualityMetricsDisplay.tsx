@@ -428,7 +428,7 @@ export const QualityMetricsDisplay: React.FC<QualityMetricsDisplayProps> = ({ me
             flexShrink: 0,
           }}
         >
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height={200}>
             <RadialBarChart
               innerRadius="75%"
               outerRadius="100%"
@@ -561,7 +561,7 @@ export const QualityMetricsDisplay: React.FC<QualityMetricsDisplayProps> = ({ me
 
         {/* Bar chart */}
         <Box sx={{ height: 160, width: '100%' }}>
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height={160}>
             <BarChart
               data={barChartData}
               layout="vertical"

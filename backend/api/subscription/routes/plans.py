@@ -57,40 +57,12 @@ async def get_subscription_plans(
 @router.get("/pricing")
 async def get_api_pricing(
     provider: Optional[str] = Query(None, description="API provider"),
-    db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Get API pricing information."""
+    """Get API pricing information directly from pricing.yaml SSOT."""
     
     try:
-        from models.subscription_models import APIProvider, APIProviderPricing
-        
-        query = db.query(APIProviderPricing).filter(
-            APIProviderPricing.is_active == True
-        )
-        
-        if provider:
-            try:
-                api_provider = APIProvider(provider.lower())
-                query = query.filter(APIProviderPricing.provider == api_provider)
-            except ValueError:
-                raise HTTPException(status_code=400, detail=f"Invalid provider: {provider}")
-        
-        pricing_data = query.all()
-        
-        pricing_list = []
-        for pricing in pricing_data:
-            pricing_list.append({
-                "provider": pricing.provider.value,
-                "model_name": pricing.model_name,
-                "cost_per_input_token": pricing.cost_per_input_token,
-                "cost_per_output_token": pricing.cost_per_output_token,
-                "cost_per_request": pricing.cost_per_request,
-                "cost_per_search": pricing.cost_per_search,
-                "cost_per_image": pricing.cost_per_image,
-                "cost_per_page": pricing.cost_per_page,
-                "description": pricing.description,
-                "effective_date": pricing.effective_date.isoformat()
-            })
+        from services.subscription import PricingLookup
+        pricing_list = PricingLookup.get_pricing_dict_list(provider=provider)
         
         return {
             "success": True,

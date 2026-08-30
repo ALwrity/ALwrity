@@ -99,7 +99,13 @@ def generate_image_edit(
         if result.metadata and "estimated_cost" in result.metadata:
             estimated_cost = float(result.metadata["estimated_cost"])
         else:
-            estimated_cost = 0.02 if provider_name == "wavespeed" else 0.05
+            from services.subscription import get_image_edit_model_cost
+            resolution = (opts.get("extra") or {}).get("resolution") if opts else None
+            estimated_cost = get_image_edit_model_cost(
+                model_name=result.model or model or "qwen-edit",
+                resolution=resolution,
+                default=0.02
+            )
 
         _track_image_operation_usage(
             user_id=user_id,

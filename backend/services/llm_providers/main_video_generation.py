@@ -99,26 +99,27 @@ def _track_video_operation_usage(
             # Update video calls and cost
             new_calls = current_calls_before + 1
             new_cost = current_cost_before + cost
+            now_utc = datetime.utcnow()
             
             # Use direct SQL UPDATE for dynamic attributes
             from sqlalchemy import text as sql_text
             update_query = sql_text("""
                 UPDATE usage_summaries 
                 SET video_calls = :new_calls,
-                    video_cost = :new_cost
+                    video_cost = :new_cost,
+                    total_calls = COALESCE(total_calls, 0) + 1,
+                    total_cost = COALESCE(total_cost, 0.0) + :cost,
+                    updated_at = :now
                 WHERE user_id = :user_id AND billing_period = :period
             """)
             db_track.execute(update_query, {
                 'new_calls': new_calls,
                 'new_cost': new_cost,
+                'cost': cost,
                 'user_id': user_id,
-                'period': current_period
+                'period': current_period,
+                'now': now_utc,
             })
-            
-            # Update total cost
-            summary.total_cost = (summary.total_cost or 0.0) + cost
-            summary.total_calls = (summary.total_calls or 0) + 1
-            summary.updated_at = datetime.utcnow()
             
             # Create usage log
             request_size = len(prompt.encode("utf-8")) if prompt else 0
@@ -166,22 +167,11 @@ def _track_video_operation_usage(
             clear_dashboard_cache(user_id)
             logger.info(f"{log_prefix} ✅ Successfully tracked usage: user {user_id} -> {operation_type} -> {new_calls} calls, ${cost:.4f}")
             
-            # UNIFIED SUBSCRIPTION LOG
-            operation_name = operation_type.replace("-", " ").title()
-            print(f"""
-[SUBSCRIPTION] {operation_name}
-├─ User: {user_id}
-├─ Plan: {plan_name} ({tier})
-├─ Provider: {provider}
-├─ Actual Provider: {provider}
-├─ Model: {model or 'unknown'}
-├─ Calls: {current_calls_before} → {new_calls} / {video_limit_display}
-├─ Cost: ${current_cost_before:.4f} → ${new_cost:.4f}
-├─ Audio: {current_audio_calls} / {audio_limit_display}
-├─ Image Editing: {current_image_edit_calls} / {image_edit_limit_display}
-└─ Status: ✅ Allowed & Tracked
-""", flush=True)
-            sys.stdout.flush()
+            try:
+                sys.stdout.write(f"\n[SUBSCRIPTION] Video Generation user={user_id} model={model} cost=${cost:.4f}\n")
+                sys.stdout.flush()
+            except Exception:
+                pass
             
             return {
                 "current_calls": new_calls,
@@ -778,6 +768,12 @@ def track_video_usage(
         current_period = pricing_service_track.get_current_billing_period(user_id) or datetime.now().strftime("%Y-%m")
         logger.debug(f"[video_gen] Billing period: {current_period}")
 
+        # Fetch limits first (get_user_limits may expire uncommitted session state)
+        limits = pricing_service_track.get_user_limits(user_id)
+        plan_name = limits.get("plan_name", "unknown") if limits else "unknown"
+        tier = limits.get("tier", "unknown") if limits else "unknown"
+        video_limit = limits["limits"].get("video_calls", 0) if limits else 0
+
         usage_summary = (
             db_track.query(UsageSummary)
             .filter(
@@ -799,30 +795,39 @@ def track_video_usage(
         else:
             logger.debug(f"[video_gen] Found existing UsageSummary: video_calls={getattr(usage_summary, 'video_calls', 0)}")
 
-        cost_info = pricing_service_track.get_pricing_for_provider_model(
-            APIProvider.VIDEO,
-            model_name,
-        )
-        default_cost = 0.10
-        if cost_info and cost_info.get("cost_per_request") is not None:
-            default_cost = cost_info["cost_per_request"]
-        cost_per_video = cost_override if cost_override is not None else default_cost
-        logger.debug(f"[video_gen] Cost per video: ${cost_per_video} (override={cost_override}, default={default_cost})")
+        if cost_override is not None:
+            cost_per_video = cost_override
+        else:
+            from services.subscription import get_video_model_cost
+            cost_per_video = get_video_model_cost(model_name, default=0.25)
+        logger.debug(f"[video_gen] Cost per video: ${cost_per_video} (override={cost_override})")
 
         current_video_calls_before = getattr(usage_summary, "video_calls", 0) or 0
         current_video_cost = getattr(usage_summary, "video_cost", 0.0) or 0.0
-        usage_summary.video_calls = current_video_calls_before + 1
-        usage_summary.video_cost = current_video_cost + cost_per_video
-        usage_summary.total_calls = (usage_summary.total_calls or 0) + 1
-        usage_summary.total_cost = (usage_summary.total_cost or 0.0) + cost_per_video
-        # Ensure the object is in the session
-        db_track.add(usage_summary)
-        logger.debug(f"[video_gen] Updated usage_summary: video_calls={current_video_calls_before} → {usage_summary.video_calls}")
+        new_video_calls = current_video_calls_before + 1
+        new_video_cost = current_video_cost + cost_per_video
+        now_utc = datetime.utcnow()
 
-        limits = pricing_service_track.get_user_limits(user_id)
-        plan_name = limits.get("plan_name", "unknown") if limits else "unknown"
-        tier = limits.get("tier", "unknown") if limits else "unknown"
-        video_limit = limits["limits"].get("video_calls", 0) if limits else 0
+        from sqlalchemy import text as sql_text
+        update_query = sql_text("""
+            UPDATE usage_summaries 
+            SET video_calls = :new_calls,
+                video_cost = :new_cost,
+                total_calls = COALESCE(total_calls, 0) + 1,
+                total_cost = COALESCE(total_cost, 0.0) + :cost,
+                updated_at = :now
+            WHERE user_id = :user_id AND billing_period = :period
+        """)
+        db_track.execute(update_query, {
+            'new_calls': new_video_calls,
+            'new_cost': new_video_cost,
+            'cost': cost_per_video,
+            'user_id': user_id,
+            'period': current_period,
+            'now': now_utc,
+        })
+        logger.debug(f"[video_gen] Updated usage_summary: video_calls={current_video_calls_before} → {new_video_calls}")
+
         current_image_calls = getattr(usage_summary, "stability_calls", 0) or 0
         image_limit = limits["limits"].get("stability_calls", 0) if limits else 0
         current_image_edit_calls = getattr(usage_summary, "image_edit_calls", 0) or 0
@@ -870,20 +875,11 @@ def track_video_usage(
 
         video_limit_display = video_limit if video_limit > 0 else '∞'
 
-        log_message = f"""
-[SUBSCRIPTION] Video Generation
-├─ User: {user_id}
-├─ Plan: {plan_name} ({tier})
-├─ Provider: video
-├─ Actual Provider: {provider}
-├─ Model: {model_name or 'default'}
-├─ Calls: {current_video_calls_before} → {usage_summary.video_calls} / {video_limit_display}
-├─ Images: {current_image_calls} / {image_limit if image_limit > 0 else '∞'}
-├─ Image Editing: {current_image_edit_calls} / {image_edit_limit if image_edit_limit > 0 else '∞'}
-├─ Audio: {current_audio_calls} / {audio_limit_display}
-└─ Status: ✅ Allowed & Tracked
-"""
-        logger.info(log_message)
+        try:
+            sys.stdout.write(f"\n[SUBSCRIPTION] Video Generation user={user_id} model={model_name or 'default'} cost=${cost_per_video:.4f}\n")
+            sys.stdout.flush()
+        except Exception:
+            pass
         return {
             "previous_calls": current_video_calls_before,
             "current_calls": usage_summary.video_calls,

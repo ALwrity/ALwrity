@@ -19,9 +19,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    op.add_column('research_preferences', sa.Column('content_pillars', sa.JSON(), nullable=True))
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if "research_preferences" in inspector.get_table_names():
+        cols = [c["name"] for c in inspector.get_columns("research_preferences")]
+        if "content_pillars" not in cols:
+            op.add_column('research_preferences', sa.Column('content_pillars', sa.JSON(), nullable=True))
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_column('research_preferences', 'content_pillars')
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if "research_preferences" in inspector.get_table_names():
+        cols = [c["name"] for c in inspector.get_columns("research_preferences")]
+        if "content_pillars" in cols:
+            op.drop_column('research_preferences', 'content_pillars')

@@ -45,7 +45,7 @@ import asyncio
 import random
 import string
 
-router = APIRouter(prefix="/onboarding/assets")
+router = APIRouter(prefix="/api/onboarding/assets")
 
 # --- Models ---
 class VoiceDesignRequest(BaseModel):
