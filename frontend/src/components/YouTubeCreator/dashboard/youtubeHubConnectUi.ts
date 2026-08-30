@@ -3,7 +3,13 @@ import type { CSSProperties } from "react";
 /** Primary hub-axis connect CTA — aligned with LinkedIn Studio connect button sizing. */
 export const YOUTUBE_CONNECT_CTA = "Connect YouTube\u26a1";
 
-/** Hub-axis CTA when the channel is already connected. */
+/** Hub-axis CTA when the channel is already connected (LinkedIn disconnect parity). */
+export const YOUTUBE_DISCONNECT_CTA = "Disconnect YouTube";
+
+/** Hub-axis CTA while revoke is in flight. */
+export const YOUTUBE_DISCONNECTING_CTA = "Disconnecting...";
+
+/** Create-wedge / Start New Video label — not the hub-axis connect button. */
 export const YOUTUBE_CREATE_VIDEO_CTA = "Create Video";
 
 /** Shared dimensions with LinkedIn `CONNECT_BUTTON_STYLE` (YouTube brand colors). */
