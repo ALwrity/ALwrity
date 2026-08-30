@@ -130,7 +130,9 @@ export interface TodayPlanPreview {
 }
 
 export async function previewTodayPlan(): Promise<TodayPlanPreview> {
-  const res: AxiosResponse<any> = await apiClient.post('/api/today-workflow/preview');
+  // Use long-running API client for this heavy operation
+  const { longRunningApiClient } = await import('./client');
+  const res: AxiosResponse<any> = await longRunningApiClient.post('/api/today-workflow/preview');
   return res.data?.data;
 }
 
