@@ -17,6 +17,8 @@ catalog prompt templates.
 
 from typing import Dict, Any, List
 
+from services.intelligence.pillar_context import extract_content_pillar_topics
+
 # Fields that are lists of strings in the structured context.
 _LIST_FIELDS = {
     "content_pillars",
@@ -29,6 +31,9 @@ _LIST_FIELDS = {
     "go_to_phrases",
     "go_to_words",
     "avoid_words",
+    "preferred_formats",
+    "content_topics",
+    "engagement_goals",
 }
 
 # List fields that keep more items when flattened (richer persona detail).
@@ -123,7 +128,7 @@ def build_prompt_context(integrated: Dict[str, Any]) -> Dict[str, Any]:
     style_analysis = website.get("style_analysis") or {}
     strategy_insights = style_analysis.get("content_strategy_insights") or {}
     sitemap_analysis = style_analysis.get("sitemap_analysis") or {}
-    content_pillars = (
+    content_pillars_value = (
         strategy_insights.get("content_pillars")
         or sitemap_analysis.get("content_pillars")
         or canonical.get("content_pillars")
@@ -181,6 +186,18 @@ def build_prompt_context(integrated: Dict[str, Any]) -> Dict[str, Any]:
     writing_tone = _str(writing_style.get("tone")) if isinstance(writing_style, dict) else ""
     writing_voice = _str(writing_style.get("voice")) if isinstance(writing_style, dict) else ""
 
+    # ── Posting cadence (fallback chain: research → persona platform personas → platforms) ──
+    posting_cadence = _resolve_posting_cadence(research, persona, platforms)
+
+    # ── P2.x: SMM agent rich fields from flat store / integrated data ────────────────
+    growth_summary = _build_growth_summary(research, competitor_analysis, platforms)
+    preferred_formats = _list(research.get("preferred_formats") or research.get("content_types") or [])
+    content_topics = extract_content_pillar_topics(content_pillars_value)
+    engagement_goals = _build_engagement_goals(persona, research)
+
+    # ── P3.x: Business goals from multiple sources ─────────────────────────────────
+    business_goals = _resolve_business_goals(canonical, research, persona)
+
     return {
         "website_name": website_name,
         "website_url": website_url,
@@ -188,13 +205,13 @@ def build_prompt_context(integrated: Dict[str, Any]) -> Dict[str, Any]:
         "industry": _str(industry),
         "brand_voice": _str(identity.get("brand_voice_description") or canonical.get("brand_voice")),
         "target_audience": _str(target_audience),
-        "content_pillars": _list(content_pillars),
+        "content_pillars": content_topics,
         "competitors": _list(competitor_names),
         "research_depth": _str(research.get("research_depth")),
         "content_types": _list(research.get("content_types")),
         "connected_platforms": _list(platforms.get("connected_platforms")),
-        "posting_cadence": _str(research.get("posting_cadence")),
-        "business_goals": _list(canonical.get("business_goals")),
+        "posting_cadence": posting_cadence,
+        "business_goals": business_goals,
         "persona_name": _str(identity.get("persona_name")),
         "archetype": _str(identity.get("archetype")),
         "core_belief": _str(identity.get("core_belief")),
@@ -208,7 +225,154 @@ def build_prompt_context(integrated: Dict[str, Any]) -> Dict[str, Any]:
         "seo_summary": seo_summary,
         "writing_tone": writing_tone,
         "writing_voice": writing_voice,
+        # P2.x: SMM agent rich fields
+        "growth_summary": growth_summary,
+        "preferred_formats": preferred_formats,
+        "content_topics": content_topics,
+        "engagement_goals": engagement_goals,
     }
+
+
+def _resolve_posting_cadence(
+    research: Dict[str, Any],
+    persona: Dict[str, Any],
+    platforms: Dict[str, Any],
+) -> str:
+    """Resolve posting cadence from multiple sources (fallback chain).
+
+    Priority:
+    1. research.posting_cadence (direct field)
+    2. research.recommended_settings.posting_cadence / posting_frequency
+    3. persona.platform_personas[].engagement_patterns.posting_frequency
+    4. platforms.postingCadence / posting_cadence
+    """
+    # 1. Direct research field (tests + future producer)
+    direct = research.get("posting_cadence") if isinstance(research, dict) else None
+    if direct:
+        return _str(direct)
+
+    # 2. Recommended settings (step-3 style detection)
+    recommended = research.get("recommended_settings") if isinstance(research, dict) else {}
+    if isinstance(recommended, dict):
+        for key in ("posting_cadence", "posting_frequency", "cadence"):
+            val = recommended.get(key)
+            if val:
+                return _str(val)
+
+    # 3. Step-4 platform personas (richest real source)
+    platform_personas = persona.get("platform_personas") or persona.get("platformPersonas") or {}
+    if isinstance(platform_personas, dict):
+        for platform, persona_data in platform_personas.items():
+            if isinstance(persona_data, dict):
+                engagement = persona_data.get("engagement_patterns") or {}
+                freq = engagement.get("posting_frequency")
+                if freq:
+                    return _str(freq)
+
+    # 4. Step-5 platform integrations (LinkedIn session payload)
+    for key in ("postingCadence", "posting_cadence", "cadence"):
+        val = platforms.get(key)
+        if val:
+            return _str(val)
+
+    return ""
+
+
+def _build_growth_summary(
+    research: Dict[str, Any],
+    competitor_analysis: List[Dict[str, Any]],
+    platforms: Dict[str, Any],
+) -> str:
+    """Build growth summary from research, competitors, and platform data."""
+    parts = []
+
+    if research:
+        research_depth = research.get("research_depth")
+        if research_depth:
+            parts.append(f"Research depth: {research_depth}")
+
+        auto_research = research.get("auto_research")
+        if auto_research is not None:
+            parts.append("Auto-research enabled" if auto_research else "Auto-research disabled")
+
+    if competitor_analysis:
+        competitor_count = len(competitor_analysis) if isinstance(competitor_analysis, list) else 0
+        if competitor_count:
+            parts.append(f"Tracking {competitor_count} competitors")
+
+    if platforms:
+        connected = platforms.get("connected_platforms") or []
+        if isinstance(connected, list) and connected:
+            parts.append(f"Connected platforms: {', '.join(connected)}")
+
+    return "; ".join(parts) if parts else ""
+
+
+def _build_engagement_goals(
+    persona: Dict[str, Any],
+    research: Dict[str, Any],
+) -> List[str]:
+    """Build engagement goals from persona and research data."""
+    goals = []
+
+    if persona:
+        core_persona = persona.get("core_persona") or persona.get("corePersona") or {}
+        primary_goal = core_persona.get("primary_goal") or core_persona.get("goal")
+        if primary_goal:
+            goals.append(str(primary_goal))
+
+        platform_personas = persona.get("platform_personas") or persona.get("platformPersonas") or {}
+        if isinstance(platform_personas, dict):
+            for platform, p_data in platform_personas.items():
+                if isinstance(p_data, dict):
+                    eng = p_data.get("engagement_patterns") or {}
+                    goal = eng.get("primary_goal") or eng.get("engagement_goal")
+                    if goal and goal not in goals:
+                        goals.append(str(goal))
+
+    if research:
+        content_goals = research.get("engagement_goals") or research.get("content_goals")
+        if isinstance(content_goals, list):
+            for g in content_goals:
+                if g and str(g) not in goals:
+                    goals.append(str(g))
+
+    return goals
+
+
+def _resolve_business_goals(
+    canonical: Dict[str, Any],
+    research: Dict[str, Any],
+    persona: Dict[str, Any],
+) -> List[str]:
+    """Resolve business goals from multiple sources (fallback chain).
+
+    Priority:
+    1. canonical.business_goals (canonical profile)
+    2. research.business_goals (research preferences)
+    3. persona.core_persona.primary_goal (persona goal)
+    """
+    goals: List[str] = []
+
+    # 1. Canonical profile business_goals
+    canonical_goals = canonical.get("business_goals") if isinstance(canonical, dict) else None
+    if canonical_goals:
+        goals.extend(_list(canonical_goals))
+
+    # 2. Research preferences business_goals
+    if not goals and isinstance(research, dict):
+        research_goals = research.get("business_goals")
+        if research_goals:
+            goals.extend(_list(research_goals))
+
+    # 3. Persona core_persona primary_goal as fallback
+    if not goals and isinstance(persona, dict):
+        core_persona = persona.get("core_persona") or persona.get("corePersona") or {}
+        primary_goal = core_persona.get("primary_goal") or core_persona.get("goal")
+        if primary_goal:
+            goals.append(str(primary_goal))
+
+    return goals
 
 
 def comma_join_context(

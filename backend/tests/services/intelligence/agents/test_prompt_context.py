@@ -365,6 +365,66 @@ class TestTruncationAndListFormatting:
         assert len(ctx["go_to_phrases"].split(", ")) == 20
 
 
+class TestContentPillarsExtraction:
+    """P1.1: the Exa content-pillar envelope must flatten into agent context."""
+
+    def test_exa_envelope_flattens_into_context(self, monkeypatch):
+        envelope = {
+            "status": "complete",
+            "timestamp": "2026-01-01T00:00:00",
+            "target_company": {
+                "domain": "acme.com",
+                "content_pillars": ["AI tooling", "Developer productivity"],
+            },
+            "competitors": [
+                {"website": "https://rival.io", "company_name": "Rival", "content_pillars": ["Automation", "API guides"]},
+                {"website": "https://competitor.dev", "company_name": "Competitor", "content_pillars": ["Developer productivity", "Case studies"]},
+            ],
+        }
+        data = integrated_data(
+            canonical_profile={"domain": "acme.com"},
+            research_preferences={"content_pillars": envelope},
+        )
+        wire_session(monkeypatch, FakeDB())
+        wire_integrated(monkeypatch, data)
+
+        ctx = make_agent()._load_prompt_context()
+
+        # Own pillars first, competitor pillars after, deduped.
+        assert ctx["content_pillars"] == (
+            "AI tooling, Developer productivity, Automation, API guides, Case studies"
+        )
+
+    def test_envelope_without_target_uses_competitor_pillars(self, monkeypatch):
+        envelope = {
+            "competitors": [
+                {"website": "https://rival.io", "company_name": "Rival", "content_pillars": ["Automation"]},
+            ],
+        }
+        data = integrated_data(
+            canonical_profile={"domain": "acme.com"},
+            research_preferences={"content_pillars": envelope},
+        )
+        wire_session(monkeypatch, FakeDB())
+        wire_integrated(monkeypatch, data)
+
+        ctx = make_agent()._load_prompt_context()
+
+        assert ctx["content_pillars"] == "Automation"
+
+    def test_single_pillar_object_extracted(self, monkeypatch):
+        data = integrated_data(
+            canonical_profile={"domain": "acme.com"},
+            research_preferences={"content_pillars": {"name": "AI"}},
+        )
+        wire_session(monkeypatch, FakeDB())
+        wire_integrated(monkeypatch, data)
+
+        ctx = make_agent()._load_prompt_context()
+
+        assert ctx["content_pillars"] == "AI"
+
+
 # ---------------------------------------------------------------------------
 # Caching
 # ---------------------------------------------------------------------------
@@ -619,3 +679,256 @@ class TestCatalogPlaceholderIntegrity:
                 continue
             template = (entry.get("defaults") or {}).get("system_prompt_template") or ""
             assert "Brand context:" in template, f"{entry.get('agent_key')} missing Brand context block"
+
+
+class TestResolvePostingCadence:
+    """Unit tests for _resolve_posting_cadence fallback chain."""
+
+    def test_research_posting_cadence_wins(self):
+        from services.intelligence.agents.prompt_context import _resolve_posting_cadence
+
+        research = {"posting_cadence": "3x_week"}
+        persona = {}
+        platforms = {}
+
+        result = _resolve_posting_cadence(research, persona, platforms)
+
+        assert result == "3x_week"
+
+    def test_research_recommended_settings_fallback(self):
+        from services.intelligence.agents.prompt_context import _resolve_posting_cadence
+
+        research = {
+            "research_depth": "deep",
+            "recommended_settings": {"posting_frequency": "weekly"}
+        }
+        persona = {}
+        platforms = {}
+
+        result = _resolve_posting_cadence(research, persona, platforms)
+
+        assert result == "weekly"
+
+    def test_persona_platform_personas_fallback(self):
+        from services.intelligence.agents.prompt_context import _resolve_posting_cadence
+
+        research = {"research_depth": "deep"}
+        persona = {
+            "platform_personas": {
+                "linkedin": {
+                    "engagement_patterns": {"posting_frequency": "2-3 times per week"}
+                }
+            }
+        }
+        platforms = {}
+
+        result = _resolve_posting_cadence(research, persona, platforms)
+
+        assert result == "2-3 times per week"
+
+    def test_platform_integrations_fallback(self):
+        from services.intelligence.agents.prompt_context import _resolve_posting_cadence
+
+        research = {"research_depth": "deep"}
+        persona = {}
+        platforms = {"postingCadence": "daily"}
+
+        result = _resolve_posting_cadence(research, persona, platforms)
+
+        assert result == "daily"
+
+    def test_returns_empty_when_no_sources(self):
+        from services.intelligence.agents.prompt_context import _resolve_posting_cadence
+
+        research = {}
+        persona = {}
+        platforms = {}
+
+        result = _resolve_posting_cadence(research, persona, platforms)
+
+        assert result == ""
+
+
+class TestP2xSMMFields:
+    """P2.x: SMM agent rich fields from integrated data."""
+
+    def test_growth_summary_from_research(self, monkeypatch):
+        """growth_summary includes research depth and auto_research."""
+        from services.intelligence.agents.prompt_context import _build_growth_summary
+
+        research = {
+            "research_depth": "deep",
+            "auto_research": True,
+        }
+        competitor_analysis = []
+        platforms = {}
+
+        result = _build_growth_summary(research, competitor_analysis, platforms)
+
+        assert "Research depth: deep" in result
+        assert "Auto-research enabled" in result
+
+    def test_growth_summary_from_competitors(self, monkeypatch):
+        """growth_summary includes competitor count."""
+        from services.intelligence.agents.prompt_context import _build_growth_summary
+
+        research = {}
+        competitor_analysis = [{"domain": "comp1.com"}, {"domain": "comp2.com"}]
+        platforms = {}
+
+        result = _build_growth_summary(research, competitor_analysis, platforms)
+
+        assert "Tracking 2 competitors" in result
+
+    def test_growth_summary_from_platforms(self, monkeypatch):
+        """growth_summary includes connected platforms."""
+        from services.intelligence.agents.prompt_context import _build_growth_summary
+
+        research = {}
+        competitor_analysis = []
+        platforms = {"connected_platforms": ["wordpress", "linkedin"]}
+
+        result = _build_growth_summary(research, competitor_analysis, platforms)
+
+        assert "Connected platforms" in result
+        assert "wordpress" in result
+        assert "linkedin" in result
+
+    def test_preferred_formats_from_research(self, monkeypatch):
+        """preferred_formats sourced from research content_types."""
+        data = integrated_data(overrides={
+            "research_preferences": {
+                "content_types": ["blog", "linkedin_post", "twitter_thread"],
+                "posting_cadence": None,
+            },
+        })
+        wire_session(monkeypatch, FakeDB())
+        wire_integrated(monkeypatch, data)
+        agent = make_agent()
+
+        ctx = agent._load_prompt_context()
+
+        assert "preferred_formats" in ctx
+        assert len(ctx["preferred_formats"]) > 0
+
+    def test_content_topics_from_content_pillars(self, monkeypatch):
+        """content_topics sourced from content_pillars."""
+        data = integrated_data(overrides={
+            "research_preferences": {
+                "content_pillars": ["AI tooling", "Developer productivity"],
+            },
+        })
+        wire_session(monkeypatch, FakeDB())
+        wire_integrated(monkeypatch, data)
+        agent = make_agent()
+
+        ctx = agent._load_prompt_context()
+
+        assert "AI tooling" in ctx["content_topics"]
+        assert "Developer productivity" in ctx["content_topics"]
+
+    def test_engagement_goals_from_persona(self, monkeypatch):
+        """engagement_goals sourced from persona primary_goal."""
+        from services.intelligence.agents.prompt_context import _build_engagement_goals
+
+        persona = {
+            "core_persona": {
+                "primary_goal": "Build thought leadership"
+            }
+        }
+        research = {}
+
+        result = _build_engagement_goals(persona, research)
+
+        assert "Build thought leadership" in result
+
+    def test_engagement_goals_from_platform_persona(self, monkeypatch):
+        """engagement_goals sourced from platform persona engagement_patterns."""
+        from services.intelligence.agents.prompt_context import _build_engagement_goals
+
+        persona = {
+            "platform_personas": {
+                "linkedin": {
+                    "engagement_patterns": {
+                        "primary_goal": "Increase brand awareness"
+                    }
+                }
+            }
+        }
+        research = {}
+
+        result = _build_engagement_goals(persona, research)
+
+        assert "Increase brand awareness" in result
+
+    def test_engagement_goals_from_research(self, monkeypatch):
+        """engagement_goals sourced from research engagement_goals."""
+        from services.intelligence.agents.prompt_context import _build_engagement_goals
+
+        persona = {}
+        research = {
+            "engagement_goals": ["Drive traffic", "Generate leads"]
+        }
+
+        result = _build_engagement_goals(persona, research)
+
+        assert "Drive traffic" in result
+        assert "Generate leads" in result
+
+
+class TestP3xBusinessGoals:
+    """P3.x: business_goals fallback chain for agent context."""
+
+    def test_canonical_business_goals_wins(self):
+        """business_goals from canonical profile takes precedence."""
+        from services.intelligence.agents.prompt_context import _resolve_business_goals
+
+        canonical = {"business_goals": ["Grow traffic", "Generate leads"]}
+        research = {"business_goals": ["Other goal"]}
+        persona = {"core_persona": {"primary_goal": "Persona goal"}}
+
+        result = _resolve_business_goals(canonical, research, persona)
+
+        assert "Grow traffic" in result
+        assert "Generate leads" in result
+        assert "Other goal" not in result
+
+    def test_research_business_goals_fallback(self):
+        """business_goals falls back to research preferences."""
+        from services.intelligence.agents.prompt_context import _resolve_business_goals
+
+        canonical = {}
+        research = {"business_goals": ["Increase conversions"]}
+        persona = {}
+
+        result = _resolve_business_goals(canonical, research, persona)
+
+        assert "Increase conversions" in result
+
+    def test_persona_primary_goal_fallback(self):
+        """business_goals falls back to persona primary_goal."""
+        from services.intelligence.agents.prompt_context import _resolve_business_goals
+
+        canonical = {}
+        research = {}
+        persona = {
+            "core_persona": {
+                "primary_goal": "Build thought leadership"
+            }
+        }
+
+        result = _resolve_business_goals(canonical, research, persona)
+
+        assert "Build thought leadership" in result
+
+    def test_returns_empty_when_no_sources(self):
+        """Returns empty list when no sources provide business_goals."""
+        from services.intelligence.agents.prompt_context import _resolve_business_goals
+
+        canonical = {}
+        research = {}
+        persona = {}
+
+        result = _resolve_business_goals(canonical, research, persona)
+
+        assert result == []

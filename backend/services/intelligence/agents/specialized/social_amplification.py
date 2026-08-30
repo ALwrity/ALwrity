@@ -118,16 +118,26 @@ class SocialAmplificationAgent(BaseALwrityAgent):
         if not isinstance(onboarding, dict):
             return default_proposals
 
-        # Extract selected platforms from onboarding step 5
+        # Extract selected platforms from onboarding data
         selected_platforms = []
         try:
-            step5 = onboarding.get("step5_summary") or onboarding.get("distribution_channels") or {}
-            if isinstance(step5, dict):
-                sp = step5.get("selected_platforms") or step5.get("platforms") or []
+            # P4.1: Read from integrated data keys (platform_integrations, persona_data)
+            # Primary: platform_integrations.connected_platforms
+            platform_integrations = onboarding.get("platform_integrations") or {}
+            if isinstance(platform_integrations, dict):
+                sp = platform_integrations.get("connected_platforms") or platform_integrations.get("social_platforms") or []
                 selected_platforms = [p for p in sp if isinstance(p, str)]
+
+            # Fallback: persona platform_personas keys
             if not selected_platforms:
-                # Fallback: check top-level keys
-                for key in ("selected_platforms", "platforms", "social_platforms"):
+                persona = onboarding.get("persona_data") or onboarding.get("persona") or {}
+                platform_personas = persona.get("platform_personas") or persona.get("platformPersonas") or {}
+                if isinstance(platform_personas, dict):
+                    selected_platforms = list(platform_personas.keys())
+
+            # Legacy fallback: check top-level keys
+            if not selected_platforms:
+                for key in ("selected_platforms", "platforms", "social_platforms", "connected_platforms"):
                     val = onboarding.get(key)
                     if isinstance(val, list):
                         selected_platforms = [p for p in val if isinstance(p, str)]
