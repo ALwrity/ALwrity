@@ -30,6 +30,22 @@ import {
   fetchLastAnalysis
 } from './WebsiteStep/utils';
 
+interface BackgroundTasksState {
+  tasks: Record<string, {
+    status: string;
+    started_at: string | null;
+    progress_pct: number;
+    failure_reason?: string | null;
+    recurring?: boolean;
+    last_success?: string | null;
+    next_execution?: string | null;
+  }>;
+  total: number;
+  completed_count: number;
+  failed_count: number;
+  all_done: boolean;
+}
+
 interface WebsiteStepProps {
   onContinue: (stepData?: any) => void;
   updateHeaderContent: (content: { title: string; description: string }) => void;
@@ -37,14 +53,8 @@ interface WebsiteStepProps {
   onDataReady?: (getData: () => any) => void;
   initialData?: any;
   email?: string;
-  onEmailChange?: (email: string) => void;
-  backgroundTasks?: {
-    tasks: Record<string, { status: string; started_at: string | null; progress_pct: number }>;
-    total: number;
-    completed_count: number;
-    failed_count: number;
-    all_done: boolean;
-  } | null;
+  backgroundTasks?: BackgroundTasksState | null;
+  onViewBackgroundResults?: (taskKey: string) => void;
 }
 
 interface AnalysisProgress {
@@ -77,8 +87,8 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   onDataReady, 
   initialData,
   email: propEmail,
-  onEmailChange,
-  backgroundTasks
+  backgroundTasks,
+  onViewBackgroundResults,
 }) => {
   const [website, setWebsite] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -446,7 +456,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
         };
       });
     }
-  }, [onDataReady, website, domainName, analysis, crawlResult, useAnalysisForGenAI, integrationData, connectedPlatforms]);
+  }, [onDataReady, website, domainName, analysis, crawlResult, useAnalysisForGenAI, integrationData, connectedPlatforms, email, emailDigestOptIn, userTimezone]);
 
   const hasWebsiteAnalysis = !!(website.trim() && analysis);
 
@@ -474,6 +484,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
         linkedinConnected={linkedinConnected}
         youtubeConnected={youtubeConnected}
         backgroundTasks={backgroundTasks || null}
+        onViewResults={onViewBackgroundResults}
       />
 
       {/* Website Tab Content */}

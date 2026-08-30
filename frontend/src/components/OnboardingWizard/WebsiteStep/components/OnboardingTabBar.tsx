@@ -12,12 +12,21 @@ interface OnboardingTabBarProps {
   linkedinConnected: boolean;
   youtubeConnected: boolean;
   backgroundTasks: {
-    tasks: Record<string, { status: string; started_at: string | null; progress_pct: number }>;
+    tasks: Record<string, {
+      status: string;
+      started_at: string | null;
+      progress_pct: number;
+      failure_reason?: string | null;
+      recurring?: boolean;
+      last_success?: string | null;
+      next_execution?: string | null;
+    }>;
     total: number;
     completed_count: number;
     failed_count: number;
     all_done: boolean;
   } | null;
+  onViewResults?: (taskKey: string) => void;
 }
 
 const OnboardingTabBar: React.FC<OnboardingTabBarProps> = ({
@@ -27,6 +36,7 @@ const OnboardingTabBar: React.FC<OnboardingTabBarProps> = ({
   linkedinConnected,
   youtubeConnected,
   backgroundTasks,
+  onViewResults,
 }) => {
   // Selected state: white pill with blue border and soft glow
   const selectedStyle = {
@@ -169,6 +179,7 @@ const OnboardingTabBar: React.FC<OnboardingTabBarProps> = ({
             activeTasks={backgroundTasks.total - backgroundTasks.completed_count - backgroundTasks.failed_count}
             totalTasks={backgroundTasks.total}
             tasks={backgroundTasks.tasks}
+            onViewResults={onViewResults}
           />
         </Box>
       )}

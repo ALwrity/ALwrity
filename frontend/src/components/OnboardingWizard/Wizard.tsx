@@ -757,8 +757,8 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         onValidationChange={onStep0Valid}
         onDataReady={handleWebsiteDataReady}
         email={email}
-        onEmailChange={handleEmailChange}
         backgroundTasks={backgroundTasks}
+        onViewBackgroundResults={handleViewBackgroundResults}
       />
     );
 
@@ -881,8 +881,11 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           dismissRetry={dismissRetry}
         />
 
-        {/* Background tasks status chip (visible after Step 2) */}
-        {activeStep > 0 && backgroundTasks && (!backgroundTasks.all_done || backgroundTasks.failed_count > 0) && (
+        {/* Background tasks banner on steps 1+ (step 0 uses compact chip in OnboardingTabBar) */}
+        {activeStep > 0 &&
+          backgroundTasks &&
+          backgroundTasks.tasks &&
+          Object.keys(backgroundTasks.tasks).length > 0 && (
           <SystemStatusChip
             activeTasks={backgroundTasks.total - backgroundTasks.completed_count - backgroundTasks.failed_count}
             totalTasks={backgroundTasks.total}
