@@ -156,7 +156,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   }, [activeStep, furthestAccessibleStep]);
 
   useEffect(() => {
-    if (activeStep < 1) return;
     let cancelled = false;
     let interval: ReturnType<typeof setInterval> | undefined;
     const fetchTasks = async () => {
@@ -181,7 +180,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       }
     };
     fetchTasks();
-    // Faster polling (30s) for active background tasks after website step
+    // Faster polling (30s) for active background tasks (including step 0 tab-bar chip)
     interval = setInterval(fetchTasks, 30000);
     return () => {
       cancelled = true;
@@ -774,6 +773,8 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         onValidationChange={onStep0Valid}
         onDataReady={handleWebsiteDataReady}
         email={email}
+        backgroundTasks={backgroundTasks}
+        onViewBackgroundResults={handleViewBackgroundResults}
       />
     );
 
@@ -896,8 +897,11 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           dismissRetry={dismissRetry}
         />
 
-        {/* Background tasks status banner (visible after Step 2) */}
-        {backgroundTasks && backgroundTasks.tasks && Object.keys(backgroundTasks.tasks).length > 0 && (
+        {/* Background tasks banner on steps 1+ (step 0 uses compact chip in OnboardingTabBar) */}
+        {activeStep > 0 &&
+          backgroundTasks &&
+          backgroundTasks.tasks &&
+          Object.keys(backgroundTasks.tasks).length > 0 && (
           <SystemStatusChip
             activeTasks={backgroundTasks.total - backgroundTasks.completed_count - backgroundTasks.failed_count}
             totalTasks={backgroundTasks.total}
@@ -907,7 +911,13 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         )}
 
         {/* Content */}
-        <Box sx={{ p: { xs: 2, md: 4 }, pt: { xs: 2, md: 3 }, flexGrow: 1, width: '100%', overflow: 'visible' }}>
+        <Box sx={{
+          p: { xs: 2, md: 4 },
+          pt: activeStep === 0 ? { xs: 1.375, md: 1.625 } : { xs: 2, md: 3 },
+          flexGrow: 1,
+          width: '100%',
+          overflow: 'visible',
+        }}>
           <Fade in={true} timeout={400}>
             <Box sx={{ width: '100%', overflow: 'visible' }}>
               {renderStepContent(activeStep)}

@@ -140,11 +140,11 @@ const ChevronBackground: React.FC<ChevronBackgroundProps> = ({ state, isFirst })
   let filter = '';
 
   if (state === 'completed') {
-    fill = 'url(#completed-grad-step)';
+    fill = '#FFFFFF'; // White background for completed steps
     stroke = '#C084FC'; // Premium soft purple border
     strokeWidth = '1.5';
   } else if (state === 'active') {
-    fill = '#FFFFFF';
+    fill = 'url(#completed-grad-step)'; // Lavender gradient background for active step
     stroke = '#E879F9'; // Vibrant young pink/magenta neon border
     strokeWidth = '2';
     filter = 'drop-shadow(0px 0px 5px rgba(232, 121, 249, 0.45))';
@@ -181,8 +181,8 @@ const ChevronBackground: React.FC<ChevronBackgroundProps> = ({ state, isFirst })
         vectorEffect="non-scaling-stroke"
         style={{ transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}
       />
-      {/* Premium Inner Bezel Path for completed steps - provides beautiful 3D glass look */}
-      {state === 'completed' && (
+      {/* Premium Inner Bezel Path for completed/active steps - provides beautiful 3D glass look */}
+      {(state === 'completed' || state === 'active') && (
         <path
           d={isFirst
             ? 'M 1.5,1.5 L 93.5,1.5 L 98,20 L 93.5,38.5 L 1.5,38.5 Z'
@@ -190,19 +190,6 @@ const ChevronBackground: React.FC<ChevronBackgroundProps> = ({ state, isFirst })
           }
           fill="none"
           stroke="rgba(255, 255, 255, 0.8)"
-          strokeWidth="1"
-          vectorEffect="non-scaling-stroke"
-        />
-      )}
-      {/* Highlighting active step inner border for extra premium contrast */}
-      {state === 'active' && (
-        <path
-          d={isFirst
-            ? 'M 1.5,1.5 L 93.5,1.5 L 98,20 L 93.5,38.5 L 1.5,38.5 Z'
-            : 'M 1,1.5 L 93.5,1.5 L 98,20 L 93.5,38.5 L 1,38.5 L 6.5,20 Z'
-          }
-          fill="none"
-          stroke="rgba(232, 121, 249, 0.15)"
           strokeWidth="1"
           vectorEffect="non-scaling-stroke"
         />
@@ -325,7 +312,39 @@ export const WizardStepper: React.FC<WizardStepperProps> = ({
                   >
                     {/* Step icon — single-layer circles to prevent border overlap */}
                     <Box sx={{ flexShrink: 0, lineHeight: 0 }}>
-                      {isCompleted ? (
+                      {isActive ? (
+                        /* Selected (active) step - highlighted circle ring and tick/number */
+                        <Box
+                          sx={{
+                            width: { xs: 22, sm: 26, md: 28 },
+                            height: { xs: 22, sm: 26, md: 28 },
+                            borderRadius: '50%',
+                            border: '2px solid #D946EF',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: '#FFFFFF',
+                            boxSizing: 'border-box',
+                            transition: 'all 0.25s ease',
+                          }}
+                        >
+                          {isCompleted ? (
+                            <Check sx={{ fontSize: { xs: 14, sm: 16, md: 18 }, color: '#D946EF' }} />
+                          ) : (
+                            <Typography
+                              sx={{
+                                fontSize: { xs: '0.7rem', sm: '0.75rem', md: '0.8rem' },
+                                fontWeight: 800,
+                                color: '#D946EF',
+                                lineHeight: 1,
+                              }}
+                            >
+                              {index + 1}
+                            </Typography>
+                          )}
+                        </Box>
+                      ) : isCompleted ? (
+                        /* Non-selected but completed step - solid purple circle with white checkmark */
                         <Box
                           sx={{
                             width: { xs: 22, sm: 26, md: 28 },
@@ -341,33 +360,8 @@ export const WizardStepper: React.FC<WizardStepperProps> = ({
                         >
                           <Check sx={{ fontSize: { xs: 14, sm: 16, md: 18 }, color: '#FFFFFF' }} />
                         </Box>
-                      ) : isActive ? (
-                        <Box
-                          sx={{
-                            width: { xs: 22, sm: 26, md: 28 },
-                            height: { xs: 22, sm: 26, md: 28 },
-                            borderRadius: '50%',
-                            border: '2px solid #D946EF',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            background: '#FFFFFF',
-                            boxSizing: 'border-box',
-                            transition: 'all 0.25s ease',
-                          }}
-                        >
-                          <Typography
-                            sx={{
-                              fontSize: { xs: '0.7rem', sm: '0.75rem', md: '0.8rem' },
-                              fontWeight: 800,
-                              color: '#D946EF',
-                              lineHeight: 1,
-                            }}
-                          >
-                            {index + 1}
-                          </Typography>
-                        </Box>
                       ) : (
+                        /* Disabled / unreached step */
                         <Box
                           sx={{
                             width: { xs: 22, sm: 26, md: 28 },

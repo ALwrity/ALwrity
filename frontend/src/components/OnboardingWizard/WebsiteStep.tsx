@@ -2,32 +2,21 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import {
   Box,
-  Button,
-  TextField,
-  Typography,
-  Alert,
-  CircularProgress,
-  Chip,
-  Paper,
   Dialog,
-  DialogTitle,
   DialogContent,
-  DialogActions,
-  DialogContentText
 } from '@mui/material';
-import AnalyticsIcon from '@mui/icons-material/Analytics';
-import HistoryIcon from '@mui/icons-material/History';
-import BusinessIcon from '@mui/icons-material/Business';
-import LinkedInIcon from '@mui/icons-material/LinkedIn';
 
 // Extracted components
-import { AnalysisResultsDisplay, AnalysisProgressDisplay, WebsiteIntegrationsSection } from './WebsiteStep/components';
+import {
+  WebsiteAnalysisTabContent,
+  AnalysisProgressDisplay,
+  OnboardingTabBar,
+  YouTubeIntegrationTab,
+  LinkedInIntegrationTab,
+  WebsiteStepHeader,
+  ExistingAnalysisDialog,
+} from './WebsiteStep/components';
 import type { StyleAnalysis } from './WebsiteStep/components/AnalysisResultsDisplay';
-import { BackgroundSetupCard } from './WebsiteStep/BackgroundSetupCard';
-import { ContentAuditSummaryCard } from './WebsiteStep/ContentAuditSummaryCard';
-import { SiteHealthSummaryCard } from './WebsiteStep/SiteHealthSummaryCard';
-import PlatformSection from './common/PlatformSection';
-import PlatformAnalytics from '../shared/PlatformAnalytics';
 
 // Import API client for saving
 import { apiClient } from '../../api/client';
@@ -41,6 +30,22 @@ import {
   fetchLastAnalysis
 } from './WebsiteStep/utils';
 
+interface BackgroundTasksState {
+  tasks: Record<string, {
+    status: string;
+    started_at: string | null;
+    progress_pct: number;
+    failure_reason?: string | null;
+    recurring?: boolean;
+    last_success?: string | null;
+    next_execution?: string | null;
+  }>;
+  total: number;
+  completed_count: number;
+  failed_count: number;
+  all_done: boolean;
+}
+
 interface WebsiteStepProps {
   onContinue: (stepData?: any) => void;
   updateHeaderContent: (content: { title: string; description: string }) => void;
@@ -48,6 +53,8 @@ interface WebsiteStepProps {
   onDataReady?: (getData: () => any) => void;
   initialData?: any;
   email?: string;
+  backgroundTasks?: BackgroundTasksState | null;
+  onViewBackgroundResults?: (taskKey: string) => void;
 }
 
 interface AnalysisProgress {
@@ -79,7 +86,9 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   onValidationChange, 
   onDataReady, 
   initialData,
-  email: propEmail
+  email: propEmail,
+  backgroundTasks,
+  onViewBackgroundResults,
 }) => {
   const [website, setWebsite] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +102,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   const [useAnalysisForGenAI, setUseAnalysisForGenAI] = useState(true);
   const [domainName, setDomainName] = useState<string>('');
   const [hasCheckedExisting, setHasCheckedExisting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'website' | 'linkedin'>('website');
+  const [activeTab, setActiveTab] = useState<'website' | 'linkedin' | 'youtube'>('website');
   const [integrationData, setIntegrationData] = useState<any>(null);
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
   const [linkedinProfile, setLinkedinProfile] = useState<any>(null);
@@ -104,7 +113,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   const [userTimezone, setUserTimezone] = useState<string>('UTC');
 
   const linkedinConnected = connectedPlatforms.includes('linkedin');
-  const analyticsPlatforms = useMemo(() => ['gsc', 'bing'], []);
+  const youtubeConnected = connectedPlatforms.includes('youtube');
 
   // Fetch LinkedIn profile summary when connected or from initialData
   useEffect(() => {
@@ -116,8 +125,8 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
     let cancelled = false;
     const fetchProfile = async () => {
       try {
-        const { apiClient } = await import('../../api/client');
-        const resp = await apiClient.get('/api/linkedin-social/profile/summary');
+        const { apiClient: client } = await import('../../api/client');
+        const resp = await client.get('/api/linkedin-social/profile/summary');
         if (!cancelled && resp.data?.analyzed) {
           setLinkedinProfile(resp.data);
         }
@@ -128,6 +137,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
     const timer = setTimeout(fetchProfile, 3000);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [linkedinConnected, initialData?.linkedin_profile]);
+
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [progress, setProgress] = useState<AnalysisProgress[]>([
     { step: 1, message: 'Validating website URL & connection', subMessage: 'Ensuring your site is accessible and ready for analysis', completed: false },
@@ -192,7 +202,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
             setDomainName(result.domainName);
           }
         }
-      } catch (error) {
+      } catch (err) {
         // Silently fail - non-critical pre-fill
         console.warn('Could not pre-fill from last analysis (non-critical)');
       }
@@ -352,9 +362,6 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
     // Store in localStorage for Step 3 (Competitor Analysis)
     localStorage.setItem('website_url', fixedUrl);
     localStorage.setItem('website_analysis_data', JSON.stringify(result.analysis));
-
-    // DO NOT call onContinue() here - let user review the analysis first
-    // User will click "Continue" button when ready to proceed
   };
 
   const handleNewAnalysis = async () => {
@@ -449,318 +456,77 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
         };
       });
     }
-  }, [onDataReady, website, domainName, analysis, crawlResult, useAnalysisForGenAI, integrationData, connectedPlatforms]);
+  }, [onDataReady, website, domainName, analysis, crawlResult, useAnalysisForGenAI, integrationData, connectedPlatforms, email, emailDigestOptIn, userTimezone]);
 
   const hasWebsiteAnalysis = !!(website.trim() && analysis);
-
-  const statusBulb = (active: boolean) => ({
-    width: 10,
-    height: 10,
-    borderRadius: '50%',
-    bgcolor: active ? '#22c55e' : '#ef4444',
-    boxShadow: active
-      ? '0 0 6px rgba(34,197,94,0.6), 0 0 12px rgba(34,197,94,0.3)'
-      : '0 0 6px rgba(239,68,68,0.6), 0 0 12px rgba(239,68,68,0.3)',
-    transition: 'all 0.3s ease',
-    flexShrink: 0,
-  });
 
   return (
     <Box sx={{ 
       maxWidth: '100%',
       width: '100%',
       mx: 0,
-      p: { xs: 1.5, md: 2 },
+      px: { xs: 1.5, md: 2 },
+      pb: { xs: 1.5, md: 2 },
+      pt: { xs: 0.375, md: 0.625 },
       '@keyframes fadeIn': {
         '0%': { opacity: 0, transform: 'translateY(10px)' },
         '100%': { opacity: 1, transform: 'translateY(0)' }
       }
     }}>
+      {/* Header Title */}
+      <WebsiteStepHeader />
+
       {/* Tab Bar */}
-      <Box sx={{ display: 'flex', gap: 1.5, mb: 3 }}>
-        <Button
-          onClick={() => setActiveTab('website')}
-          sx={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1.5,
-            py: 1.5,
-            px: 2,
-            borderRadius: 2,
-            textTransform: 'none',
-            fontWeight: 700,
-            fontSize: '0.875rem',
-            bgcolor: activeTab === 'website' ? '#2563EB' : '#E2E8F0',
-            color: activeTab === 'website' ? '#FFFFFF' : '#475569',
-            '&:hover': {
-              bgcolor: activeTab === 'website' ? '#1D4ED8' : '#CBD5E1',
-            },
-            transition: 'all 0.2s ease',
-          }}
-        >
-          <Box sx={statusBulb(hasWebsiteAnalysis)} />
-          <AnalyticsIcon sx={{ fontSize: 18 }} />
-          Website Analysis
-        </Button>
-        <Button
-          onClick={() => setActiveTab('linkedin')}
-          sx={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1.5,
-            py: 1.5,
-            px: 2,
-            borderRadius: 2,
-            textTransform: 'none',
-            fontWeight: 700,
-            fontSize: '0.875rem',
-            bgcolor: activeTab === 'linkedin' ? '#0A66C2' : '#E2E8F0',
-            color: activeTab === 'linkedin' ? '#FFFFFF' : '#475569',
-            '&:hover': {
-              bgcolor: activeTab === 'linkedin' ? '#004182' : '#CBD5E1',
-            },
-            transition: 'all 0.2s ease',
-          }}
-        >
-          <Box sx={statusBulb(linkedinConnected)} />
-          <LinkedInIcon sx={{ fontSize: 18 }} />
-          LinkedIn
-        </Button>
-      </Box>
+      <OnboardingTabBar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        hasWebsiteAnalysis={hasWebsiteAnalysis}
+        linkedinConnected={linkedinConnected}
+        youtubeConnected={youtubeConnected}
+        backgroundTasks={backgroundTasks || null}
+        onViewResults={onViewBackgroundResults}
+      />
 
       {/* Website Tab Content */}
       {activeTab === 'website' && (
-        <>
-          {/* Input Card */}
-          <Paper elevation={0} sx={{
-            mb: 2,
-            p: 2.5,
-            borderRadius: 3,
-            border: '1px solid #CBD5E1',
-            bgcolor: '#EFF6FF',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(59, 130, 246, 0.05)',
-          }}>
-            <Box sx={{ position: 'relative' }}>
-              <TextField
-                label="Your website URL (e.g., www.example.com)"
-                value={website}
-                onChange={e => setWebsite(e.target.value)}
-                fullWidth
-                placeholder="Enter your URL to instantly capture your brand voice."
-                disabled={loading}
-                InputLabelProps={{ shrink: true }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    bgcolor: '#F8FAFC',
-                    pr: '136px',
-                    '& fieldset': { borderColor: '#E2E8F0' },
-                    '&:hover fieldset': { borderColor: '#3B82F6' },
-                    '&.Mui-focused fieldset': { borderColor: '#3B82F6', borderWidth: 2 },
-                  },
-                  '& .MuiInputLabel-root': {
-                    color: '#64748B',
-                    fontWeight: 500,
-                    '&.Mui-focused': { color: '#2563EB' },
-                  },
-                  '& .MuiInputBase-input': {
-                    color: '#1E293B',
-                  },
-                }}
-              />
-              <Button
-                variant="contained"
-                onClick={handleAnalyze}
-                disabled={!website || loading}
-                startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <AnalyticsIcon />}
-                  sx={{
-                    position: 'absolute',
-                    right: 6,
-                    top: 6,
-                    bottom: 6,
-                    borderRadius: '10px',
-                    textTransform: 'none',
-                    px: 2.5,
-                    py: 0,
-                    background: analysis
-                      ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
-                      : 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
-                    color: '#FFFFFF',
-                    fontWeight: 600,
-                    fontSize: '0.875rem',
-                    boxShadow: analysis
-                      ? '0 2px 8px rgba(245, 158, 11, 0.3)'
-                      : '0 2px 8px rgba(59, 130, 246, 0.3)',
-                    zIndex: 1,
-                    '&:hover': {
-                      background: analysis
-                        ? 'linear-gradient(135deg, #D97706 0%, #B45309 100%)'
-                        : 'linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)',
-                      boxShadow: analysis
-                        ? '0 4px 12px rgba(245, 158, 11, 0.4)'
-                        : '0 4px 12px rgba(59, 130, 246, 0.4)',
-                    },
-                    '&.Mui-disabled': {
-                      background: analysis
-                        ? 'rgba(245, 158, 11, 0.3)'
-                        : 'rgba(59, 130, 246, 0.3)',
-                      color: 'rgba(255,255,255,0.5)',
-                    },
-                  }}
-              >
-                {loading ? 'Analyzing...' : analysis ? 'Re-Analyze' : 'Analyze'}
-              </Button>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1.5, pt: 1.5, borderTop: '1px solid #CBD5E1' }}>
-              <Typography variant="caption" sx={{ color: '#2563EB', fontWeight: 600 }}>
-                Connect Website Platforms
-              </Typography>
-              <Button
-                disabled
-                size="small"
-                startIcon={<BusinessIcon />}
-                sx={{
-                  textTransform: 'none',
-                  fontSize: '0.75rem',
-                  color: '#94A3B8',
-                  fontWeight: 500,
-                  borderRadius: '8px',
-                }}
-              >
-                Business details — Coming soon
-              </Button>
-            </Box>
-          </Paper>
-
-          {error && (
-            <Alert 
-              severity="error" 
-              sx={{ mb: 3 }}
-              action={
-                <Button color="inherit" size="small" disabled>
-                  ENTER MANUALLY — COMING SOON
-                </Button>
-              }
-            >
-              {error}
-            </Alert>
-          )}
-
-          {success && (
-            <Alert severity="success" sx={{ mb: 3 }}>
-              {success}
-            </Alert>
-          )}
-
-          {analysis && (
-            <>
-              <Box sx={{ animation: 'fadeIn 0.8s ease-in', mb: 3 }}>
-                <AnalysisResultsDisplay
-                  analysis={analysis}
-                  crawlResult={crawlResult}
-                  domainName={domainName}
-                  useAnalysisForGenAI={useAnalysisForGenAI}
-                  onUseAnalysisChange={setUseAnalysisForGenAI}
-                  onAnalysisUpdate={handleAnalysisUpdate}
-                  warning={analysisWarning || undefined}
-                  onSave={() => saveAnalysis(analysis)}
-                />
-              </Box>
-              <Box id="smart-background-setup">
-                <BackgroundSetupCard websiteUrl={website} brandAnalysis={analysis.brand_analysis} seoAudit={analysis.seo_audit} />
-              </Box>
-            </>
-          )}
-
-          {website && analysis && (
-            <WebsiteIntegrationsSection
-              websiteUrl={website}
-              onIntegrationChange={handleIntegrationChange}
-              connectedPlatforms={connectedPlatforms}
-              setConnectedPlatforms={setConnectedPlatforms}
-            />
-          )}
-
-          {(connectedPlatforms.includes('gsc') || connectedPlatforms.includes('bing')) && (
-            <Box sx={{ mt: 3 }}>
-              <PlatformAnalytics
-                platforms={analyticsPlatforms}
-                showSummary
-                refreshInterval={0}
-                siteUrl={website}
-              />
-            </Box>
-          )}
-        </>
+        <WebsiteAnalysisTabContent
+          website={website}
+          setWebsite={setWebsite}
+          loading={loading}
+          error={error}
+          success={success}
+          analysis={analysis}
+          crawlResult={crawlResult}
+          domainName={domainName}
+          useAnalysisForGenAI={useAnalysisForGenAI}
+          setUseAnalysisForGenAI={setUseAnalysisForGenAI}
+          analysisWarning={analysisWarning}
+          handleAnalyze={handleAnalyze}
+          handleAnalysisUpdate={handleAnalysisUpdate}
+          saveAnalysis={saveAnalysis}
+          handleIntegrationChange={handleIntegrationChange}
+          connectedPlatforms={connectedPlatforms}
+          setConnectedPlatforms={setConnectedPlatforms}
+        />
       )}
 
       {/* LinkedIn Tab Content */}
       {activeTab === 'linkedin' && (
-        <Paper
-          elevation={0}
-          sx={{
-            p: 2.5,
-            borderRadius: 3,
-            border: '1px solid #CBD5E1',
-            bgcolor: '#EFF6FF',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-          }}
-        >
-          <PlatformSection
-            title="LinkedIn"
-            description="Connect your LinkedIn profile for professional content publishing."
-            platforms={[
-              {
-                id: 'linkedin',
-                name: 'LinkedIn',
-                description: 'Connect your LinkedIn profile for professional content publishing',
-                icon: <LinkedInIcon />,
-                category: 'social',
-                status: 'available',
-                features: ['Professional posting', 'Network insights', 'Content optimization'],
-                benefits: ['LinkedIn article publishing', 'Professional network analytics', 'B2B content insights'],
-                isEnabled: true,
-              },
-            ]}
-            filterPlatformIds={['linkedin']}
-            connectedPlatforms={connectedPlatforms}
-            gscSites={null}
-            isLoading={false}
-            onConnect={() => {}}
-            setConnectedPlatforms={setConnectedPlatforms}
-          />
-          {linkedinProfile && (
-            <Box sx={{ mt: 2, p: 2, bgcolor: '#FFFFFF', borderRadius: 2, border: '1px solid #E2E8F0' }}>
-              <Typography variant="subtitle2" sx={{ color: '#0A66C2', fontWeight: 600, mb: 1 }}>
-                LinkedIn Profile Analyzed
-              </Typography>
-              {linkedinProfile.headline && (
-                <Typography variant="body2" sx={{ color: '#334155', mb: 0.5 }}>
-                  {linkedinProfile.headline}
-                </Typography>
-              )}
-              {linkedinProfile.industry && (
-                <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mb: 0.5 }}>
-                  Industry: {linkedinProfile.industry}
-                </Typography>
-              )}
-              {linkedinProfile.skills?.length > 0 && (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                  {linkedinProfile.skills.map((skill: string) => (
-                    <Chip
-                      key={skill}
-                      label={skill}
-                      size="small"
-                      sx={{ bgcolor: '#EFF6FF', color: '#0A66C2', fontSize: '0.7rem', height: 22 }}
-                    />
-                  ))}
-                </Box>
-              )}
-            </Box>
-          )}
-        </Paper>
+        <LinkedInIntegrationTab
+          connectedPlatforms={connectedPlatforms}
+          setConnectedPlatforms={setConnectedPlatforms}
+          linkedinProfile={linkedinProfile}
+          setLinkedinProfile={setLinkedinProfile}
+        />
+      )}
+
+      {/* YouTube Tab Content */}
+      {activeTab === 'youtube' && (
+        <YouTubeIntegrationTab
+          youtubeConnected={youtubeConnected}
+          setConnectedPlatforms={setConnectedPlatforms}
+          connectedPlatforms={connectedPlatforms}
+        />
       )}
 
       {/* Analysis Progress Modal */}
@@ -784,72 +550,13 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
       </Dialog>
 
       {/* Confirmation Dialog for Existing Analysis */}
-      <Dialog
+      <ExistingAnalysisDialog
         open={showConfirmationDialog}
         onClose={() => setShowConfirmationDialog(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            bgcolor: '#EFF6FF',
-            border: '1px solid #CBD5E1',
-          }
-        }}
-      >
-        <DialogTitle>
-          <Box display="flex" alignItems="center" gap={1}>
-            <HistoryIcon sx={{ color: '#2563EB' }} />
-            <Typography sx={{ color: '#1E293B', fontWeight: 600 }}>Previous Analysis Found</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ color: '#475569' }}>
-            We found a previous analysis for this website from{' '}
-            {existingAnalysis?.analysis_date ? 
-              new Date(existingAnalysis.analysis_date).toLocaleDateString() : 
-              'a previous session'
-            }.
-          </DialogContentText>
-          <DialogContentText sx={{ mt: 2, color: '#475569' }}>
-            Would you like to load the previous analysis or perform a new one?
-          </DialogContentText>
-          {existingAnalysis?.summary && (
-            <Box sx={{ mt: 2, p: 2, bgcolor: '#EFF6FF', borderRadius: 1, border: '1px solid #BFDBFE' }}>
-              <Typography variant="subtitle2" gutterBottom sx={{ color: '#1E40AF' }}>
-                Previous Analysis Summary:
-              </Typography>
-              {existingAnalysis.summary.writing_style?.tone && (
-                <Typography variant="body2" sx={{ color: '#1E293B' }}>
-                  Tone: {existingAnalysis.summary.writing_style.tone}
-                </Typography>
-              )}
-              {existingAnalysis.summary.target_audience?.expertise_level && (
-                <Typography variant="body2" sx={{ color: '#1E293B' }}>
-                  Target Audience: {existingAnalysis.summary.target_audience.expertise_level}
-                </Typography>
-              )}
-              {existingAnalysis.summary.content_type?.primary_type && (
-                <Typography variant="body2" sx={{ color: '#1E293B' }}>
-                  Content Type: {existingAnalysis.summary.content_type.primary_type}
-                </Typography>
-              )}
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowConfirmationDialog(false)} sx={{ color: '#64748B' }}>
-            Cancel
-          </Button>
-          <Button onClick={handleLoadExistingConfirm} variant="outlined" startIcon={<HistoryIcon />}
-            sx={{ borderColor: '#BFDBFE', color: '#2563EB', '&:hover': { borderColor: '#3B82F6', backgroundColor: '#EFF6FF' } }}>
-            Load Previous
-          </Button>
-          <Button onClick={handleNewAnalysis} variant="contained" startIcon={<AnalyticsIcon />}
-            sx={{ background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)', boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)', '&:hover': { background: 'linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%)', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.4)' } }}>
-            New Analysis
-          </Button>
-        </DialogActions>
-      </Dialog>
+        existingAnalysis={existingAnalysis}
+        handleLoadExistingConfirm={handleLoadExistingConfirm}
+        handleNewAnalysis={handleNewAnalysis}
+      />
     </Box>
   );
 };
