@@ -13,6 +13,7 @@ import {
 import { usePlatformConnections } from '../../../components/OnboardingWizard/common/usePlatformConnections';
 import { getWixTrustedOrigins } from '../../../config/wixConfig';
 import { markConnectionHandled, isAlreadyHandled } from '../../../utils/wixConnectionDedup';
+import { OAuthEventTypes } from '../../../utils/oauthEventTypes';
 
 interface WixConnectModalProps {
   isOpen: boolean;
@@ -38,7 +39,7 @@ export const WixConnectModal: React.FC<WixConnectModalProps> = ({
       if (!trusted.includes(event.origin)) return;
       if (!event.data || typeof event.data !== 'object') return;
 
-      if (event.data.type === 'WIX_OAUTH_SUCCESS') {
+      if (event.data.type === OAuthEventTypes.WIX.SUCCESS) {
         if (isAlreadyHandled()) return;
         markConnectionHandled();
         console.log('Wix OAuth success in modal');

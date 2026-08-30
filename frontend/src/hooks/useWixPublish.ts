@@ -3,6 +3,7 @@ import { apiClient } from '../api/client';
 import { BlogSEOMetadataResponse } from '../services/blogWriterApi';
 import { storeEncrypted, readEncrypted, storeEncryptedSync } from '../utils/wixTokenStorage';
 import { markConnectionHandled, isAlreadyHandled } from '../utils/wixConnectionDedup';
+import { OAuthEventTypes } from '../utils/oauthEventTypes';
 
 export interface WixStatus {
   connected: boolean;
@@ -154,7 +155,7 @@ export function useWixPublish() {
 
     const msgHandler = (e: MessageEvent) => {
       if (isAlreadyHandled()) return;
-      if (e.data?.type === 'WIX_OAUTH_SUCCESS' && e.data?.success) {
+      if (e.data?.type === OAuthEventTypes.WIX.SUCCESS && e.data?.success) {
         markConnectionHandled();
         if (e.data.access_token) storeEncryptedSync(WIX_TOKEN_KEY, e.data.access_token);
         localStorage.setItem(WIX_CONNECTED_KEY, 'true');

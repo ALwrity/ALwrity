@@ -73,6 +73,26 @@ from services.intelligence.agents.prompt_context import (
 
 logger = get_service_logger(__name__)
 
+# The UI and scheduler only support these deterministic modes. Legacy or
+# LLM-written values (e.g. "recurring", "cron") must be coerced so the
+# frontend Select and schedule evaluation never receive out-of-range input.
+_VALID_SCHEDULE_MODES = {"on_demand", "weekly", "daily"}
+
+
+def _sanitize_schedule(schedule: Any) -> Any:
+    """Coerce a schedule value to the supported {on_demand, weekly, daily} set."""
+    if schedule is None:
+        return None
+    if isinstance(schedule, str):
+        mode = str(schedule).strip().lower()
+        return {"mode": mode if mode in _VALID_SCHEDULE_MODES else "on_demand"}
+    if isinstance(schedule, dict):
+        out = dict(schedule)
+        mode = str(out.get("mode") or "on_demand").strip().lower()
+        out["mode"] = mode if mode in _VALID_SCHEDULE_MODES else "on_demand"
+        return out
+    return schedule
+
 router = APIRouter(prefix="/api/agents", tags=["Autonomous Agents"])
 
 
@@ -284,7 +304,7 @@ async def get_agent_team_endpoint(
                     "profile": {
                         "display_name": (profile.display_name if profile and profile.display_name else None),
                         "enabled": (bool(profile.enabled) if profile else bool(defaults.get("enabled", True))),
-                        "schedule": (profile.schedule if profile and profile.schedule is not None else defaults.get("schedule")),
+                        "schedule": _sanitize_schedule(profile.schedule if profile and profile.schedule is not None else defaults.get("schedule")),
                         "notification_prefs": (profile.notification_prefs if profile and profile.notification_prefs is not None else None),
                         "tone": (profile.tone if profile and profile.tone is not None else None),
                         "system_prompt": (profile.system_prompt if profile and profile.system_prompt is not None else None),
@@ -407,6 +427,8 @@ async def upsert_agent_profile_endpoint(
         schedule = payload.get("schedule")
         if "schedule" in payload and schedule is not None and not isinstance(schedule, dict):
             raise HTTPException(status_code=400, detail="schedule must be an object")
+        if "schedule" in payload and schedule is not None:
+            payload["schedule"] = _sanitize_schedule(schedule)
 
         profile = (
             db.query(AgentProfile)
@@ -578,6 +600,11 @@ Non-negotiables:
 - You may edit: display name, schedule, tone, system_prompt, task_prompt_template, notification_prefs, reporting_prefs.
 - Do not include secrets. Do not ask for API keys. Do not suggest unsafe or spammy behavior.
 - Prefer deterministic schedules and crisp outputs. Keep prompts concise and structured.
+- The ONLY valid schedule modes are 'on_demand', 'weekly', and 'daily'.
+  - 'on_demand' has no other fields.
+  - 'weekly' has 'days' (an array like ['mon','wed']) and an optional 'time' (HH:MM).
+  - 'daily' has an optional 'time' (HH:MM).
+  Do not invent any other mode. If you have no strong reason to change the mode, keep it.
 
 Scope: {scope}
 
@@ -606,6 +633,10 @@ Return ONLY a JSON object that matches the schema.
 """
 
         result = llm_text_gen(prompt=prompt, json_struct=json_schema, user_id=user_id)
+
+        # Defensive: even a constrained LLM can emit a non-standard mode.
+        if isinstance(result, dict) and result.get("schedule") is not None:
+            result["schedule"] = _sanitize_schedule(result["schedule"])
 
         return {
             "success": True,
