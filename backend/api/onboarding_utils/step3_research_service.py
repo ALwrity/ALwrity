@@ -21,6 +21,7 @@ import asyncio
 import traceback
 from loguru import logger
 from services.research.exa_service import ExaService
+from services.intelligence.pillar_context import extract_content_pillar_topics
 from services.database import get_db_session
 from models.onboarding import OnboardingSession
 from sqlalchemy.orm import Session
@@ -86,6 +87,12 @@ class Step3ResearchService:
             payload = dict(raw)
             payload.setdefault("status", "complete")
             payload.setdefault("timestamp", envelope.get("timestamp"))
+            # Additive normalization for agent-facing consumers: a flat,
+            # deduped list of pillar topics alongside the raw envelope the
+            # frontend still renders.
+            topics = extract_content_pillar_topics(raw)
+            if topics:
+                payload.setdefault("pillar_topics", topics)
             return payload
         return {
             "status": "failed",

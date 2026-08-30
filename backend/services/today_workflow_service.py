@@ -681,7 +681,16 @@ async def generate_agent_enhanced_plan(
 
         # Log committee meeting event for frontend transparency
         try:
-            accepted_ids = {f"{p.pillar_id}:{p.title}" for p in agent_tasks}
+            # Handle both dicts and objects for backward compatibility
+            accepted_ids = set()
+            for p in agent_tasks:
+                if isinstance(p, dict):
+                    pid = p.get("pillar_id") or p.get("pillar", "")
+                    title = p.get("title", "")
+                else:
+                    pid = p.pillar_id
+                    title = p.title
+                accepted_ids.add(f"{pid}:{title}")
             proposals_log = []
             for index, p in enumerate(raw_proposals):
                 valid = p.pillar_id in PILLAR_IDS

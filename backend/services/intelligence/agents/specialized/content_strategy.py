@@ -545,20 +545,33 @@ class ContentStrategyAgent(BaseALwrityAgent):
         content_pillars = []
         competitor_domains = []
         try:
-            cp = onboarding.get("core_persona") or {}
-            if isinstance(cp, dict):
-                industry = str(cp.get("industry") or cp.get("company_type") or "")
-            step2 = onboarding.get("step2_summary") or onboarding.get("industry_context") or {}
-            if isinstance(step2, dict):
-                content_pillars = (
-                    step2.get("content_pillars")
-                    or step2.get("topics")
-                    or onboarding.get("content_pillars")
-                    or []
-                )
-            cf = onboarding.get("competitor_focus") or {}
-            if isinstance(cf, dict):
-                competitor_domains = cf.get("top_competitor_domains") or []
+            # P4.1: Read from integrated data keys
+            # Industry from website_analysis or research_preferences
+            website_analysis = onboarding.get("website_analysis") or {}
+            research_prefs = onboarding.get("research_preferences") or {}
+            target = research_prefs.get("target_audience") or website_analysis.get("target_audience") or {}
+            if isinstance(target, dict):
+                industry = str(target.get("industry_focus") or target.get("industry") or "")
+
+            # Content pillars from multiple sources
+            style_analysis = website_analysis.get("style_analysis") or {}
+            strategy_insights = style_analysis.get("content_strategy_insights") or {}
+            sitemap_analysis = style_analysis.get("sitemap_analysis") or {}
+            content_pillars = (
+                strategy_insights.get("content_pillars")
+                or sitemap_analysis.get("content_pillars")
+                or research_prefs.get("content_pillars")
+                or []
+            )
+
+            # Competitor domains from competitor_analysis
+            competitor_analysis = onboarding.get("competitor_analysis") or []
+            if isinstance(competitor_analysis, list):
+                competitor_domains = [
+                    c.get("domain") or c.get("url") or c.get("website")
+                    for c in competitor_analysis[:10]
+                    if isinstance(c, dict) and c.get("domain")
+                ]
         except Exception:
             pass
 

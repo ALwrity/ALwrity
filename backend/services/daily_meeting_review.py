@@ -60,6 +60,7 @@ def normalize_proposal(proposal: Any, agent_key: Optional[str] = None) -> Dict[s
         "title": identity["title"],
         "description": identity["description"],
         "pillar": identity["pillar"],
+        "pillar_id": identity["pillar"],  # Alias for backward compatibility with code expecting .pillar_id
         "evidence": _evidence(_get(proposal, "evidence", None)),
         "reasoning": _text(_get(proposal, "reasoning", "")),
         "priority": _text(_get(proposal, "priority", "medium")).lower() or "medium",
@@ -70,9 +71,8 @@ def normalize_proposal(proposal: Any, agent_key: Optional[str] = None) -> Dict[s
         "action_type": _text(_get(proposal, "action_type", "navigate")) or "navigate",
         "action_parameters": action_parameters,
         "confidence": _confidence(proposal),
-        # How the proposal text was produced ("llm", "data_derived",
-        # "template_fallback"); None when the source object predates or
-        # omits the field, so downstream consumers never guess.
+        "source_agent": agent,  # Alias for backward compatibility
+        "estimated_time": _get(proposal, "estimated_time", 15) or 15,  # Include for downstream
         "synthesis_mode": _text(_get(proposal, "synthesis_mode", "")) or None,
     }
 
@@ -217,7 +217,7 @@ async def review_proposals(
     summary = {status: sum(1 for item in decisions if item["status"] == status) for status in REVIEW_STATUSES}
     return {
         "normalized_proposals": decisions,
-        "accepted_proposals": [proposals[index] for index, item in enumerate(decisions) if item["status"] == "accepted"],
+        "accepted_proposals": [decisions[index] for index, item in enumerate(decisions) if item["status"] == "accepted"],
         "summary": summary,
     }
 

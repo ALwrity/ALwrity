@@ -195,9 +195,11 @@ const clearBackendCooldown = () => {
 
 const buildCooldownError = () => {
   const secondsRemaining = Math.max(1, Math.ceil((backendUnavailableUntil - Date.now()) / 1000));
-  return new Error(
+  const err = new Error(
     `Backend is temporarily unavailable. Retrying in ${secondsRemaining}s to avoid request storms.`
-  );
+  ) as Error & { isBackendCooldownSkip?: boolean };
+  err.isBackendCooldownSkip = true;
+  return err;
 };
 
 const isApplicationLevel502 = (error: { response?: { status?: number; data?: unknown } }): boolean => {
@@ -365,8 +367,13 @@ export class RequestTimeoutError extends NetworkError {
 const isAxiosTimeout = (error: { code?: string; message?: string }): boolean =>
   error.code === 'ECONNABORTED' || /timeout/i.test(error.message ?? '');
 
-const rejectNoResponseError = (error: { code?: string; message?: string }) => {
-  openBackendCooldown(error?.message || 'network_error');
+const rejectNoResponseError = (error: { code?: string; message?: string; isBackendCooldownSkip?: boolean }) => {
+  // A rejection caused by the request interceptor's own cooldown guard must
+  // not re-open/extend the cooldown — otherwise every skipped request during
+  // an outage escalates the backoff and floods the console with warnings.
+  if (!error?.isBackendCooldownSkip) {
+    openBackendCooldown(error?.message || 'network_error');
+  }
   if (isAxiosTimeout(error)) {
     return Promise.reject(
       new RequestTimeoutError(
@@ -645,7 +652,9 @@ aiApiClient.interceptors.response.use(
 // Add interceptors for long-running client
 longRunningApiClient.interceptors.request.use(
   async (config) => {
-    console.log(`Making long-running ${config.method?.toUpperCase()} request to ${config.url}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Making long-running ${config.method?.toUpperCase()} request to ${config.url}`);
+    }
 
     if (isBackendTemporarilyUnavailable()) {
       return Promise.reject(buildCooldownError());
@@ -751,7 +760,9 @@ longRunningApiClient.interceptors.response.use(
 // Add interceptors for polling client
 pollingApiClient.interceptors.request.use(
   async (config) => {
-    console.log(`Making polling ${config.method?.toUpperCase()} request to ${config.url}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Making polling ${config.method?.toUpperCase()} request to ${config.url}`);
+    }
 
     if (isBackendTemporarilyUnavailable()) {
       return Promise.reject(buildCooldownError());

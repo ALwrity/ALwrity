@@ -162,6 +162,47 @@ class TestPillarsPayload:
         assert "status" not in raw
         assert payload["status"] == "complete"
 
+    def test_success_payload_gains_pillar_topics(self):
+        env = {
+            "success": True,
+            "error": None,
+            "content_pillars": {
+                "target_company": {
+                    "domain": "acme.com",
+                    "content_pillars": ["AI tooling", "Developer productivity"],
+                },
+                "competitors": [
+                    {
+                        "website": "https://rival.io",
+                        "company_name": "Rival",
+                        "content_pillars": ["AI tooling", "API guides"],
+                    }
+                ],
+            },
+            "timestamp": "t",
+        }
+        payload = self._svc()._pillars_payload(env)
+
+        # Additive normalization: flat, deduped topic list for agent consumers.
+        assert payload["pillar_topics"] == ["AI tooling", "Developer productivity", "API guides"]
+        # Frontend contract keys are preserved untouched.
+        assert payload["target_company"]["content_pillars"] == [
+            "AI tooling",
+            "Developer productivity",
+        ]
+        assert payload["competitors"][0]["company_name"] == "Rival"
+        assert payload["status"] == "complete"
+
+    def test_flat_pillars_payload_gains_pillar_topics(self):
+        env = {
+            "success": True,
+            "error": None,
+            "content_pillars": {"pillars": ["A", "B", "A"]},
+            "timestamp": "t",
+        }
+        payload = self._svc()._pillars_payload(env)
+        assert payload["pillar_topics"] == ["A", "B"]
+
     def test_failure_payload_is_retryable(self):
         env = {
             "success": False,

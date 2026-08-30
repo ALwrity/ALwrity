@@ -651,7 +651,7 @@ async def preview_agent_profile_endpoint(
         integrated = OnboardingDataIntegrationService().get_integrated_data_sync(user_id, db) or {}
         full_context = {**context_card}
         for key, value in build_prompt_context(integrated).items():
-            if value:
+            if value and key not in full_context:
                 full_context[key] = value
         selected_context = select_agent_context(agent_key, full_context)
 
