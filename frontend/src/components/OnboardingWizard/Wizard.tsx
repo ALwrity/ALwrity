@@ -8,7 +8,7 @@ import {
   useMediaQuery
 } from '@mui/material';
 import { getCurrentStep, setCurrentStep } from '../../api/onboarding';
-import { apiClient, longRunningApiClient, isBackendCooldownActive, logBackendCooldownSkipOnce } from '../../api/client';
+import { apiClient } from '../../api/client';
 import { useOnboarding } from '../../contexts/OnboardingContext';
 import { useUser } from '@clerk/clerk-react';
 import WebsiteStep from './WebsiteStep';
@@ -23,6 +23,7 @@ import { WizardRetryBar } from './common/WizardRetryBar';
 import { WizardNavigation } from './common/WizardNavigation';
 import { WizardLoadingState } from './common/WizardLoadingState';
 import SystemStatusChip from './common/SystemStatusChip';
+import { useOnboardingTasksStatus } from '../../hooks/useOnboardingTasksStatus';
 import {
   getOnboardingProgressState,
   progressPercentAfterStepComplete,
@@ -106,21 +107,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     description: websiteSteps[0].description
   });
   const [validationMessage, setValidationMessage] = useState<string>('');
-  const [backgroundTasks, setBackgroundTasks] = useState<{
-    tasks: Record<string, {
-      status: string;
-      started_at: string | null;
-      progress_pct: number;
-      failure_reason?: string | null;
-      recurring?: boolean;
-      last_success?: string | null;
-      next_execution?: string | null;
-    }>;
-    total: number;
-    completed_count: number;
-    failed_count: number;
-    all_done: boolean;
-  } | null>(null);
+  const { data: backgroundTasks } = useOnboardingTasksStatus();
   // Default onboarding type from enabled features when no session exists yet.
   const defaultOnboardingType = useMemo(() => {
     const enabled = new Set(
@@ -154,39 +141,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       } catch (_e) {}
     }
   }, [activeStep, furthestAccessibleStep]);
-
-  useEffect(() => {
-    let cancelled = false;
-    let interval: ReturnType<typeof setInterval> | undefined;
-    const fetchTasks = async () => {
-      if (cancelled) return;
-      // Skip when the backend is in its cooling-down period.
-      if (isBackendCooldownActive()) {
-        logBackendCooldownSkipOnce('Wizard');
-        return;
-      }
-      try {
-        const res = await longRunningApiClient.get('/api/onboarding/tasks/status');
-        if (cancelled) return;
-        if (res.data.tasks) {
-          setBackgroundTasks(res.data);
-          if (res.data.all_done && interval) {
-            clearInterval(interval);
-            interval = undefined;
-          }
-        }
-      } catch {
-        // Non-critical — wizard continues regardless
-      }
-    };
-    fetchTasks();
-    // Faster polling (30s) for active background tasks (including step 0 tab-bar chip)
-    interval = setInterval(fetchTasks, 30000);
-    return () => {
-      cancelled = true;
-      if (interval) clearInterval(interval);
-    };
-  }, [activeStep]);
 
   // Step validation function
   const isStepDataValid = useCallback((step: number, data: any): boolean => {

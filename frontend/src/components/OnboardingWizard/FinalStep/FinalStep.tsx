@@ -6,11 +6,19 @@ import {
   Alert, 
   Fade,
   Zoom,
-  CircularProgress
+  CircularProgress,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  LinearProgress,
+  List,
+  ListItem,
+  ListItemIcon
 } from '@mui/material';
 import Rocket from '@mui/icons-material/Rocket';
 import Star from '@mui/icons-material/Star';
 import CheckCircle from '@mui/icons-material/CheckCircle';
+import CircleOutlined from '@mui/icons-material/CircleOutlined';
 // import OnboardingButton from '../common/OnboardingButton';
 import { useNavigate } from 'react-router-dom';
 import { completeOnboarding, getOnboardingSummary, getWebsiteAnalysisData, getResearchPreferencesData, setCurrentStep } from '../../../api/onboarding';
@@ -22,10 +30,28 @@ import { getAgentTeam, type AgentTeamCatalogEntry, type AgentTeamContextSummary,
 import { onboardingCache } from '../../../services/onboardingCache';
 import { apiClient } from '../../../api/client';
 
+type ConfigCheckStatus = 'pending' | 'running' | 'done';
+
+interface ConfigCheck {
+  label: string;
+  status: ConfigCheckStatus;
+}
+
+const CONFIG_CHECK_STEPS = [
+  { label: 'Loading onboarding summary' },
+  { label: 'Loading website analysis' },
+  { label: 'Loading research preferences & persona' },
+  { label: 'Building agent team' },
+  { label: 'Validating configuration & capabilities' },
+];
+
 const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, onboardingType }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
+  const [configChecks, setConfigChecks] = useState<ConfigCheck[]>(() =>
+    CONFIG_CHECK_STEPS.map((step) => ({ ...step, status: 'pending' as const }))
+  );
   const [error, setError] = useState<string | null>(null);
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({
   });
@@ -42,6 +68,13 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
   // const buttonRef = useRef<HTMLButtonElement>(null);
 
   const isLinkedIn = onboardingType === 'linkedin';
+
+  const markConfigCheck = (index: number, status: ConfigCheckStatus) => {
+    setConfigChecks((prev) => prev.map((check, i) => (i === index ? { ...check, status } : check)));
+  };
+
+  const configChecksDone = configChecks.filter((check) => check.status === 'done').length;
+  const runningConfigLabel = configChecks.find((check) => check.status === 'running')?.label ?? null;
 
   const persistEmailPreference = async (payload: Record<string, unknown>) => {
     try {
@@ -109,20 +142,22 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
     }
     
     setDataLoading(true);
-    
-    // Set a timeout to prevent infinite loading
-    const loadingTimeout = setTimeout(() => {
-      console.log('FinalStep: Data loading timeout reached, proceeding with available data');
-      setDataLoading(false);
-    }, 4000); // 4s timeout
-    
+    setConfigChecks((prev) => prev.map((check) => ({ ...check, status: 'pending' as const })));
+
     try {
       // Load comprehensive onboarding summary
+      markConfigCheck(0, 'running');
       const summary = await getOnboardingSummary();
-      
+      markConfigCheck(0, 'done');
+      markConfigCheck(1, 'running');
+
       // Load individual data sources for detailed information
       const websiteAnalysis = await getWebsiteAnalysisData();
+      markConfigCheck(1, 'done');
+      markConfigCheck(2, 'running');
       const researchPreferences = await getResearchPreferencesData();
+      markConfigCheck(2, 'done');
+      markConfigCheck(3, 'running');
       try {
         const { agents, contextSummary, certification } = await getAgentTeam();
         setAgentTeam(agents || []);
@@ -136,6 +171,8 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
         setAgentCertification(null);
         setAgentTeamError(e?.message || 'Failed to load agent team configuration');
       }
+      markConfigCheck(3, 'done');
+      markConfigCheck(4, 'running');
       // Frontend fallbacks to Step 2 cached data (ensures non-breaking UI)
       const cachedUrl = typeof window !== 'undefined' ? localStorage.getItem('website_url') : null;
       const cachedAnalysisRaw = typeof window !== 'undefined' ? localStorage.getItem('website_analysis_data') : null;
@@ -156,12 +193,12 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
       console.log('FinalStep: Data loaded, running validation...');
       const validation = await validateOnboardingCompletionWithData(newOnboardingData);
       setValidationStatus(validation);
+      markConfigCheck(4, 'done');
     } catch (error) {
       console.error('Error loading onboarding data:', error);
       setError('Could not load all onboarding data. Some features may be limited.');
     } finally {
       setDataLoading(false);
-      clearTimeout(loadingTimeout);
     }
   };
 
@@ -489,20 +526,63 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
   return (
     <Fade in={true} timeout={500}>
       <Box sx={{ width: '100%', py: { xs: 1.5, md: 2 }, px: 0 }}>
-        {/* Loading State */}
-        {dataLoading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
-            <Box sx={{ textAlign: 'center' }}>
-              <CircularProgress size={60} sx={{ mb: 2 }} />
-              <Typography variant="h6" sx={{ mb: 1 }}>
-                Loading your configuration...
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Retrieving your onboarding data and settings
-              </Typography>
-            </Box>
-          </Box>
-        )}
+        {/* Configuration & Capabilities check progress modal */}
+        <Dialog
+          open={dataLoading}
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              maxWidth: 480,
+              width: '100%',
+              mx: 2,
+              bgcolor: '#ffffff',
+              color: '#0f172a',
+            },
+          }}
+        >
+          <DialogTitle component="div" sx={{ pb: 1.5 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              Checking Configuration & Capabilities
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 0.5, color: '#64748b' }}>
+              {runningConfigLabel ? `${runningConfigLabel}...` : 'Preparing your workspace...'}
+            </Typography>
+          </DialogTitle>
+          <DialogContent dividers sx={{ borderTopColor: '#e2e8f0', borderBottomColor: '#e2e8f0' }}>
+            <List dense disablePadding>
+              {configChecks.map((check) => (
+                <ListItem key={check.label} disableGutters sx={{ px: 0, py: 0.75 }}>
+                  <ListItemIcon sx={{ minWidth: 36 }}>
+                    {check.status === 'done' ? (
+                      <CheckCircle color="success" fontSize="small" />
+                    ) : check.status === 'running' ? (
+                      <CircularProgress size={18} thickness={5} />
+                    ) : (
+                      <CircleOutlined sx={{ color: '#94a3b8' }} fontSize="small" />
+                    )}
+                  </ListItemIcon>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: check.status === 'running' ? '#0f172a' : check.status === 'done' ? '#16a34a' : '#64748b',
+                      fontWeight: check.status === 'running' ? 600 : 400,
+                    }}
+                  >
+                    {check.label}
+                  </Typography>
+                </ListItem>
+              ))}
+            </List>
+            <LinearProgress
+              variant="determinate"
+              value={(configChecksDone / configChecks.length) * 100}
+              sx={{ mt: 2, height: 7, borderRadius: 4, bgcolor: '#e2e8f0' }}
+            />
+            <Typography variant="caption" sx={{ display: 'block', mt: 1, textAlign: 'center', color: '#64748b' }}>
+              {configChecksDone} of {configChecks.length} checks complete
+            </Typography>
+          </DialogContent>
+        </Dialog>
 
         {/* Content - Only show when data is loaded */}
         {!dataLoading && (

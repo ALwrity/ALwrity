@@ -1,7 +1,54 @@
 // Make sure to install axios: npm install axios
 import { AxiosResponse } from 'axios';
-import { apiClient } from './client';
+import { apiClient, longRunningApiClient } from './client';
 import type { WorkflowOptimizationSignals, WorkflowOutcomes } from '../types/workflow';
+
+export type OnboardingTaskStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface OnboardingSifIndexingDetails {
+  phase?: string;
+  pages_harvested?: number;
+  pages_total?: number;
+  sitemap_total?: number;
+  harvest_source?: string;
+  pages_indexed?: number;
+  pillars_found?: number;
+  indexed_pages?: Array<{ url: string; title?: string }>;
+  log_messages?: string[];
+  metadata_synced?: number;
+  content_synced?: number;
+  pages_analyzed?: number;
+  content_gaps?: number;
+}
+
+export interface OnboardingTaskStatusEntry {
+  status: OnboardingTaskStatus;
+  started_at: string | null;
+  progress_pct: number;
+  details: OnboardingSifIndexingDetails | null;
+  last_success?: string | null;
+  failure_reason?: string | null;
+  recurring?: boolean;
+  next_execution?: string | null;
+  index_freshness_hours?: number | null;
+  index_stale?: boolean | null;
+}
+
+export interface OnboardingTasksStatusResponse {
+  tasks: Record<string, OnboardingTaskStatusEntry>;
+  total: number;
+  completed_count: number;
+  failed_count: number;
+  all_done: boolean;
+}
+
+export async function fetchOnboardingTasksStatus(): Promise<OnboardingTasksStatusResponse> {
+  const res: AxiosResponse<OnboardingTasksStatusResponse> = await longRunningApiClient.get('/api/onboarding/tasks/status');
+  if (!res.data?.tasks) {
+    throw new Error('Onboarding tasks status unavailable');
+  }
+  return res.data;
+}
 
 export interface OnboardingStepResponse {
   step: number;
