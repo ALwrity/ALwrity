@@ -449,7 +449,7 @@ class SpeechGenerator:
                 url,
                 headers=self._get_headers(),
                 json=payload,
-                timeout=(30, 90),
+                timeout=(30, 180),
             )
         except requests_exceptions.Timeout as e:
             raise HTTPException(status_code=504, detail={"error": "WaveSpeed Qwen3 voice clone timed out", "message": str(e)})
@@ -515,7 +515,7 @@ class SpeechGenerator:
                 url,
                 headers=self._get_headers(),
                 json=payload,
-                timeout=(30, 90),
+                timeout=(30, 180),
             )
         except requests_exceptions.Timeout as e:
             raise HTTPException(status_code=504, detail={"error": "WaveSpeed CosyVoice voice clone timed out", "message": str(e)})

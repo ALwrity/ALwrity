@@ -18,7 +18,7 @@ DEFAULT_SUBSCRIPTION_PLANS = [
         "video_calls_limit": 2,
         "image_edit_calls_limit": 5,
         "audio_calls_limit": 10,
-        "wavespeed_calls_limit": 0,
+        "wavespeed_calls_limit": 25,
         "gemini_tokens_limit": 50000,
         "openai_tokens_limit": 0,
         "anthropic_tokens_limit": 0,

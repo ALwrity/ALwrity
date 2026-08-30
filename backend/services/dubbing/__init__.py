@@ -533,9 +533,10 @@ class AudioDubbingService:
         else:
             translation_cost = estimated_chars * 0.0001
         
-        tts_cost = estimated_chars * 0.001
+        from services.subscription import get_audio_tts_cost, get_voice_clone_cost
         
-        voice_clone_cost = 0.05 if use_voice_clone else 0.0
+        tts_cost = get_audio_tts_cost("minimax/speech-02-hd", text_length=estimated_chars, default_per_char=0.00005)
+        voice_clone_cost = get_voice_clone_cost("wavespeed-ai/qwen3-tts/voice-clone", char_count=estimated_chars, default_per_request=0.005) if use_voice_clone else 0.0
         
         return {
             "estimated_characters": estimated_chars,

@@ -8,10 +8,12 @@ from fastapi import HTTPException
 from loguru import logger
 
 from .client import WaveSpeedClient
+from services.subscription import get_video_model_cost
 
 INFINITALK_MODEL_PATH = "wavespeed-ai/infinitetalk"
 INFINITALK_MODEL_NAME = "wavespeed-ai/infinitetalk"
-INFINITALK_DEFAULT_COST = 0.30  # $0.30 per 5 seconds at 720p tier
+MAX_DURATION_SECONDS = 600  # 10 minutes maximum duration supported by WaveSpeed per single API request
+MIN_DURATION_SECONDS = 3    # Minimum billable duration (seconds)
 MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10MB
 MAX_AUDIO_BYTES = 50 * 1024 * 1024  # 50MB safety cap
 
@@ -102,22 +104,49 @@ def _generate_simple_infinitetalk_prompt(
     if narration and len(parts) < 4:
         parts.append(f"Discussing: {narration}")
     
-    if not parts:
-        return None
+    # Inject scene emotion and visual atmosphere — prioritize this high-value scene cue
+    emotion = (scene_data.get("emotion") or "").strip().lower()
+    visual_atmosphere = (scene_data.get("visual_atmosphere") or "").strip()
+
+    mood_phrase = ""
+    if emotion and visual_atmosphere:
+        mood_phrase = f"Speaker appears {emotion}, {visual_atmosphere}"
+    elif emotion:
+        mood_phrase = f"Speaker appears {emotion}"
+    elif visual_atmosphere:
+        mood_phrase = visual_atmosphere
+
+    # Build prompt: [title] -> [mood_phrase] -> [essential context] -> [quality suffix]
+    quality_suffix = "Cinematic lighting, high detail, smooth motion. With subtle natural movement."
     
-    # Build prompt with visual quality keywords
-    quality_keywords = "Cinematic lighting, high detail, 4k quality, smooth motion"
+    # Core components guaranteed to be included
+    core_parts = []
+    if title and len(title) > 5 and title.lower() not in ("scene", "podcast", "episode"):
+        core_parts.append(title)
+    if mood_phrase:
+        core_parts.append(mood_phrase)
     
-    # Combine parts into final prompt
-    prompt = f"{'. '.join(parts)}. {quality_keywords}. With subtle natural movement."
+    # Secondary context parts (analysis, bible, narration) - added only if budget permits
+    secondary_parts = [p for p in parts if p != title]
     
-    # Allow more room for detailed prompts - max 350 characters
-    prompt = prompt[:350].strip()
-    
+    # Assemble within the 350 character cap
+    assembled_parts = list(core_parts)
+    # Calculate available budget for secondary context
+    base_len = sum(len(p) + 2 for p in core_parts) + len(quality_suffix) + 2
+    budget = 350 - base_len
+
+    for sec in secondary_parts:
+        if len(sec) + 2 <= budget:
+            assembled_parts.append(sec)
+            budget -= (len(sec) + 2)
+
+    assembled_parts.append(quality_suffix)
+    prompt = ". ".join(assembled_parts).strip()
+
     # Clean up trailing punctuation
-    if prompt.endswith(',') or prompt.endswith('.'):
+    if prompt.endswith(","):
         prompt = prompt[:-1].strip()
-    
+
     return prompt if len(prompt) >= 15 else None
 
 
@@ -207,21 +236,31 @@ def animate_scene_with_voiceover(
 
     metadata = result.get("metadata") or {}
     duration = metadata.get("duration_seconds") or metadata.get("duration") or 0
+    actual_duration = float(duration) if duration else 5.0
+
+    cost = get_video_model_cost(
+        INFINITALK_MODEL_NAME,
+        duration_sec=actual_duration,
+        resolution=resolution,
+        default=0.30 if resolution == "720p" else 0.15,
+    )
 
     logger.info(
-        "[InfiniteTalk] Generated talking avatar video user=%s scene=%s resolution=%s size=%s bytes",
+        "[InfiniteTalk] Generated talking avatar video user=%s scene=%s resolution=%s duration=%.1fs cost=$%.4f size=%s bytes",
         user_id,
         scene_data.get("scene_number"),
         resolution,
+        actual_duration,
+        cost,
         len(video_response.content),
     )
 
     return {
         "video_bytes": video_response.content,
         "prompt": animation_prompt,
-        "duration": duration or 5,
+        "duration": actual_duration,
         "model_name": INFINITALK_MODEL_NAME,
-        "cost": INFINITALK_DEFAULT_COST,
+        "cost": cost,
         "provider": "wavespeed",
         "source_video_url": video_url,
         "prediction_id": prediction_id,

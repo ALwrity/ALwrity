@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import { ImageStudioLayout } from '../../ImageStudio/ImageStudioLayout';
 import { useProductMarketing } from '../../../hooks/useProductMarketing';
+import { useModelPricing } from '../../../hooks/useModelPricing';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -24,6 +25,10 @@ import ImageIcon from '@mui/icons-material/Image';
 
 const ProductAnimationStudio: React.FC = () => {
   const { generateProductAnimation, isGeneratingAnimation, generatedAnimation, animationError } = useProductMarketing();
+  const { getWanRate } = useModelPricing();
+  const wanRate480 = getWanRate('480p');
+  const wanRate720 = getWanRate('720p');
+  const wanRate1080 = getWanRate('1080p');
 
   const [productImageBase64, setProductImageBase64] = useState<string | null>(null);
   const [productImagePreview, setProductImagePreview] = useState<string | null>(null);
@@ -81,10 +86,9 @@ const ProductAnimationStudio: React.FC = () => {
   const canGenerate = productImageBase64 !== null && productName.trim() !== '';
 
   const costEstimate = useCallback(() => {
-    // WAN 2.5 pricing: $0.05/s (480p), $0.10/s (720p), $0.15/s (1080p)
-    const costPerSecond = resolution === '480p' ? 0.05 : resolution === '720p' ? 0.10 : 0.15;
+    const costPerSecond = getWanRate(resolution).costPerSecond;
     return (costPerSecond * duration).toFixed(2);
-  }, [resolution, duration]);
+  }, [resolution, duration, getWanRate]);
 
   return (
     <ImageStudioLayout
@@ -196,9 +200,9 @@ const ProductAnimationStudio: React.FC = () => {
                   onChange={(e) => setResolution(e.target.value)}
                   fullWidth
                 >
-                  <MenuItem value="480p">480p - $0.05/second</MenuItem>
-                  <MenuItem value="720p">720p - $0.10/second</MenuItem>
-                  <MenuItem value="1080p">1080p - $0.15/second</MenuItem>
+                  <MenuItem value="480p">480p - ${wanRate480.costPerSecond.toFixed(2)}/second</MenuItem>
+                  <MenuItem value="720p">720p - ${wanRate720.costPerSecond.toFixed(2)}/second</MenuItem>
+                  <MenuItem value="1080p">1080p - ${wanRate1080.costPerSecond.toFixed(2)}/second</MenuItem>
                 </TextField>
 
                 <TextField

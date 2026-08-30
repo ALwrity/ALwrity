@@ -15,6 +15,7 @@ import { AvatarAssetBrowser } from "../AvatarAssetBrowser";
 import { CameraSelfie } from "../CameraSelfie";
 import { PodcastMode } from "../types";
 import { useSubscription } from "../../../contexts/SubscriptionContext";
+import { useModelPricing } from "../../../hooks/useModelPricing";
 
 interface AvatarSelectorProps {
   avatarTab: number;
@@ -74,6 +75,9 @@ export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
 
   const { subscription } = useSubscription();
+  const { getImageCostDisplay } = useModelPricing();
+  const presenterCostDisplay = getImageCostDisplay('flux-kontext-pro', 0.04);
+  const customAvatarCostDisplay = getImageCostDisplay('wavespeed-ai/ideogram-character', 0.30);
   const isFreeTier = !subscription || subscription.tier?.toLowerCase() === 'free' || subscription.plan?.toLowerCase() === 'free';
 
   // Shorter tab labels for mobile
@@ -250,8 +254,8 @@ export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
                   Avatar Options:
                 </Typography>
                 <Typography variant="caption" component="div" sx={{ lineHeight: 1.6, color: "#e5e7eb" }}>
-                  <strong>Free Tier:</strong> Automatically generates a consistent AI studio presenter ($0.04/image).<br/>
-                  <strong>Pro / Paid Tier:</strong> Clone your own photo or custom avatar via Ideogram Character ($0.30/image).
+                  <strong>Free Tier:</strong> Automatically generates a consistent AI studio presenter ({presenterCostDisplay}).<br/>
+                  <strong>Pro / Paid Tier:</strong> Clone your own photo or custom avatar via Ideogram Character ({customAvatarCostDisplay}).
                 </Typography>
               </Box>
             }
@@ -457,7 +461,7 @@ export const AvatarSelector: React.FC<AvatarSelectorProps> = ({
                       <Chip label="PRO" size="small" sx={{ background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)", color: "#fff", fontWeight: 700, fontSize: "0.6rem", height: 16 }} />
                     </Stack>
                     <Typography variant="caption" sx={{ color: "#64748b", display: "block", fontSize: "0.7rem" }}>
-                      Upload your own photo or selfie to create a custom digital avatar clone ($0.30/scene).
+                      Upload your own photo or selfie to create a custom digital avatar clone ({customAvatarCostDisplay.replace('/image', '/scene')}).
                     </Typography>
                   </Box>
                   <Button

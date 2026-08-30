@@ -133,19 +133,124 @@ model_pricing:
   model: ideogram-v3-turbo
   per_request: 0.05
   per_image: 0.05
-  notes: WaveSpeed Ideogram V3 Turbo (OSS) - Photorealistic, text rendering
+  notes: WaveSpeed Ideogram V3 Turbo (OSS) - Photorealistic, text rendering ($0.05/image)
+- provider: stability
+  model: ideogram-character
+  per_request: 0.30
+  per_image: 0.30
+  notes: WaveSpeed Ideogram Character (OSS) - Full character consistency lock ($0.30/image)
+- provider: stability
+  model: ideogram-ai/ideogram-character
+  per_request: 0.30
+  per_image: 0.30
+  notes: WaveSpeed Ideogram Character (Full path alias)
+- provider: stability
+  model: flux-kontext-pro
+  per_request: 0.04
+  per_image: 0.04
+  notes: WaveSpeed FLUX Kontext Pro (OSS) - Professional typography ($0.04/image)
+- provider: stability
+  model: black-forest-labs/FLUX.1-dev
+  per_request: 0.04
+  per_image: 0.04
+  notes: Black Forest Labs FLUX.1 Dev
+- provider: stability
+  model: black-forest-labs/FLUX.1-schnell
+  per_request: 0.03
+  per_image: 0.03
+  notes: Black Forest Labs FLUX.1 Schnell
+- provider: stability
+  model: black-forest-labs/FLUX.1-Krea-dev
+  per_request: 0.04
+  per_image: 0.04
+  notes: FLUX.1 Krea Dev
+- provider: stability
+  model: runwayml/flux-dev
+  per_request: 0.04
+  per_image: 0.04
+  notes: RunwayML Hosted Flux Dev
+- provider: stability
+  model: gemini-3-pro-image
+  per_request: 0.14
+  per_image: 0.14
+  notes: Google Gemini 3 Pro Image via WaveSpeed ($0.14/image)
+- provider: stability
+  model: google/gemini-3-pro-image
+  per_request: 0.14
+  per_image: 0.14
+  notes: Google Gemini 3 Pro Image (Full path alias)
 - provider: image_edit
   model: qwen-edit
   per_request: 0.02
-  notes: WaveSpeed Qwen Image Edit (OSS) - Budget editing, bilingual
+  notes: WaveSpeed Qwen Image Edit (OSS) - Budget editing, bilingual ($0.02/edit)
+- provider: image_edit
+  model: wavespeed-ai/qwen-image/edit
+  per_request: 0.02
+  notes: WaveSpeed Qwen Image Edit (Full path alias)
 - provider: image_edit
   model: qwen-edit-plus
   per_request: 0.02
-  notes: WaveSpeed Qwen Image Edit Plus (OSS) - Multi-image editing
+  notes: WaveSpeed Qwen Image Edit Plus (OSS) - Multi-image editing ($0.02/edit)
+- provider: image_edit
+  model: wavespeed-ai/qwen-image/edit-plus
+  per_request: 0.02
+  notes: WaveSpeed Qwen Image Edit Plus (Full path alias)
 - provider: image_edit
   model: flux-kontext-pro
   per_request: 0.04
-  notes: WaveSpeed FLUX Kontext Pro (OSS) - Professional editing, typography
+  notes: WaveSpeed FLUX Kontext Pro (OSS) - Professional editing, typography ($0.04/edit)
+- provider: image_edit
+  model: wavespeed-ai/flux-kontext-pro
+  per_request: 0.04
+  notes: WaveSpeed FLUX Kontext Pro (Full path alias)
+- provider: image_edit
+  model: nano-banana-pro-edit-ultra
+  per_request: 0.15
+  notes: Google Nano Banana Pro Edit Ultra 4K ($0.15/edit)
+- provider: image_edit
+  model: google/nano-banana-pro/edit-ultra
+  per_request: 0.15
+  notes: Google Nano Banana Pro Edit Ultra (Full path alias)
+- provider: image_edit
+  model: seedream-v4.5-edit
+  per_request: 0.04
+  notes: Bytedance Seedream V4.5 Edit ($0.04/edit)
+- provider: image_edit
+  model: bytedance/seedream-v4.5/edit
+  per_request: 0.04
+  notes: Bytedance Seedream V4.5 Edit (Full path alias)
+- provider: image_edit
+  model: image-face-swap-pro
+  per_request: 0.025
+  notes: WaveSpeed Image Face Swap Pro ($0.025/swap)
+- provider: image_edit
+  model: wavespeed-ai/image-face-swap-pro
+  per_request: 0.025
+  notes: WaveSpeed Image Face Swap Pro (Full path alias)
+- provider: image_edit
+  model: image-head-swap
+  per_request: 0.025
+  notes: WaveSpeed Image Head Swap ($0.025/swap)
+- provider: image_edit
+  model: wavespeed-ai/image-head-swap
+  per_request: 0.025
+  notes: WaveSpeed Image Head Swap (Full path alias)
+- provider: image_edit
+  model: akool-face-swap
+  per_request: 0.16
+  notes: Akool Image Face Swap ($0.16/swap)
+- provider: image_edit
+  model: akool/image-face-swap
+  per_request: 0.16
+  notes: Akool Image Face Swap (Full path alias)
+- provider: image_edit
+  model: infinite-you
+  per_request: 0.03
+  notes: WaveSpeed InfiniteYou Identity Face Swap ($0.03/swap)
+- provider: image_edit
+  model: wavespeed-ai/infinite-you
+  per_request: 0.03
+  notes: WaveSpeed InfiniteYou (Full path alias)
 - provider: video
   model: tencent/HunyuanVideo
   per_request: 0.1
@@ -163,9 +268,25 @@ model_pricing:
   per_request: 0.42
   notes: WaveSpeed Kling v2.5 Turbo Std Image-to-Video (10 seconds)
 - provider: video
+  model: kling-v2.5-turbo-std
+  per_request: 0.21
+  notes: WaveSpeed Kling v2.5 Turbo Std (base 5s)
+- provider: video
   model: wavespeed-ai/infinitetalk
   per_request: 0.3
-  notes: WaveSpeed InfiniteTalk (image + audio to talking avatar video)
+  notes: WaveSpeed InfiniteTalk (image + audio to talking avatar video, $0.30 per 5s)
+- provider: video
+  model: infinitetalk
+  per_request: 0.3
+  notes: WaveSpeed InfiniteTalk (short alias)
+- provider: video
+  model: hunyuan-avatar-480p
+  per_request: 0.15
+  notes: Hunyuan Avatar 480p ($0.15 per 5s block)
+- provider: video
+  model: hunyuan-avatar-720p
+  per_request: 0.30
+  notes: Hunyuan Avatar 720p ($0.30 per 5s block)
 - provider: video
   model: wan-2.5
   per_request: 0.25
@@ -197,11 +318,35 @@ model_pricing:
   output_per_1m_tokens: 0.0
   notes: Qwen3-TTS Voice Clone via WaveSpeed (cost depends on text length)
 - provider: audio
+  model: qwen3-tts/voice-clone
+  per_request: 0.005
+  input_per_1m_tokens: 50.0
+  output_per_1m_tokens: 0.0
+  notes: Qwen3-TTS Voice Clone (Short alias)
+- provider: audio
+  model: wavespeed-ai/qwen3-tts/voice-design
+  per_request: 0.005
+  input_per_1m_tokens: 50.0
+  output_per_1m_tokens: 0.0
+  notes: Qwen3-TTS Voice Design via WaveSpeed
+- provider: audio
+  model: qwen3-tts/voice-design
+  per_request: 0.005
+  input_per_1m_tokens: 50.0
+  output_per_1m_tokens: 0.0
+  notes: Qwen3-TTS Voice Design (Short alias)
+- provider: audio
   model: wavespeed-ai/cosyvoice-tts/voice-clone
   per_request: 0.005
   input_per_1m_tokens: 50.0
   output_per_1m_tokens: 0.0
   notes: CosyVoice-TTS Voice Clone via WaveSpeed (cost depends on text length)
+- provider: audio
+  model: cosyvoice-tts/voice-clone
+  per_request: 0.005
+  input_per_1m_tokens: 50.0
+  output_per_1m_tokens: 0.0
+  notes: CosyVoice-TTS Voice Clone (Short alias)
 - provider: audio
   model: default
   input_per_1m_tokens: 50.0
@@ -256,7 +401,7 @@ plans:
     video_calls_limit: 2
     image_edit_calls_limit: 5
     audio_calls_limit: 10
-    wavespeed_calls_limit: 0
+    wavespeed_calls_limit: 25
     gemini_tokens_limit: 50000
     openai_tokens_limit: 0
     anthropic_tokens_limit: 0

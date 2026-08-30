@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import { ImageStudioLayout } from '../../ImageStudio/ImageStudioLayout';
 import { useProductMarketing } from '../../../hooks/useProductMarketing';
+import { useModelPricing } from '../../../hooks/useModelPricing';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -24,6 +25,9 @@ import ImageIcon from '@mui/icons-material/Image';
 
 const ProductAvatarStudio: React.FC = () => {
   const { generateProductAvatar, isGeneratingAvatar, generatedAvatar, avatarError } = useProductMarketing();
+  const { getInfiniteTalkRate } = useModelPricing();
+  const rate480 = getInfiniteTalkRate('480p');
+  const rate720 = getInfiniteTalkRate('720p');
 
   const [avatarImageBase64, setAvatarImageBase64] = useState<string | null>(null);
   const [avatarImagePreview, setAvatarImagePreview] = useState<string | null>(null);
@@ -87,13 +91,12 @@ const ProductAvatarStudio: React.FC = () => {
     (scriptText.trim() !== '' || productDescription.trim() !== '');
 
   const costEstimate = useCallback(() => {
-    // InfiniteTalk pricing: $0.03/s (480p) or $0.06/s (720p)
     // Estimate based on script length (roughly 150 words per minute)
     const estimatedWords = scriptText.trim().split(/\s+/).length || productDescription.trim().split(/\s+/).length || 50;
     const estimatedDuration = Math.max(5, (estimatedWords / 150) * 60); // Minimum 5 seconds
-    const costPerSecond = resolution === '480p' ? 0.03 : 0.06;
+    const costPerSecond = getInfiniteTalkRate(resolution).costPerSecond;
     return (costPerSecond * estimatedDuration).toFixed(2);
-  }, [resolution, scriptText, productDescription]);
+  }, [resolution, scriptText, productDescription, getInfiniteTalkRate]);
 
   return (
     <ImageStudioLayout
@@ -227,8 +230,8 @@ const ProductAvatarStudio: React.FC = () => {
                   onChange={(e) => setResolution(e.target.value)}
                   fullWidth
                 >
-                  <MenuItem value="480p">480p - $0.03/second</MenuItem>
-                  <MenuItem value="720p">720p - $0.06/second</MenuItem>
+                  <MenuItem value="480p">480p - ${rate480.costPerSecond.toFixed(2)}/second</MenuItem>
+                  <MenuItem value="720p">720p - ${rate720.costPerSecond.toFixed(2)}/second</MenuItem>
                 </TextField>
 
                 <TextField

@@ -105,11 +105,10 @@ def generate_audio(
         logger.info("[audio_gen] Starting audio generation")
         logger.debug(f"[audio_gen] Text length: {len(text)} characters, voice: {voice_id}")
         
-        # Calculate cost based on character count (every character is 1 token)
-        # Pricing: $0.05 per 1,000 characters
+        # Calculate cost via SSOT pricing lookup
+        from services.subscription import get_audio_tts_cost
         character_count = len(text)
-        cost_per_1000_chars = 0.05
-        estimated_cost = (character_count / 1000.0) * cost_per_1000_chars
+        estimated_cost = get_audio_tts_cost("minimax/speech-02-hd", text_length=character_count, default_per_char=0.00005)
         
         try:
             from services.database import get_session_for_user
@@ -239,23 +238,24 @@ def generate_audio(
                     # Use direct SQL UPDATE for dynamic attributes
                     # Import sqlalchemy.text with alias to avoid shadowing the 'text' parameter
                     from sqlalchemy import text as sql_text
+                    now_utc = datetime.utcnow()
                     update_query = sql_text("""
                         UPDATE usage_summaries 
                         SET audio_calls = :new_calls,
-                            audio_cost = :new_cost
+                            audio_cost = :new_cost,
+                            total_calls = COALESCE(total_calls, 0) + 1,
+                            total_cost = COALESCE(total_cost, 0.0) + :cost,
+                            updated_at = :now
                         WHERE user_id = :user_id AND billing_period = :period
                     """)
                     db_track.execute(update_query, {
                         'new_calls': new_calls,
                         'new_cost': new_cost,
+                        'cost': estimated_cost,
                         'user_id': user_id,
-                        'period': current_period
+                        'period': current_period,
+                        'now': now_utc,
                     })
-                    
-                    # Update total cost
-                    summary.total_cost = (summary.total_cost or 0.0) + estimated_cost
-                    summary.total_calls = (summary.total_calls or 0) + 1
-                    summary.updated_at = datetime.utcnow()
                     
                     # Create usage log
                     # Store the text parameter in a local variable before any imports to prevent shadowing
@@ -311,24 +311,11 @@ def generate_audio(
                     clear_dashboard_cache(user_id)
                     logger.info(f"[audio_gen] ✅ Successfully tracked usage: user {user_id} -> audio -> {new_calls} calls, ${estimated_cost:.4f}")
                     
-                    # UNIFIED SUBSCRIPTION LOG - Shows before/after state in one message
-                    print(f"""
-[SUBSCRIPTION] Audio Generation
-├─ User: {user_id}
-├─ Plan: {plan_name} ({tier})
-├─ Provider: wavespeed
-├─ Actual Provider: wavespeed
-├─ Model: minimax/speech-02-hd
-├─ Voice: {voice_id}
-├─ Calls: {current_calls_before} → {new_calls} / {audio_limit_display}
-├─ Cost: ${current_cost_before:.4f} → ${new_cost:.4f}
-├─ Characters: {character_count}
-├─ Images: {current_image_calls} / {image_limit if image_limit > 0 else '∞'}
-├─ Image Editing: {current_image_edit_calls} / {image_edit_limit if image_edit_limit > 0 else '∞'}
-├─ Videos: {current_video_calls} / {video_limit if video_limit > 0 else '∞'}
-└─ Status: ✅ Allowed & Tracked
-""", flush=True)
-                    sys.stdout.flush()
+                    try:
+                        sys.stdout.write(f"\n[SUBSCRIPTION] Audio Generation user={user_id} model=minimax/speech-02-hd cost=${estimated_cost:.4f}\n")
+                        sys.stdout.flush()
+                    except Exception:
+                        pass
                     
                 except Exception as track_error:
                     logger.error(f"[audio_gen] ❌ Error tracking usage (non-blocking): {track_error}", exc_info=True)
@@ -395,7 +382,8 @@ def clone_voice(
         if not any(c.isalpha() for c in custom_voice_id) or not any(c.isdigit() for c in custom_voice_id):
             raise ValueError("custom_voice_id must include both letters and numbers")
 
-        voice_clone_cost = 0.5
+        from services.subscription import get_voice_clone_cost
+        voice_clone_cost = get_voice_clone_cost("minimax/voice-clone", default_per_request=0.50)
 
         from services.database import get_session_for_user
         from services.subscription import PricingService
@@ -471,28 +459,29 @@ def clone_voice(
                         summary = UsageSummary(user_id=user_id, billing_period=current_period)
                         db_track.add(summary)
                         db_track.flush()
-
                     current_calls_before = getattr(summary, "audio_calls", 0) or 0
                     current_cost_before = getattr(summary, "audio_cost", 0.0) or 0.0
                     new_calls = current_calls_before + 1
                     new_cost = current_cost_before + voice_clone_cost
 
+                    now_utc = datetime.utcnow()
                     update_query = sql_text("""
                         UPDATE usage_summaries 
                         SET audio_calls = :new_calls,
-                            audio_cost = :new_cost
+                            audio_cost = :new_cost,
+                            total_calls = COALESCE(total_calls, 0) + 1,
+                            total_cost = COALESCE(total_cost, 0.0) + :cost,
+                            updated_at = :now
                         WHERE user_id = :user_id AND billing_period = :period
                     """)
                     db_track.execute(update_query, {
                         "new_calls": new_calls,
                         "new_cost": new_cost,
+                        "cost": voice_clone_cost,
                         "user_id": user_id,
-                        "period": current_period
+                        "period": current_period,
+                        "now": now_utc,
                     })
-
-                    summary.total_cost = (summary.total_cost or 0.0) + voice_clone_cost
-                    summary.total_calls = (summary.total_calls or 0) + 1
-                    summary.updated_at = datetime.utcnow()
 
                     actual_provider = detect_actual_provider(
                         provider_enum=APIProvider.AUDIO,
@@ -524,16 +513,11 @@ def clone_voice(
                     from services.subscription.cache import clear_dashboard_cache
                     clear_dashboard_cache(user_id)
 
-                    print(f"""
-[SUBSCRIPTION] Voice Clone
-├─ User: {user_id}
-├─ Provider: wavespeed
-├─ Model: minimax/voice-clone
-├─ Voice ID: {custom_voice_id}
-├─ Calls: {current_calls_before} → {new_calls}
-└─ Status: ✅ Allowed & Tracked
-""", flush=True)
-                    sys.stdout.flush()
+                    try:
+                        sys.stdout.write(f"\n[SUBSCRIPTION] Voice Clone user={user_id} model=minimax/voice-clone cost=${voice_clone_cost:.4f}\n")
+                        sys.stdout.flush()
+                    except Exception:
+                        pass
                 except Exception as track_error:
                     logger.error(f"[voice_clone] ❌ Error tracking usage (non-blocking): {track_error}", exc_info=True)
                     db_track.rollback()
@@ -589,8 +573,9 @@ def qwen3_voice_clone(
         if len(text) > 4000:
             raise ValueError("Text too long. Please keep it under 4000 characters.")
 
+        from services.subscription import get_voice_clone_cost
         char_count = len(text)
-        estimated_cost = max(0.005, 0.005 * (char_count / 100.0))
+        estimated_cost = get_voice_clone_cost("wavespeed-ai/qwen3-tts/voice-clone", char_count=char_count, default_per_request=0.005)
 
         from services.database import get_session_for_user
         from services.subscription import PricingService
@@ -668,22 +653,24 @@ def qwen3_voice_clone(
                     new_calls = current_calls_before + 1
                     new_cost = current_cost_before + float(estimated_cost)
 
+                    now_utc = datetime.utcnow()
                     update_query = sql_text("""
                         UPDATE usage_summaries 
                         SET audio_calls = :new_calls,
-                            audio_cost = :new_cost
+                            audio_cost = :new_cost,
+                            total_calls = COALESCE(total_calls, 0) + 1,
+                            total_cost = COALESCE(total_cost, 0.0) + :cost,
+                            updated_at = :now
                         WHERE user_id = :user_id AND billing_period = :period
                     """)
                     db_track.execute(update_query, {
                         "new_calls": new_calls,
                         "new_cost": new_cost,
+                        "cost": float(estimated_cost),
                         "user_id": user_id,
-                        "period": current_period
+                        "period": current_period,
+                        "now": now_utc,
                     })
-
-                    summary.total_cost = (summary.total_cost or 0.0) + float(estimated_cost)
-                    summary.total_calls = (summary.total_calls or 0) + 1
-                    summary.updated_at = datetime.utcnow()
 
                     actual_provider = detect_actual_provider(
                         provider_enum=APIProvider.AUDIO,
@@ -715,17 +702,11 @@ def qwen3_voice_clone(
                     from services.subscription.cache import clear_dashboard_cache
                     clear_dashboard_cache(user_id)
 
-                    print(f"""
-[SUBSCRIPTION] Qwen3 Voice Clone
-├─ User: {user_id}
-├─ Provider: wavespeed
-├─ Model: wavespeed-ai/qwen3-tts/voice-clone
-├─ Calls: {current_calls_before} → {new_calls}
-├─ Cost: ${current_cost_before:.4f} → ${new_cost:.4f}
-├─ Text chars: {char_count}
-└─ Status: ✅ Allowed & Tracked
-""", flush=True)
-                    sys.stdout.flush()
+                    try:
+                        sys.stdout.write(f"\n[SUBSCRIPTION] Qwen3 Voice Clone user={user_id} model=wavespeed-ai/qwen3-tts/voice-clone cost=${float(estimated_cost):.4f}\n")
+                        sys.stdout.flush()
+                    except Exception:
+                        pass
                 except Exception as track_error:
                     logger.error(f"[qwen3_voice_clone] ❌ Error tracking usage (non-blocking): {track_error}", exc_info=True)
                     db_track.rollback()
@@ -775,9 +756,9 @@ def qwen3_voice_design(
             raise ValueError("Voice description is required")
         voice_description = voice_description.strip()
 
+        from services.subscription import get_voice_clone_cost
         char_count = len(text)
-        # Pricing logic similar to TTS/Clone
-        estimated_cost = max(0.005, 0.005 * (char_count / 100.0))
+        estimated_cost = get_voice_clone_cost("wavespeed-ai/qwen3-tts/voice-design", char_count=char_count, default_per_request=0.005)
 
         from services.database import get_session_for_user
         from services.subscription import PricingService
@@ -853,22 +834,24 @@ def qwen3_voice_design(
                 new_calls = current_calls_before + 1
                 new_cost = current_cost_before + float(estimated_cost)
 
+                now_utc = datetime.utcnow()
                 update_query = sql_text("""
                     UPDATE usage_summaries 
                     SET audio_calls = :new_calls,
-                        audio_cost = :new_cost
+                        audio_cost = :new_cost,
+                        total_calls = COALESCE(total_calls, 0) + 1,
+                        total_cost = COALESCE(total_cost, 0.0) + :cost,
+                        updated_at = :now
                     WHERE user_id = :user_id AND billing_period = :period
                 """)
                 db_track.execute(update_query, {
                     "new_calls": new_calls,
                     "new_cost": new_cost,
+                    "cost": float(estimated_cost),
                     "user_id": user_id,
-                    "period": current_period
+                    "period": current_period,
+                    "now": now_utc,
                 })
-
-                summary.total_cost = (summary.total_cost or 0.0) + float(estimated_cost)
-                summary.total_calls = (summary.total_calls or 0) + 1
-                summary.updated_at = datetime.utcnow()
 
                 actual_provider = detect_actual_provider(
                     provider_enum=APIProvider.AUDIO,
@@ -900,17 +883,11 @@ def qwen3_voice_design(
                 from services.subscription.cache import clear_dashboard_cache
                 clear_dashboard_cache(user_id)
 
-                print(f"""
-[SUBSCRIPTION] Qwen3 Voice Design
-├─ User: {user_id}
-├─ Provider: wavespeed
-├─ Model: wavespeed-ai/qwen3-tts/voice-design
-├─ Calls: {current_calls_before} → {new_calls}
-├─ Cost: ${current_cost_before:.4f} → ${new_cost:.4f}
-├─ Text chars: {char_count}
-└─ Status: ✅ Allowed & Tracked
-""", flush=True)
-                sys.stdout.flush()
+                try:
+                    sys.stdout.write(f"\n[SUBSCRIPTION] Qwen3 Voice Design user={user_id} model=wavespeed-ai/qwen3-tts/voice-design cost=${float(estimated_cost):.4f}\n")
+                    sys.stdout.flush()
+                except Exception:
+                    pass
             except Exception as track_error:
                 logger.error(f"[qwen3_voice_design] ❌ Error tracking usage (non-blocking): {track_error}", exc_info=True)
                 db_track.rollback()
@@ -965,8 +942,9 @@ def cosyvoice_voice_clone(
         if len(text) > 4000:
             raise ValueError("Text too long. Please keep it under 4000 characters.")
 
+        from services.subscription import get_voice_clone_cost
         char_count = len(text)
-        estimated_cost = max(0.005, 0.005 * (char_count / 100.0))
+        estimated_cost = get_voice_clone_cost("wavespeed-ai/cosyvoice-tts/voice-clone", char_count=char_count, default_per_request=0.005)
 
         from services.database import get_session_for_user
         from services.subscription import PricingService
@@ -1043,22 +1021,24 @@ def cosyvoice_voice_clone(
                     new_calls = current_calls_before + 1
                     new_cost = current_cost_before + float(estimated_cost)
 
+                    now_utc = datetime.utcnow()
                     update_query = sql_text("""
                         UPDATE usage_summaries 
                         SET audio_calls = :new_calls,
-                            audio_cost = :new_cost
+                            audio_cost = :new_cost,
+                            total_calls = COALESCE(total_calls, 0) + 1,
+                            total_cost = COALESCE(total_cost, 0.0) + :cost,
+                            updated_at = :now
                         WHERE user_id = :user_id AND billing_period = :period
                     """)
                     db_track.execute(update_query, {
                         "new_calls": new_calls,
                         "new_cost": new_cost,
+                        "cost": float(estimated_cost),
                         "user_id": user_id,
-                        "period": current_period
+                        "period": current_period,
+                        "now": now_utc,
                     })
-
-                    summary.total_cost = (summary.total_cost or 0.0) + float(estimated_cost)
-                    summary.total_calls = (summary.total_calls or 0) + 1
-                    summary.updated_at = datetime.utcnow()
 
                     actual_provider = detect_actual_provider(
                         provider_enum=APIProvider.AUDIO,
@@ -1090,16 +1070,11 @@ def cosyvoice_voice_clone(
                     from services.subscription.cache import clear_dashboard_cache
                     clear_dashboard_cache(user_id)
 
-                    print(f"""
-[SUBSCRIPTION] CosyVoice Voice Clone
-├─ User: {user_id}
-├─ Provider: wavespeed
-├─ Model: wavespeed-ai/cosyvoice-tts/voice-clone
-├─ Calls: {current_calls_before} → {new_calls}
-├─ Text chars: {char_count}
-└─ Status: ✅ Allowed & Tracked
-""", flush=True)
-                    sys.stdout.flush()
+                    try:
+                        sys.stdout.write(f"\n[SUBSCRIPTION] CosyVoice Voice Clone user={user_id} model=wavespeed-ai/cosyvoice-tts/voice-clone cost=${float(estimated_cost):.4f}\n")
+                        sys.stdout.flush()
+                    except Exception:
+                        pass
                 except Exception as track_error:
                     logger.error(f"[cosyvoice_voice_clone] ❌ Error tracking usage (non-blocking): {track_error}", exc_info=True)
                     db_track.rollback()

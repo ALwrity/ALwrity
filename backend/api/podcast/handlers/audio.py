@@ -106,13 +106,13 @@ def _fetch_voice_sample(voice_sample_url: str, user_id: str) -> Optional[bytes]:
         if "/api/assets/" in voice_sample_url:
             # Resolve user workspace path directly
             sanitized_uid = "".join(c for c in user_id if c.isalnum() or c in ("-", "_"))
-            from api.podcast.constants import ROOT_DIR
+            from utils.storage_paths import get_repo_root
             parts = voice_sample_url.split("/")
             # Expected: /api/assets/{user_id}/voice_samples/{filename}
             try:
                 idx = parts.index("voice_samples")
                 filename = parts[idx + 1].split("?")[0]
-                local_path = ROOT_DIR / "workspace" / f"workspace_{sanitized_uid}" / "assets" / "voice_samples" / filename
+                local_path = get_repo_root() / "workspace" / f"workspace_{sanitized_uid}" / "assets" / "voice_samples" / filename
                 if local_path.exists():
                     data = local_path.read_bytes()
                     _cache_voice_sample(cache_key, data)
@@ -144,7 +144,7 @@ def _fetch_voice_sample(voice_sample_url: str, user_id: str) -> Optional[bytes]:
         # Try direct HTTP fetch as fallback
         if voice_sample_url.startswith("http"):
             logger.info(f"[Podcast] Fetching voice sample via HTTP: {voice_sample_url[:80]}...")
-            resp = requests.get(voice_sample_url, timeout=30)
+            resp = requests.get(voice_sample_url, timeout=60)
             if resp.status_code == 200:
                 data = resp.content
                 _cache_voice_sample(cache_key, data)
@@ -372,7 +372,8 @@ async def generate_podcast_audio(
             
             file_size = len(audio_bytes)
             audio_url = f"/api/podcast/audio/{audio_filename}"
-            cost = max(0.005, 0.005 * (len(scene_text) / 100.0))
+            from services.subscription import get_voice_clone_cost
+            cost = get_voice_clone_cost(model or "wavespeed-ai/qwen3-tts/voice-clone", char_count=len(scene_text), default_per_request=0.005)
 
             result = {
                 "audio_path": str(audio_path),
