@@ -374,6 +374,7 @@ export const ScriptEditor: React.FC<ScriptEditorProps> = ({
                     });
                   }}
                   idea={idea}
+                  projectId={projectId}
                   avatarUrl={avatarUrl}
                   analysis={analysis}
                 />

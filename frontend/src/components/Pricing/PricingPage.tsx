@@ -21,10 +21,11 @@ import {
 } from '@mui/material';
 import Warning from '@mui/icons-material/Warning';
 import { useNavigate, useSearchParams, Link as RouterLink } from 'react-router-dom';
-import { useClerk } from '@clerk/clerk-react';
+import { useClerk, useAuth } from '@clerk/clerk-react';
 import { apiClient, getApiUrl } from '../../api/client';
 import { saveNavigationState, restoreNavigationState, saveCurrentPhaseForTool } from '../../utils/navigationState';
-import { getEnabledFeatures, getDefaultLandingRoute } from '../../utils/demoMode';
+import { getEnabledFeatures, getDefaultLandingRoute, shouldSkipOnboarding, isFeatureOnlyMode } from '../../utils/demoMode';
+import { useOnboarding } from '../../contexts/OnboardingContext';
 import PricingPageLayout from './PricingPageLayout';
 import PricingComparisonGrid from './PricingComparisonGrid';
 import PricingJsonLd from './PricingJsonLd';
@@ -163,6 +164,8 @@ const PricingPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { openSignIn } = useClerk();
+  const { isSignedIn: clerkIsSignedIn, userId: clerkUserId } = useAuth();
+  const { isOnboardingComplete } = useOnboarding();
 
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,9 +188,10 @@ const PricingPage: React.FC = () => {
   const isPendingFreePlan = pendingPlan?.tier === 'free';
 
   const isSignedIn = useCallback((): boolean => {
+    if (clerkIsSignedIn && clerkUserId) return true;
     const userId = localStorage.getItem('user_id');
     return Boolean(userId && userId !== 'anonymous');
-  }, []);
+  }, [clerkIsSignedIn, clerkUserId]);
 
   const isFeatureLimitedMode = (): boolean => {
     const appMode = (localStorage.getItem('app_mode') || '').toLowerCase();
@@ -195,15 +199,17 @@ const PricingPage: React.FC = () => {
     const podcastOnlyDemoMode = (localStorage.getItem('podcast_only_demo_mode') || '').toLowerCase();
     const envAppMode = (process.env.REACT_APP_APP_MODE || '').toLowerCase();
     const envDemoMode = (process.env.REACT_APP_DEMO_MODE || '').toLowerCase();
-    const enabledFeatures = getEnabledFeatures();
 
     return (
-      !enabledFeatures.has('all') ||
+      appMode === 'demo' ||
+      demoMode === 'true' ||
+      demoMode === '1' ||
       podcastOnlyDemoMode === 'true' ||
-      appMode === 'podcast-only' ||
-      demoMode === 'podcast-only' ||
-      envAppMode === 'podcast-only' ||
-      envDemoMode === 'podcast-only'
+      envAppMode === 'demo' ||
+      envDemoMode === 'true' ||
+      envDemoMode === '1' ||
+      shouldSkipOnboarding() ||
+      isFeatureOnlyMode()
     );
   };
 
@@ -225,8 +231,8 @@ const PricingPage: React.FC = () => {
       return;
     }
 
-    const onboardingComplete = localStorage.getItem('onboarding_complete') === 'true';
-    navigate(onboardingComplete ? '/dashboard' : '/onboarding');
+    const isComplete = isOnboardingComplete || localStorage.getItem('onboarding_complete') === 'true';
+    navigate(isComplete ? '/dashboard' : '/onboarding');
   };
 
   const fetchPlans = async () => {
@@ -279,7 +285,14 @@ const PricingPage: React.FC = () => {
   }, [searchParams, setSearchParams]);
 
   const activateFreePlan = async (planId: number) => {
-    const userId = localStorage.getItem('user_id') || 'anonymous';
+    const userId = clerkUserId || localStorage.getItem('user_id') || 'anonymous';
+    if (userId === 'anonymous') {
+      setPendingPlanId(planId);
+      sessionStorage.setItem(PENDING_PLAN_KEY, String(planId));
+      sessionStorage.setItem('subscription_referrer', '/pricing');
+      setShowSignInPrompt(true);
+      return;
+    }
     setSubscribing(true);
     try {
       await apiClient.post(`/api/subscription/subscribe/${userId}`, {
@@ -288,9 +301,10 @@ const PricingPage: React.FC = () => {
       });
       window.dispatchEvent(new CustomEvent('subscription-updated'));
       redirectAfterSubscription();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error subscribing:', err);
-      setError('Failed to process subscription');
+      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to process subscription';
+      setError(errorMessage);
     } finally {
       setSubscribing(false);
     }
@@ -364,7 +378,7 @@ const PricingPage: React.FC = () => {
 
     try {
       setSubscribing(true);
-      const userId = localStorage.getItem('user_id') || 'anonymous';
+      const userId = clerkUserId || localStorage.getItem('user_id') || 'anonymous';
 
       if (stripePublishableKey) {
         if (window.location.pathname !== '/pricing') {
@@ -420,8 +434,8 @@ const PricingPage: React.FC = () => {
         if (isFeatureLimitedMode()) {
           navigate(getDefaultLandingRoute());
         } else {
-          const onboardingComplete = localStorage.getItem('onboarding_complete') === 'true';
-          if (onboardingComplete) {
+          const isComplete = isOnboardingComplete || localStorage.getItem('onboarding_complete') === 'true';
+          if (isComplete) {
             const navState = restoreNavigationState();
             if (navState?.path && navState.path !== '/pricing') {
               if (navState.tool === 'blog-writer' && navState.phase) {

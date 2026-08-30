@@ -39,6 +39,7 @@ class PodcastProjectResponse(BaseModel):
     avatar_url: Optional[str] = None
     avatar_prompt: Optional[str] = None
     avatar_persona_id: Optional[str] = None
+    presenter_reference_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     
@@ -53,6 +54,7 @@ class PodcastAnalyzeRequest(BaseModel):
     speakers: int = Field(default=1, description="Number of speakers")
     bible: Optional[Dict[str, Any]] = Field(None, description="Optional Podcast Bible for context")
     avatar_url: Optional[str] = Field(None, description="Current avatar URL if selected")
+    presenter_reference_url: Optional[str] = Field(None, description="Current presenter reference image URL if generated")
     feedback: Optional[str] = Field(None, description="User feedback for regeneration")
     podcast_mode: Optional[str] = Field(None, description="Podcast mode: audio_only, video_only, or audio_video")
 
@@ -73,6 +75,7 @@ class PodcastAnalyzeResponse(BaseModel):
     bible: Optional[Dict[str, Any]] = None
     avatar_url: Optional[str] = None
     avatar_prompt: Optional[str] = None
+    presenter_reference_url: Optional[str] = None
     estimate: Optional[Dict[str, Any]] = None
 
 
@@ -124,6 +127,8 @@ class PodcastScene(BaseModel):
     lines: list[PodcastSceneLine]
     approved: bool = False
     emotion: Optional[str] = None
+    camera_angle: Optional[str] = "medium_shot"  # wide_shot | medium_shot | close_up | over_shoulder
+    visual_atmosphere: Optional[str] = ""  # e.g. "dim blue-lit studio, contemplative"
     imageUrl: Optional[str] = None  # Generated image URL for video generation
     audioUrl: Optional[str] = None  # Generated audio URL for this scene
     imagePrompt: Optional[str] = None  # Original image generation prompt for video context
@@ -276,6 +281,7 @@ class CreateProjectRequest(BaseModel):
     speakers: int = Field(default=1, description="Number of speakers")
     budget_cap: float = Field(default=50.0, description="Budget cap in USD")
     avatar_url: Optional[str] = Field(None, description="Optional presenter avatar URL")
+    presenter_reference_url: Optional[str] = Field(None, description="Optional presenter reference image URL")
 
 
 class UpdateProjectRequest(BaseModel):
@@ -296,6 +302,7 @@ class UpdateProjectRequest(BaseModel):
     current_step: Optional[str] = None
     status: Optional[str] = None
     final_video_url: Optional[str] = None
+    presenter_reference_url: Optional[str] = None
 
 
 class PodcastCombineAudioRequest(BaseModel):
@@ -318,8 +325,11 @@ class PodcastImageRequest(BaseModel):
     """Request for generating an image for a podcast scene."""
     scene_id: str
     scene_title: str
+    project_id: Optional[str] = None  # Optional: podcast project ID for session character locking
     scene_content: Optional[str] = None  # Optional: scene lines text for context
     scene_emotion: Optional[str] = None  # Optional: scene emotion for visual tone
+    camera_angle: Optional[str] = "medium_shot"  # wide_shot | medium_shot | close_up | over_shoulder
+    visual_atmosphere: Optional[str] = ""  # e.g. "dim blue-lit studio, contemplative"
     idea: Optional[str] = None  # Optional: podcast idea for context
     analysis: Optional[Dict[str, Any]] = Field(None, description="AI analysis for visual context (keywords, audience)")
     base_avatar_url: Optional[str] = None  # Base avatar image URL for scene variations
@@ -346,6 +356,30 @@ class PodcastImageResponse(BaseModel):
     image_prompt: Optional[str] = None  # Return the prompt used for generation
 
 
+class PresenterReferenceRequest(BaseModel):
+    """Request to generate (or retrieve) the base presenter reference image for an episode.
+
+    This image is generated once at the start of an episode and used as an
+    image-to-image anchor for all subsequent scene generations, eliminating
+    per-scene character drift.
+    """
+    project_id: str
+    bible: Optional[Dict[str, Any]] = Field(None, description="Podcast Bible for host appearance")
+    idea: Optional[str] = None
+    force_regenerate: bool = False  # If True, regenerate even if a reference already exists
+    style_index: Optional[int] = None  # Optional specific character style index for re-rolling (0-4)
+
+
+
+class PresenterReferenceResponse(BaseModel):
+    """Response for presenter reference image generation."""
+    project_id: str
+    reference_url: str    # Served via /api/podcast/images/<filename>
+    was_cached: bool      # True if an existing reference was returned without regeneration
+
+
+
+
 class PodcastVideoGenerationRequest(BaseModel):
     """Request model for podcast video generation."""
     project_id: str = Field(..., description="Podcast project ID")
@@ -361,6 +395,8 @@ class PodcastVideoGenerationRequest(BaseModel):
     prompt: Optional[str] = Field(None, description="Optional animation prompt override")
     seed: Optional[int] = Field(-1, description="Random seed; -1 for random")
     mask_image_url: Optional[str] = Field(None, description="Optional mask image URL to specify animated region")
+    scene_emotion: Optional[str] = Field(None, description="Scene emotion (e.g. excited, serious, curious) for InfiniteTalk prompt")
+    scene_visual_atmosphere: Optional[str] = Field(None, description="Scene visual atmosphere / lighting mood for InfiniteTalk prompt")
 
 
 class PodcastVideoGenerationResponse(BaseModel):

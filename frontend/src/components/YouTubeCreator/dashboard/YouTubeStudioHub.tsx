@@ -122,8 +122,9 @@ export function YouTubeStudioHub({
     <YouTubeHubConnectButton
       connected={connected}
       onConnect={onConnect}
-      onCreateVideo={() => openYouTubeCreator({ step: 0 })}
+      onDisconnect={onDisconnect}
       isLoading={oauthLoading}
+      isDisconnecting={isDisconnecting}
     />
   );
 

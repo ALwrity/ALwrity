@@ -15,6 +15,7 @@ from fastapi import HTTPException
 from loguru import logger
 
 from .client import WaveSpeedClient
+from services.subscription import get_video_model_cost
 
 HUNYUAN_AVATAR_MODEL_PATH = "wavespeed-ai/hunyuan-avatar"
 HUNYUAN_AVATAR_MODEL_NAME = "wavespeed-ai/hunyuan-avatar"
@@ -32,7 +33,7 @@ def _as_data_uri(content_bytes: bytes, mime_type: str) -> str:
 
 def calculate_hunyuan_avatar_cost(resolution: str, duration: float) -> float:
     """
-    Calculate cost for Hunyuan Avatar video.
+    Calculate cost for Hunyuan Avatar video from pricing.yaml.
     
     Pricing:
     - 480p: $0.15 per 5 seconds
@@ -47,16 +48,12 @@ def calculate_hunyuan_avatar_cost(resolution: str, duration: float) -> float:
     Returns:
         Cost in USD
     """
-    # Clamp duration to valid range
-    actual_duration = max(MIN_DURATION_SECONDS, min(duration, MAX_DURATION_SECONDS))
-    
-    # Calculate cost per 5 seconds
-    cost_per_5_seconds = 0.15 if resolution == "480p" else 0.30
-    
-    # Round up to nearest 5 seconds
-    billable_5_second_blocks = (actual_duration + 4) // 5  # Ceiling division
-    
-    return cost_per_5_seconds * billable_5_second_blocks
+    return get_video_model_cost(
+        f"hunyuan-avatar-{resolution}",
+        duration_sec=duration,
+        resolution=resolution,
+        default=0.15 if resolution == "480p" else 0.30,
+    )
 
 
 def create_hunyuan_avatar(

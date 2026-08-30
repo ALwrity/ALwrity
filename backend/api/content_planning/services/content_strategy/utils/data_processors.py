@@ -22,23 +22,30 @@ class DataProcessorService:
     
     async def get_onboarding_data(self, user_id: str) -> Dict[str, Any]:
         """
-        Get comprehensive onboarding data for intelligent auto-population via AutoFillService.
-        
+        Get the raw integrated onboarding data for a user (all 8+ data sources).
+
+        Returns the full integrated_data dict from OnboardingDataIntegrationService
+        containing website_analysis, research_preferences, onboarding_session,
+        persona_data, competitor_analysis, deep_competitor_analysis,
+        linkedin_profile, platform_integrations, gsc_analytics, bing_analytics,
+        canonical_profile and data_quality so AI generation can be grounded in
+        real onboarding context (not processed field payloads).
+
         Args:
             user_id: The user ID to get onboarding data for
-            
+
         Returns:
-            Dictionary containing comprehensive onboarding data
+            Dictionary of raw integrated onboarding data sources
         """
         try:
             from services.database import get_db_session
-            from ..autofill import AutoFillService
+            from ..onboarding.data_integration import OnboardingDataIntegrationService
             temp_db = get_db_session()
             try:
-                service = AutoFillService(temp_db)
-                payload = await service.get_autofill(user_id)
-                self.logger.info(f"Retrieved comprehensive onboarding data for user {user_id}")
-                return payload
+                integration = OnboardingDataIntegrationService()
+                integrated_data = await integration.process_onboarding_data(user_id, temp_db)
+                self.logger.info(f"Retrieved raw integrated onboarding data for user {user_id}")
+                return integrated_data
             except Exception as e:
                 self.logger.error(f"Error getting onboarding data: {str(e)}")
                 raise

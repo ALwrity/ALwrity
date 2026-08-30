@@ -31,6 +31,7 @@ interface UseCompetitorDiscoveryReturn {
   startCompetitorDiscovery: (force?: boolean) => Promise<void>;
   loadCachedAnalysis: () => boolean;
   updateCacheWithSitemapAnalysis: (sitemapResult: any) => void;
+  refreshContentPillars: () => Promise<void>;
 }
 
 export function useCompetitorDiscovery({
@@ -107,11 +108,24 @@ export function useCompetitorDiscovery({
         const parsedData = JSON.parse(cachedData);
         parsedData.sitemap_analysis = sitemapResult;
         localStorage.setItem('competitor_analysis_data', JSON.stringify(parsedData));
+      } else {
+        // Create the cache entry so future mounts have the sitemap data
+        // even if competitor_analysis_data was never written.
+        const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
+        localStorage.setItem('competitor_analysis_data', JSON.stringify({
+          competitors: [],
+          social_media_accounts: {},
+          research_summary: null,
+          sitemap_analysis: sitemapResult,
+          content_pillars: null,
+        }));
+        localStorage.setItem('competitor_analysis_url', finalUserUrl);
+        localStorage.setItem('competitor_analysis_timestamp', Date.now().toString());
       }
     } catch (err) {
       console.warn('Failed to update cache with sitemap analysis:', err);
     }
-  }, []);
+  }, [userUrl]);
 
   const startCompetitorDiscovery = useCallback(async (force = false) => {
     if (!force && loadCachedAnalysis()) {
@@ -122,13 +136,25 @@ export function useCompetitorDiscovery({
       try {
         const dbResult = await longRunningApiClient.get('/api/onboarding/competitor-analysis');
         if (dbResult?.data?.competitors?.length > 0) {
-          const comps = dbResult.data.competitors.map((c: any) => ({
-            url: c.url || '', domain: c.domain || '', title: c.url || '',
-            summary: '', relevance_score: 0.8,
-            highlights: [], favicon: null, image: null, published_date: null, author: null,
-            competitive_insights: { business_model: '', target_audience: '' },
-            content_insights: { content_focus: '', content_quality: '' },
-          }));
+          const comps = dbResult.data.competitors.map((c: any) => {
+            const ad = c.analysis_data && typeof c.analysis_data === 'object' ? c.analysis_data : {};
+            return {
+              url: c.url || c.competitor_url || '',
+              domain: c.domain || c.competitor_domain || '',
+              title: ad.title || c.title || c.url || '',
+              summary: ad.summary || '',
+              relevance_score: ad.relevance_score ?? 0.8,
+              highlights: ad.highlights || [],
+              favicon: ad.favicon ?? null,
+              image: ad.image ?? null,
+              published_date: ad.published_date ?? null,
+              author: ad.author ?? null,
+              subpages: ad.subpages || [],
+              competitive_insights: ad.competitive_analysis || ad.competitive_insights || { business_model: '', target_audience: '' },
+              content_insights: ad.content_insights || { content_focus: '', content_quality: '' },
+              market_positioning: ad.market_positioning || {},
+            };
+          });
           setCompetitors(comps);
           setUsingCachedData(true);
         }
@@ -203,9 +229,13 @@ export function useCompetitorDiscovery({
         const mergedAccounts = mergeCrawlSocialMedia(analysisData.social_media_accounts);
         setSocialMediaAccounts(mergedAccounts);
         setResearchSummary(analysisData.research_summary);
-        if (result.content_pillars) {
-          setContentPillars(result.content_pillars);
-        }
+        // The backend now always returns a normalized payload (complete or
+        // failed), so both states are surfaced instead of an eternal pending.
+        setContentPillars(result.content_pillars || {
+          status: 'failed',
+          error: 'Content pillar discovery returned no data',
+          timestamp: new Date().toISOString(),
+        });
 
         try {
           localStorage.setItem('competitor_analysis_data', JSON.stringify({
@@ -233,6 +263,52 @@ export function useCompetitorDiscovery({
       setShowProgressModal(false);
     }
   }, [userUrl, industryContext, loadCachedAnalysis, sitemapAnalysis, mergeCrawlSocialMedia]);
+
+  const refreshContentPillars = useCallback(async () => {
+    setIsLoadingPillars(true);
+    setError(null);
+
+    try {
+      const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
+      if (!finalUserUrl || finalUserUrl.trim() === '') {
+        throw new Error('No website URL available for content pillar discovery.');
+      }
+
+      const response = await aiApiClient.post('/api/onboarding/step3/discover-content-pillars', {
+        user_url: finalUserUrl,
+      });
+
+      const result = response.data;
+      // Always set a truthy payload so the section can render tri-state
+      // (complete / failed / pending). The endpoint returns a complete
+      // payload even when persistence fails, plus an error message.
+      const payload: ContentPillarData = result.content_pillars || {
+        status: 'failed',
+        error: result.error || 'Content pillar discovery failed',
+        timestamp: new Date().toISOString(),
+      };
+      setContentPillars(payload);
+      if (result.error) {
+        setError(result.error);
+      }
+
+      try {
+        const cachedData = localStorage.getItem('competitor_analysis_data');
+        if (cachedData) {
+          const parsedData = JSON.parse(cachedData);
+          parsedData.content_pillars = payload;
+          localStorage.setItem('competitor_analysis_data', JSON.stringify(parsedData));
+        }
+      } catch (cacheErr) {
+        console.warn('Failed to update cache with content pillars:', cacheErr);
+      }
+    } catch (err) {
+      console.error('Content pillar refresh error:', err);
+      setError(err instanceof Error ? err.message : 'Content pillar discovery failed');
+    } finally {
+      setIsLoadingPillars(false);
+    }
+  }, [userUrl]);
 
   // Initialize: Check cache first, then run analysis if needed
   useEffect(() => {
@@ -278,6 +354,15 @@ export function useCompetitorDiscovery({
         } catch (e) {
           console.warn('Failed to prime cache from backend data', e);
         }
+
+        // Self-heal: only when the DB has *no* pillars at all (e.g. a legacy
+        // session). A persisted "failed" state is left visible with its Retry
+        // button instead of silently re-running Exa on every reload, which
+        // would incur recurring API cost without user intent.
+        const dbPillars = initialData.content_pillars;
+        if (!dbPillars) {
+          await refreshContentPillars();
+        }
         return;
       }
 
@@ -291,7 +376,7 @@ export function useCompetitorDiscovery({
     };
 
     initialize();
-  }, [initialData, loadCachedAnalysis, startCompetitorDiscovery, mergeCrawlSocialMedia]);
+  }, [initialData, loadCachedAnalysis, startCompetitorDiscovery, mergeCrawlSocialMedia, refreshContentPillars]);
 
   return {
     competitors,
@@ -313,5 +398,6 @@ export function useCompetitorDiscovery({
     startCompetitorDiscovery,
     loadCachedAnalysis,
     updateCacheWithSitemapAnalysis,
+    refreshContentPillars,
   };
 }

@@ -39,15 +39,59 @@ class Step3ResearchService:
         self.service_name = "step3_research"
         logger.info(f"Initialized {self.service_name}")
     
-    async def _discover_content_pillars_with_fallback(self, user_url: str) -> Optional[Dict[str, Any]]:
-        """Discover content pillars via Answer API (fast, structured JSON)."""
+    async def _discover_content_pillars_with_fallback(self, user_url: str) -> Dict[str, Any]:
+        """Discover content pillars via Answer API, normalized into a status envelope.
+
+        Returns a dict with: ``success`` (bool), ``error`` (str|None),
+        ``content_pillars`` (raw dict|None) and ``timestamp`` (ISO string).
+        Never returns an ambiguous ``None`` so callers can tell a real failure
+        apart from an in-flight / empty state.
+        """
+        timestamp = datetime.utcnow().isoformat()
         logger.info(f"[research] Content pillar discovery starting for {user_url}")
         result = await self.exa_service._discover_content_pillars_via_answer(user_url)
-        if result:
+        if result and isinstance(result, dict):
             logger.info(f"[research] Content pillars from Answer API: {list(result.keys())}")
-        else:
-            logger.warning(f"[research] Content pillar discovery returned None — no pillars data")
-        return result
+            return {
+                "success": True,
+                "error": None,
+                "content_pillars": result,
+                "timestamp": timestamp,
+            }
+        error = (
+            "Content pillar discovery returned no data. "
+            "Exa credits may be exhausted or the API found no structured pillars."
+        )
+        logger.warning(f"[research] Content pillar discovery failed for {user_url}: {error}")
+        return {
+            "success": False,
+            "error": error,
+            "content_pillars": None,
+            "timestamp": timestamp,
+        }
+
+    @staticmethod
+    def _pillars_payload(envelope: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Normalize a discovery envelope into the value persisted and returned.
+
+        Success -> the raw Exa pillars dict tagged with ``status: "complete"``
+        plus timestamp. Failure -> a minimal ``{status: "failed", error,
+        timestamp}`` dict so reloads show a retryable error instead of an
+        eternal "pending".
+        """
+        if not envelope or not isinstance(envelope, dict):
+            return None
+        raw = envelope.get("content_pillars")
+        if envelope.get("success") and isinstance(raw, dict):
+            payload = dict(raw)
+            payload.setdefault("status", "complete")
+            payload.setdefault("timestamp", envelope.get("timestamp"))
+            return payload
+        return {
+            "status": "failed",
+            "error": envelope.get("error") or "Content pillar discovery failed",
+            "timestamp": envelope.get("timestamp") or datetime.utcnow().isoformat(),
+        }
 
     async def discover_competitors_for_onboarding(
         self,
@@ -73,11 +117,13 @@ class Step3ResearchService:
             logger.info(f"Starting research analysis for user {user_id}, URL: {user_url}")
 
             # Find the correct onboarding session for this user
+            # Use the most recent session (ordered by updated_at DESC) to match
+            # the session that reads target, ensuring writes go to the same session.
             with get_db_session(user_id) as db:
                 from models.onboarding import OnboardingSession
                 session = db.query(OnboardingSession).filter(
                     OnboardingSession.user_id == user_id
-                ).first()
+                ).order_by(OnboardingSession.updated_at.desc()).first()
 
                 if not session:
                     logger.error(f"No onboarding session found for user {user_id}")
@@ -120,8 +166,14 @@ class Step3ResearchService:
                 return competitor_results
             if isinstance(social_media_results, Exception) or not social_media_results.get("success"):
                 social_media_results = {"success": False, "social_media_accounts": {}, "citations": []}
-            if isinstance(pillars_results, Exception) or not pillars_results:
-                pillars_results = None
+            if isinstance(pillars_results, Exception):
+                pillars_results = {
+                    "success": False,
+                    "error": f"Content pillar discovery raised: {pillars_results}",
+                    "content_pillars": None,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            pillars_payload = self._pillars_payload(pillars_results) if isinstance(pillars_results, dict) else None
             
             # Process and enhance competitor data
             enhanced_competitors = await self._enhance_competitor_data(
@@ -130,24 +182,36 @@ class Step3ResearchService:
                 industry_context
             )
             
+            # Generate research summary
+            research_summary = self._generate_research_summary(
+                enhanced_competitors,
+                industry_context
+            )
+            
+            # Get social media citations for persistence
+            social_media_citations = social_media_results.get("citations", [])
+            
             # Persist to DB immediately so results survive refresh
+            # Include research_summary and social_media_citations for persistence
             try:
                 from services.database import get_session_for_user
                 from api.onboarding_utils.step_management_service import StepManagementService
                 db = get_session_for_user(user_id)
                 if db:
                     svc = StepManagementService()
-                    svc._save_competitor_analysis(user_id, enhanced_competitors, industry_context, db, content_pillars=pillars_results)
+                    svc._save_competitor_analysis(
+                        user_id, 
+                        enhanced_competitors, 
+                        industry_context, 
+                        db, 
+                        content_pillars=pillars_payload,
+                        research_summary=research_summary,
+                        social_media_citations=social_media_citations
+                    )
                     db.close()
                     logger.info(f"Competitor analysis persisted for user {user_id}")
             except Exception as persist_err:
-                logger.warning(f"Failed to persist competitor analysis for user {user_id}: {persist_err}")
-            
-            # Generate research summary
-            research_summary = self._generate_research_summary(
-                enhanced_competitors,
-                industry_context
-            )
+                logger.exception(f"Failed to persist competitor analysis for user {user_id}: {persist_err}")
             
             logger.info(f"Successfully discovered {len(enhanced_competitors)} competitors for user {user_id}")
 
@@ -157,8 +221,8 @@ class Step3ResearchService:
                 "user_url": user_url,
                 "competitors": enhanced_competitors,
                 "social_media_accounts": social_media_results.get("social_media_accounts", {}),
-                "social_media_citations": social_media_results.get("citations", []),
-                "content_pillars": pillars_results,
+                "social_media_citations": social_media_citations,
+                "content_pillars": pillars_payload,
                 "research_summary": research_summary,
                 "total_competitors": len(enhanced_competitors),
                 "industry_context": industry_context,
@@ -247,7 +311,12 @@ class Step3ResearchService:
             "competitive_strengths": [],
             "competitive_weaknesses": [],
             "market_share_estimate": "unknown",
-            "differentiation_opportunities": []
+            "differentiation_opportunities": [],
+            # business_model/target_audience satisfy the frontend `Competitor`
+            # contract under the `competitive_insights` alias (`business_model`,
+            # `target_audience`). Kept alongside the richer analysis fields.
+            "business_model": "unknown",
+            "target_audience": "unknown"
         }
         
         # Analyze threat level based on relevance score
@@ -259,7 +328,9 @@ class Step3ResearchService:
         
         # Analyze competitive strengths from content
         summary = competitor.get("summary", "").lower()
+        title = competitor.get("title", "").lower()
         highlights = competitor.get("highlights", [])
+        highlight_blob = " ".join(h.lower() for h in highlights)
         
         # Extract strengths from content analysis
         if "innovative" in summary or "cutting-edge" in summary:
@@ -268,12 +339,35 @@ class Step3ResearchService:
         if "comprehensive" in summary or "complete" in summary:
             analysis["competitive_strengths"].append("Comprehensive solution")
         
-        if any("enterprise" in highlight.lower() for highlight in highlights):
+        if "enterprise" in highlight_blob:
             analysis["competitive_strengths"].append("Enterprise focus")
         
         # Generate differentiation opportunities
-        if not any("saas" in summary for summary in [summary]):
+        if "saas" not in summary:
             analysis["differentiation_opportunities"].append("SaaS platform differentiation")
+        
+        # Infer business model from the site's description
+        blob = f"{title} {summary} {highlight_blob}"
+        if "saas" in blob or "software" in blob or "platform" in blob:
+            analysis["business_model"] = "SaaS / platform"
+        elif "subscription" in blob or "membership" in blob or "recurring" in blob:
+            analysis["business_model"] = "Subscription"
+        elif "marketplace" in blob or "e-commerce" in blob or "ecommerce" in blob or "shop" in blob:
+            analysis["business_model"] = "E-commerce / marketplace"
+        elif "agency" in blob or "services" in blob or "consulting" in blob:
+            analysis["business_model"] = "Agency / services"
+        elif "advertis" in blob:
+            analysis["business_model"] = "Ad-supported"
+        
+        # Infer target audience from the same descriptive blob
+        if "enterprise" in blob or "for business" in blob:
+            analysis["target_audience"] = "Enterprise"
+        elif "developer" in blob or "technical" in blob:
+            analysis["target_audience"] = "Developers"
+        elif "startup" in blob or "small business" in blob or "sme" in blob:
+            analysis["target_audience"] = "Startups / SMBs"
+        elif "consumer" in blob or "individuals" in blob or "personal" in blob:
+            analysis["target_audience"] = "Consumers"
         
         return analysis
     

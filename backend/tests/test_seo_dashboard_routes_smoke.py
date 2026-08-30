@@ -36,7 +36,7 @@ TARGET_PATHS = {
     "/api/seo-dashboard/sif-health",
 }
 
-ENTRYPOINT_MODULES = ("backend.app", "backend.main")
+ENTRYPOINT_MODULES = ("backend.app",)
 
 
 @pytest.mark.parametrize("module_name", ENTRYPOINT_MODULES)

@@ -16,9 +16,11 @@ import { useNavigate } from 'react-router-dom';
 import { completeOnboarding, getOnboardingSummary, getWebsiteAnalysisData, getResearchPreferencesData, setCurrentStep } from '../../../api/onboarding';
 import { SetupSummary, AgentTeamSection, TaskSchedulingPanel, AgentTeamPreview } from './components';
 import { SifIndexingPanel } from '../common/SifIndexingPanel';
+import EmailSection from '../common/EmailSection';
 import { FinalStepProps, OnboardingData, Capability, OnboardingCompletionResult } from './types';
 import { getAgentTeam, type AgentTeamCatalogEntry, type AgentTeamContextSummary, type TeamCertification } from '../../../api/agentsTeam';
 import { onboardingCache } from '../../../services/onboardingCache';
+import { apiClient } from '../../../api/client';
 
 const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, onboardingType }) => {
   const navigate = useNavigate();
@@ -35,9 +37,29 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
   const [agentTeamError, setAgentTeamError] = useState<string | null>(null);
   const [completionResult, setCompletionResult] = useState<OnboardingCompletionResult | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [emailDigestOptIn, setEmailDigestOptIn] = useState<boolean>(true);
+  const [userTimezone, setUserTimezone] = useState<string>('UTC');
   // const buttonRef = useRef<HTMLButtonElement>(null);
 
   const isLinkedIn = onboardingType === 'linkedin';
+
+  const persistEmailPreference = async (payload: Record<string, unknown>) => {
+    try {
+      await apiClient.put('/api/onboarding/email-preferences', payload);
+    } catch (e) {
+      console.warn('Could not save email preference:', e);
+    }
+  };
+
+  const handleEmailDigestOptInChange = (optIn: boolean) => {
+    setEmailDigestOptIn(optIn);
+    void persistEmailPreference({ email_digest_opt_in: optIn });
+  };
+
+  const handleUserTimezoneChange = (tz: string) => {
+    setUserTimezone(tz);
+    void persistEmailPreference({ timezone: tz });
+  };
 
   useEffect(() => {
     updateHeaderContent({
@@ -558,6 +580,16 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
 
                 {/* Pre-launch team preview: dry-run the committee before launching */}
                 {!agentTeamError && agentTeam.length > 0 && <AgentTeamPreview />}
+
+                {/* Daily Email Summary - shown after the agent team is defined */}
+                {!agentTeamError && agentTeam.length > 0 && (
+                  <EmailSection
+                    emailDigestOptIn={emailDigestOptIn}
+                    onEmailDigestOptInChange={handleEmailDigestOptInChange}
+                    userTimezone={userTimezone}
+                    onUserTimezoneChange={handleUserTimezoneChange}
+                  />
+                )}
 
                 {/* Missing Requirements Warning */}
                 {missingRequirements.length > 0 && (

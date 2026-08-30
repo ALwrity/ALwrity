@@ -76,6 +76,33 @@ def get_db():
     finally:
         db.close()
 
+def _validate_strategy_context(onboarding_data: Dict[str, Any]) -> None:
+    """Fail-fast: reject strategy generation when onboarding context is missing.
+
+    A strategy generated without real onboarding data is ungrounded and
+    meaningless; fail loudly instead of silently producing generic output.
+    """
+    if not onboarding_data or not isinstance(onboarding_data, dict):
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot generate strategy: onboarding context is missing. Complete onboarding first."
+        )
+
+    website = onboarding_data.get("website_analysis") or {}
+    persona = onboarding_data.get("persona_data") or {}
+    session = onboarding_data.get("onboarding_session") or {}
+
+    has_url = bool(website.get("website_url"))
+    has_persona = bool(persona.get("core_persona") or persona.get("corePersona"))
+    has_completed = bool(session) and (session.get("progress") in (3, 4, 5, 100) or session.get("completed") is True)
+
+    if not (has_url or has_persona or has_completed):
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot generate strategy: no onboarding context (website, persona, or completed session) found. Complete onboarding first."
+        )
+
+
 # Global storage for latest strategies (more persistent than task status)
 _latest_strategies = {}
 
@@ -97,6 +124,9 @@ async def generate_comprehensive_strategy(
         
         # Get onboarding data for context
         onboarding_data = await enhanced_service._get_onboarding_data(user_id)
+        
+        # Fail-fast: never generate a strategy without grounding onboarding context.
+        _validate_strategy_context(onboarding_data)
         
         # Build context for AI generation
         context = {
@@ -177,6 +207,7 @@ async def generate_strategy_component(
             db_service = EnhancedStrategyDBService(db)
             enhanced_service = EnhancedStrategyService(db_service)
             onboarding_data = await enhanced_service._get_onboarding_data(user_id)
+            _validate_strategy_context(onboarding_data)
             context = {"onboarding_data": onboarding_data, "user_id": user_id}
         
         # Get base strategy if not provided
@@ -315,6 +346,7 @@ async def optimize_existing_strategy(
         
         # Get user context
         onboarding_data = await enhanced_service._get_onboarding_data(user_id)
+        _validate_strategy_context(onboarding_data)
         context = {"onboarding_data": onboarding_data, "user_id": user_id}
         
         # Initialize AI strategy generator
@@ -372,6 +404,7 @@ async def generate_comprehensive_strategy_polling(
         
         # Get onboarding data for context
         onboarding_data = await enhanced_service._get_onboarding_data(user_id)
+        _validate_strategy_context(onboarding_data)
                 
         # Build context for AI generation
         context = {

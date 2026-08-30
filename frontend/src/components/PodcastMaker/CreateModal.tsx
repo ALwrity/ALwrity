@@ -93,6 +93,11 @@ export const CreateModal: React.FC<CreateModalProps> = ({ onCreate, open, defaul
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarPreviewBlobUrl, setAvatarPreviewBlobUrl] = useState<string | null>(null);
+  const [draftProjectId] = useState<string>(() => `podcast_${Date.now()}_${Math.floor(Math.random() * 1000)}`);
+  const [presenterReferenceUrl, setPresenterReferenceUrl] = useState<string | null>(null);
+  const [presenterReferenceBlobUrl, setPresenterReferenceBlobUrl] = useState<string | null>(null);
+  const [generatingPresenterReference, setGeneratingPresenterReference] = useState<boolean>(false);
+  const [presenterStyleIndex, setPresenterStyleIndex] = useState<number>(0);
   const [makingPresentable, setMakingPresentable] = useState(false);
   const [enhancingTopic, setEnhancingTopic] = useState(false);
   const [enhanceTopicProgressIndex, setEnhanceTopicProgressIndex] = useState(0);
@@ -334,6 +339,84 @@ useEffect(() => {
     };
   }, [brandAvatarFromDb]);
 
+  // Handle blob URL for presenter reference image preview
+  useEffect(() => {
+    if (!presenterReferenceUrl) {
+      setPresenterReferenceBlobUrl(null);
+      return;
+    }
+
+    let isMounted = true;
+    const currentRef = presenterReferenceUrl;
+
+    const loadRefBlob = async () => {
+      try {
+        clearMediaCache(currentRef);
+        const blobUrl = await fetchMediaBlobUrl(currentRef);
+
+        if (!isMounted || presenterReferenceUrl !== currentRef) {
+          if (blobUrl && blobUrl.startsWith("blob:")) {
+            URL.revokeObjectURL(blobUrl);
+          }
+          return;
+        }
+
+        setPresenterReferenceBlobUrl((prev) => {
+          if (prev && prev !== blobUrl && prev.startsWith("blob:")) {
+            URL.revokeObjectURL(prev);
+          }
+          return blobUrl;
+        });
+      } catch {
+        if (isMounted && presenterReferenceUrl === currentRef) {
+          setPresenterReferenceBlobUrl(null);
+        }
+      }
+    };
+
+    loadRefBlob();
+
+    return () => {
+      isMounted = false;
+      setPresenterReferenceBlobUrl((prev) => {
+        if (prev && prev.startsWith("blob:")) {
+          URL.revokeObjectURL(prev);
+        }
+        return null;
+      });
+    };
+  }, [presenterReferenceUrl]);
+
+  const handleGeneratePresenterReference = React.useCallback(async (forceRegenerate: boolean = false, styleIndex?: number) => {
+    if (generatingPresenterReference) return;
+    try {
+      setGeneratingPresenterReference(true);
+      const targetStyleIndex = styleIndex !== undefined ? styleIndex : presenterStyleIndex;
+      if (styleIndex !== undefined) {
+        setPresenterStyleIndex(styleIndex);
+      }
+      console.log(`[CreateModal] Calling generatePresenterReference: draftProjectId=${draftProjectId}, forceRegenerate=${forceRegenerate}, styleIndex=${targetStyleIndex}`);
+      const result = await podcastApi.generatePresenterReference({
+        projectId: draftProjectId,
+        forceRegenerate,
+        styleIndex: targetStyleIndex,
+        idea: topicInput.trim() || undefined,
+      });
+      console.log("[CreateModal] Presenter reference generated successfully:", result);
+      if (result.reference_url) {
+        setPresenterReferenceUrl(result.reference_url);
+      }
+    } catch (error: any) {
+      console.error("[CreateModal] Failed to generate presenter reference:", error);
+      const msg = error?.response?.data?.detail?.message || error?.message || "Failed to generate presenter reference image";
+      setSubmitError(msg);
+    } finally {
+      setGeneratingPresenterReference(false);
+    }
+  }, [draftProjectId, generatingPresenterReference, presenterStyleIndex, topicInput]);
+
+
+
   // Ensure duration and speakers are within limits
   useEffect(() => {
     if (duration > 10) {
@@ -498,9 +581,9 @@ useEffect(() => {
   const hasSpeakers = Boolean(speakers >= 1 && speakers <= 2);
   const hasPodcastMode = Boolean(podcastMode);
 
-  // Required: topic, duration, speakers, voice, podcastMode, presenter avatar
-  // Avatar required for video modes; for audio_only, still require avatar for presenter display
-  const canSubmit = Boolean(hasTopic && hasVoice && hasDuration && hasSpeakers && hasPodcastMode && hasAvatar);
+  // Required: topic, duration, speakers, voice, podcastMode
+  // Presenter avatar is optional (Pro feature for custom cloning; Free tier auto-generates studio presenter via Path B)
+  const canSubmit = Boolean(hasTopic && hasVoice && hasDuration && hasSpeakers && hasPodcastMode);
 
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -623,13 +706,14 @@ useEffect(() => {
         budgetCap,
         files: { voiceFile, avatarFile },
         avatarUrl: finalAvatarUrl,
+        presenterReferenceUrl: presenterReferenceUrl || null,
         podcastMode,
       });
     } catch (err: any) {
       console.error("[CreateModal] Submit error:", err);
       setSubmitError(err?.message || String(err) || "Failed to create project");
     }
-  }, [canSubmit, isSubmitting, isUrl, topicInput, avatarFile, avatarUrl, knobs, selectedVoiceId, speakers, duration, budgetCap, podcastMode, onCreate]);
+  }, [canSubmit, isSubmitting, isUrl, topicInput, avatarFile, avatarUrl, presenterReferenceUrl, knobs, selectedVoiceId, speakers, duration, budgetCap, podcastMode, onCreate]);
 
   const reset = () => {
     setTopicInput("");
@@ -640,6 +724,9 @@ useEffect(() => {
     setAvatarFile(null);
     setAvatarPreview(null);
     setAvatarUrl(null);
+    setPresenterReferenceUrl(null);
+    setPresenterReferenceBlobUrl(null);
+    setPresenterStyleIndex(0);
     setMakingPresentable(false);
     setEnhancingTopic(false);
     setEnhanceTopicProgressIndex(0);
@@ -882,6 +969,11 @@ useEffect(() => {
           cameraSelfieOpen={cameraSelfieOpen}
           setCameraSelfieOpen={setCameraSelfieOpen}
           podcastMode={podcastMode}
+          presenterReferenceUrl={presenterReferenceUrl}
+          presenterReferenceBlobUrl={presenterReferenceBlobUrl}
+          generatingPresenterReference={generatingPresenterReference}
+          onGeneratePresenterReference={handleGeneratePresenterReference}
+          presenterStyleIndex={presenterStyleIndex}
         />
 
         <VoiceSelector

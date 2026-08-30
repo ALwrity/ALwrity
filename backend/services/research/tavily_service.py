@@ -61,7 +61,7 @@ class TavilyService:
                 self.enabled = False
                 return
             self.enabled = True
-            logger.info("Tavily Service initialized successfully")
+            logger.debug("Tavily Service initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Tavily service: {e}")
             self.enabled = False

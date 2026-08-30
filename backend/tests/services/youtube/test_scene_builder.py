@@ -211,6 +211,47 @@ class TestBuildScenesFromPlan:
 
         mock_batch.assert_called_once()
         assert enhanced[0]["enhanced_visual_prompt"] == "Wide shot of a busy departure hall"
+        assert enhanced[0]["visual_prompt"] == "Wide shot of a busy departure hall"
+        assert enhanced[0]["visual_prompt"] != enhanced[0]["narration"]
+
+    def test_seeds_hook_visual_when_enhance_returns_empty(self):
+        from services.youtube.scene_builder import YouTubeSceneBuilderService
+
+        with patch("services.youtube.scene_builder.PromptEnhancerService"):
+            svc = YouTubeSceneBuilderService()
+            scenes = [
+                {
+                    "scene_number": 1,
+                    "title": "Hook",
+                    "emphasis": "hook",
+                    "narration": "Want titles that explode clicks? Watch this!",
+                    "visual_prompt": "",
+                    "visual_description": "",
+                },
+                {
+                    "scene_number": 2,
+                    "title": "Why midweek is cheaper",
+                    "emphasis": "main_content",
+                    "narration": "Book midweek",
+                    "visual_prompt": "Calendar highlighting Tuesday",
+                    "visual_description": "Calendar highlighting Tuesday",
+                },
+            ]
+            with patch.object(
+                svc,
+                "_batch_enhance_prompts",
+                return_value={0: "", 1: "Calendar highlighting Tuesday"},
+            ):
+                enhanced = svc._enhance_visual_prompts_batch(
+                    scenes=scenes,
+                    video_plan={"duration_type": "shorts"},
+                    user_id="user_scenes",
+                    duration_type="shorts",
+                )
+
+        assert "Calendar highlighting Tuesday" in enhanced[0]["visual_prompt"]
+        assert enhanced[0]["visual_prompt"] != enhanced[0]["narration"]
+        assert enhanced[1]["visual_prompt"] == "Calendar highlighting Tuesday"
 
     def test_error_is_wrapped_as_http_500(self):
         from services.youtube.scene_builder import YouTubeSceneBuilderService
@@ -232,3 +273,31 @@ class TestBuildScenesFromPlan:
                         user_id="user_scenes",
                     )
         assert exc.value.status_code == 500
+
+
+class TestMapYoutubeEnhanceResponse:
+    def test_accepts_list_of_strings(self):
+        from services.youtube.youtube_scene_enhance_response import map_youtube_enhance_response
+
+        mapped = map_youtube_enhance_response(
+            ["Opening kitchen shot", "Calendar close-up"],
+            [
+                {"image_prompt": ""},
+                {"image_prompt": "seed"},
+            ],
+        )
+        assert mapped[0] == "Opening kitchen shot"
+        assert mapped[1] == "Calendar close-up"
+
+    def test_accepts_one_based_scene_index(self):
+        from services.youtube.youtube_scene_enhance_response import map_youtube_enhance_response
+
+        mapped = map_youtube_enhance_response(
+            [
+                {"scene_index": 1, "enhanced_prompt": "Hook shot"},
+                {"scene_index": 2, "enhanced_prompt": "Beat shot"},
+            ],
+            [{"image_prompt": ""}, {"image_prompt": ""}],
+        )
+        assert mapped[0] == "Hook shot"
+        assert mapped[1] == "Beat shot"

@@ -37,6 +37,7 @@ import models.content_strategy_state_models  # noqa: E402, F401
 import models.crawled_content  # noqa: E402, F401
 import models.daily_meeting_models  # noqa: E402, F401
 import models.daily_workflow_models  # noqa: E402, F401
+import models.daily_email_ledger  # noqa: E402, F401
 import models.workflow_execution_models  # noqa: E402, F401
 import models.enhanced_calendar_models  # noqa: E402, F401
 import models.enhanced_strategy_models  # noqa: E402, F401
@@ -128,8 +129,8 @@ def _auto_stamp_existing_db(engine, user_id: str) -> bool:
 
         cfg = AlembicConfig(str(_ALEMBIC_INI_PATH))
         cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
-        command.stamp(cfg, "head")
-        logger.info(f"Stamped existing DB for user {user_id} at Alembic head")
+        command.stamp(cfg, "a4fe799f2cab")
+        logger.info(f"Stamped existing DB for user {user_id} at Alembic baseline a4fe799f2cab")
         return True
     except Exception as exc:
         logger.warning(f"Could not auto-stamp DB for user {user_id}: {exc}")
@@ -149,6 +150,24 @@ def init_user_database(user_id: str) -> None:
         _auto_stamp_existing_db(engine, user_id)
         command.upgrade(alembic_cfg, "head")
 
+        # Ensure schema integrity for columns that might have been skipped by premature head stamps
+        db_path = engine.url.database
+        try:
+            conn = sqlite3.connect(db_path)
+            tables = [t[0] for t in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+            if "onboarding_sessions" in tables:
+                cols = [c[1] for c in conn.execute("PRAGMA table_info(onboarding_sessions)").fetchall()]
+                if "timezone" not in cols:
+                    conn.execute("ALTER TABLE onboarding_sessions ADD COLUMN timezone VARCHAR(50)")
+                if "contact_email" not in cols:
+                    conn.execute("ALTER TABLE onboarding_sessions ADD COLUMN contact_email VARCHAR(255)")
+                if "email_digest_opt_in" not in cols:
+                    conn.execute("ALTER TABLE onboarding_sessions ADD COLUMN email_digest_opt_in BOOLEAN DEFAULT 0")
+                conn.commit()
+            conn.close()
+        except Exception as heal_exc:
+            logger.debug(f"Schema column check for {user_id}: {heal_exc}")
+
         if user_id not in _pricing_initialized:
             _pricing_initialized.add(user_id)
             try:
@@ -161,7 +180,7 @@ def init_user_database(user_id: str) -> None:
                     pricing_service.initialize_default_pricing()
                     pricing_service.initialize_default_plans()
                     db.commit()
-                    logger.info(f"Default pricing and plans initialized for user {user_id}")
+                    logger.debug(f"Default pricing and plans initialized for user {user_id}")
                 except Exception as data_error:
                     logger.error(f"Error initializing default data for user {user_id}: {data_error}")
                     db.rollback()
@@ -172,7 +191,7 @@ def init_user_database(user_id: str) -> None:
                     f"Could not initialize pricing data (PricingService import failed): {import_error}"
                 )
 
-        logger.info(f"Database initialized successfully for user {user_id}")
+        logger.debug(f"Database initialized successfully for user {user_id}")
     except SQLAlchemyError as e:
         logger.error(f"Error initializing database for user {user_id}: {str(e)}")
         raise

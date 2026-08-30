@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
-  Paper,
   CircularProgress,
   Alert,
   Button,
@@ -10,14 +9,14 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  Divider,
   Tooltip,
   IconButton,
   Collapse,
   Chip,
+  Stack,
 } from '@mui/material';
-import AssessmentIcon from '@mui/icons-material/Assessment';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import InfoIcon from '@mui/icons-material/Info';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import SearchIcon from '@mui/icons-material/Search';
@@ -30,6 +29,7 @@ import type { Competitor } from './WebsiteStep/components';
 import ResearchStepBackgroundSetupModal from './CompetitorAnalysisStep/ResearchStepBackgroundSetupModal';
 import { SifIndexingPanel } from './common/SifIndexingPanel';
 import { ContentPillarsSection, type ContentPillarData } from './CompetitorAnalysisStep/ContentPillarsSection';
+import { BenchmarkInsightsSection } from './CompetitorAnalysisStep/BenchmarkInsightsSection';
 import { StrategicInsightsSection } from './CompetitorAnalysisStep/StrategicInsightsSection';
 import { InsightsModals } from './CompetitorAnalysisStep/InsightsModals';
 import { ProgressModal } from './CompetitorAnalysisStep/ProgressModal';
@@ -51,6 +51,29 @@ const lightTheme = {
   shadowMd: '0 4px 10px rgba(16,24,40,0.08)',
   radiusLg: '20px'
 };
+
+// Render a titled list of strings with bullet styling (used in the competitor modal)
+const renderStringList = (title: string, items: string[]): React.ReactNode => (
+  <Box>
+    <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+      {title}
+    </Typography>
+    <Stack spacing={0.5}>
+      {items.map((item, i) => (
+        <Typography key={i} variant="body2" sx={{ color: '#4B5563' }}>
+          • {item}
+        </Typography>
+      ))}
+    </Stack>
+  </Box>
+);
+
+// Convert snake_case keys into human-friendly labels
+const labelify = (key: string): string =>
+  key
+    .split('_')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
 
 interface ResearchSummary {
   total_competitors: number;
@@ -80,8 +103,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
 
   // UI state (modals, header, sitemap, social discovery) — stays in parent
   const [showHighlightsModal, setShowHighlightsModal] = useState(false);
-  const [selectedCompetitorHighlights, setSelectedCompetitorHighlights] = useState<string[]>([]);
-  const [selectedCompetitorTitle, setSelectedCompetitorTitle] = useState<string>('');
+  const [selectedCompetitor, setSelectedCompetitor] = useState<Competitor | null>(null);
   // Seed from initialData so the persisted sitemap/strategic insights render
   // immediately and don't trigger an unnecessary AI call on back-navigation.
   const [sitemapAnalysis, setSitemapAnalysis] = useState<any>(initialData?.sitemapAnalysis ?? null);
@@ -123,6 +145,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     usingCachedData,
     startCompetitorDiscovery,
     updateCacheWithSitemapAnalysis,
+    refreshContentPillars,
   } = useCompetitorDiscovery({
     userUrl,
     industryContext,
@@ -218,40 +241,99 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   const startSitemapAnalysis = useCallback(async (force = false) => {
     if (isAnalyzingSitemap) return;
     
+    const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
+    const stateKey = 'alwrity_sitemap_state';
+
+    // DB-first: when not forced, restore the persisted analysis from the DB
+    // (mirrors the Discovered Competitors flow) before paying for an LLM call.
+    if (!force && finalUserUrl) {
+      try {
+        const dbResp = await aiApiClient.get('/api/onboarding/step3/sitemap-analysis', {
+          params: { user_url: finalUserUrl }
+        });
+        if (dbResp?.data?.success && dbResp.data.sitemap_analysis) {
+          const cached = dbResp.data.sitemap_analysis;
+          console.log('[sitemap] Loaded persisted analysis from DB');
+          setSitemapAnalysis(cached);
+          updateCacheWithSitemapAnalysis(cached);
+          return;
+        }
+      } catch (e) {
+        console.warn('[sitemap] DB lookup failed, will fall through to LLM', e);
+      }
+    }
+
+    // Persistent guard (localStorage, not sessionStorage — survives hard refresh):
+    // blocks duplicate LLM calls across remounts AND page reloads.
+    if (!force && finalUserUrl) {
+      try {
+        const prev = JSON.parse(localStorage.getItem(stateKey) || 'null');
+        if (prev && prev.url === finalUserUrl) {
+          const ageMs = Date.now() - (prev.ts || 0);
+          if (prev.status === 'inflight' && ageMs < 5 * 60_000) {
+            console.log('[sitemap] Blocked: already inflight');
+            return;
+          }
+          if (prev.status === 'done' && ageMs < 24 * 60 * 60_000) {
+            console.log('[sitemap] Blocked: completed within 24h');
+            return;
+          }
+        }
+      } catch { /* corrupted — ignore */ }
+    }
+    
     setIsAnalyzingSitemap(true);
     if (force) {
-        setSitemapAnalysis(null); // Clear existing data to show loading state
+        setSitemapAnalysis(null);
+    }
+
+    // Mark inflight
+    if (finalUserUrl) {
+      try {
+        localStorage.setItem(stateKey, JSON.stringify({ url: finalUserUrl, status: 'inflight', ts: Date.now() }));
+      } catch { /* non-critical */ }
     }
     
     try {
-      const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
       const competitorDomains = competitors.map(c => c.domain).filter(Boolean);
       
-      console.log('Starting sitemap analysis for:', finalUserUrl);
+      console.log('[sitemap] Starting analysis for:', finalUserUrl);
       
       const response = await aiApiClient.post('/api/onboarding/step3/analyze-sitemap', {
         user_url: finalUserUrl,
         competitors: competitorDomains,
         industry_context: industryContext,
         analyze_content_trends: true,
-        analyze_publishing_patterns: true
+        analyze_publishing_patterns: true,
+        force
       });
       
       const result = response.data;
       
       if (result.success) {
-        console.log('Sitemap analysis completed successfully');
+        console.log('[sitemap] Analysis completed successfully');
         setSitemapAnalysis(result);
-        
-        // Update cache with sitemap analysis
         updateCacheWithSitemapAnalysis(result);
+
+        // Mark done (24h TTL in the check above)
+        if (finalUserUrl) {
+          try {
+            localStorage.setItem(stateKey, JSON.stringify({ url: finalUserUrl, status: 'done', ts: Date.now() }));
+          } catch { /* non-critical */ }
+        }
+      } else if (result.error === 'analysis_in_progress') {
+        console.log('[sitemap] Backend busy — another request running');
+        // Leave state as-is so next mount also waits
       } else {
-        console.error('Sitemap analysis failed:', result.error);
+        console.error('[sitemap] Analysis failed:', result.error);
         setError(result.error || 'Sitemap analysis failed');
+        // Clear state on hard failure so next mount retries
+        if (finalUserUrl) localStorage.removeItem(stateKey);
       }
     } catch (err) {
-      console.error('Sitemap analysis error:', err);
+      console.error('[sitemap] Request error:', err);
       setError(err instanceof Error ? err.message : 'Sitemap analysis failed');
+      if (finalUserUrl) localStorage.removeItem(stateKey);
     } finally {
       setIsAnalyzingSitemap(false);
     }
@@ -283,22 +365,41 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   }, [competitors.length, sitemapAnalysis]);
 
   // Auto-trigger sitemap analysis only when competitors load and there is no
-  // persisted data either in state or from the Wizard's initialData. Waiting on
-  // initialData prevents an unnecessary LLM call on back-navigation.
+  // persisted data available in state, initialData, or localStorage. The
+  // localStorage check here must be SYNCHRONOUS: the cache-load effect above
+  // only schedules a state update, and within the same commit this effect
+  // would otherwise still see the stale null value and fire an LLM call.
   useEffect(() => {
     if (
       competitors.length > 0 &&
       !sitemapAnalysis &&
-      !initialData?.sitemapAnalysis &&
       !isAnalyzing &&
       !isAnalyzingSitemap &&
       !sitemapAutoTriggered.current
     ) {
+      // Re-check initialData at fire time
+      if (initialData?.sitemapAnalysis) return;
+
+      // Re-check localStorage synchronously (covers back-navigation where
+      // Wizard's stepData was seeded before the analysis ever ran)
+      let hasCached = false;
+      try {
+        const cachedData = JSON.parse(localStorage.getItem('competitor_analysis_data') || 'null');
+        if (cachedData?.sitemap_analysis) {
+          setSitemapAnalysis(cachedData.sitemap_analysis);
+          hasCached = true;
+        }
+      } catch {
+        // Corrupted cache — treat as absent
+      }
+      if (hasCached) {
+        console.log('CompetitorAnalysisStep: Using cached sitemap analysis, skipping auto-trigger');
+        return;
+      }
+
       sitemapAutoTriggered.current = true;
       console.log('CompetitorAnalysisStep: Auto-triggering sitemap analysis');
-      startSitemapAnalysis(false).finally(() => {
-        sitemapAutoTriggered.current = false;
-      });
+      startSitemapAnalysis(false);
     }
   }, [competitors.length, isAnalyzing, sitemapAnalysis, isAnalyzingSitemap, startSitemapAnalysis, initialData?.sitemapAnalysis]);
 
@@ -306,6 +407,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   const [benchmarkReport, setBenchmarkReport] = useState<any>(null);
   const [benchmarkLoading, setBenchmarkLoading] = useState(false);
   const [isRunningBenchmark, setIsRunningBenchmark] = useState(false);
+  const [benchmarkError, setBenchmarkError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!competitors.length || isAnalyzing) return;
@@ -324,33 +426,55 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     return () => { cancelled = true; };
   }, [competitors.length, isAnalyzing]);
 
+  // Normalize a competitor's identifier into a usable URL. Sources may store a
+  // bare domain (e.g. "example.com") instead of a full scheme — accept both so
+  // the benchmark is never silently skipped.
+  const normalizeCompetitorUrl = (c: Competitor): string | null => {
+    const raw = (c?.url || c?.domain || '').trim();
+    if (!raw) return null;
+    const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw)
+      ? raw
+      : `https://${raw}`;
+    return candidate;
+  };
+
   const runSitemapBenchmark = async () => {
     const validCompetitors = competitors
-      .filter(c => c.url && (c.url.startsWith('http') || c.url.startsWith('https')))
-      .map(c => c.url);
-    if (!validCompetitors.length) return;
+      .map(normalizeCompetitorUrl)
+      .filter((u): u is string => !!u);
+    setBenchmarkError(null);
+    if (!validCompetitors.length) {
+      // Nothing to benchmark — tell the user instead of silently doing nothing.
+      setBenchmarkError('No competitor URLs available. Add or refresh competitors before running the benchmark.');
+      return;
+    }
     setIsRunningBenchmark(true);
     try {
       await longRunningApiClient.post('/api/seo/competitive-sitemap-benchmarking/run', {
         max_competitors: 5,
         competitors: validCompetitors.slice(0, 5)
       });
+      setBenchmarkError(null);
+      // The run is a background task — poll until the report is persisted so the
+      // result appears without requiring a manual "View Sitemap Report" click.
+      for (let attempt = 0; attempt < 12; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        try {
+          const resp = await aiApiClient.get('/api/onboarding/step3/sitemap-benchmark-report');
+          const report = resp.data || resp.data?.benchmark;
+          if (report && (report?.competitors?.summaries || report?.competitors?.errors)) {
+            setBenchmarkReport(report);
+            break;
+          }
+        } catch {
+          break;
+        }
+      }
     } catch (err) {
       console.warn('Sitemap benchmark run failed (may already be running):', err);
+      setBenchmarkError('Failed to start the sitemap benchmark. Please try again.');
     }
     setIsRunningBenchmark(false);
-  };
-
-  const fetchSitemapReport = async () => {
-    setBenchmarkLoading(true);
-    try {
-      const resp = await aiApiClient.get('/api/onboarding/step3/sitemap-benchmark-report');
-      setBenchmarkReport(resp.data || resp.data?.benchmark);
-    } catch {
-      setBenchmarkReport(null);
-    } finally {
-      setBenchmarkLoading(false);
-    }
   };
 
   // Data collection function for global Continue button (no side effects)
@@ -381,8 +505,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   }, [onDataReady, getResearchData]); // Include getResearchData in dependencies
 
   const handleShowHighlights = (competitor: Competitor) => {
-    setSelectedCompetitorHighlights(competitor.highlights || []);
-    setSelectedCompetitorTitle(competitor.title);
+    setSelectedCompetitor(competitor);
     setShowHighlightsModal(true);
   };
 
@@ -407,13 +530,21 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     const newCompetitors = [...competitors];
     newCompetitors.splice(index, 1);
     setCompetitors(newCompetitors);
-    // Update cache
+    // Update cache - clear entire cache if no competitors remain to prevent
+    // stale data resurrection on next page load
     try {
-        const cachedData = localStorage.getItem('competitor_analysis_data');
-        if (cachedData) {
-            const parsedData = JSON.parse(cachedData);
-            parsedData.competitors = newCompetitors;
-            localStorage.setItem('competitor_analysis_data', JSON.stringify(parsedData));
+        if (newCompetitors.length === 0) {
+            localStorage.removeItem('competitor_analysis_data');
+            localStorage.removeItem('competitor_analysis_url');
+            localStorage.removeItem('competitor_analysis_timestamp');
+            console.log('Cleared competitor cache after deleting last competitor');
+        } else {
+            const cachedData = localStorage.getItem('competitor_analysis_data');
+            if (cachedData) {
+                const parsedData = JSON.parse(cachedData);
+                parsedData.competitors = newCompetitors;
+                localStorage.setItem('competitor_analysis_data', JSON.stringify(parsedData));
+            }
         }
     } catch (e) {
         console.warn('Failed to update cache for competitors', e);
@@ -594,82 +725,23 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         onAddCompetitor={handleAddCompetitor}
       />
 
-      {/* Sitemap Benchmark Actions — user-triggered */}
-      {competitors.length > 0 && (
-        <Box mt={3} display="flex" gap={2} flexWrap="wrap">
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={isRunningBenchmark ? <CircularProgress size={14} /> : <RefreshIcon />}
-            onClick={runSitemapBenchmark}
-            disabled={isRunningBenchmark}
-            sx={{ textTransform: 'none' }}
-          >
-            {isRunningBenchmark ? 'Scheduling...' : 'Run Sitemap Benchmark'}
-          </Button>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={benchmarkLoading ? <CircularProgress size={14} /> : <AssessmentIcon />}
-            onClick={fetchSitemapReport}
-            disabled={benchmarkLoading}
-            sx={{ textTransform: 'none' }}
-          >
-            {benchmarkLoading ? 'Loading...' : 'View Sitemap Report'}
-          </Button>
-        </Box>
+      {benchmarkError && (
+        <Alert severity="warning" sx={{ mt: 2 }} onClose={() => setBenchmarkError(null)}>
+          {benchmarkError}
+        </Alert>
       )}
 
       {/* Content Pillars Section */}
-      <ContentPillarsSection data={contentPillars} isLoading={isLoadingPillars} error={error} />
+      <ContentPillarsSection data={contentPillars} isLoading={isLoadingPillars} error={error} onRefresh={refreshContentPillars} />
 
-      {/* Competitor Sitemap Analysis — results */}
-      {benchmarkReport && (
-        <Box mt={4} mb={3}>
-          <Paper sx={{ p: 3, bgcolor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 2 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, color: '#1e293b' }}>
-              Competitor Sitemap Analysis
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {benchmarkReport.competitors?.summaries &&
-                Object.entries(benchmarkReport.competitors.summaries).map(([url, info]: [string, any]) => {
-                  let hostname = url;
-                  try { hostname = new URL(url).hostname.replace('www.', ''); } catch {}
-                  return (
-                  <Chip
-                    key={url}
-                    size="small"
-                    label={hostname}
-                    icon={info?.error ? <span style={{ fontSize: 14 }}>⚠️</span> : <CheckCircleIcon sx={{ fontSize: 18, color: '#10b981' }} />}
-                    color={info?.error ? 'default' : 'success'}
-                    variant={info?.error ? 'outlined' : 'filled'}
-                    title={info?.error || `Analyzed: ${(info as any)?.total_urls ?? '?'} URLs`}
-                  />
-                )})}
-              {benchmarkReport.competitors?.errors &&
-                Object.entries(benchmarkReport.competitors.errors).map(([url, err]: [string, any]) => {
-                  let hostname = url;
-                  try { hostname = new URL(url).hostname.replace('www.', ''); } catch {}
-                  return (
-                  <Chip
-                    key={`err-${url}`}
-                    size="small"
-                    label={hostname}
-                    icon={<span style={{ fontSize: 14 }}>❌</span>}
-                    color="error"
-                    variant="outlined"
-                    title={typeof err === 'string' ? err : 'Analysis failed'}
-                  />
-                )})}
-            </Box>
-            {(!benchmarkReport?.competitors?.summaries && !benchmarkReport?.competitors?.errors) && (
-              <Typography variant="body2" sx={{ color: '#64748b', fontStyle: 'italic' }}>
-                Analysis running in background — results will appear here when complete.
-              </Typography>
-            )}
-          </Paper>
-        </Box>
-      )}
+      {/* Competitor Sitemap Benchmark — enriched insights */}
+      <Box mt={4} mb={3}>
+        <BenchmarkInsightsSection
+          report={benchmarkReport}
+          onRefresh={runSitemapBenchmark}
+          isRefreshing={isRunningBenchmark}
+        />
+      </Box>
 
       {/* Strategic Content Opportunities Section */}
       {competitors.length > 0 && (
@@ -704,45 +776,213 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         step={analysisStep}
       />
 
-      {/* Highlights Modal */}
-      <Dialog 
-        open={showHighlightsModal} 
+      {/* Competitor analysis modal — shows the full data persisted by the backend */}
+      <Dialog
+        open={showHighlightsModal}
         onClose={() => setShowHighlightsModal(false)}
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>
-          <Typography variant="h6" component="span" fontWeight={600}>
-            Key Highlights - {selectedCompetitorTitle}
-          </Typography>
-        </DialogTitle>
-        <DialogContent>
-          {selectedCompetitorHighlights.length > 0 ? (
-            <Box>
-              {selectedCompetitorHighlights.map((highlight, index) => (
-                <Box 
-                  key={index} 
-                  sx={{ 
-                    p: 2, 
-                    mb: 2, 
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    backgroundColor: 'background.paper'
-                  }}
-                >
-                  <Typography variant="body2" color="text.secondary">
-                    {highlight}
-                  </Typography>
+        {selectedCompetitor && (
+          <>
+            <DialogTitle>
+              <Typography variant="h6" component="span" fontWeight={700} sx={{ color: '#0B1220' }}>
+                {selectedCompetitor.title || selectedCompetitor.domain}
+              </Typography>
+              <Typography variant="caption" component="div" sx={{ color: '#6B7280', mt: 0.5 }}>
+                {selectedCompetitor.domain}
+              </Typography>
+            </DialogTitle>
+            <DialogContent dividers>
+              <Stack spacing={2.5}>
+                {/* Top-line chips */}
+                <Box display="flex" gap={1} flexWrap="wrap">
+                  <Chip
+                    size="small"
+                    label={`${Math.round(selectedCompetitor.relevance_score * 100)}% match`}
+                    sx={{ bgcolor: '#f0fdf4', color: '#15803d', fontWeight: 600, border: '1px solid #bbf7d0' }}
+                  />
+                  {selectedCompetitor.competitive_insights?.threat_level && (
+                    <Chip
+                      size="small"
+                      label={`Threat: ${selectedCompetitor.competitive_insights.threat_level}`}
+                      sx={{
+                        bgcolor:
+                          selectedCompetitor.competitive_insights.threat_level === 'high'
+                            ? '#fef2f2' : selectedCompetitor.competitive_insights.threat_level === 'low'
+                            ? '#f0fdf4' : '#fffbeb',
+                        color:
+                          selectedCompetitor.competitive_insights.threat_level === 'high'
+                            ? '#b91c1c' : selectedCompetitor.competitive_insights.threat_level === 'low'
+                            ? '#15803d' : '#b45309',
+                        fontWeight: 600,
+                        border: '1px solid',
+                        borderColor:
+                          selectedCompetitor.competitive_insights.threat_level === 'high'
+                            ? '#fecaca' : selectedCompetitor.competitive_insights.threat_level === 'low'
+                            ? '#bbf7d0' : '#fde68a',
+                      }}
+                    />
+                  )}
+                  {selectedCompetitor.published_date && (
+                    <Chip
+                      size="small"
+                      label={`Published: ${new Date(selectedCompetitor.published_date).toLocaleDateString()}`}
+                      variant="outlined"
+                      sx={{ fontSize: '0.7rem', height: 22, borderColor: '#E5E7EB', color: '#6B7280' }}
+                    />
+                  )}
                 </Box>
-              ))}
-            </Box>
-          ) : (
-            <Typography variant="body2" color="text.secondary">
-              No highlights available for this competitor.
-            </Typography>
-          )}
-        </DialogContent>
+
+                {/* Summary */}
+                {selectedCompetitor.summary && (
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+                      Summary
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#4B5563' }}>
+                      {selectedCompetitor.summary}
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Business / audience / market share */}
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+                    Business & Audience
+                  </Typography>
+                  <Box display="flex" gap={1} flexWrap="wrap">
+                    {selectedCompetitor.competitive_insights?.business_model &&
+                      selectedCompetitor.competitive_insights.business_model !== 'unknown' && (
+                        <Chip size="small" label={`Model: ${selectedCompetitor.competitive_insights.business_model}`} variant="outlined" sx={{ fontSize: '0.72rem', borderColor: '#d1d5db', color: '#374151' }} />
+                      )}
+                    {selectedCompetitor.competitive_insights?.target_audience &&
+                      selectedCompetitor.competitive_insights.target_audience !== 'unknown' && (
+                        <Chip size="small" label={`Audience: ${selectedCompetitor.competitive_insights.target_audience}`} variant="outlined" sx={{ fontSize: '0.72rem', borderColor: '#d1d5db', color: '#374151' }} />
+                      )}
+                    {selectedCompetitor.competitive_insights?.market_share_estimate &&
+                      selectedCompetitor.competitive_insights.market_share_estimate !== 'unknown' && (
+                        <Chip size="small" label={`Market share: ${selectedCompetitor.competitive_insights.market_share_estimate}`} variant="outlined" sx={{ fontSize: '0.72rem', borderColor: '#d1d5db', color: '#374151' }} />
+                      )}
+                  </Box>
+                </Box>
+
+                {/* Strengths */}
+                {selectedCompetitor.competitive_insights.competitive_strengths &&
+                  selectedCompetitor.competitive_insights.competitive_strengths.length > 0 && (
+                    renderStringList('Competitive Strengths', selectedCompetitor.competitive_insights.competitive_strengths)
+                  )}
+
+                {/* Weaknesses */}
+                {selectedCompetitor.competitive_insights.competitive_weaknesses &&
+                  selectedCompetitor.competitive_insights.competitive_weaknesses.length > 0 && (
+                    renderStringList('Competitive Weaknesses', selectedCompetitor.competitive_insights.competitive_weaknesses)
+                  )}
+
+                {/* Differentiation opportunities */}
+                {selectedCompetitor.competitive_insights.differentiation_opportunities &&
+                  selectedCompetitor.competitive_insights.differentiation_opportunities.length > 0 && (
+                    renderStringList('Differentiation Opportunities', selectedCompetitor.competitive_insights.differentiation_opportunities)
+                  )}
+
+                {/* Market positioning */}
+                {selectedCompetitor.market_positioning && (
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+                      Market Positioning
+                    </Typography>
+                    <Box display="flex" gap={1} flexWrap="wrap">
+                      {Object.entries(selectedCompetitor.market_positioning)
+                        .filter(([, v]) => v && v !== 'unknown')
+                        .map(([k, v]) => (
+                          <Chip key={k} size="small" label={`${labelify(k)}: ${v}`} variant="outlined" sx={{ fontSize: '0.72rem', borderColor: '#d1d5db', color: '#374151' }} />
+                        ))}
+                      {(!selectedCompetitor.market_positioning || 
+                        !Object.values(selectedCompetitor.market_positioning).some((v) => v && v !== 'unknown')) && (
+                        <Typography variant="body2" color="text.secondary">No market positioning data available.</Typography>
+                      )}
+                    </Box>
+                  </Box>
+                )}
+
+                {/* Content insights */}
+                {selectedCompetitor.content_insights && (
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+                      Content Insights
+                    </Typography>
+                    <Box display="flex" gap={1} flexWrap="wrap">
+                      {selectedCompetitor.content_insights.content_focus && (
+                        <Chip size="small" label={`Focus: ${selectedCompetitor.content_insights.content_focus}`} variant="outlined" sx={{ fontSize: '0.72rem', borderColor: '#d1d5db', color: '#374151' }} />
+                      )}
+                      {selectedCompetitor.content_insights.target_audience && (
+                        <Chip size="small" label={`Audience: ${selectedCompetitor.content_insights.target_audience}`} variant="outlined" sx={{ fontSize: '0.72rem', borderColor: '#d1d5db', color: '#374151' }} />
+                      )}
+                      {selectedCompetitor.content_insights.content_quality && (
+                        <Chip size="small" label={`Quality: ${selectedCompetitor.content_insights.content_quality}`} variant="outlined" sx={{ fontSize: '0.72rem', borderColor: '#d1d5db', color: '#374151' }} />
+                      )}
+                      {selectedCompetitor.content_insights.publishing_frequency && (
+                        <Chip size="small" label={`Frequency: ${selectedCompetitor.content_insights.publishing_frequency}`} variant="outlined" sx={{ fontSize: '0.72rem', borderColor: '#d1d5db', color: '#374151' }} />
+                      )}
+                    </Box>
+                    {selectedCompetitor.content_insights.content_types &&
+                      selectedCompetitor.content_insights.content_types.length > 0 && (
+                      <Typography variant="body2" sx={{ color: '#4B5563', mt: 0.75 }}>
+                        <strong>Content types:</strong> {selectedCompetitor.content_insights.content_types.join(', ')}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+
+                <Divider />
+
+                {/* Highlights */}
+                <Box>
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+                    Key Highlights
+                  </Typography>
+                  {selectedCompetitor.highlights && selectedCompetitor.highlights.length > 0 ? (
+                    <Box>
+                      {selectedCompetitor.highlights.map((highlight, index) => (
+                        <Box
+                          key={index}
+                          sx={{
+                            p: 1.5,
+                            mb: 1,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            borderRadius: 1,
+                            backgroundColor: 'background.paper'
+                          }}
+                        >
+                          <Typography variant="body2" color="text.secondary">{highlight}</Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">No highlights available.</Typography>
+                  )}
+                </Box>
+
+                {/* Subpages */}
+                {selectedCompetitor.subpages && selectedCompetitor.subpages.length > 0 && (
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+                      Subpages ({selectedCompetitor.subpages.length})
+                    </Typography>
+                    <Stack spacing={0.5}>
+                      {selectedCompetitor.subpages.map((sp, i) => (
+                        <Typography key={i} variant="body2" sx={{ color: '#4B5563', wordBreak: 'break-all' }}>
+                          • {sp}
+                        </Typography>
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
+              </Stack>
+            </DialogContent>
+          </>
+        )}
       </Dialog>
 
       <ResearchStepBackgroundSetupModal

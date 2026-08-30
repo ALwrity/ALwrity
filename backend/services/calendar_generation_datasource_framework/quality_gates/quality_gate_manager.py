@@ -15,6 +15,7 @@ from .chain_context_gate import ChainContextGate
 from .calendar_structure_gate import CalendarStructureGate
 from .enterprise_standards_gate import EnterpriseStandardsGate
 from .kpi_integration_gate import KPIIntegrationGate
+from .onboarding_data_grounding_gate import OnboardingDataGroundingGate
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +33,10 @@ class QualityGateManager:
             "chain_context": ChainContextGate(),
             "calendar_structure": CalendarStructureGate(),
             "enterprise_standards": EnterpriseStandardsGate(),
-            "kpi_integration": KPIIntegrationGate()
+            "kpi_integration": KPIIntegrationGate(),
+            "onboarding_data_grounding": OnboardingDataGroundingGate()
         }
-        
+
         logger.info(f"Initialized QualityGateManager with {len(self.gates)} gates")
     
     async def validate_all_gates(self, calendar_data: Dict[str, Any], step_name: str = None) -> Dict[str, Any]:

@@ -53,7 +53,7 @@ export const generateBrandAvatar = async (
   provider?: string
 ): Promise<AssetResponse> => {
   try {
-    const response = await apiClient.post('/onboarding/assets/generate-avatar', {
+    const response = await apiClient.post(`${ONBOARDING_ASSET_QUERY_BASE}/generate-avatar`, {
       prompt,
       style_preset: stylePreset,
       aspect_ratio: aspectRatio,
@@ -74,7 +74,7 @@ export const generateBrandAvatar = async (
 
 export const optimizeAvatarPrompt = async (prompt: string): Promise<AssetResponse> => {
   try {
-    const response = await apiClient.post('/onboarding/assets/enhance-prompt', {
+    const response = await apiClient.post(`${ONBOARDING_ASSET_QUERY_BASE}/enhance-prompt`, {
       prompt,
       user_id: "current_user"
     });
@@ -98,7 +98,7 @@ export const createAvatarVariation = async (
     formData.append('file', file);
     formData.append('user_id', "current_user");
 
-    const response = await apiClient.post('/onboarding/assets/create-variation', formData, {
+    const response = await apiClient.post(`${ONBOARDING_ASSET_QUERY_BASE}/create-variation`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -121,7 +121,7 @@ export const enhanceBrandAvatar = async (
     formData.append('file', file);
     formData.append('user_id', "current_user");
 
-    const response = await apiClient.post('/onboarding/assets/enhance-avatar', formData, {
+    const response = await apiClient.post(`${ONBOARDING_ASSET_QUERY_BASE}/enhance-avatar`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -221,8 +221,8 @@ export const createVoiceClone = async (
     // We might want to remove this if backend doesn't need it
     formData.append('voice_name', 'My Voice Clone'); 
 
-    console.log('[VoiceClone] Sending request to /onboarding/assets/create-voice-clone');
-    const response = await aiApiClient.post('/onboarding/assets/create-voice-clone', formData, {
+    console.log(`[VoiceClone] Sending request to ${ONBOARDING_ASSET_QUERY_BASE}/create-voice-clone`);
+    const response = await aiApiClient.post(`${ONBOARDING_ASSET_QUERY_BASE}/create-voice-clone`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -248,7 +248,7 @@ export const createVoiceDesign = async (
   params: VoiceDesignParams
 ): Promise<VoiceCloneResponse> => {
   try {
-    const response = await aiApiClient.post('/onboarding/assets/create-voice-design', {
+    const response = await aiApiClient.post(`${ONBOARDING_ASSET_QUERY_BASE}/create-voice-design`, {
       text: params.text,
       voice_description: params.voiceDescription,
       language: params.language || 'auto',

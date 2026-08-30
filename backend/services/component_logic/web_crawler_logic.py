@@ -18,7 +18,7 @@ class WebCrawlerLogic:
     
     def __init__(self):
         """Initialize the Web Crawler Logic service."""
-        logger.info("[WebCrawlerLogic.__init__] Initializing web crawler service")
+        logger.debug("[WebCrawlerLogic.__init__] Initializing web crawler service")
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }

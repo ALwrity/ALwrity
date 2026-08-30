@@ -356,6 +356,7 @@ export const podcastApi = {
       speakers: payload.speakers,
       bible: bible,
       avatar_url: payload.avatarUrl,
+      presenter_reference_url: payload.presenterReferenceUrl,
       feedback: feedback,
       podcast_mode: payload.podcastMode, // Pass mode to skip avatar for audio_only
     });
@@ -402,14 +403,18 @@ export const podcastApi = {
     const projectId = createId("podcast");
     const estimate = toPodcastEstimate(analysisResp.data?.estimate, payload.knobs);
 
+    const effectivePresenterRef = payload.presenterReferenceUrl || analysisResp.data?.presenter_reference_url || null;
+    const effectiveAvatarUrl = payload.avatarUrl || effectivePresenterRef || analysisResp.data?.avatar_url || null;
+
     return {
       projectId,
       analysis,
       estimate,
       queries,
       bible: analysisResp.data?.bible || undefined,
-      avatar_url: analysisResp.data?.avatar_url || null,
+      avatar_url: effectiveAvatarUrl,
       avatar_prompt: analysisResp.data?.avatar_prompt || null,
+      presenterReferenceUrl: effectivePresenterRef,
     };
   },
 
@@ -821,13 +826,14 @@ export const podcastApi = {
     return response.data;
   },
 
-  async createProjectInDb(params: {
+  async initProject(params: {
     project_id: string;
     idea: string;
     duration: number;
     speakers: number;
     budget_cap: number;
     avatar_url?: string | null;
+    presenter_reference_url?: string | null;
   }): Promise<any> {
     try {
       const response = await aiApiClient.post("/api/podcast/projects", params);
@@ -920,6 +926,8 @@ export const podcastApi = {
     prompt?: string;
     seed?: number;
     maskImageUrl?: string;
+    sceneEmotion?: string;
+    sceneVisualAtmosphere?: string;
   }): Promise<{ taskId: string; status: string; message: string }> {
     // Preflight check for video generation
     await ensurePreflight({
@@ -943,6 +951,8 @@ export const podcastApi = {
       prompt: params.prompt,
       seed: params.seed ?? -1,
       mask_image_url: params.maskImageUrl,
+      scene_emotion: params.sceneEmotion,
+      scene_visual_atmosphere: params.sceneVisualAtmosphere,
     });
 
     // Backend returns snake_case (task_id); normalize to camelCase for callers
@@ -995,12 +1005,50 @@ export const podcastApi = {
       message,
     };
   },
+  /**
+   * Generate (or retrieve) the base presenter reference image for an episode.
+   *
+   * Should be called once per episode before generating individual scene images.
+   * Subsequent calls with the same projectId return the cached URL immediately
+   * (was_cached=true) without incurring another API cost.
+   */
+  async generatePresenterReference(params: {
+    projectId: string;
+    bible?: any;
+    idea?: string;
+    forceRegenerate?: boolean;
+    styleIndex?: number;
+  }): Promise<{
+    project_id: string;
+    reference_url: string;
+    was_cached: boolean;
+  }> {
+    await ensurePreflight({
+      provider: 'stability',
+      model: 'stability-ai',
+      operation_type: 'image_generation',
+      actual_provider_name: 'wavespeed',
+    });
+
+    const response = await aiApiClient.post("/api/podcast/presenter-reference", {
+      project_id: params.projectId,
+      bible: params.bible || null,
+      idea: params.idea || null,
+      force_regenerate: params.forceRegenerate ?? false,
+      style_index: params.styleIndex !== undefined ? params.styleIndex : null,
+    });
+    return response.data;
+  },
 
   async generateSceneImage(params: {
     sceneId: string;
     sceneTitle: string;
+    projectId?: string;
     sceneContent?: string;
     sceneEmotion?: string;
+    cameraAngle?: "wide_shot" | "medium_shot" | "close_up" | "over_shoulder";
+    visualAtmosphere?: string;
+
     baseAvatarUrl?: string;
     bible?: any;
     idea?: string;
@@ -1038,8 +1086,11 @@ export const podcastApi = {
     const response = await aiApiClient.post("/api/podcast/image", {
       scene_id: params.sceneId,
       scene_title: params.sceneTitle,
+      project_id: params.projectId || null,
       scene_content: params.sceneContent,
       scene_emotion: params.sceneEmotion || null,
+      camera_angle: params.cameraAngle || null,
+      visual_atmosphere: params.visualAtmosphere || null,
       base_avatar_url: params.baseAvatarUrl || null,
       bible: params.bible,
       idea: params.idea || null,

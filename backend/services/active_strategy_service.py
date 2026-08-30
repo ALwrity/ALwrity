@@ -6,7 +6,6 @@ in content calendar generation. Ensures Phase 1 and Phase 2 use the correct
 active strategy from the database.
 """
 
-import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -31,8 +30,6 @@ class ActiveStrategyService:
         self._memory_cache = {}  # Tier 1: Memory cache
         self._cache_ttl = 300  # 5 minutes cache TTL
         self._last_cache_update = {}
-        
-        logger.info("🚀 ActiveStrategyService initialized with 3-tier caching")
     
     async def get_active_strategy(self, user_id: int, force_refresh: bool = False) -> Optional[Dict[str, Any]]:
         """
@@ -52,7 +49,7 @@ class ActiveStrategyService:
             if not force_refresh and self._is_cache_valid(cache_key):
                 cached_strategy = self._memory_cache.get(cache_key)
                 if cached_strategy:
-                    logger.info(f"✅ Tier 1 Cache HIT: Active strategy for user {user_id}")
+                    logger.debug(f"Tier 1 cache hit for user {user_id}")
                     return cached_strategy
             
             # Tier 2: Database Query with Activation Status
@@ -60,7 +57,7 @@ class ActiveStrategyService:
             if active_strategy:
                 # Cache the result
                 self._cache_strategy(cache_key, active_strategy)
-                logger.info(f"✅ Tier 2 Database HIT: Active strategy {active_strategy.get('id')} for user {user_id}")
+                logger.debug(f"Active strategy {active_strategy.get('id')} loaded from DB for user {user_id}")
                 return active_strategy
             
             # Tier 3: Fallback to Most Recent Strategy
@@ -68,14 +65,14 @@ class ActiveStrategyService:
             if fallback_strategy:
                 # Cache the fallback result
                 self._cache_strategy(cache_key, fallback_strategy)
-                logger.warning(f"⚠️ Tier 3 Fallback: Using most recent strategy {fallback_strategy.get('id')} for user {user_id}")
+                logger.warning(f"Active strategy not found, falling back to most recent strategy {fallback_strategy.get('id')} for user {user_id}")
                 return fallback_strategy
             
-            logger.error(f"❌ No strategy found for user {user_id}")
+            logger.error(f"No strategy found for user {user_id}")
             return None
             
         except Exception as e:
-            logger.error(f"❌ Error getting active strategy for user {user_id}: {str(e)}")
+            logger.error(f"Error getting active strategy for user {user_id}: {str(e)}")
             return None
     
     async def _get_active_strategy_from_db(self, user_id: int) -> Optional[Dict[str, Any]]:
@@ -102,7 +99,7 @@ class ActiveStrategyService:
             ).order_by(desc(StrategyActivationStatus.activation_date)).first()
             
             if not active_status:
-                logger.info(f"No active strategy status found for user {user_id}")
+                logger.debug(f"No active strategy status found for user {user_id}")
                 return None
             
             # Get the strategy details
@@ -122,11 +119,11 @@ class ActiveStrategyService:
                 'last_updated': active_status.last_updated.isoformat() if active_status.last_updated else None
             }
             
-            logger.info(f"✅ Found active strategy {strategy.id} for user {user_id}")
+            logger.debug(f"Found active strategy {strategy.id} for user {user_id}")
             return strategy_data
             
         except Exception as e:
-            logger.error(f"❌ Error querying active strategy from database: {str(e)}")
+            logger.error(f"Error querying active strategy from database: {str(e)}")
             return None
     
     async def _get_most_recent_strategy(self, user_id: int) -> Optional[Dict[str, Any]]:
@@ -167,13 +164,13 @@ class ActiveStrategyService:
                     'note': 'Fallback to most recent strategy'
                 }
                 
-                logger.info(f"✅ Found fallback strategy {strategy.id} for user {user_id}")
+                logger.debug(f"Found fallback strategy {strategy.id} for user {user_id}")
                 return strategy_data
             
             return None
             
         except Exception as e:
-            logger.error(f"❌ Error getting most recent strategy: {str(e)}")
+            logger.error(f"Error getting most recent strategy: {str(e)}")
             return None
     
     def _convert_strategy_to_dict(self, strategy: EnhancedContentStrategy) -> Dict[str, Any]:
@@ -232,7 +229,7 @@ class ActiveStrategyService:
             return strategy_dict
             
         except Exception as e:
-            logger.error(f"❌ Error converting strategy to dictionary: {str(e)}")
+            logger.error(f"Error converting strategy to dictionary: {str(e)}")
             return {}
     
     def _is_cache_valid(self, cache_key: str) -> bool:
@@ -261,7 +258,7 @@ class ActiveStrategyService:
         """
         self._memory_cache[cache_key] = strategy_data
         self._last_cache_update[cache_key] = datetime.now()
-        logger.debug(f"📦 Cached strategy data for key: {cache_key}")
+        logger.debug(f"Cached strategy data for key: {cache_key}")
     
     async def clear_cache(self, user_id: Optional[int] = None):
         """
@@ -276,11 +273,11 @@ class ActiveStrategyService:
                 del self._memory_cache[cache_key]
             if cache_key in self._last_cache_update:
                 del self._last_cache_update[cache_key]
-            logger.info(f"🗑️ Cleared cache for user {user_id}")
+            logger.debug(f"Cleared cache for user {user_id}")
         else:
             self._memory_cache.clear()
             self._last_cache_update.clear()
-            logger.info("🗑️ Cleared all cache")
+            logger.debug("Cleared all cache")
     
     async def get_cache_stats(self) -> Dict[str, Any]:
         """

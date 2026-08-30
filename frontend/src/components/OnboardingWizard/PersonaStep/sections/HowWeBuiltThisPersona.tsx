@@ -306,22 +306,25 @@ export const HowWeBuiltThisPersona: React.FC<HowWeBuiltThisPersonaProps> = ({
   // evidence citations + data gaps). After their first render, we
   // set a sessionStorage flag and respect their choice on subsequent
   // visits. This is opt-out via `autoExpandFirstView={false}`.
-  const [firstViewDefaultOpen, setFirstViewDefaultOpen] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!autoExpandFirstView) return;
-    if (typeof window === 'undefined') return;
+  // Read + flag synchronously in the lazy initializer so the first render
+  // already knows whether to default-open. A post-mount effect would flip
+  // `defaultExpanded` after the uncontrolled Accordion had initialized,
+  // which makes MUI warn ("changing the default expanded state of an
+  // uncontrolled Accordion after being initialized").
+  const [firstViewDefaultOpen] = React.useState(() => {
+    if (!autoExpandFirstView) return false;
+    if (typeof window === 'undefined') return false;
     try {
       const seen = window.sessionStorage.getItem('alwrity_howwebuilt_seen');
-      if (!seen) {
-        setFirstViewDefaultOpen(true);
-        // Mark as seen so subsequent visits default-collapsed
-        window.sessionStorage.setItem('alwrity_howwebuilt_seen', '1');
-      }
+      if (seen) return false;
+      // Mark as seen so subsequent visits default-collapsed
+      window.sessionStorage.setItem('alwrity_howwebuilt_seen', '1');
+      return true;
     } catch {
       // sessionStorage may be blocked; safe to ignore
+      return false;
     }
-  }, [autoExpandFirstView]);
+  });
 
   // Decide the actual `expanded` / `defaultExpanded` props.
   // - If parent passes `expanded`, we are controlled.
