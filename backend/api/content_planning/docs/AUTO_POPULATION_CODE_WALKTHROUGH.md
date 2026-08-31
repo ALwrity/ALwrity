@@ -493,12 +493,23 @@ const [autoPopulateAttempted, setAutoPopulateAttempted] = useState(false);
 - **Commit**: `eb30cd38`
 
 ### Expanded Data Sources
-- AI strategy generation now receives **all 13 onboarding data sources** (previously only 4):
+- AI strategy generation reads **11 onboarding data sources** via `process_onboarding_data` (previously only 4):
   - website_analysis, research_preferences, onboarding_session
   - persona_data, competitor_analysis, deep_competitor_analysis
-  - linkedin_profile, platform_integrations
+  - linkedin_profile
   - gsc_analytics, bing_analytics
   - canonical_profile, data_quality
+- **Known gap (audit finding)**: `api_keys_data` and `platform_integrations` are read by
+  `_build_context_summary` / `_generate_ai_fields` but are **not returned** by the async
+  `process_onboarding_data` (only the sync `get_integrated_data_sync` includes
+  `platform_integrations`). Both are always `{}` in the strategy path. Impact is low:
+  `api_keys_data.providers` only feeds the informational "YOUR AVAILABLE TOOLS" prompt
+  section, and `platform_integrations` never reaches the prompt at all.
+- **Contract tests** (`tests/api/test_strategy_integration.py::TestDataStructureContract`)
+  lock this data structure: all source keys present, grounding-required sources
+  non-empty, the known gap (so fixing it forces a doc update), the sync-path contrast,
+  and field-level consumption by `validate_strategy_grounding` (core_persona
+  role/goals/pain_points, competitor domain/name, GSC/Bing metrics, data_quality scores).
 
 ### Fail-Fast Guard
 - Strategy generation returns **409 Conflict** if onboarding context is missing
@@ -512,6 +523,130 @@ const [autoPopulateAttempted, setAutoPopulateAttempted] = useState(false);
   - `validate_analytics_consistency()` - predictions match GSC/Bing data
   - `validate_data_quality_grounding()` - uses completeness/freshness scores
   - `validate_strategy_grounding()` - comprehensive check combining all
+- `dict_to_text()` helper: strategy payloads are nested dicts without text fields, so
+  `validate_strategy_grounding` serialises them to JSON before matching persona /
+  competitor attributes (without this, persona/competitor checks silently no-op).
+  Empty payloads return `""` (not `"{}"`) so they are reported as unchecked rather
+  than falsely "checked".
+- **Robustness (Phase 5)**: `validate_strategy_grounding` guards `None` strategy
+  input (previously crashed with AttributeError). Unit-level pass/fail semantics
+  (exact scores, warning types, thresholds) are locked in
+  `tests/services/test_quality_gates_integration.py` (31 tests).
+
+### Grounding Validation Wiring (Production)
+- `ai_generation_endpoints.py` now runs grounding validation on every strategy
+  generation (soft gate — logs and annotates, never blocks):
+  - `generate_comprehensive_strategy` → `_apply_grounding_validation()` after generation
+  - `generate-comprehensive-strategy-polling` → same, inside the background task
+  - `optimize-existing-strategy` → comprehensive path uses `_apply_grounding_validation()`;
+    component path uses `_validate_component_grounding()`
+  - `generate-strategy-component` → `_validate_component_grounding()` with
+    component-specific validators (persona for strategic_insights, competitor for
+    competitive_analysis, analytics for performance_predictions, comprehensive otherwise)
+- `AIStrategyGenerator.generate_comprehensive_strategy()` also runs
+  `_validate_grounding()` before returning (defense-in-depth: protects every
+  caller of the generator, not just the endpoints). Gate errors map to
+  `grounding_status="error"` and never break generation.
+- **Fixed (Phase 2)**: `_generate_competitive_analysis` and `_generate_risk_assessment`
+  signatures now accept the `user_id` kwarg that `generate_comprehensive_strategy`
+  passes — previously this raised TypeError and crashed the sync comprehensive flow.
+  All component generators now forward `user_id` to the AI service call.
+- Response metadata gains:
+  - `grounding_validation`: full result (score, violations, warnings, per-check details)
+  - `grounding_status`: `"validated"` | `"partial"` | `"error"`
+- Gate errors are non-blocking: validation failures attach `"error"` status and log,
+  strategy delivery is never interrupted.
+
+### Grounding Enforcement Modes (Phase 3)
+- Enforcement is resolved via `_get_grounding_enforcement()`:
+  priority: request `config["grounding_enforcement"]` > `STRATEGY_GROUNDING_ENFORCEMENT`
+  env var > default **"soft"** (invalid values fall back to soft).
+- **Soft mode (default)**: grounding failures are logged + attached to metadata;
+  strategy is always returned (`grounding_status: "partial"`).
+- **Hard mode**: genuine grounding failures raise **HTTP 422** with
+  `{message, score, violations, warnings}` detail so clients can show actionable
+  feedback. `except HTTPException: raise` was added to
+  `generate_comprehensive_strategy` — without it `handle_general_error` converts
+  the 422 into a misleading 500.
+- **Fail-open guarantee**: gate *errors* (gate crashed, `status: "error"`) never
+  block in either mode — a broken gate must not take down generation. Only
+  genuine grounding failures (`passed=False`) block in hard mode.
+- **Polling flow**: hard-mode failures mark the task `failed` with a
+  `grounding_violations` list instead of saving/serving the strategy.
+- `optimize-existing-strategy` has no request config; it honours the env var
+  (default soft). Component generation stays soft (components are building blocks).
+
+### Grounding Failures: Interpretation & Remediation (Phase 6)
+
+#### Where validation runs in the flow
+
+```
+1. Endpoint: fetch onboarding_data
+       └─ _validate_strategy_context()        → 409 if context entirely missing
+2. Generator: AIStrategyGenerator.generate_comprehensive_strategy()
+       └─ _validate_grounding()               → attaches grounding metadata (all callers)
+3. Endpoint: _apply_grounding_validation()    → enforcement-aware re-validation
+       └─ soft: annotate only | hard: HTTP 422 on genuine failure
+4. Response: strategy_metadata.grounding_validation + grounding_status
+```
+
+#### How to read `grounding_validation` in the response
+
+```jsonc
+"grounding_validation": {
+  "passed": true,          // all components passed AND overall >= 0.6
+  "score": 0.91,           // weighted: persona .25, competitor .25, analytics .20, quality .30
+  "status": "checked",     // "checked" | "unavailable" (per component); overall always "checked"
+  "checked": true,         // false when no strategy content was extractable
+  "violations": [],        // hard failures (block in hard mode)
+  "warnings": [],          // soft signals (never block)
+  "details": {
+    "persona_grounding":      { "passed": true, "score": 1.0, "checks": [...] },
+    "competitor_grounding":   { "passed": true, "score": 0.8, "checks": [...] },
+    "analytics_consistency":  { "passed": true, "score": 1.0, "checks": [...] },
+    "data_quality":           { "passed": true, "score": 0.87, "checks": [...] }
+  }
+},
+"grounding_status": "validated"   // "validated" | "partial" | "error"
+```
+
+`grounding_status` meanings:
+
+| Status | Meaning | Strategy delivered? |
+|--------|---------|---------------------|
+| `validated` | Gate passed (warnings may still be present) | Yes |
+| `partial` | Genuine grounding failure (`passed=false`) | Yes (soft) / No — 422 or failed task (hard) |
+| `error` | The gate itself crashed (fail-open) | Yes — check logs for the gate error |
+
+#### Signal catalogue
+
+| Signal | Component | Meaning | Remediation |
+|--------|-----------|---------|-------------|
+| `low_completeness` (violation) | data_quality | Onboarding data incomplete (< 0.5); AI lacks context | Complete onboarding steps |
+| `stale_data` (warning) | data_quality | Data freshness < 0.5 | Refresh onboarding data |
+| `role_not_reflected` / `role_mismatch` (warning) | persona | Content ignores persona role (`role_mismatch` = DB-sourced role) | Ensure persona feeds generation; review content |
+| `goals_not_addressed` (warning) | persona | Persona goals barely covered (< 0.2 ratio) | Feed persona goals into prompt/context |
+| `generic_competitive` (warning) | competitor | Generic "Competitor A/B" instead of real ones | Ground competitive analysis in onboarding competitors |
+| `competitors_not_referenced` (warning) | competitor | DB-sourced competitors unused | Same as above (DB data exists but unused) |
+| `aggressive_growth` (warning) | analytics | Growth % > 200 without basis | Align predictions with analytics baseline |
+| `unrealistic_growth` (warning) | analytics | Growth multiplier > 5x | Same |
+| `traffic_disconnect` (warning) | analytics | Predicted traffic > 10x actual clicks | Same |
+
+#### What to do if grounding fails
+
+- **Users (client UX)**: read `grounding_validation.violations` / `.warnings` and the
+  per-component `details`; in hard mode the 422 `detail` carries the same
+  `{message, score, violations, warnings}` for actionable error display.
+- **Operators**: soft mode (default) logs `⚠️ Strategy grounding issues detected |
+  score=… | violations=…` per generation — monitor for recurring violation types.
+  Once real-world scores are understood, flip enforcement globally via
+  `STRATEGY_GROUNDING_ENFORCEMENT=hard` or per-request via
+  `config: {"grounding_enforcement": "hard"}`.
+- **Users' remediation path**: most grounding failures trace back to thin onboarding
+  data (low completeness → low grounding ceiling). Completing persona, competitor and
+  analytics steps raises the achievable score directly.
+- **Gate errors (`grounding_status: "error"`)**: never user-facing blockers; treat as
+  a bug in the gate itself — check backend logs for `Grounding validation error`.
 
 ### Observability
 - Added data source coverage logging in `_build_context_summary()`:

@@ -220,12 +220,18 @@ To verify provider switching works:
 - Commit: `eb30cd38`
 
 ### Expanded AI Context
-- AI strategy generation now receives **all 13 onboarding data sources**:
+- AI strategy generation reads **11 onboarding data sources** via `process_onboarding_data`:
   - website_analysis, research_preferences, onboarding_session
   - persona_data, competitor_analysis, deep_competitor_analysis
-  - linkedin_profile, platform_integrations
+  - linkedin_profile
   - gsc_analytics, bing_analytics
   - canonical_profile, data_quality
+- **Known gap (audit finding)**: `api_keys_data` and `platform_integrations` are read by
+  the AI context builders but not returned by `process_onboarding_data`; both are always
+  `{}` in the strategy path. Low impact (informational prompt metadata only).
+- **Contract tests** (`TestDataStructureContract`) lock the data structure:
+  grounding-required keys present and non-empty, known-gap keys documented,
+  and field-level consumption by `validate_strategy_grounding`.
 
 ### Context Unwrapping
 - `_build_context_summary()` now unwraps nested `context['onboarding_data']` for strategy generation
@@ -237,6 +243,35 @@ To verify provider switching works:
   - `validate_competitor_grounding()` - validates real competitors are referenced
   - `validate_analytics_consistency()` - ensures predictions match GSC/Bing data
   - `validate_strategy_grounding()` - comprehensive grounding check
+- `dict_to_text()` helper serialises nested strategy dicts to text so grounding
+  checks have real content to match (prevents silent no-op on empty extraction)
+
+### Grounding Validation Wiring (Production)
+- All four AI generation endpoints run grounding validation as a **soft gate**:
+  results are logged and attached to response metadata, never blocking delivery
+- `grounding_validation` (full result) and `grounding_status`
+  (`validated` | `partial` | `error`) appear in strategy metadata / response data
+- Gate failures are non-blocking by design; tune to hard-fail later based on
+  observed grounding scores
+
+### Grounding Enforcement Modes
+- Default **soft**: log + annotate (`grounding_status: "partial"`), always return
+- Optional **hard**: set `config: {"grounding_enforcement": "hard"}` per request or
+  `STRATEGY_GROUNDING_ENFORCEMENT=hard` env var — genuine grounding failures
+  return **HTTP 422** with violations detail; polling flow marks the task failed
+- Gate errors never block in either mode (fail-open)
+
+### Interpreting Grounding Results
+- `grounding_status`: `validated` (passed; warnings may exist) | `partial`
+  (genuine failure; returned in soft mode, blocked in hard mode) | `error`
+  (gate crashed; fail-open, check logs)
+- `grounding_validation.score`: weighted 0.25 persona + 0.25 competitor +
+  0.20 analytics + 0.30 data_quality; `details` has per-component breakdown
+- Most failures trace back to thin onboarding data — completing persona,
+  competitor and analytics steps raises the achievable grounding score
+- Full signal catalogue + remediation table:
+  see `AUTO_POPULATION_CODE_WALKTHROUGH.md` → "Grounding Failures:
+  Interpretation & Remediation"
 
 ### Fail-Fast Guard
 - Strategy generation returns 409 Conflict when onboarding context is missing
@@ -245,3 +280,4 @@ To verify provider switching works:
 ### Observability
 - Added data source coverage logging showing which sources are used
 - Warning logged when data quality score < 0.5
+- Grounding validation logs score and violation types on every generation

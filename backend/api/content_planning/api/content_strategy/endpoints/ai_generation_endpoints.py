@@ -1,6 +1,62 @@
 """
 AI Generation Endpoints
 Handles AI-powered strategy generation endpoints.
+
+Endpoints
+---------
+POST /generate-comprehensive-strategy           Sync full strategy generation.
+POST /generate-comprehensive-strategy-polling   Background generation + task polling.
+POST /generate-strategy-component               Single component (insights, competitors, ...).
+POST /optimize-existing-strategy                Re-generate or patch an existing strategy.
+GET  /strategy-generation-status                Aggregated generation status for the user.
+GET  /strategy-generation-status/{task_id}      Poll a background generation task.
+GET  /latest-strategy                           Latest completed strategy (DB then memory).
+
+Grounding validation (quality gates)
+------------------------------------
+Every generation path validates its output against the user's onboarding data
+before returning. The helpers below are the single wiring point:
+
+  _validate_strategy_context(onboarding_data)      Fail-fast 409 pre-generation.
+  _apply_grounding_validation(strategy, onboarding, enforcement)
+                                                   Full-strategy gate; attaches
+                                                   grounding_validation +
+                                                   grounding_status to metadata
+                                                   ("strategy_metadata" for sync,
+                                                   "metadata" for polling). Hard
+                                                   enforcement raises HTTP 422.
+  _validate_component_grounding(type, component, onboarding)
+                                                   Component-specific soft gate.
+  _get_grounding_enforcement(config)               Mode resolution: request
+                                                   config > STRATEGY_GROUNDING_ENFORCEMENT
+                                                   env var > "soft".
+  _grounding_failed(result)                        True only for genuine grounding
+                                                   failures (never gate errors).
+
+Wiring map:
+  generate-comprehensive-strategy        -> _apply_grounding_validation (post-generation)
+  generate-comprehensive-strategy-polling-> same, inside the background task; hard
+                                           failure marks the task failed (no 422 path)
+  optimize-existing-strategy             -> comprehensive: _apply_grounding_validation;
+                                           component: _validate_component_grounding
+  generate-strategy-component            -> _validate_component_grounding (always soft)
+
+AIStrategyGenerator.generate_comprehensive_strategy() also self-validates via its
+own _validate_grounding(), so every generator caller is protected even when this
+module's endpoints are bypassed. Gates are deterministic, so the double pass on
+the sync path yields identical results.
+
+Response contract (all generation paths):
+  strategy_metadata.grounding_validation -> {passed, score, violations, warnings,
+                                              details{persona_grounding,
+                                              competitor_grounding,
+                                              analytics_consistency,
+                                              data_quality}}
+  strategy_metadata.grounding_status     -> "validated" | "partial" | "error"
+
+Do NOT let gate exceptions escape the helpers: gate errors must stay fail-open
+(annotate "error", never block delivery). Only genuine grounding failures
+(passed=False) may block, and only under hard enforcement.
 """
 
 from typing import Dict, Any, Optional
@@ -8,6 +64,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from loguru import logger
 from datetime import datetime
+import os
 
 # Import database
 from services.database import get_db_session
@@ -16,6 +73,16 @@ from services.database import get_db_session
 from ....services.content_strategy.ai_generation import AIStrategyGenerator, StrategyGenerationConfig
 from ....services.enhanced_strategy_service import EnhancedStrategyService
 from ....services.enhanced_strategy_db_service import EnhancedStrategyDBService
+
+# Import quality gates for grounding validation
+from services.intelligence.agents.quality_gates import (
+    validate_strategy_grounding,
+    validate_persona_grounding,
+    validate_competitor_grounding,
+    validate_analytics_consistency,
+    extract_content,
+    dict_to_text,
+)
 
 # Import educational content manager
 from .content_strategy.educational_content import EducationalContentManager
@@ -76,6 +143,17 @@ def get_db():
     finally:
         db.close()
 
+
+# ============================================================================
+# Grounding validation helpers (quality gates wiring)
+#
+# Single wiring point for AI-grounding quality gates. See the module
+# docstring for the wiring map and response contract. Invariants:
+#   * helpers never leak gate exceptions (fail-open on gate errors)
+#   * only _apply_grounding_validation may raise (hard enforcement, 422)
+#   * DB-sourced onboarding data always outranks AI guesses inside the gates
+# ============================================================================
+
 def _validate_strategy_context(onboarding_data: Dict[str, Any]) -> None:
     """Fail-fast: reject strategy generation when onboarding context is missing.
 
@@ -103,6 +181,208 @@ def _validate_strategy_context(onboarding_data: Dict[str, Any]) -> None:
         )
 
 
+def _get_grounding_enforcement(config: Optional[Dict[str, Any]] = None) -> str:
+    """Resolve grounding enforcement mode: request config > env var > default.
+
+    Priority:
+      1. ``config["grounding_enforcement"]`` if it is "soft" or "hard"
+      2. ``STRATEGY_GROUNDING_ENFORCEMENT`` environment variable ("soft"/"hard")
+      3. Default: "soft" (log + annotate, never block)
+
+    Args:
+        config: Request generation config dict (may be None).
+
+    Returns:
+        "soft" or "hard".
+    """
+    if config and config.get("grounding_enforcement") in ("soft", "hard"):
+        return config["grounding_enforcement"]
+    env_value = (os.environ.get("STRATEGY_GROUNDING_ENFORCEMENT") or "").strip().lower()
+    if env_value in ("soft", "hard"):
+        return env_value
+    return "soft"
+
+
+def _grounding_failed(result: Dict[str, Any]) -> bool:
+    """True only for genuine grounding failures (gate errors never count).
+
+    A gate crash (status == "error") is our bug, not ungrounded content, so
+    hard enforcement stays fail-open for it.
+
+    Args:
+        result: Grounding validation result dict.
+
+    Returns:
+        True if the strategy genuinely failed grounding validation.
+    """
+    return not result.get("passed", True) and result.get("status") != "error"
+
+
+def _apply_grounding_validation(
+    strategy_data: Dict[str, Any],
+    onboarding_data: Dict[str, Any],
+    enforcement: str = "soft",
+) -> Dict[str, Any]:
+    """Validate generated strategy is grounded in real onboarding data.
+
+    Runs the intelligence quality gates (persona, competitor, analytics,
+    data-quality grounding) against the AI-generated strategy.
+
+    Enforcement modes:
+      - "soft" (default): results are logged and attached to strategy
+        metadata for transparency but never block the response.
+      - "hard": genuine grounding failures (passed=False, status != "error")
+        raise HTTPException 422 with violations detail. Gate errors still
+        never block (fail-open).
+
+    Attaches:
+      - <metadata_key>["grounding_validation"]: full result
+      - <metadata_key>["grounding_status"]: "validated" | "partial" | "error"
+
+    Reading the result: `score` is weighted across components (persona 0.25,
+    competitor 0.25, analytics 0.20, data_quality 0.30); `details` carries the
+    per-component breakdown; `violations` block in hard mode while `warnings`
+    never block in any mode. "unavailable" components (missing onboarding
+    source) score 1.0 and do not fail the gate.
+
+    The metadata dict is detected from the strategy shape: the sync endpoint
+    uses "strategy_metadata" while the polling endpoint uses "metadata".
+
+    Args:
+        strategy_data: The generated strategy dict (mutated in place).
+        onboarding_data: Raw onboarding context from _get_onboarding_data.
+        enforcement: "soft" (default) or "hard".
+
+    Returns:
+        The grounding validation result dict.
+
+    Raises:
+        HTTPException: 422 when enforcement="hard" and grounding genuinely fails.
+    """
+    try:
+        grounding_result = validate_strategy_grounding(
+            strategy_data=strategy_data,
+            onboarding_context=onboarding_data,
+        )
+
+        metadata_key = "strategy_metadata" if "strategy_metadata" in strategy_data else "metadata"
+        metadata = strategy_data.setdefault(metadata_key, {})
+        metadata["grounding_validation"] = grounding_result
+        if grounding_result.get("status") == "error":
+            metadata["grounding_status"] = "error"
+        else:
+            metadata["grounding_status"] = "validated" if grounding_result.get("passed") else "partial"
+
+        if grounding_result.get("passed"):
+            logger.info(
+                f"✅ Strategy grounding validation passed | score={grounding_result.get('score', 0):.2f}"
+            )
+        else:
+            violations = grounding_result.get("violations", [])
+            logger.warning(
+                f"⚠️ Strategy grounding issues detected | score={grounding_result.get('score', 0):.2f} "
+                f"| violations={len(violations)} | details={[v.get('type') for v in violations]}"
+            )
+
+        # Hard enforcement: block ungrounded strategies with an actionable 422.
+        # Gate errors never block (fail-open) — _grounding_failed excludes them.
+        if enforcement == "hard" and _grounding_failed(grounding_result):
+            logger.warning(
+                f"⛔ Hard grounding enforcement: blocking strategy | "
+                f"score={grounding_result.get('score', 0):.2f} | "
+                f"violations={len(grounding_result.get('violations', []))}"
+            )
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": "Strategy generation failed grounding validation",
+                    "score": grounding_result.get("score"),
+                    "violations": grounding_result.get("violations", []),
+                    "warnings": grounding_result.get("warnings", []),
+                },
+            )
+
+        return grounding_result
+    except HTTPException:
+        # Hard-enforcement 422 must propagate, not be swallowed below.
+        raise
+    except Exception as e:
+        # Never let the gate itself break strategy delivery (soft validation).
+        logger.error(f"❌ Grounding validation error (non-blocking): {str(e)}")
+        try:
+            metadata_key = "strategy_metadata" if "strategy_metadata" in strategy_data else "metadata"
+            strategy_data.setdefault(metadata_key, {})["grounding_status"] = "error"
+        except Exception:
+            pass
+        return {"passed": True, "score": 0.0, "status": "error", "error": str(e)}
+
+
+def _validate_component_grounding(
+    component_type: str,
+    component: Dict[str, Any],
+    onboarding_data: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Validate a single generated strategy component is grounded (soft gate).
+
+    Uses the component-specific validator where one exists:
+      - strategic_insights        -> validate_persona_grounding
+      - competitive_analysis      -> validate_competitor_grounding
+      - performance_predictions   -> validate_analytics_consistency
+      - everything else           -> full validate_strategy_grounding
+
+    Soft mode: logs and returns the result; never raises.
+
+    Interpreting the result:
+      - "passed" is component-level only; a warning-reduced score (e.g. a
+        generic_competitive warning scoring 0.8) still passes, so callers
+        should surface warnings from grounding_validation.warnings rather
+        than treating grounding_status as the only signal.
+      - Components with no onboarding source return status "unavailable"
+        with score 1.0 (graceful, not a grounding failure).
+
+    Args:
+        component_type: One of the valid component types.
+        component: The generated component data dict.
+        onboarding_data: Raw onboarding context for grounding.
+
+    Returns:
+        The grounding validation result dict.
+    """
+    try:
+        # Component payloads are nested dicts without _CONTENT_KEYS; fall back
+        # to a JSON text dump so grounding checks have real content to match.
+        component_text = extract_content(component) or dict_to_text(component)
+
+        if component_type == "strategic_insights":
+            persona = onboarding_data.get("persona_data") or {}
+            result = validate_persona_grounding(component_text, persona)
+        elif component_type == "competitive_analysis":
+            competitors = onboarding_data.get("competitor_analysis") or []
+            result = validate_competitor_grounding(component_text, competitors)
+        elif component_type == "performance_predictions":
+            result = validate_analytics_consistency(
+                component,
+                onboarding_data.get("gsc_analytics") or {},
+                onboarding_data.get("bing_analytics") or {},
+            )
+        else:
+            result = validate_strategy_grounding(component, onboarding_data)
+
+        if result.get("passed"):
+            logger.info(
+                f"✅ Component grounding passed | type={component_type} score={result.get('score', 0):.2f}"
+            )
+        else:
+            logger.warning(
+                f"⚠️ Component grounding issues | type={component_type} "
+                f"score={result.get('score', 0):.2f} violations={result.get('violations', [])}"
+            )
+        return result
+    except Exception as e:
+        logger.error(f"❌ Component grounding validation error (non-blocking): {str(e)}")
+        return {"passed": True, "score": 0.0, "status": "error", "error": str(e)}
+
+
 # Global storage for latest strategies (more persistent than task status)
 _latest_strategies = {}
 
@@ -113,7 +393,16 @@ async def generate_comprehensive_strategy(
     config: Optional[Dict[str, Any]] = None,
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Generate a comprehensive AI-powered content strategy."""
+    """Generate a comprehensive AI-powered content strategy.
+
+    Grounding: after generation the strategy is validated against the user's
+    onboarding data (persona, competitors, analytics, data quality) via
+    _apply_grounding_validation(). Enforcement is soft by default — the
+    response always carries strategy_metadata.grounding_validation (score,
+    per-component details) and grounding_status ("validated" | "partial" |
+    "error"); pass config {"grounding_enforcement": "hard"} to return 422 on
+    genuine grounding failures instead of serving them.
+    """
     try:
         user_id = current_user.get('id')
         logger.info(f"🚀 Generating comprehensive AI strategy for user: {user_id}")
@@ -156,6 +445,14 @@ async def generate_comprehensive_strategy(
             strategy_name=strategy_name
         )
         
+        # Quality gate: validate strategy is grounded in real onboarding data.
+        # Enforcement: request config > env var > default "soft".
+        _apply_grounding_validation(
+            comprehensive_strategy,
+            onboarding_data,
+            enforcement=_get_grounding_enforcement(config),
+        )
+        
         logger.info(f"✅ Comprehensive AI strategy generated successfully for user: {user_id}")
         
         return ResponseBuilder.create_success_response(
@@ -163,6 +460,8 @@ async def generate_comprehensive_strategy(
             data=comprehensive_strategy
         )
         
+    except HTTPException:
+        raise
     except RuntimeError as e:
         logger.error(f"❌ AI service error generating comprehensive strategy: {str(e)}")
         raise HTTPException(
@@ -181,7 +480,14 @@ async def generate_strategy_component(
     context: Optional[Dict[str, Any]] = None,
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Generate a specific strategy component using AI."""
+    """Generate a specific strategy component using AI.
+
+    Grounding: the component is validated against onboarding data with a
+    component-specific gate (persona for strategic_insights, competitor for
+    competitive_analysis, analytics for performance_predictions, comprehensive
+    otherwise). Response includes grounding_validation + grounding_status;
+    components are always soft-validated (never blocked).
+    """
     try:
         user_id = current_user.get('id')
         logger.info(f"🚀 Generating strategy component '{component_type}' for user: {user_id}")
@@ -209,6 +515,10 @@ async def generate_strategy_component(
             onboarding_data = await enhanced_service._get_onboarding_data(user_id)
             _validate_strategy_context(onboarding_data)
             context = {"onboarding_data": onboarding_data, "user_id": user_id}
+        else:
+            # Unwrap onboarding sources from a client-provided context (same
+            # convention as AIStructuredAutofillService._build_context_summary).
+            onboarding_data = context.get("onboarding_data") or context
         
         # Get base strategy if not provided
         if not base_strategy:
@@ -235,6 +545,9 @@ async def generate_strategy_component(
         elif component_type == "risk_assessment":
             component = await strategy_generator._generate_risk_assessment(base_strategy, context)
         
+        # Quality gate: validate component grounding in onboarding data (soft).
+        component_grounding = _validate_component_grounding(component_type, component, onboarding_data)
+        
         logger.info(f"✅ Strategy component '{component_type}' generated successfully for user: {user_id}")
         
         return ResponseBuilder.create_success_response(
@@ -242,6 +555,8 @@ async def generate_strategy_component(
             data={
                 "component_type": component_type,
                 "component_data": component,
+                "grounding_validation": component_grounding,
+                "grounding_status": "validated" if component_grounding.get("passed") else "partial",
                 "generated_at": datetime.utcnow().isoformat(),
                 "user_id": user_id
             }
@@ -325,7 +640,13 @@ async def optimize_existing_strategy(
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Optimize an existing strategy using AI."""
+    """Optimize an existing strategy using AI.
+
+    Grounding: comprehensive optimizations are validated like fresh generation
+    (enforcement from env var, default soft); component optimizations are
+    soft-validated with the persona gate and carry grounding_validation /
+    grounding_status in the response.
+    """
     try:
         logger.info(f"🚀 Optimizing existing strategy {strategy_id} with type: {optimization_type}")
         
@@ -360,6 +681,13 @@ async def optimize_existing_strategy(
                 context=context,
                 strategy_name=f"Optimized: {existing_strategy.get('name', 'Strategy')}"
             )
+            # Quality gate: validate optimized strategy grounding.
+            # Enforcement: env var > default "soft" (no request config available).
+            _apply_grounding_validation(
+                optimized_strategy,
+                onboarding_data,
+                enforcement=_get_grounding_enforcement(),
+            )
         else:
             # Generate specific component optimization
             component = await strategy_generator._generate_strategic_insights(existing_strategy, context)
@@ -369,6 +697,14 @@ async def optimize_existing_strategy(
                 "optimization_data": component,
                 "optimized_at": datetime.utcnow().isoformat()
             }
+            # Quality gate: validate component grounding (soft).
+            component_grounding = _validate_component_grounding(
+                "strategic_insights", component, onboarding_data
+            )
+            optimized_strategy["grounding_validation"] = component_grounding
+            optimized_strategy["grounding_status"] = (
+                "validated" if component_grounding.get("passed") else "partial"
+            )
         
         logger.info(f"✅ Strategy {strategy_id} optimized successfully")
         
@@ -389,7 +725,13 @@ async def generate_comprehensive_strategy_polling(
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Generate a comprehensive AI-powered content strategy using polling approach."""
+    """Generate a comprehensive AI-powered content strategy using polling approach.
+
+    Grounding: the background task validates the compiled strategy before
+    saving. In hard mode a genuine grounding failure marks the task "failed"
+    with a grounding_violations list instead of saving/serving it; soft mode
+    (default) annotates the strategy metadata only.
+    """
     try:
         # Extract parameters from request body
         user_id = current_user.get('id')
@@ -412,6 +754,9 @@ async def generate_comprehensive_strategy_polling(
                     "user_id": user_id,
                     "generation_config": config or {}
         }
+                
+        # Grounding enforcement mode (captured by the background task below).
+        enforcement = _get_grounding_enforcement(config)
                 
         # Create strategy generation config
         generation_config = StrategyGenerationConfig(
@@ -595,6 +940,25 @@ async def generate_comprehensive_strategy_polling(
                         "content_calendar_ready": False  # Indicates calendar needs to be generated separately
                     }
                 }
+                
+                # Quality gate: validate strategy is grounded in real onboarding data.
+                # In hard mode the helper raises HTTPException(422) on genuine
+                # grounding failures; convert that into a failed task status.
+                try:
+                    _apply_grounding_validation(
+                        comprehensive_strategy, onboarding_data, enforcement=enforcement
+                    )
+                except HTTPException as gate_exc:
+                    gate_detail = gate_exc.detail if isinstance(gate_exc.detail, dict) else {}
+                    logger.warning(f"⛔ Task {task_id} blocked by hard grounding enforcement")
+                    generate_comprehensive_strategy_polling._task_status[task_id].update({
+                        "status": "failed",
+                        "error": gate_detail.get("message", "Strategy failed grounding validation"),
+                        "message": "Strategy generation blocked by grounding validation",
+                        "grounding_violations": gate_detail.get("violations", []),
+                        "failed_at": datetime.utcnow().isoformat()
+                    })
+                    return
                 
                 # Step 8: Complete
                 completion_content = EducationalContentManager.get_step_content(8)

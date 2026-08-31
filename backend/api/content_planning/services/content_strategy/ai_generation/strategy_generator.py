@@ -1,6 +1,24 @@
 """
 AI-Powered Strategy Generation Service
 Generates comprehensive content strategies using AI with enhanced insights and recommendations.
+
+Grounding note
+--------------
+generate_comprehensive_strategy() self-validates its output via _validate_grounding()
+before returning, attaching grounding_validation + grounding_status to
+strategy_metadata. This protects every caller of the generator (the sync endpoint,
+optimize-existing-strategy, and any future caller) even though the endpoints run
+their own enforcement-aware validation too — gates are deterministic, so the
+double pass on the sync path yields identical results.
+
+All five component generators (_generate_strategic_insights,
+_generate_competitive_analysis, _generate_performance_predictions,
+_generate_implementation_roadmap, _generate_risk_assessment) accept a user_id
+kwarg and forward it to the AI service call. generate_comprehensive_strategy
+passes user_id= to each — adding a new component generator without the kwarg
+will crash the comprehensive flow (regression test:
+tests/api/test_strategy_integration.py::TestStrategyGeneratorGrounding::
+test_component_methods_accept_user_id_kwarg).
 """
 
 import json
@@ -10,6 +28,7 @@ from datetime import datetime
 from dataclasses import dataclass
 
 from services.ai_service_manager import AIServiceManager, AIServiceType
+from services.intelligence.agents.quality_gates import validate_strategy_grounding
 from ..autofill.ai_structured_autofill import AIStructuredAutofillService
 
 logger = logging.getLogger(__name__)
@@ -134,11 +153,53 @@ class AIStrategyGenerator:
                 self.logger.info(f"✅ Partial AI strategy generated successfully for user: {user_id}")
             else:
                 self.logger.info(f"✅ Comprehensive AI strategy generated successfully for user: {user_id}")
+            
+            # Quality gate: validate grounding before returning (soft gate).
+            grounding_result = self._validate_grounding(comprehensive_strategy, context)
+            comprehensive_strategy["strategy_metadata"]["grounding_validation"] = grounding_result
+            if grounding_result.get("status") == "error":
+                comprehensive_strategy["strategy_metadata"]["grounding_status"] = "error"
+            else:
+                comprehensive_strategy["strategy_metadata"]["grounding_status"] = (
+                    "validated" if grounding_result.get("passed") else "partial"
+                )
+            
             return comprehensive_strategy
             
         except Exception as e:
             self.logger.error(f"❌ Error generating comprehensive strategy: {str(e)}")
             raise RuntimeError(f"Failed to generate comprehensive strategy: {str(e)}")
+
+    def _validate_grounding(self, strategy_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate the generated strategy is grounded in onboarding data (soft gate).
+
+        Runs the intelligence quality gates (persona, competitor, analytics,
+        data-quality grounding) against the compiled strategy. Soft mode:
+        gate errors never break strategy generation.
+
+        Args:
+            strategy_data: The compiled comprehensive strategy dict.
+            context: Generation context containing ``onboarding_data``.
+
+        Returns:
+            The grounding validation result dict.
+        """
+        try:
+            onboarding_context = context.get("onboarding_data") or {}
+            result = validate_strategy_grounding(strategy_data, onboarding_context)
+            if not result.get("passed"):
+                self.logger.warning(
+                    f"⚠️ Strategy grounding validation failed | score={result.get('score', 0):.2f} "
+                    f"| violations={len(result.get('violations', []))}"
+                )
+            else:
+                self.logger.info(
+                    f"✅ Strategy grounding validated | score={result.get('score', 0):.2f}"
+                )
+            return result
+        except Exception as e:
+            self.logger.error(f"❌ Grounding validation error (non-blocking): {str(e)}")
+            return {"passed": True, "score": 0.0, "status": "error", "error": str(e)}
 
     async def _generate_base_strategy_fields(
         self, 
@@ -253,7 +314,7 @@ class AIStrategyGenerator:
                 "failure_reason": str(e)
             }
 
-    async def _generate_competitive_analysis(self, base_strategy: Dict[str, Any], context: Dict[str, Any], ai_manager: Optional[Any] = None) -> Dict[str, Any]:
+    async def _generate_competitive_analysis(self, base_strategy: Dict[str, Any], context: Dict[str, Any], user_id: Optional[int] = None, ai_manager: Optional[Any] = None) -> Dict[str, Any]:
         """Generate competitive analysis using AI."""
         try:
             logger.info("🔍 Generating competitive analysis...")
@@ -635,7 +696,8 @@ class AIStrategyGenerator:
             response = await ai_manager.execute_structured_json_call(
                 AIServiceType.STRATEGIC_INTELLIGENCE, 
                 prompt, 
-                schema
+                schema,
+                user_id=str(user_id) if user_id else None
             )
             
             if not response or not response.get("data"):
@@ -664,7 +726,7 @@ class AIStrategyGenerator:
                 "failure_reason": str(e)
             }
 
-    async def _generate_risk_assessment(self, base_strategy: Dict[str, Any], context: Dict[str, Any], ai_manager: Optional[Any] = None) -> Dict[str, Any]:
+    async def _generate_risk_assessment(self, base_strategy: Dict[str, Any], context: Dict[str, Any], user_id: Optional[int] = None, ai_manager: Optional[Any] = None) -> Dict[str, Any]:
         """Generate risk assessment using AI."""
         try:
             logger.info("⚠️ Generating risk assessment...")
@@ -786,7 +848,8 @@ class AIStrategyGenerator:
             response = await ai_manager.execute_structured_json_call(
                 AIServiceType.STRATEGIC_INTELLIGENCE, 
                 prompt, 
-                schema
+                schema,
+                user_id=str(user_id) if user_id else None
             )
             
             if not response or not response.get("data"):
