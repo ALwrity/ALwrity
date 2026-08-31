@@ -14,31 +14,14 @@ if str(_BACKEND_ROOT) not in sys.path:
 
 
 class TestYouTubeBrainstormContextService:
-    def test_format_trends_block_uses_rising_queries(self):
-        from services.brainstorm.youtube_brainstorm_context_service import _format_trends_block
-
-        block = _format_trends_block(
-            {
-                "related_queries": {
-                    "rising": [{"query": "solo travel tips", "value": 120}],
-                    "top": [],
-                },
-                "related_topics": {"rising": [], "top": []},
-            }
-        )
-        assert "YOUTUBE TRENDING SIGNALS" in block
-        assert "solo travel tips" in block
-
     @pytest.mark.asyncio
-    async def test_fetch_youtube_trends_context_returns_empty_on_timeout(self):
-        from services.brainstorm import youtube_brainstorm_context_service as svc
+    async def test_fetch_youtube_trends_context_returns_empty(self):
+        from services.brainstorm.youtube_brainstorm_context_service import (
+            fetch_youtube_trends_context,
+        )
 
-        with patch.object(svc, "_get_trends_service") as get_service, patch.object(
-            svc.asyncio, "wait_for", side_effect=TimeoutError()
-        ):
-            get_service.return_value.analyze_trends = MagicMock()
-            result = await svc.fetch_youtube_trends_context("budget travel", "user-1")
-            assert result == ""
+        result = await fetch_youtube_trends_context("budget travel", "user-1")
+        assert result == ""
 
     def test_fetch_youtube_saved_ideas_context_filters_youtube_tags(self):
         from services.brainstorm.youtube_brainstorm_context_service import (

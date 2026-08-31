@@ -1,11 +1,11 @@
-"""Normalize long user ideas into short Google Trends-friendly keywords."""
+"""Normalize long user ideas into short search-friendly keywords."""
 
 from __future__ import annotations
 
 import re
 from typing import Iterable, List
 
-# Generic words that do not help Google Trends queries.
+# Generic words that do not help search queries.
 _TRENDS_STOPWORDS = frozenset(
     {
         "a",
@@ -44,9 +44,9 @@ _TRENDS_STOPWORDS = frozenset(
 
 def normalize_trends_keywords(raw_keywords: Iterable[str], max_keywords: int = 5) -> List[str]:
     """
-    Convert long ideas into 1-5 short search terms for pytrends.
+    Convert long ideas into 1-5 short search terms.
 
-    Google Trends works best with 1-4 word phrases, not full video titles.
+    Search APIs work best with 1-4 word phrases, not full video titles.
     """
     result: List[str] = []
     seen: set[str] = set()

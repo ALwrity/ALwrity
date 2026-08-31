@@ -310,18 +310,17 @@ async def execute_intent_driven_research(
             # Execute research and trends in parallel
             research_task = asyncio.create_task(engine.research(context))
             
-            # Execute Google Trends analysis in parallel (if enabled)
+            # Execute trends analysis in parallel (if enabled)
             trends_task = None
             trends_data = None
             if request.trends_config and request.trends_config.get("enabled"):
-                from services.research.trends.google_trends_service import GoogleTrendsService
-                trends_service = GoogleTrendsService()
+                from api.research.utils import _fetch_research_trends
                 trends_task = asyncio.create_task(
-                    trends_service.analyze_trends(
+                    _fetch_research_trends(
                         keywords=request.trends_config.get("keywords", []),
                         timeframe=request.trends_config.get("timeframe", "today 12-m"),
                         geo=request.trends_config.get("geo", "US"),
-                        user_id=user_id
+                        user_id=user_id,
                     )
                 )
             
@@ -332,9 +331,9 @@ async def execute_intent_driven_research(
             if trends_task:
                 try:
                     trends_data = await trends_task
-                    logger.info(f"Google Trends data fetched: {len(trends_data.get('interest_over_time', []))} time points")
+                    logger.info(f"Trend data fetched: {len(trends_data.get('trends', []))} trends, {len(trends_data.get('items', []))} items")
                 except Exception as e:
-                    logger.error(f"Google Trends analysis failed: {e}")
+                    logger.error(f"Trend analysis failed: {e}")
                     trends_data = None
             
             # Analyze results using intent-aware analyzer

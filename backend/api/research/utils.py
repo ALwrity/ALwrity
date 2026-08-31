@@ -14,6 +14,7 @@ from services.research.core import (
     ProviderPreference,
 )
 from models.research_intent_models import TrendAnalysis
+from services.research.trends import TavilyTrendProvider, TrendPlatform, synthesize_trends
 
 
 def convert_to_research_context(request, user_id: str) -> ResearchContext:
@@ -180,3 +181,29 @@ def merge_trends_data(analyzed_result: Any, trends_data: Dict[str, Any]) -> Any:
     # Update analyzed result with enhanced trends
     analyzed_result.trends = enhanced_trends
     return analyzed_result
+
+
+async def _fetch_research_trends(
+    keywords: list,
+    timeframe: str,
+    geo: str,
+    user_id: str,
+    provider=None,
+) -> Dict[str, Any]:
+    """Fetch and synthesize Tavily trends for the research intent endpoint."""
+    provider = provider or TavilyTrendProvider()
+    items = await provider.fetch_trends(
+        TrendPlatform.WEB, industry="", keywords=keywords, user_id=user_id
+    )
+    report = await synthesize_trends(
+        items, TrendPlatform.WEB, user_id=user_id, focus="trend analysis"
+    )
+    return {
+        "summary": report.get("summary", ""),
+        "trends": report.get("trends", []),
+        "items": [item.to_dict() for item in items],
+        "keywords": keywords,
+        "timeframe": timeframe,
+        "geo": geo,
+        "platform": TrendPlatform.WEB.value,
+    }

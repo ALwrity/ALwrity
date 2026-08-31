@@ -56,9 +56,32 @@ from services.intelligence.agents.output_contracts import (
     get_role_contract,
 )
 from services.intelligence.agents.quality_gates import validate_action_content
+from services.research.trends import TavilyTrendProvider, TrendPlatform, synthesize_trends
 import time
 
 logger = get_service_logger(__name__)
+
+
+def _build_market_trends_envelope(
+    keywords: List[str],
+    timeframe: str,
+    geo: str,
+    items: list,
+    report: Dict[str, Any],
+    now: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Build a Tavily market-trends envelope compatible with the SIF market_trends doc."""
+    return {
+        "keywords": keywords,
+        "timeframe": timeframe,
+        "geo": geo,
+        "timestamp": now or datetime.utcnow().isoformat(),
+        "cached": False,
+        "source": "tavily",
+        "platform": TrendPlatform.WEB.value,
+        "items": [item.to_dict() for item in items],
+        "synthesis": report,
+    }
 
 LOW_COST_REMOTE_MODELS = [
     "Qwen/Qwen2.5-1.5B-Instruct",
@@ -1360,15 +1383,16 @@ class StrategyOrchestratorAgent(BaseALwrityAgent):
             if not keywords:
                 return {"error": "keywords is required", "success": False}
 
-            from services.research.trends.google_trends_service import GoogleTrendsService
             from services.intelligence.txtai_service import TxtaiIntelligenceService
 
-            trends = await GoogleTrendsService().analyze_trends(
-                keywords=keywords,
-                timeframe=timeframe,
-                geo=geo,
-                user_id=self.user_id,
+            provider = getattr(self, "trend_provider", None) or TavilyTrendProvider()
+            items = await provider.fetch_trends(
+                TrendPlatform.WEB, industry="", keywords=keywords, user_id=self.user_id
             )
+            report = await synthesize_trends(
+                items, TrendPlatform.WEB, user_id=self.user_id, focus="market trends summary"
+            )
+            trends = _build_market_trends_envelope(keywords, timeframe, geo, items, report)
 
             run_id = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
             latest_id = f"market_trends_latest:{self.user_id}"
@@ -1376,8 +1400,7 @@ class StrategyOrchestratorAgent(BaseALwrityAgent):
 
             summary = (
                 f"LATEST Market Trends for {geo} ({timeframe}). Keywords: {', '.join(trends.get('keywords', keywords))}. "
-                f"Related queries top: {len((trends.get('related_queries') or {}).get('top', []))}. "
-                f"Related topics top: {len((trends.get('related_topics') or {}).get('top', []))}."
+                f"Trend items: {len(items)}. Synthesis trends: {len(report.get('trends', []))}."
             )
 
             metadata = {
