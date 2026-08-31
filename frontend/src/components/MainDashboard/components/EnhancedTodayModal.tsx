@@ -652,7 +652,7 @@ const getTaskStatus = (task: TodayTask) => {
                               </Box>
                             )}
                             {/* Gap scoring breakdown for ContentGapRadarAgent tasks */}
-                            {task.metadata.source_agent === 'ContentGapRadarAgent' && task.metadata.context_data?.gap?.scoring && (
+                            {task.metadata.source_agent === 'content_gap_radar' && task.metadata.context_data?.gap?.scoring && (
                               <GapScoringBreakdown scoring={task.metadata.context_data.gap.scoring} />
                             )}
                           </Box>

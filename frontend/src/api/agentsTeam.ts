@@ -82,18 +82,6 @@ export async function saveAgentProfile(agentKey: string, payload: Record<string,
   return res.data?.data?.profile;
 }
 
-export async function aiOptimizeAgentProfile(
-  agentKey: string,
-  scope: "agent" | "system_prompt" | "task_prompt_template",
-  contextCard: Record<string, any>
-) {
-  const res = await aiApiClient.post(`/api/agents/team/${encodeURIComponent(agentKey)}/ai-optimize`, {
-    scope,
-    context_card: contextCard,
-  });
-  return res.data?.data?.suggestion;
-}
-
 export async function previewAgentProfile(
   agentKey: string,
   contextCard: Record<string, any>,

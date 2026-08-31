@@ -257,5 +257,5 @@ def test_controlled_pillar_fallback_is_labeled():
 def test_committee_final_tasks_carry_synthesis_mode():
     """The final_tasks payload built by generate_agent_enhanced_plan must
     include the proposal's synthesis_mode inside metadata."""
-    source = (_BACKEND_ROOT / "services" / "today_workflow_service.py").read_text(encoding="utf-8")
-    assert '"synthesis_mode": getattr(prop, "synthesis_mode", None)' in source
+    source = (_BACKEND_ROOT / "services" / "today_workflow_agents.py").read_text(encoding="utf-8")
+    assert '"synthesis_mode": prop.get("synthesis_mode") if is_dict else getattr(prop, "synthesis_mode", None)' in source

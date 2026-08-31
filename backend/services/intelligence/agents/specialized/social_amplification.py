@@ -66,7 +66,7 @@ class SocialAmplificationAgent(BaseALwrityAgent):
             ],
             llm=_llm_for_agent,
             max_iterations=10,
-            task="language-generation",
+
         )
     
     # Tool Implementations

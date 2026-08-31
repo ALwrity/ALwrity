@@ -97,7 +97,8 @@ AGENT_TEAM_CATALOG: List[AgentCatalogEntry] = [
                 "Operating principles:\n"
                 "- Be specific, actionable, and non-technical.\n"
                 "- Prefer high-impact, low-effort recommendations first.\n"
-                "- Maintain brand consistency; use the brand voice and target audience above.\n\n"
+                "- Maintain brand consistency; use the brand voice and target audience above.\n"
+                "- Only assert what the provided context supports; never invent metrics or data.\n\n"
                 "When you respond, include:\n"
                 "- What to do, why it matters, and what success looks like."
             ),
@@ -142,7 +143,8 @@ AGENT_TEAM_CATALOG: List[AgentCatalogEntry] = [
                 "- Use semantic insights to avoid guesswork.\n"
                 "- Avoid panic. Prioritize only meaningful threats.\n"
                 "- Keep outputs concise and actionable.\n"
-                "- Recommend responses that reinforce the brand voice and audience positioning above."
+                "- Recommend responses that reinforce the brand voice and audience positioning above.\n"
+                "- Only assert what the provided context supports; never invent metrics or data."
             ),
             "task_prompt_template": (
                 "Task: Summarize competitor moves and recommend responses.\n\n"
@@ -185,7 +187,8 @@ AGENT_TEAM_CATALOG: List[AgentCatalogEntry] = [
                 "- Prioritize high-impact, low-risk fixes.\n"
                 "- Explain recommendations in simple language.\n"
                 "- If an action is risky, require approval.\n"
-                "- Ensure SEO recommendations align with the brand voice and audience above."
+                "- Ensure SEO recommendations align with the brand voice and audience above.\n"
+                "- Only assert what the provided context supports; never invent metrics or data."
             ),
             "task_prompt_template": (
                 "Task: Produce a weekly SEO fix list for {website_name}.\n\n"
@@ -225,7 +228,8 @@ AGENT_TEAM_CATALOG: List[AgentCatalogEntry] = [
                 "Rules:\n"
                 "- Adapt to platform norms.\n"
                 "- Optimize for engagement ethically.\n"
-                "- Keep messages aligned with the brand voice and target audience above."
+                "- Keep messages aligned with the brand voice and target audience above.\n"
+                "- Only assert what the provided context supports; never invent metrics or data."
             ),
             "task_prompt_template": (
                 "Task: Suggest a weekly distribution plan for {website_name}.\n\n"
@@ -273,7 +277,8 @@ AGENT_TEAM_CATALOG: List[AgentCatalogEntry] = [
                 "- Never propose new tasks; only audit existing proposals.\n"
                 "- Score plans on a 0-100 health scale.\n"
                 "- Surface only systemic, high-signal issues; dedupe alerts.\n"
-                "- Flag output that diverges from the brand voice, target audience, or forbidden tones above."
+                "- Flag output that diverges from the brand voice, target audience, or forbidden tones above.\n"
+                "- Only assert what the provided context supports; never invent metrics or data."
             ),
             "task_prompt_template": (
                 "Task: Audit the committee's daily plan for {website_name}.\n\n"
@@ -321,7 +326,8 @@ AGENT_TEAM_CATALOG: List[AgentCatalogEntry] = [
                 "Rules:\n"
                 "- Use semantic clustering insights; avoid guesswork.\n"
                 "- Prioritize high-impact pillar topics first.\n"
-                "- Keep proposals actionable and measurable."
+                "- Keep proposals actionable and measurable.\n"
+                "- Only assert what the provided context supports; never invent metrics or data."
             ),
             "task_prompt_template": (
                 "Task: Discover content pillars and propose strategic tasks for {website_name}.\n\n"

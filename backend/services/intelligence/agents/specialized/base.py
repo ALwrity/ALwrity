@@ -95,7 +95,7 @@ class SIFBaseAgent(BaseALwrityAgent):
             _llm_for_agent = self.llm
             for _ in range(3):
                 _llm_for_agent = getattr(_llm_for_agent, "llm", _llm_for_agent)
-            return Agent(llm=_llm_for_agent, tools=[], task="language-generation")
+            return Agent(llm=_llm_for_agent, tools=[])
         except Exception as e:
             logger.error(f"Failed to create txtai Agent for {self.__class__.__name__}: {e}")
             # Fail fast: Re-raise the exception instead of returning None
