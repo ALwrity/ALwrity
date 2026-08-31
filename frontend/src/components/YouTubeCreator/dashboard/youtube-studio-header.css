@@ -86,7 +86,17 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  width: 100%;
   min-width: 0;
+}
+
+.yt-studio-landing-header-search-slot {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+  max-width: 252px;
 }
 
 @media (max-width: 600px) {
@@ -106,5 +116,9 @@
 
   .yt-studio-landing-header-brand-subline {
     font-size: 11px;
+  }
+
+  .yt-studio-landing-header-search-slot {
+    max-width: 140px;
   }
 }

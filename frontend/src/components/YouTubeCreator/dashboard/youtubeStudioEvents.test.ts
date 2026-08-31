@@ -3,11 +3,13 @@ import {
   openYouTubeCreator,
   openYouTubePlanFromCreator,
   parseYouTubeStudioTab,
+  publishYouTubeSearchResults,
   queueYouTubeCreatorOpen,
   resumeYouTubeDraft,
   YT_CLOSE_CREATOR_EVENT,
   YT_OPEN_CREATOR_EVENT,
   YT_OPEN_WEDGE_EVENT,
+  YT_SEARCH_RESULTS_EVENT,
   YT_SWITCH_TAB_EVENT,
 } from "./youtubeStudioEvents";
 
@@ -140,5 +142,42 @@ describe("resumeYouTubeDraft", () => {
 
     window.removeEventListener(YT_OPEN_CREATOR_EVENT, onOpen);
     window.removeEventListener(YT_SWITCH_TAB_EVENT, onTab);
+  });
+});
+
+describe("publishYouTubeSearchResults", () => {
+  it("dispatches Hub search results without logging the query text", () => {
+    const seen: unknown[] = [];
+    const onResults = (event: Event) => {
+      seen.push((event as CustomEvent).detail);
+    };
+    window.addEventListener(YT_SEARCH_RESULTS_EVENT, onResults);
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+
+    publishYouTubeSearchResults({
+      query: "secret keyword",
+      items: [{ video_id: "vid123", title: "How to train dogs" }],
+      message: null,
+    });
+
+    expect(seen).toEqual([
+      {
+        query: "secret keyword",
+        items: [{ video_id: "vid123", title: "How to train dogs" }],
+        message: null,
+      },
+    ]);
+    expect(JSON.stringify(info.mock.calls)).not.toContain("secret keyword");
+    expect(info).toHaveBeenCalledWith(
+      "[youtubeStudioEvents] publishYouTubeSearchResults",
+      expect.objectContaining({
+        queryLength: 14,
+        itemCount: 1,
+        hasMessage: false,
+      }),
+    );
+
+    info.mockRestore();
+    window.removeEventListener(YT_SEARCH_RESULTS_EVENT, onResults);
   });
 });

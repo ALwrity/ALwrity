@@ -18,6 +18,7 @@ export const YT_RESUME_DRAFT_EVENT = "youtube:resumeDraft";
 export const YT_SWITCH_TAB_EVENT = "youtube:switchTab";
 export const YT_OPEN_CHANNEL_BIBLE_EVENT = "youtube:openChannelBible";
 export const YT_CHANNEL_BIBLE_UPDATED_EVENT = "youtube:channelBibleUpdated";
+export const YT_SEARCH_RESULTS_EVENT = "youtube:searchResults";
 
 export type YouTubeStudioTab = "hub" | "creator";
 
@@ -187,4 +188,28 @@ export function notifyYouTubeChannelBibleUpdated(bible: YouTubeChannelBible): vo
       detail: bible,
     }),
   );
+}
+
+export type YouTubeSearchResultsDetail = {
+  query: string;
+  items: Array<{ video_id: string; title: string }>;
+  message: string | null;
+};
+
+/** Header search bar publishes results for the Hub panel (not the header dropdown). */
+export function publishYouTubeSearchResults(detail: YouTubeSearchResultsDetail): void {
+  try {
+    window.dispatchEvent(
+      new CustomEvent<YouTubeSearchResultsDetail>(YT_SEARCH_RESULTS_EVENT, {
+        detail,
+      }),
+    );
+    console.info("[youtubeStudioEvents] publishYouTubeSearchResults", {
+      queryLength: detail.query.length,
+      itemCount: Array.isArray(detail.items) ? detail.items.length : 0,
+      hasMessage: Boolean(detail.message),
+    });
+  } catch (error) {
+    console.error("[youtubeStudioEvents] publishYouTubeSearchResults failed", error);
+  }
 }

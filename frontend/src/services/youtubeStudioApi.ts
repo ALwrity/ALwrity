@@ -83,4 +83,19 @@ export const youtubeStudioApi = {
     const response = await apiClient.post(`${API_BASE}/studio/content-gaps`, body || {});
     return response.data;
   },
+
+  /** YouTube.Search.list by keyword — GET /api/youtube/search */
+  async searchByKeyword(params: {
+    q: string;
+    max_results?: number;
+    page_token?: string;
+    token_id?: number;
+    order?: string;
+    event_type?: string;
+    video_duration?: string;
+    search_type?: string;
+  }) {
+    const response = await apiClient.get(`${API_BASE}/search`, { params });
+    return response.data;
+  },
 };

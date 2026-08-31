@@ -23,6 +23,7 @@ from .publish_router import router as youtube_publish_router
 from .analytics_router import router as youtube_analytics_router
 from .comments_router import router as youtube_comments_router
 from .studio_ops_router import router as youtube_studio_ops_router
+from .search_router import router as youtube_search_router
 from .task_manager import task_manager
 
 # Re-export schemas for existing test imports
@@ -100,6 +101,7 @@ router.include_router(youtube_publish_router)
 router.include_router(youtube_analytics_router)
 router.include_router(youtube_comments_router)
 router.include_router(youtube_studio_ops_router)
+router.include_router(youtube_search_router)
 
 __all__ = [
     "router",
