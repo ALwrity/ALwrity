@@ -1,6 +1,6 @@
 """
 Market Trends Executor
-Runs Google Trends (pytrends) periodically and embeds results into the user SIF index.
+Surfaces market trends via Tavily and embeds results into the user SIF index.
 """
 
 import time
@@ -13,7 +13,7 @@ from models.website_analysis_monitoring_models import MarketTrendsTask, MarketTr
 from services.scheduler.core.executor_interface import TaskExecutor, TaskExecutionResult
 from services.scheduler.core.failure_detection_service import FailureDetectionService
 from services.intelligence.sif_integration import SIFIntegrationService
-from services.research.trends.google_trends_service import GoogleTrendsService
+from services.research.trends import TavilyTrendProvider, TrendPlatform, synthesize_trends
 from utils.logger_utils import get_service_logger
 
 logger = get_service_logger("market_trends_executor")
@@ -21,7 +21,7 @@ logger = get_service_logger("market_trends_executor")
 
 class MarketTrendsExecutor(TaskExecutor):
     def __init__(self):
-        pass
+        self.trend_provider = TavilyTrendProvider()
 
     async def execute_task(self, task: Any, db: Session) -> TaskExecutionResult:
         start_time = time.time()
@@ -51,30 +51,9 @@ class MarketTrendsExecutor(TaskExecutor):
             if len(keywords) > 5:
                 keywords = keywords[:5]
 
-            trends_result: Dict[str, Any]
-            if keywords:
-                try:
-                    trends_result = await GoogleTrendsService().analyze_trends(
-                        keywords=keywords, timeframe=timeframe, geo=geo, user_id=user_id
-                    )
-                except Exception as trends_err:
-                    trends_result = {
-                        "error": str(trends_err),
-                        "keywords": keywords,
-                        "timeframe": timeframe,
-                        "geo": geo,
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "cached": False,
-                    }
-            else:
-                trends_result = {
-                    "error": "No keywords available for market trends run",
-                    "keywords": [],
-                    "timeframe": timeframe,
-                    "geo": geo,
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "cached": False,
-                }
+            trends_result = await self._build_trends_result(
+                keywords=keywords, geo=geo, timeframe=timeframe, user_id=user_id
+            )
 
             run_id = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
             await sif_service.index_market_trends_run(trends_result=trends_result, run_id=run_id)
@@ -153,6 +132,49 @@ class MarketTrendsExecutor(TaskExecutor):
                 retryable=(task.status != "needs_intervention"),
                 retry_delay=21600,
             )
+
+    async def _build_trends_result(
+        self, keywords: List[str], geo: str, timeframe: str, user_id: str
+    ) -> Dict[str, Any]:
+        if not keywords:
+            return {
+                "error": "No keywords available for market trends run",
+                "keywords": [],
+                "timeframe": timeframe,
+                "geo": geo,
+                "timestamp": datetime.utcnow().isoformat(),
+                "cached": False,
+            }
+        try:
+            items = await self.trend_provider.fetch_trends(
+                TrendPlatform.WEB, industry="", keywords=keywords, user_id=user_id
+            )
+            report = await synthesize_trends(
+                items,
+                TrendPlatform.WEB,
+                user_id=user_id,
+                focus="market and business trends summary",
+            )
+            return {
+                "keywords": keywords,
+                "timeframe": timeframe,
+                "geo": geo,
+                "timestamp": datetime.utcnow().isoformat(),
+                "cached": False,
+                "source": "tavily",
+                "platform": TrendPlatform.WEB.value,
+                "items": [item.to_dict() for item in items],
+                "synthesis": report,
+            }
+        except Exception as exc:
+            return {
+                "error": str(exc),
+                "keywords": keywords,
+                "timeframe": timeframe,
+                "geo": geo,
+                "timestamp": datetime.utcnow().isoformat(),
+                "cached": False,
+            }
 
     async def _select_keywords_for_user(self, db: Session, user_id: str, website_url: str) -> List[str]:
         keywords: List[str] = []
