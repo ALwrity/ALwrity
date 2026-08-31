@@ -33,6 +33,8 @@ class _StudioYouTubeSearchStub:
         event_type: str | None = None,
         video_duration: str | None = None,
         search_type: str | None = None,
+        upload_date: str | None = None,
+        time_zone: str | None = None,
     ) -> dict:
         assert user_id
         self.calls.append(
@@ -45,6 +47,8 @@ class _StudioYouTubeSearchStub:
                 "order": order,
                 "event_type": event_type,
                 "video_duration": video_duration,
+                "upload_date": upload_date,
+                "time_zone": time_zone,
             }
         )
         if not self.connected:
@@ -145,3 +149,48 @@ class TestYouTubeSearchByKeywordJourney:
         assert_status(resp_long, 200)
         assert stub.calls[0]["video_duration"] == "medium"
         assert stub.calls[1]["video_duration"] == "long"
+
+    def test_forwards_upload_date(self):
+        stub = _StudioYouTubeSearchStub()
+        client = _client(stub)
+
+        resp_today = client.get(
+            "/api/youtube/search",
+            params={"q": "dogs", "upload_date": "today"},
+        )
+        resp_week = client.get(
+            "/api/youtube/search",
+            params={"q": "dogs", "upload_date": "week"},
+        )
+        resp_month = client.get(
+            "/api/youtube/search",
+            params={"q": "dogs", "upload_date": "month"},
+        )
+        resp_year = client.get(
+            "/api/youtube/search",
+            params={"q": "dogs", "upload_date": "year"},
+        )
+        assert_status(resp_today, 200)
+        assert_status(resp_week, 200)
+        assert_status(resp_month, 200)
+        assert_status(resp_year, 200)
+        assert stub.calls[0]["upload_date"] == "today"
+        assert stub.calls[1]["upload_date"] == "week"
+        assert stub.calls[2]["upload_date"] == "month"
+        assert stub.calls[3]["upload_date"] == "year"
+
+    def test_forwards_upload_date_time_zone(self):
+        stub = _StudioYouTubeSearchStub()
+        client = _client(stub)
+
+        resp = client.get(
+            "/api/youtube/search",
+            params={
+                "q": "dogs",
+                "upload_date": "today",
+                "time_zone": "Asia/Kolkata",
+            },
+        )
+        assert_status(resp, 200)
+        assert stub.calls[0]["upload_date"] == "today"
+        assert stub.calls[0]["time_zone"] == "Asia/Kolkata"

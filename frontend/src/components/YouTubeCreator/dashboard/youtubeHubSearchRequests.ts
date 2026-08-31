@@ -1,5 +1,5 @@
 /**
- * Hub Search.list requests for chip filters, TYPE, and Duration overlay.
+ * Hub Search.list requests for chip filters, TYPE, Duration, and Upload Date.
  */
 import { youtubeStudioApi } from "../../../services/youtubeStudioApi";
 import {
@@ -8,7 +8,9 @@ import {
   type YouTubeSearchFilter,
   type YouTubeSearchHit,
   type YouTubeSearchTypeFilter,
+  type YouTubeSearchUploadDateFilter,
 } from "./YouTubeSearchResultsPanel";
+import { resolveYouTubeSearchTimeZone } from "./youtubeSearchTimeZone";
 
 export type YouTubeHubSearchResult = {
   items: YouTubeSearchHit[];
@@ -167,6 +169,49 @@ export async function searchYouTubeByDuration(
     console.error(
       "[youtubeHubSearchRequests] Duration search failed",
       { videoDuration: duration },
+      error,
+    );
+    throw error;
+  }
+}
+
+export async function searchYouTubeByUploadDate(
+  query: string,
+  uploadDate: YouTubeSearchUploadDateFilter,
+): Promise<YouTubeHubSearchResult> {
+  let timeZone: string | null = null;
+  try {
+    timeZone = resolveYouTubeSearchTimeZone();
+    console.info("[youtubeHubSearchRequests] Upload date search start", {
+      uploadDate,
+      timeZone,
+      queryLength: query.length,
+    });
+    const data = await youtubeStudioApi.searchByKeyword({
+      q: query,
+      max_results: 25,
+      upload_date: uploadDate,
+      time_zone: timeZone,
+    });
+    if (!data?.success) {
+      console.warn("[youtubeHubSearchRequests] Upload date search unsuccessful", {
+        uploadDate,
+        timeZone,
+        errorCode: data?.error_code || null,
+      });
+      return { items: [], message: data?.message || "Search failed." };
+    }
+    const items = asHits(data);
+    console.info("[youtubeHubSearchRequests] Upload date search complete", {
+      uploadDate,
+      timeZone,
+      itemCount: items.length,
+    });
+    return { items, message: items.length === 0 ? "No videos found." : null };
+  } catch (error) {
+    console.error(
+      "[youtubeHubSearchRequests] Upload date search failed",
+      { uploadDate, timeZone, queryLength: query.length },
       error,
     );
     throw error;

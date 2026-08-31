@@ -12,9 +12,9 @@
  *   Playlists → type=playlist
  *   Movies    → type=video + videoType=movie
  *
- * Out of scope here: Upload date, Features, Prioritise,
- * Unwatched/Watched. Duration is a sibling column (YouTubeSearchDurationFilters),
- * not part of YouTubeSearchTypeFilters. Do not change chip-row behavior.
+ * Out of scope here: Features, Prioritise, Unwatched/Watched.
+ * Duration and Upload Date are sibling columns, not part of
+ * YouTubeSearchTypeFilters. Do not change chip-row behavior.
  */
 import { fireEvent, render, screen, within } from "@testing-library/react";
 
@@ -74,7 +74,7 @@ describe("YouTube search Filters icon", () => {
     expect(within(dialog).getByRole("button", { name: /^channels$/i })).toBeTruthy();
     expect(within(dialog).getByRole("button", { name: /^playlists$/i })).toBeTruthy();
     expect(within(dialog).getByRole("button", { name: /^movies$/i })).toBeTruthy();
-    expect(within(dialog).queryByRole("group", { name: /^upload date$/i })).toBeNull();
+    expect(within(dialog).queryByRole("group", { name: /^features$/i })).toBeNull();
     expect(within(dialog).queryByRole("button", { name: /unwatched/i })).toBeNull();
   });
 

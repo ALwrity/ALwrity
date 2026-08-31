@@ -12,10 +12,18 @@ import {
   YouTubeSearchDurationFilters,
   type YouTubeSearchDurationFilter,
 } from "./YouTubeSearchDurationFilters";
+import {
+  YouTubeSearchUploadDateFilters,
+  type YouTubeSearchUploadDateFilter,
+} from "./YouTubeSearchUploadDateFilters";
 import "./youtubeSearchResultsPanel.css";
 
 export type YouTubeSearchFilter = "all" | "videos" | "shorts" | "recent" | "live";
-export type { YouTubeSearchTypeFilter, YouTubeSearchDurationFilter };
+export type {
+  YouTubeSearchTypeFilter,
+  YouTubeSearchDurationFilter,
+  YouTubeSearchUploadDateFilter,
+};
 
 export type YouTubeSearchHit = {
   video_id?: string;
@@ -51,9 +59,11 @@ export interface YouTubeSearchResultsPanelProps {
   selectedFilter?: YouTubeSearchFilter;
   selectedType?: YouTubeSearchTypeFilter;
   selectedDuration?: YouTubeSearchDurationFilter;
+  selectedUploadDate?: YouTubeSearchUploadDateFilter;
   onFilterChange?: (filter: YouTubeSearchFilter) => void;
   onTypeChange?: (type: YouTubeSearchTypeFilter) => void;
   onDurationChange?: (duration: YouTubeSearchDurationFilter) => void;
+  onUploadDateChange?: (uploadDate: YouTubeSearchUploadDateFilter) => void;
   onClose?: () => void;
 }
 
@@ -110,9 +120,11 @@ export const YouTubeSearchResultsPanel: React.FC<YouTubeSearchResultsPanelProps>
   selectedFilter = "all",
   selectedType,
   selectedDuration,
+  selectedUploadDate,
   onFilterChange,
   onTypeChange,
   onDurationChange,
+  onUploadDateChange,
   onClose,
 }) => {
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -166,6 +178,22 @@ export const YouTubeSearchResultsPanel: React.FC<YouTubeSearchResultsPanelProps>
       );
     }
     closeSearchFilters("duration", { videoDuration: duration });
+  };
+
+  const applyUploadDateAndClose = (uploadDate: YouTubeSearchUploadDateFilter) => {
+    try {
+      console.info("[YouTubeSearchResultsPanel] Upload date filter selected", {
+        uploadDate,
+      });
+      onUploadDateChange?.(uploadDate);
+    } catch (error) {
+      console.error(
+        "[YouTubeSearchResultsPanel] Upload date filter apply failed",
+        { uploadDate },
+        error,
+      );
+    }
+    closeSearchFilters("upload-date", { uploadDate });
   };
 
   useEffect(() => {
@@ -281,7 +309,11 @@ export const YouTubeSearchResultsPanel: React.FC<YouTubeSearchResultsPanelProps>
               selectedDuration={selectedDuration}
               onDurationChange={applyDurationAndClose}
             />
-            {/* Upload date, Features, Prioritise — later slices */}
+            <YouTubeSearchUploadDateFilters
+              selectedUploadDate={selectedUploadDate}
+              onUploadDateChange={applyUploadDateAndClose}
+            />
+            {/* Features, Prioritise — later slices */}
           </div>
         </div>
       ) : null}

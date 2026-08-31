@@ -1,0 +1,46 @@
+/* Search filters UPLOAD DATE column — Studio rail reds, not YouTube.com dark. */
+
+.yt-search-upload-date-filters {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 120px;
+}
+
+.yt-search-upload-date-filters__heading {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #7f1d1d;
+}
+
+.yt-search-upload-date-filters__option {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 700;
+  color: #7f1d1d;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.yt-search-upload-date-filters__option:hover {
+  background: #fef2f2;
+  color: #cc0000;
+}
+
+.yt-search-upload-date-filters__option--active {
+  background: #ff0000;
+  color: #ffffff;
+}
+
+.yt-search-upload-date-filters__option--active:hover {
+  background: #e60000;
+  color: #ffffff;
+}
