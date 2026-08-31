@@ -11,7 +11,7 @@ Active fixtures:
 * ``subscription_client``      — TestClient over ``subscription_app``.
 * ``free_user``                — fake user dict with a free-tier subscription
                                  and a zeroed usage summary.
-* ``seed_pricing_and_plans``   — helper that upserts all 49 model pricing
+* ``seed_pricing_and_plans``   — helper that upserts all model pricing
                                  entries and 4 plans from pricing.yaml.
 """
 
@@ -54,6 +54,9 @@ def subscription_db_engine():
     )
 
     from models.base import Base
+    # Ensure subscription models are registered on Base BEFORE create_all so
+    # api_provider_pricing etc. exist regardless of test import order.
+    import models.subscription_models  # noqa: F401
 
     Base.metadata.create_all(engine)
     yield engine

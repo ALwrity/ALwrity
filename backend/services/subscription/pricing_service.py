@@ -20,6 +20,9 @@ from models.subscription_models import (
 )
 from services.subscription.pricing_config import PricingConfigLoader
 
+# Shared loader — parses pricing.yaml once, caches the result.
+_shared_pricing_loader = PricingConfigLoader()
+
 class PricingService:
     """Service for managing API pricing and cost calculations."""
     
@@ -139,8 +142,7 @@ class PricingService:
             logger.debug("[PRICING_INIT] Pricing already initialized — skipping")
             return
 
-        loader = PricingConfigLoader()
-        config = loader.load()
+        config = _shared_pricing_loader.get_config()
 
         all_pricing = config.model_pricing
 
@@ -185,8 +187,7 @@ class PricingService:
 
     def initialize_default_plans(self):
         """Initialize default subscription plans from pricing.yaml SSOT."""
-        loader = PricingConfigLoader()
-        config = loader.load()
+        config = _shared_pricing_loader.get_config()
 
         for plan_entry in config.plans:
             plan_data = {
@@ -220,7 +221,7 @@ class PricingService:
                 logger.debug(f"Updated existing plan: {existing.name}")
 
         self.db.commit()
-        logger.info("[PLANS_INIT] Default subscription plans initialized from pricing.yaml")
+        logger.debug("[PLANS_INIT] Default subscription plans synced from pricing.yaml")
 
     def calculate_api_cost(self, provider: APIProvider, model_name: str, 
                           tokens_input: int = 0, tokens_output: int = 0, 

@@ -1,7 +1,7 @@
 """add research_summary and social_media_citations to research_preferences
 
 Revision ID: b0c1d2e3f4a5
-Revises: fa1b2c3d4e5f
+Revises: c9d8e7f6a5b4
 Create Date: 2026-08-29 15:20:00.000000
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'b0c1d2e3f4a5'
-down_revision: Union[str, Sequence[str], None] = 'fa1b2c3d4e5f'
+down_revision: Union[str, Sequence[str], None] = 'c9d8e7f6a5b4'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

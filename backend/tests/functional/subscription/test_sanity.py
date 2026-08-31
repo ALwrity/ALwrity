@@ -54,7 +54,7 @@ class TestPricingEntryCount:
     """Verify the expected number of pricing entries and plans."""
 
     def test_model_pricing_count(self, raw_config):
-        assert len(_model_entries(raw_config)) == 49
+        assert len(_model_entries(raw_config)) == 81
 
     def test_plan_count(self, raw_config):
         assert len(_plan_entries(raw_config)) == 4
@@ -68,8 +68,8 @@ class TestProviderDistribution:
     _EXPECTED = {
         "gemini": 14, "openai": 2, "anthropic": 1, "mistral": 3,
         "tavily": 1, "serper": 1, "metaphor": 1, "firecrawl": 1,
-        "exa": 1, "stability": 3, "image_edit": 3, "video": 8,
-        "audio": 7, "wavespeed": 3,
+        "exa": 1, "stability": 12, "image_edit": 18, "video": 12,
+        "audio": 11, "wavespeed": 3,
     }
 
     def test_provider_counts_match(self, raw_config):

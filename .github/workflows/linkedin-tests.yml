@@ -80,6 +80,29 @@ env:
 # required — the workflow picks it up automatically.
 # ----------------------------------------------------------------
 jobs:
+  check-alembic-heads:
+    name: 🔍 Check Alembic single head
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install alembic
+        working-directory: backend
+        run: python -m pip install alembic sqlalchemy
+      - name: Fail if multiple migration heads exist
+        working-directory: backend
+        run: |
+          HEADS=$(python -m alembic heads 2>&1 | grep -c "^Revision:" || true)
+          if [ "$HEADS" -gt 1 ]; then
+            echo "::error::Multiple Alembic head revisions detected ($HEADS). Run 'alembic merge' to create a merge revision."
+            python -m alembic heads
+            exit 1
+          fi
+          echo "Single Alembic head OK"
+
   apply-suite-selection:
     name: 🧭 Resolve suite selection
     runs-on: ubuntu-latest
@@ -144,6 +167,7 @@ jobs:
                 'backend/alwrity_utils/',
                 'backend/middleware/',
                 'backend/services/database.py',
+                'backend/alembic_migrations/',
                 'backend/tests/__init__.py',
               ],
             };
