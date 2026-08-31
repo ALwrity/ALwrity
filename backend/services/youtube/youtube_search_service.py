@@ -71,6 +71,72 @@ def _parse_search_list_http_error(exc: HttpError) -> Tuple[int, Optional[str], s
     return status, reason, api_message
 
 
+def _snippet_title(item: Dict[str, Any]) -> str:
+    raw_snippet = item.get("snippet")
+    if isinstance(raw_snippet, dict):
+        return raw_snippet.get("title") or ""
+    return ""
+
+
+def _apply_search_type(list_kwargs: Dict[str, Any], search_type: Optional[str], user_id: str) -> None:
+    """Map TYPE filter ids onto documented Search.list type / videoType / duration."""
+    if not search_type:
+        return
+    if search_type == "videos":
+        list_kwargs["type"] = "video"
+        list_kwargs.pop("videoType", None)
+        return
+    if search_type == "shorts":
+        list_kwargs["type"] = "video"
+        list_kwargs["videoDuration"] = "short"
+        list_kwargs.pop("videoType", None)
+        return
+    if search_type == "channel":
+        list_kwargs["type"] = "channel"
+        list_kwargs.pop("videoDuration", None)
+        list_kwargs.pop("videoType", None)
+        list_kwargs.pop("eventType", None)
+        return
+    if search_type == "playlist":
+        list_kwargs["type"] = "playlist"
+        list_kwargs.pop("videoDuration", None)
+        list_kwargs.pop("videoType", None)
+        list_kwargs.pop("eventType", None)
+        return
+    if search_type == "movie":
+        list_kwargs["type"] = "video"
+        list_kwargs["videoType"] = "movie"
+        return
+    logger.warning(
+        "YouTube search_by_keyword ignoring unsupported search_type={} user_id={}",
+        search_type,
+        user_id,
+    )
+
+
+def _map_search_list_item(
+    item: Dict[str, Any], search_type: Optional[str]
+) -> Optional[Dict[str, str]]:
+    raw_id = item.get("id")
+    if not isinstance(raw_id, dict):
+        return None
+    title = _snippet_title(item)
+    if search_type == "channel":
+        channel_id = raw_id.get("channelId")
+        if not channel_id:
+            return None
+        return {"channel_id": channel_id, "title": title}
+    if search_type == "playlist":
+        playlist_id = raw_id.get("playlistId")
+        if not playlist_id:
+            return None
+        return {"playlist_id": playlist_id, "title": title}
+    video_id = raw_id.get("videoId")
+    if not video_id:
+        return None
+    return {"video_id": video_id, "title": title}
+
+
 class YouTubeSearchService:
     """Keyword search via authenticated YouTube Data API v3 Search.list."""
 
@@ -87,10 +153,12 @@ class YouTubeSearchService:
         order: Optional[str] = None,
         event_type: Optional[str] = None,
         video_duration: Optional[str] = None,
+        search_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         logger.info(
             "YouTube search_by_keyword start user_id={} query_length={} max_results={} "
-            "has_page_token={} token_id_set={} order={} event_type={} video_duration={}",
+            "has_page_token={} token_id_set={} order={} event_type={} "
+            "video_duration={} search_type={}",
             user_id,
             len((query or "").strip()),
             max_results,
@@ -99,6 +167,7 @@ class YouTubeSearchService:
             order,
             event_type,
             video_duration,
+            search_type,
         )
         stripped = (query or "").strip()
         if not stripped:
@@ -158,10 +227,11 @@ class YouTubeSearchService:
                     video_duration,
                     user_id,
                 )
+            _apply_search_type(list_kwargs, search_type, user_id)
 
             logger.info(
                 "YouTube Search.list request user_id={} part={} type={} maxResults={} "
-                "has_page_token={} order={} event_type={} video_duration={}",
+                "has_page_token={} order={} event_type={} video_duration={} video_type={}",
                 user_id,
                 list_kwargs["part"],
                 list_kwargs["type"],
@@ -170,6 +240,7 @@ class YouTubeSearchService:
                 list_kwargs.get("order"),
                 list_kwargs.get("eventType"),
                 list_kwargs.get("videoDuration"),
+                list_kwargs.get("videoType"),
             )
             results = youtube.search().list(**list_kwargs).execute()
             items: List[Dict[str, str]] = []
@@ -180,17 +251,9 @@ class YouTubeSearchService:
                         user_id,
                     )
                     continue
-                raw_id = item.get("id")
-                if not isinstance(raw_id, dict):
-                    continue
-                video_id = raw_id.get("videoId")
-                if not video_id:
-                    continue
-                raw_snippet = item.get("snippet")
-                title = ""
-                if isinstance(raw_snippet, dict):
-                    title = raw_snippet.get("title") or ""
-                items.append({"video_id": video_id, "title": title})
+                mapped = _map_search_list_item(item, search_type)
+                if mapped:
+                    items.append(mapped)
 
             next_page_token = results.get("nextPageToken") or None
             logger.info(

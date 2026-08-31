@@ -32,6 +32,7 @@ class _StudioYouTubeSearchStub:
         order: str | None = None,
         event_type: str | None = None,
         video_duration: str | None = None,
+        search_type: str | None = None,
     ) -> dict:
         assert user_id
         self.calls.append(

@@ -14,6 +14,10 @@ import { fireEvent, render, screen } from "@testing-library/react";
 
 const HEADER_SOURCE = path.join(__dirname, "../YouTubeStudioLandingHeader.tsx");
 const HUB_SOURCE = path.join(__dirname, "../YouTubeStudioHub.tsx");
+const HUB_SEARCH_REQUESTS = path.join(
+  __dirname,
+  "../youtubeHubSearchRequests.ts",
+);
 
 const SAMPLE_HIT = {
   video_id: "vid123",
@@ -35,10 +39,12 @@ describe("YouTube search results live on the Hub, not the header dropdown", () =
   });
 
   it("Hub Shorts filter uses videoDuration=short and hashtag matching", () => {
-    const source = fs.readFileSync(HUB_SOURCE, "utf8");
-    expect(source).toContain('video_duration = "short"');
-    expect(source).toContain("isYouTubeShortsTitle");
-    expect(source).toContain("No Shorts found.");
+    const hub = fs.readFileSync(HUB_SOURCE, "utf8");
+    const requests = fs.readFileSync(HUB_SEARCH_REQUESTS, "utf8");
+    expect(hub).toContain("searchYouTubeByChip");
+    expect(requests).toContain('video_duration = "short"');
+    expect(requests).toContain("isYouTubeShortsTitle");
+    expect(requests).toContain("No Shorts found.");
   });
 
   it("YouTubeStudioLandingHeader no longer mounts the results list", () => {

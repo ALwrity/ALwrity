@@ -28,6 +28,7 @@ def search_by_keyword(
     order: Optional[str] = Query(None),
     event_type: Optional[str] = Query(None),
     video_duration: Optional[str] = Query(None),
+    search_type: Optional[str] = Query(None),
     user: dict = Depends(get_current_user),
     service: YouTubeSearchService = Depends(get_search_service),
 ):
@@ -38,7 +39,8 @@ def search_by_keyword(
     try:
         logger.info(
             "YouTube search route user_id={} query_length={} max_results={} "
-            "has_page_token={} token_id_set={} order={} event_type={} video_duration={}",
+            "has_page_token={} token_id_set={} order={} event_type={} "
+            "video_duration={} search_type={}",
             user_id,
             len(q.strip()),
             max_results,
@@ -47,6 +49,7 @@ def search_by_keyword(
             order,
             event_type,
             video_duration,
+            search_type,
         )
         result = service.search_by_keyword(
             user_id,
@@ -57,6 +60,7 @@ def search_by_keyword(
             order=order,
             event_type=event_type,
             video_duration=video_duration,
+            search_type=search_type,
         )
         if not result.get("success"):
             logger.warning(

@@ -1,15 +1,22 @@
 /**
- * Hub search results panel — Search.list titles + filter chips.
+ * Hub search results panel — Search.list titles + filter chips + Filters icon.
  * Embed/iframe is intentionally omitted; titles still open youtube.com.
  */
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { YOUTUBE_STUDIO_OVERLAY_TIERS } from "./youtubeStudioZIndex";
+import {
+  YouTubeSearchTypeFilters,
+  type YouTubeSearchTypeFilter,
+} from "./YouTubeSearchTypeFilters";
 import "./youtubeSearchResultsPanel.css";
 
 export type YouTubeSearchFilter = "all" | "videos" | "shorts" | "recent" | "live";
+export type { YouTubeSearchTypeFilter };
 
 export type YouTubeSearchHit = {
-  video_id: string;
+  video_id?: string;
+  channel_id?: string;
+  playlist_id?: string;
   title: string;
 };
 
@@ -38,7 +45,9 @@ export interface YouTubeSearchResultsPanelProps {
   items: YouTubeSearchHit[];
   message?: string | null;
   selectedFilter?: YouTubeSearchFilter;
+  selectedType?: YouTubeSearchTypeFilter;
   onFilterChange?: (filter: YouTubeSearchFilter) => void;
+  onTypeChange?: (type: YouTubeSearchTypeFilter) => void;
   onClose?: () => void;
 }
 
@@ -53,14 +62,66 @@ export function decodeYouTubeSnippetTitle(raw: string): string {
   }
 }
 
+function youtubeSearchHitKey(hit: YouTubeSearchHit): string {
+  return hit.video_id || hit.channel_id || hit.playlist_id || hit.title;
+}
+
+function youtubeSearchHitHref(hit: YouTubeSearchHit): string | null {
+  if (hit.channel_id) {
+    return `https://www.youtube.com/channel/${hit.channel_id}`;
+  }
+  if (hit.playlist_id) {
+    return `https://www.youtube.com/playlist?list=${hit.playlist_id}`;
+  }
+  if (hit.video_id) {
+    return `https://www.youtube.com/watch?v=${hit.video_id}`;
+  }
+  return null;
+}
+
+const FiltersSlidersIcon: React.FC = () => (
+  <svg
+    width={16}
+    height={16}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    aria-hidden="true"
+  >
+    <line x1="4" y1="8" x2="20" y2="8" />
+    <circle cx="16" cy="8" r="2.5" fill="currentColor" stroke="none" />
+    <line x1="4" y1="16" x2="20" y2="16" />
+    <circle cx="8" cy="16" r="2.5" fill="currentColor" stroke="none" />
+  </svg>
+);
+
 export const YouTubeSearchResultsPanel: React.FC<YouTubeSearchResultsPanelProps> = ({
   isOpen,
   items,
   message = null,
   selectedFilter = "all",
+  selectedType,
   onFilterChange,
+  onTypeChange,
   onClose,
 }) => {
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      try {
+        setFiltersOpen(false);
+      } catch (error) {
+        console.error(
+          "[YouTubeSearchResultsPanel] Failed to reset Search filters",
+          error,
+        );
+      }
+    }
+  }, [isOpen]);
+
   if (!isOpen) {
     return null;
   }
@@ -73,7 +134,7 @@ export const YouTubeSearchResultsPanel: React.FC<YouTubeSearchResultsPanelProps>
       style={{ zIndex: YOUTUBE_STUDIO_OVERLAY_TIERS.hubToolbar }}
     >
       <div className="yt-search-results-panel__header">
-        <div className="yt-search-results-panel__chips" role="toolbar" aria-label="Search filters">
+        <div className="yt-search-results-panel__chips" role="toolbar" aria-label="Search chips">
           {FILTER_CHIPS.map((chip) => (
             <button
               key={chip.id}
@@ -96,6 +157,25 @@ export const YouTubeSearchResultsPanel: React.FC<YouTubeSearchResultsPanelProps>
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          className="yt-search-results-panel__filters"
+          aria-expanded={filtersOpen}
+          onClick={() => {
+            try {
+              const nextOpen = !filtersOpen;
+              setFiltersOpen(nextOpen);
+              console.info("[YouTubeSearchResultsPanel] Filters toggled", {
+                nextOpen,
+              });
+            } catch (error) {
+              console.error("[YouTubeSearchResultsPanel] Filters toggle failed", error);
+            }
+          }}
+        >
+          Filters
+          <FiltersSlidersIcon />
+        </button>
         {onClose ? (
           <button
             type="button"
@@ -113,6 +193,42 @@ export const YouTubeSearchResultsPanel: React.FC<YouTubeSearchResultsPanelProps>
           </button>
         ) : null}
       </div>
+      {filtersOpen ? (
+        <div
+          className="yt-search-filters-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="yt-search-filters-title"
+        >
+          <div className="yt-search-filters-dialog__header">
+            <h2 id="yt-search-filters-title" className="yt-search-filters-dialog__title">
+              Search filters
+            </h2>
+            <button
+              type="button"
+              className="yt-search-results-panel__close"
+              aria-label="Close search filters"
+              onClick={() => {
+                try {
+                  setFiltersOpen(false);
+                  console.info("[YouTubeSearchResultsPanel] Search filters closed");
+                } catch (error) {
+                  console.error("[YouTubeSearchResultsPanel] Search filters close failed", error);
+                }
+              }}
+            >
+              ×
+            </button>
+          </div>
+          <div className="yt-search-filters-dialog__columns">
+            <YouTubeSearchTypeFilters
+              selectedType={selectedType}
+              onTypeChange={onTypeChange}
+            />
+            {/* Duration, Upload date, Features, Prioritise — later slices */}
+          </div>
+        </div>
+      ) : null}
       {message ? (
         <p className="yt-search-results-panel__status" role="status">
           {message}
@@ -120,17 +236,22 @@ export const YouTubeSearchResultsPanel: React.FC<YouTubeSearchResultsPanelProps>
       ) : null}
       {items.length > 0 ? (
         <ul className="yt-search-results-panel__list">
-          {items.map((hit) => (
-            <li key={hit.video_id}>
-              <a
-                href={`https://www.youtube.com/watch?v=${hit.video_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {decodeYouTubeSnippetTitle(hit.title)}
-              </a>
-            </li>
-          ))}
+          {items.map((hit) => {
+            const href = youtubeSearchHitHref(hit);
+            if (!href) {
+              console.warn(
+                "[YouTubeSearchResultsPanel] Skipping search hit without id",
+              );
+              return null;
+            }
+            return (
+              <li key={youtubeSearchHitKey(hit)}>
+                <a href={href} target="_blank" rel="noopener noreferrer">
+                  {decodeYouTubeSnippetTitle(hit.title)}
+                </a>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </section>
