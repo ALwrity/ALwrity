@@ -1,0 +1,73 @@
+/* LinkedIn Studio search-bar shape, YouTube Studio header colors/fonts. */
+
+.yt-search-bar-wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.yt-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: #ffffff;
+  border: 1.5px solid rgba(220, 38, 38, 0.25);
+  border-radius: 22px;
+  box-shadow: 0 1px 3px rgba(204, 0, 0, 0.08);
+  color: #cc0000;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.yt-search-bar:hover {
+  border-color: rgba(220, 38, 38, 0.45);
+  box-shadow: 0 2px 8px rgba(204, 0, 0, 0.12);
+}
+
+.yt-search-bar:focus-within {
+  border-color: #cc0000;
+  box-shadow: 0 0 0 3px rgba(204, 0, 0, 0.15);
+  background: #ffffff;
+}
+
+.yt-search-bar--nav {
+  width: 100%;
+  max-width: 252px;
+  min-width: 126px;
+  padding: 4px 11px;
+}
+
+.yt-search-bar__icon {
+  display: flex;
+  flex-shrink: 0;
+  line-height: 0;
+  color: #cc0000;
+  opacity: 0.7;
+}
+
+.yt-search-bar:hover .yt-search-bar__icon,
+.yt-search-bar:focus-within .yt-search-bar__icon {
+  opacity: 1;
+}
+
+.yt-search-bar__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  color: #0f0f0f;
+  padding: 0;
+}
+
+.yt-search-bar__input::placeholder {
+  color: #7f1d1d;
+  font-weight: 700;
+  opacity: 0.9;
+}
