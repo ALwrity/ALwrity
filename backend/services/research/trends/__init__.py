@@ -1,9 +1,18 @@
 """
-Google Trends Research Service
+Trends Research Service
 
-Provides Google Trends data integration for the Research Engine.
+Tavily-backed trend provider (production path) plus keyword normalization.
 """
 
-from .google_trends_service import GoogleTrendsService
+from .trend_provider import TrendItem, TrendPlatform, TrendProvider, TrendReport
+from .tavily_trend_provider import TavilyTrendProvider
+from .trend_synthesis import synthesize_trends
 
-__all__ = ['GoogleTrendsService']
+__all__ = [
+    "TrendItem",
+    "TrendPlatform",
+    "TrendProvider",
+    "TrendReport",
+    "TavilyTrendProvider",
+    "synthesize_trends",
+]

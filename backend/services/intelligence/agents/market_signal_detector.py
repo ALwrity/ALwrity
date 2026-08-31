@@ -17,6 +17,7 @@ import math
 from services.intelligence.monitoring.semantic_dashboard import RealTimeSemanticMonitor
 from services.intelligence.semantic_cache import SemanticCacheManager
 from services.seo_analyzer import ComprehensiveSEOAnalyzer
+from services.research.trends import TavilyTrendProvider, TrendPlatform
 from utils.logger_utils import get_service_logger
 
 logger = get_service_logger(__name__)
@@ -178,6 +179,7 @@ class MarketSignalDetector:
         self.semantic_monitor = RealTimeSemanticMonitor(user_id)
         self.cache_manager = SemanticCacheManager()
         self.seo_analyzer = ComprehensiveSEOAnalyzer()
+        self.trend_provider = TavilyTrendProvider()
         
         # Signal detection thresholds
         self.thresholds = {
@@ -1078,49 +1080,30 @@ class MarketSignalDetector:
         return keywords[:limit]
 
     async def _load_trending_topics(self, integrated: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Trending topics from public Google Trends over the user's keywords."""
+        """Trending topics from Tavily over the user's keywords."""
         keywords = self._extract_trend_keywords(integrated)
         if not keywords:
             return []
         try:
-            from services.research.trends.google_trends_service import GoogleTrendsService
-
-            trends_service = GoogleTrendsService()
-            trend_data = await trends_service.analyze_trends(
+            items = await self.trend_provider.fetch_trends(
+                TrendPlatform.WEB,
+                industry="",
                 keywords=keywords[:5],
-                timeframe="now 7-d",
+                user_id=self.user_id,
             )
         except Exception as e:
-            logger.info(f"Google Trends unavailable for signal context: {e}")
+            logger.info(f"Tavily unavailable for signal context: {e}")
             return []
 
         topics: List[Dict[str, Any]] = []
-        interest = trend_data.get('interest_over_time') or []
-        values_by_keyword: Dict[str, List[float]] = {}
-        for point in interest:
-            if not isinstance(point, dict):
-                continue
-            for key, value in point.items():
-                if key in ('date', 'isPartial'):
-                    continue
-                try:
-                    values_by_keyword.setdefault(str(key), []).append(float(value))
-                except (TypeError, ValueError):
-                    continue
-        for keyword, values in values_by_keyword.items():
-            if len(values) < 2:
-                continue
-            avg_interest = sum(values) / len(values)
-            last_interest = values[-1]
-            if avg_interest <= 0:
-                continue
-            momentum = (last_interest - avg_interest) / avg_interest
+        for item in items:
+            score = max(min(item.score, 1.0), 0.0)
             topics.append({
-                'topic': keyword,
-                'trend_score': round(max(momentum, 0.0), 4),
-                'interest_level': round(last_interest / 100.0, 4),
-                'sample_points': len(values),
-                'platforms': ['google_trends'],
+                'topic': item.title,
+                'trend_score': round(score, 4),
+                'interest_level': round(score, 4),
+                'sample_points': 1,
+                'platforms': ['tavily'],
             })
         topics.sort(key=lambda t: t['trend_score'], reverse=True)
         return topics[:5]

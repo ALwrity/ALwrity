@@ -72,19 +72,19 @@ class TestTopicDiscoveryTrendsEndpoint:
         mount_topic_discovery_routes(app)
         app.dependency_overrides[get_current_user] = lambda: {"user_id": "user_test", "id": "user_test"}
 
-        mock_service = MagicMock()
-        mock_service.analyze_trends = AsyncMock(
-            return_value={
-                "interest_over_time": [{"date": "2026-01-01", "value": 50}],
-                "interest_by_region": [],
-                "related_topics": {"top": [], "rising": []},
-                "related_queries": {"top": [], "rising": []},
+        mock_provider = MagicMock()
+        mock_provider.fetch_trends = AsyncMock(return_value=[])
+
+        async def _fake_synthesize(items, platform, user_id=None, focus=""):
+            return {
+                "summary": "s",
+                "trends": [{"topic": "AI tutorials", "momentum": "rising", "suggested_angle": "x"}],
             }
-        )
 
         with patch(
-            "api.podcast.handlers.trends.get_trends_service",
-            return_value=mock_service,
+            "api.podcast.handlers.trends.get_trend_provider", return_value=mock_provider
+        ), patch(
+            "api.podcast.handlers.trends.synthesize_trends", new=_fake_synthesize
         ):
             client = TestClient(app)
             response = client.post(
@@ -100,7 +100,8 @@ class TestTopicDiscoveryTrendsEndpoint:
         assert response.status_code == 200
         body = response.json()
         assert body["success"] is True
-        assert body["data"]["interest_over_time"]
+        assert body["data"]["trends"]
+        assert body["data"]["platform"] == "podcast"
 
     def test_trends_requires_auth(self):
         from api.shared.topic_discovery_router import mount_topic_discovery_routes
