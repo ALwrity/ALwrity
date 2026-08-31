@@ -3,10 +3,41 @@
 Quality gates validate that AI-generated content is grounded in real onboarding
 data (persona, competitors, analytics, etc.) and meets quality thresholds.
 DB-sourced fields always take precedence over AI-generated suggestions.
+
+Function index (two distinct families — wire the right one)
+-----------------------------------------------------------
+1. Agent-content gates (wired into the intelligence agent framework):
+     validate_content_quality      -> agents.specialized.content_guardian
+     validate_action_content       -> agents.core_agent_framework
+     validate_pre_publish_quality  -> agents.agent_orchestrator
+
+2. Strategy grounding family (wired into content-strategy generation):
+     validate_persona_grounding      Content reflects persona role/goals/pain points.
+     validate_competitor_grounding   Real competitors referenced (not generic ones).
+     validate_analytics_consistency  Predictions consistent with GSC/Bing baseline.
+     validate_data_quality_grounding Grounding ceiling from onboarding data quality.
+     validate_strategy_grounding     Combined entry point (weighted 0.25/0.25/0.20/0.30).
+
+   Wiring: api/content_planning/.../ai_generation_endpoints.py (all four
+   generation endpoints) and content_strategy/ai_generation/strategy_generator.py
+   (generator self-check). Full-strategy payloads are nested dicts, so
+   validate_strategy_grounding extracts text via extract_content() first and
+   falls back to dict_to_text() (JSON dump). Component payloads with known text
+   keys ("content", "draft", ...) match through extract_content() directly.
+
+Scoring semantics (change with care — tests lock exact values):
+  persona     score = 1.0 - 0.15 * warnings, passed >= 0.70
+  competitor  score = 1.0 - 0.20 * warnings, passed >= 0.60
+  analytics   score = 1.0 - 0.25 * warnings, passed >= 0.50
+  data quality passed = score >= 0.60 AND no violations
+  overall     passed = all components passed AND weighted score >= 0.60
+  Missing sources return status "unavailable" with score 1.0 (fail-open).
+  Gate crashes must surface as status "error" to callers, never exceptions.
 """
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any, Dict, List, Optional
 
@@ -51,6 +82,35 @@ def extract_content(parameters: Optional[Dict[str, Any]]) -> str:
         if isinstance(value, str) and value.strip():
             return value.strip()
     return ""
+
+
+def dict_to_text(data: Any) -> str:
+    """Best-effort text representation of structured strategy data.
+
+    Grounding validators match persona/competitor attributes against content
+    text. Strategy payloads (base_strategy, strategic_insights, ...) are
+    nested dicts without any of the _CONTENT_KEYS, so ``extract_content``
+    returns "" for them and grounding checks silently no-op. Serialising the
+    dict to JSON gives the validators real text to match against.
+
+    Args:
+        data: Arbitrary strategy payload (dict, list, str, ...).
+
+    Returns:
+        Text representation suitable for substring grounding checks.
+    """
+    if isinstance(data, str):
+        return data
+    if isinstance(data, (dict, list)) and not data:
+        # Empty payloads serialise to "{}"/"[]" — meaningless text that would
+        # wrongly mark the gate as "checked". Treat as no content.
+        return ""
+    if not isinstance(data, (dict, list)):
+        return str(data) if data else ""
+    try:
+        return json.dumps(data, default=str, ensure_ascii=False)
+    except Exception:
+        return str(data)
 
 
 def validate_content_quality(
@@ -587,8 +647,12 @@ def validate_strategy_grounding(
         Comprehensive grounding validation result
     """
     context = onboarding_context or {}
+    strategy_data = strategy_data or {}
 
-    content = extract_content(strategy_data)
+    # Strategy payloads are nested dicts without _CONTENT_KEYS; fall back to a
+    # JSON text dump so persona/competitor grounding checks have real content
+    # to match against instead of silently passing on empty strings.
+    content = extract_content(strategy_data) or dict_to_text(strategy_data)
 
     persona_data = context.get("persona_data") or context.get("persona") or {}
     competitor_data = context.get("competitor_analysis") or context.get("competitors") or []
