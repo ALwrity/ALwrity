@@ -90,6 +90,9 @@ export const youtubeStudioApi = {
     max_results?: number;
     page_token?: string;
     token_id?: number;
+    order?: string;
+    event_type?: string;
+    video_duration?: string;
   }) {
     const response = await apiClient.get(`${API_BASE}/search`, { params });
     return response.data;

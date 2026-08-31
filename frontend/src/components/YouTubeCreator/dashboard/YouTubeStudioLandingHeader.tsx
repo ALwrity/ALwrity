@@ -1,24 +1,18 @@
 /**
  * YouTube Studio landing header — mirrors LinkedIn Studio brand block layout.
+ * Keyword Search.list results open on the Hub panel, not this header slot.
  */
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import HeaderControls from "../../shared/HeaderControls";
 import { youtubeStudioApi } from "../../../services/youtubeStudioApi";
 import { YouTubeSearchBar } from "./YouTubeSearchBar";
+import { publishYouTubeSearchResults } from "./youtubeStudioEvents";
 import "./youtube-studio-header.css";
-
-type YouTubeSearchHit = {
-  video_id: string;
-  title: string;
-};
 
 export const YouTubeStudioLandingHeader: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchHits, setSearchHits] = useState<YouTubeSearchHit[]>([]);
-  const [searchMessage, setSearchMessage] = useState<string | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
 
   const handleSearchQueryChange = (nextQuery: string) => {
     try {
@@ -36,13 +30,18 @@ export const YouTubeStudioLandingHeader: React.FC = () => {
         hasQuery: query.length > 0,
       });
       if (!query) {
-        setSearchHits([]);
-        setSearchMessage("Enter a search keyword.");
+        publishYouTubeSearchResults({
+          query: "",
+          items: [],
+          message: "Enter a search keyword.",
+        });
         return;
       }
-      setIsSearching(true);
-      setSearchMessage(null);
-      setSearchHits([]);
+      publishYouTubeSearchResults({
+        query,
+        items: [],
+        message: "Searching...",
+      });
       const data = await youtubeStudioApi.searchByKeyword({
         q: query,
         max_results: 25,
@@ -51,22 +50,29 @@ export const YouTubeStudioLandingHeader: React.FC = () => {
         console.warn("[YouTubeStudioLandingHeader] Search returned no results", {
           errorCode: data?.error_code,
         });
-        setSearchHits([]);
-        setSearchMessage(data?.message || "Search failed.");
+        publishYouTubeSearchResults({
+          query,
+          items: [],
+          message: data?.message || "Search failed.",
+        });
         return;
       }
       const items = Array.isArray(data.items) ? data.items : [];
-      setSearchHits(items);
-      setSearchMessage(items.length === 0 ? "No videos found." : null);
+      publishYouTubeSearchResults({
+        query,
+        items,
+        message: items.length === 0 ? "No videos found." : null,
+      });
       console.info("[YouTubeStudioLandingHeader] Search complete", {
         itemCount: items.length,
       });
     } catch (error) {
       console.error("[YouTubeStudioLandingHeader] Search submit handler failed", error);
-      setSearchHits([]);
-      setSearchMessage("Search failed.");
-    } finally {
-      setIsSearching(false);
+      publishYouTubeSearchResults({
+        query,
+        items: [],
+        message: "Search failed.",
+      });
     }
   };
 
@@ -96,31 +102,6 @@ export const YouTubeStudioLandingHeader: React.FC = () => {
               onChange={handleSearchQueryChange}
               onSearch={handleSearchSubmit}
             />
-            {isSearching ? (
-              <p className="yt-search-results__status" role="status">
-                Searching...
-              </p>
-            ) : null}
-            {searchMessage ? (
-              <p className="yt-search-results__status" role="status">
-                {searchMessage}
-              </p>
-            ) : null}
-            {searchHits.length > 0 ? (
-              <ul className="yt-search-results" aria-label="YouTube search results">
-                {searchHits.map((hit) => (
-                  <li key={hit.video_id} className="yt-search-results__item">
-                    <a
-                      href={`https://www.youtube.com/watch?v=${hit.video_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {hit.title}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
           </div>
           <HeaderControls colorMode="light" showAlerts showUser gap={1} />
         </div>

@@ -4,6 +4,8 @@ import { YouTubeMobileWorkflowGrid } from "./YouTubeMobileWorkflowGrid";
 import { YouTubeChannelHub } from "./YouTubeChannelHub";
 import { YouTubeChannelHubStrip } from "./YouTubeChannelHubStrip";
 import { YouTubeHubConnectButton } from "./YouTubeHubConnectButton";
+import { isYouTubeShortsTitle, YouTubeSearchResultsPanel } from "./YouTubeSearchResultsPanel";
+import type { YouTubeSearchFilter, YouTubeSearchHit } from "./YouTubeSearchResultsPanel";
 import { YouTubeMobileStudioActionsDock } from "./YouTubeMobileStudioActionsDock";
 import { YouTubeMobileAnalyticsSection } from "./YouTubeMobileAnalyticsSection";
 import { YouTubeChannelBibleChip } from "./YouTubeChannelBibleChip";
@@ -17,10 +19,13 @@ import { StartNewVideoButton } from "../components/StartNewVideoButton";
 import { hasYouTubeCreatorDraft } from "../utils/youtubeCreatorDraftUtils";
 import { YouTubeCopilotFab } from "./YouTubeCopilotFab";
 import { YouTubeActionModal } from "./YouTubeActionModal";
+import { youtubeStudioApi } from "../../../services/youtubeStudioApi";
 import {
   openYouTubeCreator,
   YT_OPEN_WEDGE_EVENT,
+  YT_SEARCH_RESULTS_EVENT,
   type YouTubeOpenWedgeDetail,
+  type YouTubeSearchResultsDetail,
 } from "./youtubeStudioEvents";
 import type { YouTubeCreatorState } from "../../../hooks/useYouTubeCreatorState";
 import type { YouTubeChannelBible } from "../../../services/youtubeApi";
@@ -63,6 +68,11 @@ export function YouTubeStudioHub({
   const canvasRef = useRef<HTMLDivElement>(null);
   const [workflowModal, setWorkflowModal] = useState<YouTubeWorkflowCardId | null>(null);
   const [connectGateOpen, setConnectGateOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchItems, setSearchItems] = useState<YouTubeSearchHit[]>([]);
+  const [searchMessage, setSearchMessage] = useState<string | null>(null);
+  const [searchFilter, setSearchFilter] = useState<YouTubeSearchFilter>("all");
 
   const { layout, hubCenterLeft, hubCenterY, hubDiameter, hubAvatarSize } =
     useYouTubeHeroLayoutMetrics({
@@ -72,6 +82,32 @@ export function YouTubeStudioHub({
       canvasRef,
     });
   const hubAxisLeft = isDesktop ? `var(${HUB_CENTER_LEFT_CSS_VAR})` : hubCenterLeft;
+
+  useEffect(() => {
+    const onSearchResults = (event: Event) => {
+      const detail = (event as CustomEvent<YouTubeSearchResultsDetail>).detail;
+      if (!detail) {
+        console.warn("[YouTubeStudioHub] Search results event missing detail");
+        return;
+      }
+      try {
+        setSearchOpen(true);
+        setSearchQuery(detail.query || "");
+        setSearchItems(Array.isArray(detail.items) ? detail.items : []);
+        setSearchMessage(detail.message);
+        setSearchFilter("all");
+        console.info("[YouTubeStudioHub] Search results panel opened", {
+          queryLength: (detail.query || "").length,
+          itemCount: Array.isArray(detail.items) ? detail.items.length : 0,
+          hasMessage: Boolean(detail.message),
+        });
+      } catch (error) {
+        console.error("[YouTubeStudioHub] Failed to apply search results", error);
+      }
+    };
+    window.addEventListener(YT_SEARCH_RESULTS_EVENT, onSearchResults);
+    return () => window.removeEventListener(YT_SEARCH_RESULTS_EVENT, onSearchResults);
+  }, []);
 
   useEffect(() => {
     const onOpenWedge = (event: Event) => {
@@ -118,6 +154,76 @@ export function YouTubeStudioHub({
     [connected],
   );
 
+  const handleSearchFilterChange = useCallback(
+    async (filter: YouTubeSearchFilter) => {
+      try {
+        setSearchFilter(filter);
+        const query = searchQuery.trim();
+        if (!query) {
+          console.info("[YouTubeStudioHub] Search filter skipped empty query", {
+            filter,
+          });
+          return;
+        }
+        console.info("[YouTubeStudioHub] Search filter changed", {
+          filter,
+          queryLength: query.length,
+        });
+        setSearchMessage("Searching...");
+        const params: {
+          q: string;
+          max_results: number;
+          order?: string;
+          event_type?: string;
+          video_duration?: string;
+        } = { q: query, max_results: 25 };
+        if (filter === "recent") {
+          params.order = "date";
+        }
+        if (filter === "live") {
+          params.event_type = "live";
+        }
+        if (filter === "shorts") {
+          params.video_duration = "short";
+        }
+        const data = await youtubeStudioApi.searchByKeyword(params);
+        if (!data?.success) {
+          console.warn("[YouTubeStudioHub] Search filter unsuccessful", {
+            filter,
+            errorCode: data?.error_code || null,
+          });
+          setSearchItems([]);
+          setSearchMessage(data?.message || "Search failed.");
+          return;
+        }
+        const items: YouTubeSearchHit[] = Array.isArray(data.items) ? data.items : [];
+        if (filter === "shorts") {
+          const shortsItems = items.filter((hit: YouTubeSearchHit) =>
+            isYouTubeShortsTitle(hit.title),
+          );
+          console.info("[YouTubeStudioHub] Shorts hashtag filter applied", {
+            before: items.length,
+            after: shortsItems.length,
+          });
+          setSearchItems(shortsItems);
+          setSearchMessage(shortsItems.length === 0 ? "No Shorts found." : null);
+          return;
+        }
+        console.info("[YouTubeStudioHub] Search filter complete", {
+          filter,
+          itemCount: items.length,
+        });
+        setSearchItems(items);
+        setSearchMessage(items.length === 0 ? "No videos found." : null);
+      } catch (error) {
+        console.error("[YouTubeStudioHub] Search filter request failed", error);
+        setSearchItems([]);
+        setSearchMessage("Search failed.");
+      }
+    },
+    [searchQuery],
+  );
+
   const hubCta = (
     <YouTubeHubConnectButton
       connected={connected}
@@ -155,6 +261,21 @@ export function YouTubeStudioHub({
             />
           </div>
         ) : null}
+        <YouTubeSearchResultsPanel
+          isOpen={searchOpen}
+          items={searchItems}
+          message={searchMessage}
+          selectedFilter={searchFilter}
+          onFilterChange={handleSearchFilterChange}
+          onClose={() => {
+            try {
+              setSearchOpen(false);
+              console.info("[YouTubeStudioHub] Search results panel closed");
+            } catch (error) {
+              console.error("[YouTubeStudioHub] Failed to close search results", error);
+            }
+          }}
+        />
 
         <div
           ref={heroStageRef}

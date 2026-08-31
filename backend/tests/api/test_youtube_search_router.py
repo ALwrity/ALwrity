@@ -126,6 +126,63 @@ class TestYouTubeSearchRouter:
         assert kwargs.get("max_results") == 10
         assert kwargs.get("page_token") == "CAUQAA"
 
+    def test_forwards_video_duration_short(self):
+        service = MagicMock()
+        service.search_by_keyword.return_value = {
+            "success": True,
+            "items": [],
+            "next_page_token": None,
+        }
+        client = youtube_studio_client(
+            {_get_search_service(): lambda: service}
+        )
+
+        resp = client.get(
+            "/api/youtube/search",
+            params={"q": "goa", "video_duration": "short"},
+        )
+
+        assert resp.status_code == 200
+        kwargs = service.search_by_keyword.call_args.kwargs
+        assert kwargs.get("video_duration") == "short"
+
+    def test_forwards_order_and_event_type(self):
+        service = MagicMock()
+        service.search_by_keyword.return_value = {
+            "success": True,
+            "items": [],
+            "next_page_token": None,
+        }
+        client = youtube_studio_client(
+            {_get_search_service(): lambda: service}
+        )
+
+        resp = client.get(
+            "/api/youtube/search",
+            params={"q": "dogs", "order": "date", "event_type": "live"},
+        )
+
+        assert resp.status_code == 200
+        kwargs = service.search_by_keyword.call_args.kwargs
+        assert kwargs.get("order") == "date"
+        assert kwargs.get("event_type") == "live"
+
+    def test_unexpected_service_error_is_500_without_leaking_exception(self):
+        service = MagicMock()
+        service.search_by_keyword.side_effect = RuntimeError("secret boom")
+        client = youtube_studio_client(
+            {_get_search_service(): lambda: service}
+        )
+
+        resp = client.get("/api/youtube/search", params={"q": "dogs"})
+
+        assert resp.status_code == 500
+        body = resp.json()
+        assert body["detail"] == "YouTube search failed."
+        assert "secret boom" not in resp.text
+        assert body.get("items") is None
+        assert body.get("video_id") is None
+
     def test_requires_authentication(self):
         service = MagicMock()
 

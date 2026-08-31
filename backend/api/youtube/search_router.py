@@ -25,6 +25,9 @@ def search_by_keyword(
     max_results: int = Query(25, ge=1, le=50),
     page_token: Optional[str] = Query(None),
     token_id: Optional[int] = Query(None),
+    order: Optional[str] = Query(None),
+    event_type: Optional[str] = Query(None),
+    video_duration: Optional[str] = Query(None),
     user: dict = Depends(get_current_user),
     service: YouTubeSearchService = Depends(get_search_service),
 ):
@@ -35,12 +38,15 @@ def search_by_keyword(
     try:
         logger.info(
             "YouTube search route user_id={} query_length={} max_results={} "
-            "has_page_token={} token_id_set={}",
+            "has_page_token={} token_id_set={} order={} event_type={} video_duration={}",
             user_id,
             len(q.strip()),
             max_results,
             bool(page_token),
             token_id is not None,
+            order,
+            event_type,
+            video_duration,
         )
         result = service.search_by_keyword(
             user_id,
@@ -48,6 +54,9 @@ def search_by_keyword(
             max_results=max_results,
             page_token=page_token,
             token_id=token_id,
+            order=order,
+            event_type=event_type,
+            video_duration=video_duration,
         )
         if not result.get("success"):
             logger.warning(
@@ -63,5 +72,5 @@ def search_by_keyword(
             )
         return result
     except Exception as exc:
-        logger.exception("YouTube search route error: {}", exc)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("YouTube search route unexpected error user_id={}", user_id)
+        raise HTTPException(status_code=500, detail="YouTube search failed.") from exc

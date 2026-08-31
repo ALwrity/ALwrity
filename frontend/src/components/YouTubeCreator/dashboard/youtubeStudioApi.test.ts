@@ -51,4 +51,38 @@ describe("youtubeStudioApi", () => {
     expect(result.items[0].video_id).toBe("vid123");
     expect(result.items[0].title).toBe("How to train dogs");
   });
+
+  it("forwards order and event_type for Recently uploaded and Live", async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: { success: true, items: [] },
+    });
+    await youtubeStudioApi.searchByKeyword({
+      q: "dogs",
+      max_results: 25,
+      order: "date",
+      event_type: "live",
+    });
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/search", {
+      params: {
+        q: "dogs",
+        max_results: 25,
+        order: "date",
+        event_type: "live",
+      },
+    });
+  });
+
+  it("forwards video_duration=short for the Shorts Search.list filter", async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: { success: true, items: [] },
+    });
+    await youtubeStudioApi.searchByKeyword({
+      q: "goa",
+      max_results: 25,
+      video_duration: "short",
+    });
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/search", {
+      params: { q: "goa", max_results: 25, video_duration: "short" },
+    });
+  });
 });

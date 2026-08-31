@@ -29,6 +29,9 @@ class _StudioYouTubeSearchStub:
         max_results: int = 25,
         page_token: str | None = None,
         token_id: int | None = None,
+        order: str | None = None,
+        event_type: str | None = None,
+        video_duration: str | None = None,
     ) -> dict:
         assert user_id
         self.calls.append(
@@ -38,6 +41,9 @@ class _StudioYouTubeSearchStub:
                 "max_results": max_results,
                 "page_token": page_token,
                 "token_id": token_id,
+                "order": order,
+                "event_type": event_type,
+                "video_duration": video_duration,
             }
         )
         if not self.connected:
@@ -101,3 +107,23 @@ class TestYouTubeSearchByKeywordJourney:
         resp = client.get("/api/youtube/search")
         assert_status(resp, 422)
         assert stub.calls == []
+
+    def test_forwards_search_list_filter_params(self):
+        stub = _StudioYouTubeSearchStub()
+        client = _client(stub)
+
+        resp = client.get(
+            "/api/youtube/search",
+            params={
+                "q": "goa",
+                "order": "date",
+                "event_type": "live",
+                "video_duration": "short",
+            },
+        )
+        assert_status(resp, 200)
+        call = stub.calls[0]
+        assert call["query"] == "goa"
+        assert call["order"] == "date"
+        assert call["event_type"] == "live"
+        assert call["video_duration"] == "short"

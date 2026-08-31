@@ -187,6 +187,136 @@ class TestYouTubeSearchByKeyword:
         assert list_kwargs["pageToken"] == "CAUQAA"
         oauth.get_valid_credentials.assert_called_once_with(USER_ID, 7)
 
+    def test_forwards_video_duration_short_as_search_list_param(self):
+        oauth = MagicMock()
+        oauth.get_valid_credentials.return_value = MagicMock(name="creds")
+        youtube = _youtube_client({"items": [_video_item("v1", "Goa #shorts")]})
+
+        with patch(
+            "services.youtube.youtube_search_service.build",
+            return_value=youtube,
+        ):
+            result = _service(oauth).search_by_keyword(
+                USER_ID,
+                "goa",
+                video_duration="short",
+            )
+
+        assert result["success"] is True
+        list_kwargs = youtube.search.return_value.list.call_args.kwargs
+        assert list_kwargs["type"] == "video"
+        assert list_kwargs["videoDuration"] == "short"
+
+    def test_ignores_unknown_video_duration(self):
+        oauth = MagicMock()
+        oauth.get_valid_credentials.return_value = MagicMock(name="creds")
+        youtube = _youtube_client({"items": [_video_item("v1", "Title")]})
+
+        with patch(
+            "services.youtube.youtube_search_service.build",
+            return_value=youtube,
+        ):
+            _service(oauth).search_by_keyword(
+                USER_ID,
+                "dogs",
+                video_duration="medium",
+            )
+
+        list_kwargs = youtube.search.return_value.list.call_args.kwargs
+        assert "videoDuration" not in list_kwargs
+
+    def test_forwards_order_date_and_event_type_live(self):
+        oauth = MagicMock()
+        oauth.get_valid_credentials.return_value = MagicMock(name="creds")
+        youtube = _youtube_client({"items": [_video_item("v1", "Live dogs")]})
+
+        with patch(
+            "services.youtube.youtube_search_service.build",
+            return_value=youtube,
+        ):
+            _service(oauth).search_by_keyword(
+                USER_ID,
+                "dogs",
+                order="date",
+                event_type="live",
+            )
+
+        list_kwargs = youtube.search.return_value.list.call_args.kwargs
+        assert list_kwargs["order"] == "date"
+        assert list_kwargs["eventType"] == "live"
+        assert list_kwargs["type"] == "video"
+
+    def test_ignores_unknown_order_and_event_type(self):
+        oauth = MagicMock()
+        oauth.get_valid_credentials.return_value = MagicMock(name="creds")
+        youtube = _youtube_client({"items": [_video_item("v1", "Title")]})
+
+        with patch(
+            "services.youtube.youtube_search_service.build",
+            return_value=youtube,
+        ):
+            _service(oauth).search_by_keyword(
+                USER_ID,
+                "dogs",
+                order="rating",
+                event_type="completed",
+            )
+
+        list_kwargs = youtube.search.return_value.list.call_args.kwargs
+        assert "order" not in list_kwargs
+        assert "eventType" not in list_kwargs
+
+    def test_missing_snippet_title_is_empty_string_not_fake_title(self):
+        oauth = MagicMock()
+        oauth.get_valid_credentials.return_value = MagicMock(name="creds")
+        youtube = _youtube_client(
+            {
+                "items": [
+                    {
+                        "id": {"kind": "youtube#video", "videoId": "vid-empty"},
+                        "snippet": {},
+                    }
+                ]
+            }
+        )
+
+        with patch(
+            "services.youtube.youtube_search_service.build",
+            return_value=youtube,
+        ):
+            result = _service(oauth).search_by_keyword(USER_ID, "dogs")
+
+        assert result["success"] is True
+        assert result["items"] == [{"video_id": "vid-empty", "title": ""}]
+
+    def test_skips_non_object_google_items_without_inventing_videos(self):
+        oauth = MagicMock()
+        oauth.get_valid_credentials.return_value = MagicMock(name="creds")
+        youtube = _youtube_client(
+            {"items": ["not-an-item", _video_item("v1", "Real video")]}
+        )
+
+        with patch(
+            "services.youtube.youtube_search_service.build",
+            return_value=youtube,
+        ):
+            result = _service(oauth).search_by_keyword(USER_ID, "dogs")
+
+        assert result["success"] is True
+        assert result["items"] == [{"video_id": "v1", "title": "Real video"}]
+
+    def test_oauth_exception_returns_search_failed_without_fake_items(self):
+        oauth = MagicMock()
+        oauth.get_valid_credentials.side_effect = RuntimeError("token store down")
+
+        with patch("services.youtube.youtube_search_service.build") as mock_build:
+            result = _service(oauth).search_by_keyword(USER_ID, "dogs")
+
+        assert result["success"] is False
+        assert result["error_code"] == "search_failed"
+        assert result["items"] == []
+        mock_build.assert_not_called()
+
 
 def _search_list_http_error(reason: str, status: int = 400):
     """Build a Search.list HttpError with YouTube's error.errors[].reason payload.

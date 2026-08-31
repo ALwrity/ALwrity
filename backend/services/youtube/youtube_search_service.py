@@ -84,15 +84,21 @@ class YouTubeSearchService:
         max_results: int = _DEFAULT_MAX_RESULTS,
         page_token: Optional[str] = None,
         token_id: Optional[int] = None,
+        order: Optional[str] = None,
+        event_type: Optional[str] = None,
+        video_duration: Optional[str] = None,
     ) -> Dict[str, Any]:
         logger.info(
             "YouTube search_by_keyword start user_id={} query_length={} max_results={} "
-            "has_page_token={} token_id_set={}",
+            "has_page_token={} token_id_set={} order={} event_type={} video_duration={}",
             user_id,
             len((query or "").strip()),
             max_results,
             bool(page_token),
             token_id is not None,
+            order,
+            event_type,
+            video_duration,
         )
         stripped = (query or "").strip()
         if not stripped:
@@ -128,23 +134,62 @@ class YouTubeSearchService:
             }
             if page_token:
                 list_kwargs["pageToken"] = page_token
+            if order == "date":
+                list_kwargs["order"] = "date"
+            elif order:
+                logger.warning(
+                    "YouTube search_by_keyword ignoring unsupported order={} user_id={}",
+                    order,
+                    user_id,
+                )
+            if event_type == "live":
+                list_kwargs["eventType"] = "live"
+            elif event_type:
+                logger.warning(
+                    "YouTube search_by_keyword ignoring unsupported event_type={} user_id={}",
+                    event_type,
+                    user_id,
+                )
+            if video_duration == "short":
+                list_kwargs["videoDuration"] = "short"
+            elif video_duration:
+                logger.warning(
+                    "YouTube search_by_keyword ignoring unsupported video_duration={} user_id={}",
+                    video_duration,
+                    user_id,
+                )
 
             logger.info(
                 "YouTube Search.list request user_id={} part={} type={} maxResults={} "
-                "has_page_token={}",
+                "has_page_token={} order={} event_type={} video_duration={}",
                 user_id,
                 list_kwargs["part"],
                 list_kwargs["type"],
                 list_kwargs["maxResults"],
                 bool(page_token),
+                list_kwargs.get("order"),
+                list_kwargs.get("eventType"),
+                list_kwargs.get("videoDuration"),
             )
             results = youtube.search().list(**list_kwargs).execute()
             items: List[Dict[str, str]] = []
             for item in results.get("items") or []:
-                video_id = (item.get("id") or {}).get("videoId")
+                if not isinstance(item, dict):
+                    logger.warning(
+                        "YouTube Search.list skipped non-object item user_id={}",
+                        user_id,
+                    )
+                    continue
+                raw_id = item.get("id")
+                if not isinstance(raw_id, dict):
+                    continue
+                video_id = raw_id.get("videoId")
                 if not video_id:
                     continue
-                title = (item.get("snippet") or {}).get("title") or ""
+                raw_snippet = item.get("snippet")
+                title = ""
+                if isinstance(raw_snippet, dict):
+                    title = raw_snippet.get("title") or ""
                 items.append({"video_id": video_id, "title": title})
 
             next_page_token = results.get("nextPageToken") or None
