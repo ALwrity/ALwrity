@@ -161,6 +161,6 @@ async def test_generate_agent_enhanced_plan_strategy_plan_task_survives_dedupe_a
     plan_tasks = [task for task in result["tasks"] if task["pillarId"] == "plan"]
     assert any(
         task["title"] == "Review Strategic Goals"
-        and task["metadata"].get("source_agent") == "StrategyArchitectAgent"
+        and task["metadata"].get("source_agent") == "strategy_architect"
         for task in plan_tasks
     )

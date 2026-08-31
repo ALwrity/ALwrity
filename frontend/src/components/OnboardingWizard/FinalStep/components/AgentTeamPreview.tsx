@@ -10,17 +10,12 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  LinearProgress,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
+  DialogActions,
+  IconButton,
 } from "@mui/material";
-import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
-import PsychologyIcon from "@mui/icons-material/Psychology";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
-import EmailIcon from "@mui/icons-material/Email";
+import CloseIcon from "@mui/icons-material/Close";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import {
   previewTodayPlan,
   generateTodayPlan,
@@ -29,52 +24,13 @@ import {
 import { onboardingCache } from "../../../../services/onboardingCache";
 
 const AGENT_LABELS: Record<string, string> = {
-  ContentStrategyAgent: "Content Strategist",
-  StrategyArchitectAgent: "Strategy Architect",
-  SEOOptimizationAgent: "SEO Specialist",
-  SocialAmplificationAgent: "Social Media Manager",
-  CompetitorResponseAgent: "Competitor Analyst",
-  ContentGapRadarAgent: "Content Gap Radar",
+  content_strategist: "Content Strategist",
+  strategy_architect: "Strategy Architect",
+  seo_specialist: "SEO Specialist",
+  social_media_manager: "Social Media Manager",
+  competitor_analyst: "Competitor Analyst",
+  content_gap_radar: "Content Gap Radar",
 };
-
-const AGENT_TEAM_INFO = [
-  {
-    key: "ContentStrategyAgent",
-    label: "Content Strategist",
-    icon: "📝",
-    description: "Analyzes your brand and competitors to recommend content pillars and topics",
-  },
-  {
-    key: "StrategyArchitectAgent", 
-    label: "Strategy Architect",
-    icon: "🏗️",
-    description: "Defines your overall content strategy and business goals alignment",
-  },
-  {
-    key: "SEOOptimizationAgent",
-    label: "SEO Specialist", 
-    icon: "🔍",
-    description: "Optimizes content for search engines and discovers opportunities",
-  },
-  {
-    key: "SocialAmplificationAgent",
-    label: "Social Media Manager",
-    icon: "📱",
-    description: "Creates social media engagement strategies and post ideas",
-  },
-  {
-    key: "CompetitorResponseAgent",
-    label: "Competitor Analyst",
-    icon: "🎯",
-    description: "Monitors competitor activities and suggests response strategies",
-  },
-  {
-    key: "ContentGapRadarAgent",
-    label: "Content Gap Radar",
-    icon: "📡",
-    description: "Identifies content gaps and opportunities in your market",
-  },
-];
 
 const PROGRESS_STAGES = [
   { key: "initializing", message: "Initializing agent committee...", duration: "5-10s" },
@@ -111,30 +67,24 @@ export const AgentTeamPreview: React.FC = () => {
   });
   const [saved, setSaved] = React.useState(false);
 
+  // Result modal state - shows preview/error after generation
+  const [resultModalOpen, setResultModalOpen] = React.useState(false);
+
   // Progress modal state
   const [currentStage, setCurrentStage] = React.useState(0);
   const [progressPercent, setProgressPercent] = React.useState(0);
   const [completedAgents, setCompletedAgents] = React.useState<string[]>([]);
-  // Mirrors currentStage for use inside the interval callback (pure setters only).
   const currentStageRef = React.useRef(0);
 
-  // Simulate progress through stages
   React.useEffect(() => {
-    if (!loading) {
-      return;
-    }
-
+    if (!loading) return;
     const interval = setInterval(() => {
       const stage = currentStageRef.current;
-      if (stage >= PROGRESS_STAGES.length - 1) {
-        return;
-      }
+      if (stage >= PROGRESS_STAGES.length - 1) return;
       const next = stage + 1;
       currentStageRef.current = next;
       setCurrentStage(next);
       setProgressPercent((next / PROGRESS_STAGES.length) * 100);
-
-      // Track completed agents based on stage
       const stageInfo = PROGRESS_STAGES[next];
       const label = stageInfo ? STAGE_AGENT_LABELS[stageInfo.key] : undefined;
       if (label) {
@@ -142,8 +92,7 @@ export const AgentTeamPreview: React.FC = () => {
           completed.includes(label) ? completed : [...completed, label],
         );
       }
-    }, 8000); // Update every 8 seconds (rough estimate per agent)
-
+    }, 8000);
     return () => clearInterval(interval);
   }, [loading]);
 
@@ -159,8 +108,11 @@ export const AgentTeamPreview: React.FC = () => {
       const data = await previewTodayPlan();
       setPreview(data);
       onboardingCache.saveFinalStepData({ todayPlanPreview: data });
+      setResultModalOpen(true);
     } catch (e: any) {
-      setError(e?.response?.data?.detail || e?.message || "Failed to preview the team plan.");
+      const errMsg = e?.response?.data?.detail || e?.message || "Failed to preview the team plan.";
+      setError(errMsg);
+      setResultModalOpen(true);
     } finally {
       setLoading(false);
     }
@@ -172,12 +124,17 @@ export const AgentTeamPreview: React.FC = () => {
     try {
       await generateTodayPlan();
       setSaved(true);
+      setResultModalOpen(true);
     } catch (e: any) {
-      setError(e?.response?.data?.detail || e?.message || "Failed to save today's plan.");
+      const errMsg = e?.response?.data?.detail || e?.message || "Failed to save today's plan.";
+      setError(errMsg);
+      setResultModalOpen(true);
     } finally {
       setSaving(false);
     }
   };
+
+  const closeResultModal = () => setResultModalOpen(false);
 
   return (
     <Box
@@ -203,7 +160,7 @@ export const AgentTeamPreview: React.FC = () => {
         See what your agents would propose for today before you launch.
       </Typography>
 
-      {error && (
+      {error && !resultModalOpen && (
         <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
           {error}
         </Alert>
@@ -226,23 +183,20 @@ export const AgentTeamPreview: React.FC = () => {
         </Button>
       )}
 
-      {preview && (
+      {preview && !resultModalOpen && (
         <>
           {preview.fallback_used && (
             <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
               Agents are still warming up — showing a fallback plan.
             </Alert>
           )}
-
           {(preview.template_fallback_count ?? 0) > 0 && (
             <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
               {preview.template_fallback_count} suggestion
-              {(preview.template_fallback_count ?? 0) === 1 ? " is" : "s are"} generic
-              template{((preview.template_fallback_count ?? 0) === 1) ? "" : "s"} because agent
-              analysis couldn&apos;t complete.
+              {(preview.template_fallback_count ?? 0) === 1 ? " is" : "s are"} generic template
+              {((preview.template_fallback_count ?? 0) === 1) ? "" : "s"} because agent analysis couldn&apos;t complete.
             </Alert>
           )}
-
           <Stack spacing={2}>
             {Object.entries(preview.proposals_by_agent).map(([agent, tasks]) => (
               <Box key={agent}>
@@ -250,7 +204,7 @@ export const AgentTeamPreview: React.FC = () => {
                   {AGENT_LABELS[agent] || agent}
                 </Typography>
                 <Stack spacing={1}>
-                  {(tasks || []).map((t, i) => (
+                  {(tasks || []).map((t: any, i: number) => (
                     <Box
                       key={i}
                       sx={{
@@ -291,7 +245,6 @@ export const AgentTeamPreview: React.FC = () => {
               </Box>
             ))}
           </Stack>
-
           <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
             <Button
               variant="contained"
@@ -312,6 +265,108 @@ export const AgentTeamPreview: React.FC = () => {
           </Box>
         </>
       )}
+
+      {/* Result Modal - Shows preview result or error */}
+      <Dialog
+        open={resultModalOpen}
+        onClose={closeResultModal}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pb: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            {error ? (
+              <Alert severity="error" sx={{ p: 0, minWidth: 24, height: 24, alignItems: "center" }}>!</Alert>
+            ) : (
+              <CheckCircleIcon sx={{ color: "success.main" }} />
+            )}
+            <Typography variant="h6">
+              {error ? "Preview Error" : "Today's Plan Preview"}
+            </Typography>
+          </Box>
+          <IconButton onClick={closeResultModal} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        
+        <DialogContent dividers>
+          {error ? (
+            <Alert severity="error" sx={{ borderRadius: 2 }}>
+              {error}
+            </Alert>
+          ) : preview ? (
+            <Stack spacing={2}>
+              {preview.fallback_used && (
+                <Alert severity="info" sx={{ borderRadius: 2 }}>
+                  Agents are still warming up — showing a fallback plan.
+                </Alert>
+              )}
+              {(preview.template_fallback_count ?? 0) > 0 && (
+                <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                  {preview.template_fallback_count} suggestion
+                  {(preview.template_fallback_count ?? 0) === 1 ? " is" : "s are"} generic template
+                  {((preview.template_fallback_count ?? 0) === 1) ? "" : "s"} because agent analysis couldn't complete.
+                </Alert>
+              )}
+              <Stack spacing={2}>
+                {Object.entries(preview.proposals_by_agent).map(([agent, tasks]) => (
+                  <Box key={agent}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: "primary.main" }}>
+                      {AGENT_LABELS[agent] || agent}
+                    </Typography>
+                    <Stack spacing={1}>
+                      {(tasks || []).map((t: any, i: number) => (
+                        <Box
+                          key={i}
+                          sx={{
+                            p: 1.5,
+                            borderRadius: 2,
+                            border: "1px solid",
+                            borderColor: "divider",
+                            bgcolor: "background.default",
+                          }}
+                        >
+                          <Stack direction="row" spacing={1} sx={{ mb: 0.5 }}>
+                            {t.priority && (
+                              <Chip
+                                size="small"
+                                label={t.priority}
+                                color={t.priority === "high" ? "error" : t.priority === "medium" ? "warning" : "default"}
+                              />
+                            )}
+                            {t.pillarId && (
+                              <Chip size="small" label={t.pillarId} variant="outlined" />
+                            )}
+                          </Stack>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {t.title}
+                          </Typography>
+                          {t.description && (
+                            <Typography variant="body2" color="text.secondary">
+                              {t.description}
+                            </Typography>
+                          )}
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Box>
+                ))}
+              </Stack>
+            </Stack>
+          ) : (
+            <Typography color="text.secondary">
+              No preview data available. Click "Preview today's plan" to generate.
+            </Typography>
+          )}
+        </DialogContent>
+        
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={closeResultModal} variant="contained">
+            {error ? "Try Again" : "Close"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

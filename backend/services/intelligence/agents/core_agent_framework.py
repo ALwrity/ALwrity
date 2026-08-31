@@ -1289,7 +1289,7 @@ class StrategyOrchestratorAgent(BaseALwrityAgent):
                 },
             ],
             max_iterations=15,
-            task="language-generation",
+
         )
 
     def _run_async_tool_sync(self, coro) -> Any:

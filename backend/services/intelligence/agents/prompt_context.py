@@ -82,6 +82,19 @@ def _join(items: List[str], limit: int) -> str:
     return ", ".join(items)
 
 
+def _scalar_text(value: Any) -> str:
+    """Coerce a scalar or list-of-scalars into a single comma-joined string.
+
+    Some onboarding fields (e.g. ``target_audience``, ``industry``) are stored
+    as lists in the raw data but must render as one inline string inside
+    ``{placeholder}`` templates. Lists are flattened here instead of leaking a
+    Python ``repr`` (``['a', 'b']``) into the prompt.
+    """
+    if isinstance(value, (list, tuple)):
+        return _join([_str(v) for v in value], 10)
+    return _str(value)
+
+
 def build_prompt_context(integrated: Dict[str, Any]) -> Dict[str, Any]:
     """Build the full structured prompt context from integrated onboarding data.
 
@@ -202,9 +215,9 @@ def build_prompt_context(integrated: Dict[str, Any]) -> Dict[str, Any]:
         "website_name": website_name,
         "website_url": website_url,
         "domain": domain,
-        "industry": _str(industry),
+        "industry": _scalar_text(industry),
         "brand_voice": _str(identity.get("brand_voice_description") or canonical.get("brand_voice")),
-        "target_audience": _str(target_audience),
+        "target_audience": _scalar_text(target_audience),
         "content_pillars": content_topics,
         "competitors": _list(competitor_names),
         "research_depth": _str(research.get("research_depth")),

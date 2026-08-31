@@ -27,14 +27,12 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import GroupIcon from "@mui/icons-material/Group";
 import LockIcon from "@mui/icons-material/Lock";
-import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import SaveIcon from "@mui/icons-material/Save";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 
 import {
-  aiOptimizeAgentProfile,
   previewAgentProfile,
   saveAgentProfile,
   type AgentTeamCatalogEntry,
@@ -235,20 +233,11 @@ function lintDraft(agent: AgentTeamCatalogEntry, draft: Draft) {
 const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, contextSummary, certification }) => {
   const [drafts, setDrafts] = React.useState<Record<string, Draft>>({});
   const [savingKey, setSavingKey] = React.useState<string | null>(null);
-  const [aiBusyKey, setAiBusyKey] = React.useState<string | null>(null);
   const [previewBusyKey, setPreviewBusyKey] = React.useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [previewTitle, setPreviewTitle] = React.useState("");
   const [previewData, setPreviewData] = React.useState<any>(null);
-  const [aiSuggestionOpen, setAiSuggestionOpen] = React.useState(false);
-  const [aiSuggestionTitle, setAiSuggestionTitle] = React.useState("");
-  const [aiSuggestionData, setAiSuggestionData] = React.useState<any>(null);
-  const [aiSuggestionAgentKey, setAiSuggestionAgentKey] = React.useState<string | null>(null);
-  const [aiSuggestionPatch, setAiSuggestionPatch] = React.useState<Partial<Draft> | null>(null);
   const [actionError, setActionError] = React.useState<string | null>(null);
-  const [optimizingAll, setOptimizingAll] = React.useState(false);
-  const [optimizeAllOpen, setOptimizeAllOpen] = React.useState(false);
-  const [optimizeAllSummary, setOptimizeAllSummary] = React.useState<{ key: string; title: string; patch: Partial<Draft> }[]>([]);
 
   React.useEffect(() => {
     const next: Record<string, Draft> = {};
@@ -319,55 +308,6 @@ const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, c
     }
   };
 
-  const handleAiOptimize = async (agent: AgentTeamCatalogEntry) => {
-    const key = agent.agent_key;
-    setAiBusyKey(key);
-    setActionError(null);
-    try {
-      const suggestion = await aiOptimizeAgentProfile(key, "agent", contextCard);
-      setAiSuggestionTitle(resolveDisplayName(agent, websiteName));
-      setAiSuggestionData(suggestion);
-      setAiSuggestionAgentKey(key);
-
-      // Parse the suggestion into a patch, but do NOT apply it yet — the user
-      // must review and explicitly accept the changes in the dialog.
-      const parsed = typeof suggestion === "string" ? safeJsonParse(suggestion) : suggestion;
-      const patch: Partial<Draft> = {};
-      if (parsed && typeof parsed === "object") {
-        if (typeof parsed.display_name === "string") patch.display_name = parsed.display_name;
-        if (typeof parsed.enabled === "boolean") patch.enabled = parsed.enabled;
-        if (parsed.schedule && typeof parsed.schedule === "object") patch.schedule = normalizeSchedule(parsed.schedule);
-        if (typeof parsed.system_prompt === "string") patch.system_prompt = parsed.system_prompt;
-        if (typeof parsed.task_prompt_template === "string") patch.task_prompt_template = parsed.task_prompt_template;
-      }
-      setAiSuggestionPatch(patch);
-      setAiSuggestionOpen(true);
-    } catch (e: any) {
-      const message =
-        e?.response?.data?.detail ||
-        e?.message ||
-        "AI optimization failed. Please try again.";
-      setActionError(typeof message === "string" ? message : "AI optimization failed. Please try again.");
-    } finally {
-      setAiBusyKey(null);
-    }
-  };
-
-  const handleApplyAiSuggestion = () => {
-    if (aiSuggestionAgentKey && aiSuggestionPatch && Object.keys(aiSuggestionPatch).length > 0) {
-      setDraftField(aiSuggestionAgentKey, aiSuggestionPatch);
-    }
-    setAiSuggestionOpen(false);
-    setAiSuggestionAgentKey(null);
-    setAiSuggestionPatch(null);
-  };
-
-  const handleCloseAiSuggestion = () => {
-    setAiSuggestionOpen(false);
-    setAiSuggestionAgentKey(null);
-    setAiSuggestionPatch(null);
-  };
-
   const handlePreview = async (agent: AgentTeamCatalogEntry) => {
     const key = agent.agent_key;
     setPreviewBusyKey(key);
@@ -391,80 +331,6 @@ const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, c
     } finally {
       setPreviewBusyKey(null);
     }
-  };
-
-  const handleOptimizeAll = async () => {
-    setOptimizingAll(true);
-    setActionError(null);
-    try {
-      const results = await Promise.allSettled(
-        agents.map(async (agent) => {
-          const key = agent.agent_key;
-          const suggestion = await aiOptimizeAgentProfile(key, "agent", contextCard);
-          const parsed = typeof suggestion === "string" ? safeJsonParse(suggestion) : suggestion;
-          const patch: Partial<Draft> = {};
-          if (parsed && typeof parsed === "object") {
-            if (typeof parsed.display_name === "string") patch.display_name = parsed.display_name;
-            if (typeof parsed.enabled === "boolean") patch.enabled = parsed.enabled;
-            if (parsed.schedule && typeof parsed.schedule === "object") patch.schedule = normalizeSchedule(parsed.schedule);
-            if (typeof parsed.system_prompt === "string") patch.system_prompt = parsed.system_prompt;
-            if (typeof parsed.task_prompt_template === "string") patch.task_prompt_template = parsed.task_prompt_template;
-          }
-          return { key, title: resolveDisplayName(agent, websiteName), patch };
-        })
-      );
-
-      const successes = results
-        .filter((r) => r.status === "fulfilled")
-        .map((r) => (r as PromiseFulfilledResult<any>).value)
-        .filter((v) => v && Object.keys(v.patch).length > 0);
-      const failureCount = results.filter((r) => r.status === "rejected").length;
-
-      if (successes.length === 0) {
-        setActionError(
-          failureCount > 0
-            ? `Optimization failed for all ${agents.length} agents. Please try again.`
-            : "No suggestions were produced. Please try again."
-        );
-        return;
-      }
-
-      setOptimizeAllSummary(successes);
-      setOptimizeAllOpen(true);
-      if (failureCount > 0) {
-        setActionError(`Optimized ${successes.length} agents; ${failureCount} failed.`);
-      }
-    } finally {
-      setOptimizingAll(false);
-    }
-  };
-
-  const handleApplyAll = async () => {
-    const items = optimizeAllSummary;
-    if (!items.length) return;
-    for (const item of items) {
-      const current = drafts[item.key] || ({} as Draft);
-      const merged: Draft = { ...current, ...item.patch };
-      setDraftField(item.key, item.patch);
-      try {
-        await saveAgentProfile(item.key, {
-          display_name: merged.display_name,
-          enabled: merged.enabled,
-          schedule: merged.schedule,
-          system_prompt: merged.system_prompt,
-          task_prompt_template: merged.task_prompt_template,
-        });
-      } catch {
-        // Individual save failures are non-fatal; drafts still updated for review.
-      }
-    }
-    setOptimizeAllOpen(false);
-    setOptimizeAllSummary([]);
-  };
-
-  const handleCloseOptimizeAll = () => {
-    setOptimizeAllOpen(false);
-    setOptimizeAllSummary([]);
   };
 
   return (
@@ -638,20 +504,6 @@ const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, c
             <Box sx={{ width: 8, height: 8, borderRadius: "999px", bgcolor: "#e5e7eb" }} />
             <Typography variant="caption">Disabled</Typography>
           </Stack>
-          <Tooltip title="Personalize every agent's prompts against your brand context in one step." arrow>
-            <span>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<AutoFixHighIcon />}
-                disabled={optimizingAll}
-                onClick={handleOptimizeAll}
-                sx={{ textTransform: "none", borderColor: "#4f46e5", color: "#4f46e5" }}
-              >
-                {optimizingAll ? "Optimizing…" : "Optimize all"}
-              </Button>
-            </span>
-          </Tooltip>
         </Stack>
       </Box>
 
@@ -779,31 +631,6 @@ const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, c
               <AccordionDetails>
                 <Stack spacing={2}>
                   <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                    <Tooltip
-                      title="Let ALwrity refine this agent's prompts and schedule based on your brand context."
-                      arrow
-                    >
-                      <span>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<AutoFixHighIcon />}
-                          disabled={aiBusyKey === agent.agent_key}
-                          onClick={() => handleAiOptimize(agent)}
-                          sx={{
-                            textTransform: "none",
-                            borderColor: "#4f46e5",
-                            color: "#4f46e5",
-                            "&:hover": {
-                              borderColor: "#4338ca",
-                              background: "rgba(79,70,229,0.04)",
-                            },
-                          }}
-                        >
-                          AI Optimize
-                        </Button>
-                      </span>
-                    </Tooltip>
                     <Tooltip
                       title="Preview how this agent would respond using the current configuration."
                       arrow
@@ -1130,69 +957,8 @@ const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, c
           </Button>
         </DialogActions>
       </Dialog>
-
-      <Dialog open={aiSuggestionOpen} onClose={handleCloseAiSuggestion} fullWidth maxWidth="md">
-        <DialogTitle>AI Optimize suggestion: {aiSuggestionTitle}</DialogTitle>
-        <DialogContent dividers>
-          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-            {typeof aiSuggestionData === "string" ? aiSuggestionData : JSON.stringify(aiSuggestionData, null, 2)}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseAiSuggestion} sx={{ textTransform: "none" }}>
-            Dismiss
-          </Button>
-          <Button
-            onClick={handleApplyAiSuggestion}
-            variant="contained"
-            color="primary"
-            disabled={!aiSuggestionPatch || Object.keys(aiSuggestionPatch).length === 0}
-            sx={{ textTransform: "none" }}
-          >
-            Apply Changes
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={optimizeAllOpen} onClose={handleCloseOptimizeAll} fullWidth maxWidth="sm">
-        <DialogTitle>Optimize all agents</DialogTitle>
-        <DialogContent dividers>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            Personalized {optimizeAllSummary.length} agent{optimizeAllSummary.length === 1 ? "" : "s"} against
-            your brand context. Apply and save these changes?
-          </Typography>
-          <Stack spacing={0.5}>
-            {optimizeAllSummary.map((item) => (
-              <Typography key={item.key} variant="body2" sx={{ color: "#4b5563" }}>
-                • {item.title}
-              </Typography>
-            ))}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseOptimizeAll} sx={{ textTransform: "none" }}>
-            Dismiss
-          </Button>
-          <Button
-            onClick={handleApplyAll}
-            variant="contained"
-            color="primary"
-            sx={{ textTransform: "none" }}
-          >
-            Apply &amp; Save All
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Paper>
   );
 };
 
 export default AgentTeamSection;
-
-function safeJsonParse(raw: string): any {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}

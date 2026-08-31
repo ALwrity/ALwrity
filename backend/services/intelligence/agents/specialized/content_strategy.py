@@ -112,7 +112,7 @@ class ContentStrategyAgent(BaseALwrityAgent):
             ],
             llm=_llm_for_agent,
             max_iterations=8,
-            task="language-generation",
+
             )
 
     def _run_async_tool(self, coroutine):

@@ -27,14 +27,17 @@ def test_orchestrator_failure_returns_fallback_flag():
     raises, the committee function must return a fallback marker so
     the caller can set ``fallback_used=True`` on the plan row.
     """
-    src = _read_backend("services/today_workflow_service.py")
+    # The committee function was extracted to today_workflow_agents.py.
+    src = _read_backend("services/today_workflow_agents.py")
     # The two known fallback returns in the orchestrator-unavailable
     # path must include the new flag.
     assert '"fallback_used": True' in src, (
         "orchestrator-unavailable paths must return fallback_used=True"
     )
-    # And the plan creation must propagate the flag.
-    assert "plan_data.get(\"fallback_used\", False)" in src
+    # And the plan creation (still in today_workflow_service.py) must
+    # propagate the flag.
+    svc_src = _read_backend("services/today_workflow_service.py")
+    assert "plan_data.get(\"fallback_used\", False)" in svc_src
 
 
 def test_orchestrator_failure_does_not_return_silent_empty():
@@ -46,11 +49,12 @@ def test_orchestrator_failure_does_not_return_silent_empty():
     scan each branch's body directly instead of matching a bare
     ``return {`` literal.
     """
-    src = _read_backend("services/today_workflow_service.py")
+    # The committee function was extracted to today_workflow_agents.py.
+    src = _read_backend("services/today_workflow_agents.py")
 
     def branch_body(anchor: str, window: int = 900) -> str:
         index = src.find(anchor)
-        assert index != -1, f"anchor not found in today_workflow_service.py: {anchor!r}"
+        assert index != -1, f"anchor not found in today_workflow_agents.py: {anchor!r}"
         return src[index:index + window]
 
     # Branch 1: orchestration_service is None.
@@ -167,16 +171,18 @@ def test_generate_agent_enhanced_plan_returns_polled_count():
     of agents that participated (not just the distinct sources on
     surviving tasks).
     """
-    src = _read_backend("services/today_workflow_service.py")
+    # The committee function was extracted to today_workflow_agents.py.
+    src = _read_backend("services/today_workflow_agents.py")
     assert "agents_polled_count = len(active_agents)" in src
     assert '"committee_agent_count": agents_polled_count' in src
-    # The plan creation must prefer the polled count over the walk.
-    # The source may format the expression across two lines (one
-    # identifier on the first line, ``or _count_committee_agents(tasks)``
-    # on the second), so we check for the components individually
-    # rather than a single literal string.
-    assert "committee_polled_count" in src
-    assert "or _count_committee_agents(tasks)" in src
+    # The plan creation (still in today_workflow_service.py) must prefer the
+    # polled count over the walk. The source may format the expression across
+    # two lines (one identifier on the first line, ``or _count_committee_agents(tasks)``
+    # on the second), so we check for the components individually rather than a
+    # single literal string.
+    svc_src = _read_backend("services/today_workflow_service.py")
+    assert "committee_polled_count" in svc_src
+    assert "or _count_committee_agents(tasks)" in svc_src
 
 
 def test_count_committee_agents_walks_with_fallback():
