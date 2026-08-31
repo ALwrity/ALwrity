@@ -1,7 +1,8 @@
 """
 SERP Gap Service for ALwrity
 
-Detects which competitors rank for target topics using Google Custom Search.
+Detects which competitors rank for target topics using Google Custom Search
+or the optional SerpBase API (opt-in via SERPBASE_API_KEY).
 Phase 1 of the Content Gap Radar feature.
 
 Usage:
@@ -20,6 +21,7 @@ import time
 from typing import Dict, List, Optional, Any
 from loguru import logger
 from services.research.google_search_service import GoogleSearchService
+from services.seo_tools.serpbase_service import SerpBaseService
 
 
 class SerpGapService:
@@ -28,7 +30,9 @@ class SerpGapService:
 
     Uses Google Custom Search `site:` queries to detect competitor ranking presence
     for specific topics. Results are cached for 24h to stay within free-tier quotas
-    (100 queries/day). Designed to be consumed by a future ContentGapRadarAgent
+    (100 queries/day). When SERPBASE_API_KEY is set, SerpBase is used instead of
+    Google Custom Search (no 100-query/day cap, returns positions and AI Overview).
+    Designed to be consumed by a future ContentGapRadarAgent
     that scores and prioritizes gaps.
     """
 
@@ -36,8 +40,10 @@ class SerpGapService:
 
     def __init__(self, google_search_service: Optional[GoogleSearchService] = None):
         self.gcs = google_search_service or GoogleSearchService()
+        self.serpbase = SerpBaseService()
         self._cache: Dict[str, Dict[str, Any]] = {}
-        logger.info("SerpGapService initialized")
+        provider = "SerpBase" if self.serpbase.enabled else "Google Custom Search"
+        logger.info(f"SerpGapService initialized (provider: {provider})")
 
     def _cache_key(self, topics: List[str], domains: List[str]) -> str:
         """Deterministic cache key from sorted topics + domains."""
@@ -72,7 +78,7 @@ class SerpGapService:
         Args:
             topics: Topic phrases to check (e.g. from find_semantic_gaps())
             competitor_domains: Known competitor domains (e.g. ["example.com"])
-            max_results_per_site: Max Google CSE results per site: query (max 10)
+            max_results_per_site: Max results per site: query (max 10)
             concurrency: Max concurrent API calls to stay under rate limits
             bypass_cache: Force fresh API calls, ignoring cache
 
@@ -136,12 +142,18 @@ class SerpGapService:
         for domain in competitor_domains:
             query = f"site:{domain} {topic}"
             try:
-                raw_results = await self.gcs.perform_search(
-                    query,
-                    max_results,
-                    dateRestrict=None,  # Don't limit to last month
-                    sort=None,  # Use relevance sorting, not date
-                )
+                if self.serpbase.enabled:
+                    raw_results = await self.serpbase.perform_search(
+                        query,
+                        max_results,
+                    )
+                else:
+                    raw_results = await self.gcs.perform_search(
+                        query,
+                        max_results,
+                        dateRestrict=None,  # Don't limit to last month
+                        sort=None,  # Use relevance sorting, not date
+                    )
                 for result in raw_results:
                     competitors_found.append({
                         "domain": domain,
