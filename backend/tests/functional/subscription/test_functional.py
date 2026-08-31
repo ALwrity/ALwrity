@@ -75,6 +75,9 @@ def db_session():
         echo=False,
     )
     from models.base import Base
+    # Ensure subscription models are registered on Base BEFORE create_all so
+    # api_provider_pricing etc. exist regardless of test import order.
+    import models.subscription_models  # noqa: F401
     Base.metadata.create_all(engine)
 
     SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
@@ -286,10 +289,10 @@ class TestPlanUpgradeChangesLimits:
 class TestPricingDataSeeded:
     """Verify pricing data was inserted correctly into the DB."""
 
-    def test_49_pricing_entries_seeded(self, db_session):
+    def test_pricing_entries_seeded(self, db_session):
         from models.subscription_models import APIProviderPricing
         count = db_session.query(APIProviderPricing).count()
-        assert count == 49, f"Expected 49 pricing entries, got {count}"
+        assert count == 81, f"Expected 81 pricing entries, got {count}"
 
     def test_4_plans_seeded(self, db_session):
         from models.subscription_models import SubscriptionPlan

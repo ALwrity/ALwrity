@@ -164,6 +164,15 @@ def init_user_database(user_id: str) -> None:
                 if "email_digest_opt_in" not in cols:
                     conn.execute("ALTER TABLE onboarding_sessions ADD COLUMN email_digest_opt_in BOOLEAN DEFAULT 0")
                 conn.commit()
+            if "research_preferences" in tables:
+                cols = [c[1] for c in conn.execute("PRAGMA table_info(research_preferences)").fetchall()]
+                if "content_pillars" not in cols:
+                    conn.execute("ALTER TABLE research_preferences ADD COLUMN content_pillars JSON")
+                if "research_summary" not in cols:
+                    conn.execute("ALTER TABLE research_preferences ADD COLUMN research_summary JSON")
+                if "social_media_citations" not in cols:
+                    conn.execute("ALTER TABLE research_preferences ADD COLUMN social_media_citations JSON")
+                conn.commit()
             conn.close()
         except Exception as heal_exc:
             logger.debug(f"Schema column check for {user_id}: {heal_exc}")
