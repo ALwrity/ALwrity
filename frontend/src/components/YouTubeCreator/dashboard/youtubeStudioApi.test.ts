@@ -35,4 +35,20 @@ describe("youtubeStudioApi", () => {
     });
     expect(result.comments).toEqual([]);
   });
+
+  it("searches by keyword via GET /api/youtube/search", async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: {
+        success: true,
+        items: [{ video_id: "vid123", title: "How to train dogs" }],
+        next_page_token: "CAUQAA",
+      },
+    });
+    const result = await youtubeStudioApi.searchByKeyword({ q: "dogs", max_results: 25 });
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/search", {
+      params: { q: "dogs", max_results: 25 },
+    });
+    expect(result.items[0].video_id).toBe("vid123");
+    expect(result.items[0].title).toBe("How to train dogs");
+  });
 });

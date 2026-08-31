@@ -4,12 +4,21 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import HeaderControls from "../../shared/HeaderControls";
+import { youtubeStudioApi } from "../../../services/youtubeStudioApi";
 import { YouTubeSearchBar } from "./YouTubeSearchBar";
 import "./youtube-studio-header.css";
+
+type YouTubeSearchHit = {
+  video_id: string;
+  title: string;
+};
 
 export const YouTubeStudioLandingHeader: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchHits, setSearchHits] = useState<YouTubeSearchHit[]>([]);
+  const [searchMessage, setSearchMessage] = useState<string | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   const handleSearchQueryChange = (nextQuery: string) => {
     try {
@@ -19,13 +28,45 @@ export const YouTubeStudioLandingHeader: React.FC = () => {
     }
   };
 
-  const handleSearchSubmit = () => {
+  const handleSearchSubmit = async () => {
+    const query = searchQuery.trim();
     try {
-      console.info("[YouTubeStudioLandingHeader] Search submit ignored — results not implemented", {
-        queryLength: searchQuery.trim().length,
+      console.info("[YouTubeStudioLandingHeader] Search submitted", {
+        queryLength: query.length,
+        hasQuery: query.length > 0,
+      });
+      if (!query) {
+        setSearchHits([]);
+        setSearchMessage("Enter a search keyword.");
+        return;
+      }
+      setIsSearching(true);
+      setSearchMessage(null);
+      setSearchHits([]);
+      const data = await youtubeStudioApi.searchByKeyword({
+        q: query,
+        max_results: 25,
+      });
+      if (!data?.success) {
+        console.warn("[YouTubeStudioLandingHeader] Search returned no results", {
+          errorCode: data?.error_code,
+        });
+        setSearchHits([]);
+        setSearchMessage(data?.message || "Search failed.");
+        return;
+      }
+      const items = Array.isArray(data.items) ? data.items : [];
+      setSearchHits(items);
+      setSearchMessage(items.length === 0 ? "No videos found." : null);
+      console.info("[YouTubeStudioLandingHeader] Search complete", {
+        itemCount: items.length,
       });
     } catch (error) {
       console.error("[YouTubeStudioLandingHeader] Search submit handler failed", error);
+      setSearchHits([]);
+      setSearchMessage("Search failed.");
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -55,6 +96,31 @@ export const YouTubeStudioLandingHeader: React.FC = () => {
               onChange={handleSearchQueryChange}
               onSearch={handleSearchSubmit}
             />
+            {isSearching ? (
+              <p className="yt-search-results__status" role="status">
+                Searching...
+              </p>
+            ) : null}
+            {searchMessage ? (
+              <p className="yt-search-results__status" role="status">
+                {searchMessage}
+              </p>
+            ) : null}
+            {searchHits.length > 0 ? (
+              <ul className="yt-search-results" aria-label="YouTube search results">
+                {searchHits.map((hit) => (
+                  <li key={hit.video_id} className="yt-search-results__item">
+                    <a
+                      href={`https://www.youtube.com/watch?v=${hit.video_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {hit.title}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
           <HeaderControls colorMode="light" showAlerts showUser gap={1} />
         </div>

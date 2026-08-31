@@ -186,3 +186,84 @@ class TestYouTubeSearchByKeyword:
         assert list_kwargs["maxResults"] == 50
         assert list_kwargs["pageToken"] == "CAUQAA"
         oauth.get_valid_credentials.assert_called_once_with(USER_ID, 7)
+
+
+def _search_list_http_error(reason: str, status: int = 400):
+    """Build a Search.list HttpError with YouTube's error.errors[].reason payload.
+
+    Pytest conftest may stub googleapiclient.errors.HttpError as a bare
+    Exception, so always set ``resp`` and ``content`` after construction.
+    """
+    import json
+    from types import SimpleNamespace
+
+    from googleapiclient.errors import HttpError
+
+    body = {
+        "error": {
+            "code": status,
+            "message": reason,
+            "errors": [{"reason": reason, "domain": "youtube.parameter"}],
+        }
+    }
+    content = json.dumps(body).encode()
+    resp = SimpleNamespace(status=status, reason="Bad Request")
+    try:
+        exc = HttpError(resp, content)
+    except Exception:
+        exc = HttpError()
+    exc.resp = resp
+    exc.content = content
+    return exc
+
+
+class TestYouTubeSearchListDocumentedErrors:
+    """Search.list error table: https://developers.google.com/youtube/v3/docs/search/list"""
+
+    def _run(self, reason: str, status: int = 400) -> dict:
+        oauth = MagicMock()
+        oauth.get_valid_credentials.return_value = MagicMock(name="creds")
+        youtube = MagicMock()
+        youtube.search.return_value.list.return_value.execute.side_effect = (
+            _search_list_http_error(reason, status)
+        )
+        with patch(
+            "services.youtube.youtube_search_service.build",
+            return_value=youtube,
+        ):
+            return _service(oauth).search_by_keyword(USER_ID, "dogs")
+
+    def test_invalid_channel_id_returns_documented_error_without_fake_items(self):
+        result = self._run("invalidChannelId")
+        assert result["success"] is False
+        assert result["error_code"] == "invalidChannelId"
+        assert "channel ID" in result["message"]
+        assert result["items"] == []
+
+    def test_invalid_location_returns_documented_error_without_fake_items(self):
+        result = self._run("invalidLocation")
+        assert result["success"] is False
+        assert result["error_code"] == "invalidLocation"
+        assert "location" in result["message"].lower()
+        assert result["items"] == []
+
+    def test_invalid_relevance_language_returns_documented_error_without_fake_items(self):
+        result = self._run("invalidRelevanceLanguage")
+        assert result["success"] is False
+        assert result["error_code"] == "invalidRelevanceLanguage"
+        assert "relevanceLanguage" in result["message"]
+        assert result["items"] == []
+
+    def test_invalid_search_filter_returns_documented_error_without_fake_items(self):
+        result = self._run("invalidSearchFilter")
+        assert result["success"] is False
+        assert result["error_code"] == "invalidSearchFilter"
+        assert "type" in result["message"].lower()
+        assert result["items"] == []
+
+    def test_unmapped_google_http_error_stays_search_failed_without_fake_items(self):
+        result = self._run("quotaExceeded", status=403)
+        assert result["success"] is False
+        assert result["error_code"] == "search_failed"
+        assert result["items"] == []
+

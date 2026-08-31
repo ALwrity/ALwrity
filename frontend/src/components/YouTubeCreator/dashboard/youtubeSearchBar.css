@@ -71,3 +71,45 @@
   font-weight: 700;
   opacity: 0.9;
 }
+
+.yt-search-results,
+.yt-search-results__status {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  background: #ffffff;
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(127, 29, 29, 0.12);
+}
+
+.yt-search-results {
+  list-style: none;
+  padding: 6px 0;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.yt-search-results__status {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #7f1d1d;
+}
+
+.yt-search-results__item a {
+  display: block;
+  padding: 8px 12px;
+  color: #0f0f0f;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.yt-search-results__item a:hover {
+  background: #fef2f2;
+  color: #cc0000;
+}

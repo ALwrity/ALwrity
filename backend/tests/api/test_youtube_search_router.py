@@ -22,11 +22,19 @@ def _get_search_service():
 
 class TestYouTubeSearchRouterMount:
     def test_search_path_is_mounted(self):
-        from api.youtube.router import router as youtube_router
+        """GET /api/youtube/search is mounted once. Stub the search service so
+        this check does not construct YouTubeOAuthService (that 500s without
+        encryption config). Missing q is 422; a doubled prefix is 404.
+        """
+        service = MagicMock()
+        client = youtube_studio_client({_get_search_service(): lambda: service})
 
-        paths = {getattr(r, "path", "") for r in youtube_router.routes}
-        assert "/youtube/search" in paths
-        assert "/youtube/youtube/search" not in paths
+        assert client.get("/api/youtube/search").status_code == 422
+        service.search_by_keyword.assert_not_called()
+        assert (
+            client.get("/api/youtube/youtube/search", params={"q": "dogs"}).status_code
+            == 404
+        )
 
 
 class TestYouTubeSearchRouter:

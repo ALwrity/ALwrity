@@ -45,7 +45,7 @@ function submitSearch(onSearch: () => void, query: string): void {
   }
 }
 
-/** Hub header search field only — no results or API in this slice. */
+/** Hub header search field — submit is handled by the parent (Search.list). */
 export const YouTubeSearchBar: React.FC<YouTubeSearchBarProps> = ({
   value,
   onChange,

@@ -1,6 +1,7 @@
 /**
- * TDD: YouTube Creator Studio search bar only (no results, modal, or API).
+ * TDD: YouTube Creator Studio search field.
  * Mimics YouTube.com: search input, placeholder "Search", submit on Enter.
+ * Keyword Search.list is owned by YouTubeStudioLandingHeader + youtubeStudioApi.
  */
 import { fireEvent, render, screen } from "@testing-library/react";
 import { YouTubeSearchBar } from "../YouTubeSearchBar";

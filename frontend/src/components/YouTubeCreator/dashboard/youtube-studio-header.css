@@ -91,6 +91,7 @@
 }
 
 .yt-studio-landing-header-search-slot {
+  position: relative;
   flex: 1 1 auto;
   display: flex;
   justify-content: flex-end;
