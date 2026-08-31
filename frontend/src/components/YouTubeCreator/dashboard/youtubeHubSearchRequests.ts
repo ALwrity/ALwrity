@@ -1,9 +1,10 @@
 /**
- * Hub Search.list requests for chip filters and TYPE overlay.
+ * Hub Search.list requests for chip filters, TYPE, and Duration overlay.
  */
 import { youtubeStudioApi } from "../../../services/youtubeStudioApi";
 import {
   isYouTubeShortsTitle,
+  type YouTubeSearchDurationFilter,
   type YouTubeSearchFilter,
   type YouTubeSearchHit,
   type YouTubeSearchTypeFilter,
@@ -129,6 +130,43 @@ export async function searchYouTubeByType(
     console.error(
       "[youtubeHubSearchRequests] Type search failed",
       { searchType },
+      error,
+    );
+    throw error;
+  }
+}
+
+export async function searchYouTubeByDuration(
+  query: string,
+  duration: YouTubeSearchDurationFilter,
+): Promise<YouTubeHubSearchResult> {
+  try {
+    console.info("[youtubeHubSearchRequests] Duration search start", {
+      videoDuration: duration,
+      queryLength: query.length,
+    });
+    const data = await youtubeStudioApi.searchByKeyword({
+      q: query,
+      max_results: 25,
+      video_duration: duration,
+    });
+    if (!data?.success) {
+      console.warn("[youtubeHubSearchRequests] Duration search unsuccessful", {
+        videoDuration: duration,
+        errorCode: data?.error_code || null,
+      });
+      return { items: [], message: data?.message || "Search failed." };
+    }
+    const items = asHits(data);
+    console.info("[youtubeHubSearchRequests] Duration search complete", {
+      videoDuration: duration,
+      itemCount: items.length,
+    });
+    return { items, message: items.length === 0 ? "No videos found." : null };
+  } catch (error) {
+    console.error(
+      "[youtubeHubSearchRequests] Duration search failed",
+      { videoDuration: duration },
       error,
     );
     throw error;

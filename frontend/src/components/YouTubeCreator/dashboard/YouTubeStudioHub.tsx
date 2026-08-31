@@ -5,9 +5,15 @@ import { YouTubeChannelHub } from "./YouTubeChannelHub";
 import { YouTubeChannelHubStrip } from "./YouTubeChannelHubStrip";
 import { YouTubeHubConnectButton } from "./YouTubeHubConnectButton";
 import { YouTubeSearchResultsPanel } from "./YouTubeSearchResultsPanel";
-import type { YouTubeSearchFilter, YouTubeSearchHit, YouTubeSearchTypeFilter } from "./YouTubeSearchResultsPanel";
+import type {
+  YouTubeSearchDurationFilter,
+  YouTubeSearchFilter,
+  YouTubeSearchHit,
+  YouTubeSearchTypeFilter,
+} from "./YouTubeSearchResultsPanel";
 import {
   searchYouTubeByChip,
+  searchYouTubeByDuration,
   searchYouTubeByType,
 } from "./youtubeHubSearchRequests";
 import { YouTubeMobileStudioActionsDock } from "./YouTubeMobileStudioActionsDock";
@@ -79,6 +85,9 @@ export function YouTubeStudioHub({
   const [searchType, setSearchType] = useState<YouTubeSearchTypeFilter | undefined>(
     undefined,
   );
+  const [searchDuration, setSearchDuration] = useState<
+    YouTubeSearchDurationFilter | undefined
+  >(undefined);
 
   const { layout, hubCenterLeft, hubCenterY, hubDiameter, hubAvatarSize } =
     useYouTubeHeroLayoutMetrics({
@@ -103,6 +112,7 @@ export function YouTubeStudioHub({
         setSearchMessage(detail.message);
         setSearchFilter("all");
         setSearchType(undefined);
+        setSearchDuration(undefined);
         console.info("[YouTubeStudioHub] Search results panel opened", {
           queryLength: (detail.query || "").length,
           itemCount: Array.isArray(detail.items) ? detail.items.length : 0,
@@ -193,6 +203,7 @@ export function YouTubeStudioHub({
     async (searchTypeNext: YouTubeSearchTypeFilter) => {
       try {
         setSearchType(searchTypeNext);
+        setSearchDuration(undefined);
         const query = searchQuery.trim();
         if (!query) {
           console.info("[YouTubeStudioHub] Search type skipped empty query", {
@@ -210,6 +221,47 @@ export function YouTubeStudioHub({
         setSearchMessage(result.message);
       } catch (error) {
         console.error("[YouTubeStudioHub] Search type request failed", error);
+        setSearchItems([]);
+        setSearchMessage("Search failed.");
+      }
+    },
+    [searchQuery],
+  );
+
+  const handleSearchDurationChange = useCallback(
+    async (durationNext: YouTubeSearchDurationFilter) => {
+      try {
+        setSearchDuration(durationNext);
+        setSearchType(undefined);
+        const query = searchQuery.trim();
+        if (!query) {
+          console.info("[YouTubeStudioHub] Search duration skipped empty query", {
+            videoDuration: durationNext,
+          });
+          return;
+        }
+        console.info("[YouTubeStudioHub] Search duration changed", {
+          videoDuration: durationNext,
+          queryLength: query.length,
+        });
+        setSearchMessage("Searching...");
+        const result = await searchYouTubeByDuration(query, durationNext);
+        setSearchItems(result.items);
+        setSearchMessage(result.message);
+        console.info("[YouTubeStudioHub] Search duration complete", {
+          videoDuration: durationNext,
+          itemCount: result.items.length,
+          hasMessage: Boolean(result.message),
+        });
+      } catch (error) {
+        console.error(
+          "[YouTubeStudioHub] Search duration request failed",
+          {
+            videoDuration: durationNext,
+            queryLength: searchQuery.trim().length,
+          },
+          error,
+        );
         setSearchItems([]);
         setSearchMessage("Search failed.");
       }
@@ -260,8 +312,10 @@ export function YouTubeStudioHub({
           message={searchMessage}
           selectedFilter={searchFilter}
           selectedType={searchType}
+          selectedDuration={searchDuration}
           onFilterChange={handleSearchFilterChange}
           onTypeChange={handleSearchTypeChange}
+          onDurationChange={handleSearchDurationChange}
           onClose={() => {
             try {
               setSearchOpen(false);

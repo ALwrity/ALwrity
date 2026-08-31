@@ -8,10 +8,14 @@ import {
   YouTubeSearchTypeFilters,
   type YouTubeSearchTypeFilter,
 } from "./YouTubeSearchTypeFilters";
+import {
+  YouTubeSearchDurationFilters,
+  type YouTubeSearchDurationFilter,
+} from "./YouTubeSearchDurationFilters";
 import "./youtubeSearchResultsPanel.css";
 
 export type YouTubeSearchFilter = "all" | "videos" | "shorts" | "recent" | "live";
-export type { YouTubeSearchTypeFilter };
+export type { YouTubeSearchTypeFilter, YouTubeSearchDurationFilter };
 
 export type YouTubeSearchHit = {
   video_id?: string;
@@ -46,8 +50,10 @@ export interface YouTubeSearchResultsPanelProps {
   message?: string | null;
   selectedFilter?: YouTubeSearchFilter;
   selectedType?: YouTubeSearchTypeFilter;
+  selectedDuration?: YouTubeSearchDurationFilter;
   onFilterChange?: (filter: YouTubeSearchFilter) => void;
   onTypeChange?: (type: YouTubeSearchTypeFilter) => void;
+  onDurationChange?: (duration: YouTubeSearchDurationFilter) => void;
   onClose?: () => void;
 }
 
@@ -103,11 +109,64 @@ export const YouTubeSearchResultsPanel: React.FC<YouTubeSearchResultsPanelProps>
   message = null,
   selectedFilter = "all",
   selectedType,
+  selectedDuration,
   onFilterChange,
   onTypeChange,
+  onDurationChange,
   onClose,
 }) => {
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const closeSearchFilters = (
+    source: string,
+    meta?: Record<string, string>,
+  ) => {
+    try {
+      setFiltersOpen(false);
+      console.info("[YouTubeSearchResultsPanel] Search filters closed", {
+        source,
+        ...meta,
+      });
+    } catch (error) {
+      console.error(
+        "[YouTubeSearchResultsPanel] Search filters close failed",
+        { source, ...meta },
+        error,
+      );
+    }
+  };
+
+  const applyTypeAndClose = (type: YouTubeSearchTypeFilter) => {
+    try {
+      console.info("[YouTubeSearchResultsPanel] TYPE filter selected", {
+        searchType: type,
+      });
+      onTypeChange?.(type);
+    } catch (error) {
+      console.error(
+        "[YouTubeSearchResultsPanel] TYPE filter apply failed",
+        { searchType: type },
+        error,
+      );
+    }
+    closeSearchFilters("type", { searchType: type });
+  };
+
+  const applyDurationAndClose = (duration: YouTubeSearchDurationFilter) => {
+    try {
+      console.info("[YouTubeSearchResultsPanel] Duration filter selected", {
+        videoDuration: duration,
+      });
+      onDurationChange?.(duration);
+    } catch (error) {
+      console.error(
+        "[YouTubeSearchResultsPanel] Duration filter apply failed",
+        { videoDuration: duration },
+        error,
+      );
+    }
+    closeSearchFilters("duration", { videoDuration: duration });
+  };
 
   useEffect(() => {
     if (!isOpen) {
@@ -208,14 +267,7 @@ export const YouTubeSearchResultsPanel: React.FC<YouTubeSearchResultsPanelProps>
               type="button"
               className="yt-search-results-panel__close"
               aria-label="Close search filters"
-              onClick={() => {
-                try {
-                  setFiltersOpen(false);
-                  console.info("[YouTubeSearchResultsPanel] Search filters closed");
-                } catch (error) {
-                  console.error("[YouTubeSearchResultsPanel] Search filters close failed", error);
-                }
-              }}
+              onClick={() => closeSearchFilters("close-control")}
             >
               ×
             </button>
@@ -223,9 +275,13 @@ export const YouTubeSearchResultsPanel: React.FC<YouTubeSearchResultsPanelProps>
           <div className="yt-search-filters-dialog__columns">
             <YouTubeSearchTypeFilters
               selectedType={selectedType}
-              onTypeChange={onTypeChange}
+              onTypeChange={applyTypeAndClose}
             />
-            {/* Duration, Upload date, Features, Prioritise — later slices */}
+            <YouTubeSearchDurationFilters
+              selectedDuration={selectedDuration}
+              onDurationChange={applyDurationAndClose}
+            />
+            {/* Upload date, Features, Prioritise — later slices */}
           </div>
         </div>
       ) : null}

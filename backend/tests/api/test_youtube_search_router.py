@@ -146,6 +146,34 @@ class TestYouTubeSearchRouter:
         kwargs = service.search_by_keyword.call_args.kwargs
         assert kwargs.get("video_duration") == "short"
 
+    def test_forwards_video_duration_medium_and_long(self):
+        service = MagicMock()
+        service.search_by_keyword.return_value = {
+            "success": True,
+            "items": [],
+            "next_page_token": None,
+        }
+        client = youtube_studio_client(
+            {_get_search_service(): lambda: service}
+        )
+
+        resp_medium = client.get(
+            "/api/youtube/search",
+            params={"q": "dogs", "video_duration": "medium"},
+        )
+        resp_long = client.get(
+            "/api/youtube/search",
+            params={"q": "dogs", "video_duration": "long"},
+        )
+
+        assert resp_medium.status_code == 200
+        assert resp_long.status_code == 200
+        durations = [
+            call.kwargs.get("video_duration")
+            for call in service.search_by_keyword.call_args_list
+        ]
+        assert durations == ["medium", "long"]
+
     def test_forwards_order_and_event_type(self):
         service = MagicMock()
         service.search_by_keyword.return_value = {

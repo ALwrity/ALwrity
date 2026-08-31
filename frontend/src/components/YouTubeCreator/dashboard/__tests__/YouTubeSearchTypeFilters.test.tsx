@@ -12,11 +12,9 @@
  *   Playlists → type=playlist
  *   Movies    → type=video + videoType=movie
  *
- * Out of scope: Duration, Upload date, Features, Prioritise,
- * Unwatched/Watched. Do not change current chip-row behavior.
- *
- * Product modules are not in this slice — these tests fail until
- * the next implementation command.
+ * Out of scope here: Upload date, Features, Prioritise,
+ * Unwatched/Watched. Duration is a sibling column (YouTubeSearchDurationFilters),
+ * not part of YouTubeSearchTypeFilters. Do not change chip-row behavior.
  */
 import { fireEvent, render, screen, within } from "@testing-library/react";
 
@@ -76,7 +74,6 @@ describe("YouTube search Filters icon", () => {
     expect(within(dialog).getByRole("button", { name: /^channels$/i })).toBeTruthy();
     expect(within(dialog).getByRole("button", { name: /^playlists$/i })).toBeTruthy();
     expect(within(dialog).getByRole("button", { name: /^movies$/i })).toBeTruthy();
-    expect(within(dialog).queryByRole("group", { name: /^duration$/i })).toBeNull();
     expect(within(dialog).queryByRole("group", { name: /^upload date$/i })).toBeNull();
     expect(within(dialog).queryByRole("button", { name: /unwatched/i })).toBeNull();
   });
@@ -93,18 +90,69 @@ describe("YouTube search Filters icon", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /^filters$/i }));
-    const dialog = screen.getByRole("dialog", { name: /search filters/i });
-    fireEvent.click(within(dialog).getByRole("button", { name: /^videos$/i }));
-    fireEvent.click(within(dialog).getByRole("button", { name: /^shorts$/i }));
-    fireEvent.click(within(dialog).getByRole("button", { name: /^channels$/i }));
-    fireEvent.click(within(dialog).getByRole("button", { name: /^playlists$/i }));
-    fireEvent.click(within(dialog).getByRole("button", { name: /^movies$/i }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: /search filters/i })).getByRole(
+        "button",
+        { name: /^videos$/i },
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^filters$/i }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: /search filters/i })).getByRole(
+        "button",
+        { name: /^shorts$/i },
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^filters$/i }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: /search filters/i })).getByRole(
+        "button",
+        { name: /^channels$/i },
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^filters$/i }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: /search filters/i })).getByRole(
+        "button",
+        { name: /^playlists$/i },
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^filters$/i }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: /search filters/i })).getByRole(
+        "button",
+        { name: /^movies$/i },
+      ),
+    );
 
     expect(onTypeChange).toHaveBeenCalledWith("videos");
     expect(onTypeChange).toHaveBeenCalledWith("shorts");
     expect(onTypeChange).toHaveBeenCalledWith("channel");
     expect(onTypeChange).toHaveBeenCalledWith("playlist");
     expect(onTypeChange).toHaveBeenCalledWith("movie");
+  });
+
+  it("closes Search filters after a TYPE option is selected", async () => {
+    const { YouTubeSearchResultsPanel } = await loadPanel();
+    render(
+      <YouTubeSearchResultsPanel
+        isOpen
+        items={[SAMPLE_HIT]}
+        onTypeChange={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^filters$/i }));
+    expect(screen.getByRole("dialog", { name: /search filters/i })).toBeTruthy();
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: /search filters/i })).getByRole(
+        "button",
+        { name: /^videos$/i },
+      ),
+    );
+    expect(
+      screen.queryByRole("dialog", { name: /search filters/i }),
+    ).toBeNull();
   });
 
   it("closes Search filters from the dialog close control", async () => {

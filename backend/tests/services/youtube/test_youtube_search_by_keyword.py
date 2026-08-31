@@ -208,6 +208,7 @@ class TestYouTubeSearchByKeyword:
         assert list_kwargs["videoDuration"] == "short"
 
     def test_ignores_unknown_video_duration(self):
+        """Unknown buckets (tiny) are ignored. medium and long are Duration filters."""
         oauth = MagicMock()
         oauth.get_valid_credentials.return_value = MagicMock(name="creds")
         youtube = _youtube_client({"items": [_video_item("v1", "Title")]})
@@ -219,7 +220,7 @@ class TestYouTubeSearchByKeyword:
             _service(oauth).search_by_keyword(
                 USER_ID,
                 "dogs",
-                video_duration="medium",
+                video_duration="tiny",
             )
 
         list_kwargs = youtube.search.return_value.list.call_args.kwargs

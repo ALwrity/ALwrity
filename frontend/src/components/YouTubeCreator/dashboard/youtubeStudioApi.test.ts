@@ -85,4 +85,26 @@ describe("youtubeStudioApi", () => {
       params: { q: "goa", max_results: 25, video_duration: "short" },
     });
   });
+
+  it("forwards video_duration medium and long for the Duration Search.list filter", async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: { success: true, items: [] },
+    });
+    await youtubeStudioApi.searchByKeyword({
+      q: "dogs",
+      max_results: 25,
+      video_duration: "medium",
+    });
+    await youtubeStudioApi.searchByKeyword({
+      q: "dogs",
+      max_results: 25,
+      video_duration: "long",
+    });
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/search", {
+      params: { q: "dogs", max_results: 25, video_duration: "medium" },
+    });
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/search", {
+      params: { q: "dogs", max_results: 25, video_duration: "long" },
+    });
+  });
 });
