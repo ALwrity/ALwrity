@@ -63,7 +63,7 @@ const CrawlResultSections: React.FC<CrawlResultSectionsProps> = ({ crawlResult }
   const metadataDegraded = crawlResult.content?.metadata_degraded;
 
   return (
-    <Box sx={{ mt: 4 }}>
+    <Box data-testid="crawl-result-sections" sx={{ mt: 4 }}>
       {metadataDegraded && (
         <Alert severity="info" sx={{ mb: 2 }}>
           Page metadata (headings, brand info, social links) is limited — analysis used content text only.
@@ -146,6 +146,7 @@ const CrawlResultSections: React.FC<CrawlResultSectionsProps> = ({ crawlResult }
                         href={url}
                         target="_blank"
                         rel="noopener noreferrer"
+                        aria-label={platform}
                         sx={{
                           color,
                           bgcolor: `${color}11`,
