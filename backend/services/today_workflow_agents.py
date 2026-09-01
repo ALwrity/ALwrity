@@ -45,6 +45,22 @@ from services.today_workflow_service import (
 from services import today_workflow_service as _today_svc
 
 
+def _proposal_field(proposal, key: str, default=None):
+    """Read a field from a TaskProposal object or a dict-shaped proposal.
+
+    Some agents return dict-shaped LLM output instead of ``TaskProposal``
+    instances, so every consumer must tolerate both shapes. Dict-shaped
+    proposals may carry ``pillar`` as an alias for ``pillar_id``.
+    """
+    if isinstance(proposal, dict):
+        aliases = ("pillar_id", "pillar") if key == "pillar_id" else (key,)
+        for alias in aliases:
+            if proposal.get(alias) is not None:
+                return proposal.get(alias)
+        return default
+    return getattr(proposal, key, default)
+
+
 def build_grounding_context(db, user_id, date):
     """Late-bound delegate to the service's grounding builder.
 
@@ -448,20 +464,22 @@ async def generate_agent_enhanced_plan(
                     title = p.title
                 accepted_ids.add(f"{pid}:{title}")
             proposals_log = []
+            normalized_count = len(proposal_review.get("normalized_proposals", []))
             for index, p in enumerate(raw_proposals):
-                valid = p.pillar_id in PILLAR_IDS
-                key = f"{p.pillar_id}:{p.title}"
-                reviewed = proposal_review.get("normalized_proposals", [])[index] if index < len(proposal_review.get("normalized_proposals", [])) else {}
+                pillar_id = _proposal_field(p, "pillar_id")
+                title = _proposal_field(p, "title")
+                valid = pillar_id in PILLAR_IDS
+                reviewed = proposal_review.get("normalized_proposals", [])[index] if index < normalized_count else {}
                 participates = (
                     reviewed.get("status") == "accepted"
                     and reviewed.get("guardian_outcome") in {None, "approved", "approved_with_warning"}
                 )
                 proposals_log.append({
                     "recommendation_id": reviewed.get("recommendation_id"),
-                    "agent": reviewed.get("agent") or p.source_agent,
-                    "title": p.title,
-                    "pillar_id": p.pillar_id,
-                    "priority": p.priority,
+                    "agent": reviewed.get("agent") or _proposal_field(p, "source_agent"),
+                    "title": title,
+                    "pillar_id": pillar_id,
+                    "priority": _proposal_field(p, "priority"),
                     "valid": valid,
                     "accepted": participates,
                     "review_status": reviewed.get("status", "rejected"),
@@ -471,18 +489,21 @@ async def generate_agent_enhanced_plan(
                     "selection_score": reviewed.get("selection_score"),
                     "selection_factors": reviewed.get("selection_factors", {}),
                     "rejected_reason": None if valid and participates else (
-                        f"pillar_id '{p.pillar_id}' not in {PILLAR_IDS}"
+                        f"pillar_id '{pillar_id}' not in {PILLAR_IDS}"
                         if not valid else (reviewed.get("review_reasons") or ["proposal was not accepted"])[0]
                     ),
-                    "reasoning": p.reasoning,
-                    "estimated_time": p.estimated_time,
+                    "reasoning": _proposal_field(p, "reasoning"),
+                    "estimated_time": _proposal_field(p, "estimated_time"),
                     "action_type": _resolve_recommendation_action_type(p),
-                    "synthesis_mode": getattr(p, "synthesis_mode", None),
+                    "synthesis_mode": (
+                        p.get("synthesis_mode") if isinstance(p, dict)
+                        else getattr(p, "synthesis_mode", None)
+                    ),
                 })
                 if not valid:
                     logger.warning(
-                        f"Rejected proposal from agent {p.source_agent}: "
-                        f"invalid pillar_id={p.pillar_id!r} (title={p.title!r}). "
+                        f"Rejected proposal from agent {_proposal_field(p, 'source_agent')}: "
+                        f"invalid pillar_id={pillar_id!r} (title={title!r}). "
                         f"Must be one of {PILLAR_IDS}"
                     )
             activity.log_event(
@@ -507,20 +528,27 @@ async def generate_agent_enhanced_plan(
         try:
             guardian_agent = orchestrator.agents.get('guardian')
             if guardian_agent and hasattr(guardian_agent, 'audit_committee'):
-                # Build proposals list from committee data (same format as proposals_log above)
-                accepted_ids = {f"{p.pillar_id}:{p.title}" for p in agent_tasks}
+                # Build proposals list from committee data (same format as
+                # proposals_log above). Raw proposals may be TaskProposal
+                # objects or dict-shaped LLM output, so read fields through
+                # _proposal_field in both loops.
+                accepted_ids = {
+                    f"{_proposal_field(p, 'pillar_id')}:{_proposal_field(p, 'title')}"
+                    for p in agent_tasks
+                }
                 audit_input = []
                 for p in raw_proposals:
-                    key = f"{p.pillar_id}:{p.title}"
+                    pillar_id = _proposal_field(p, "pillar_id")
+                    key = f"{pillar_id}:{_proposal_field(p, 'title')}"
                     audit_input.append({
-                        "agent": p.source_agent,
-                        "title": p.title,
-                        "pillar_id": p.pillar_id,
-                        "priority": p.priority,
-                        "reasoning": p.reasoning or "",
+                        "agent": _proposal_field(p, "source_agent"),
+                        "title": _proposal_field(p, "title"),
+                        "pillar_id": pillar_id,
+                        "priority": _proposal_field(p, "priority"),
+                        "reasoning": _proposal_field(p, "reasoning") or "",
                         "accepted": key in accepted_ids,
-                        "valid": p.pillar_id in PILLAR_IDS,
-                        "rejected_reason": None if p.pillar_id in PILLAR_IDS else f"pillar_id '{p.pillar_id}' not in {PILLAR_IDS}",
+                        "valid": pillar_id in PILLAR_IDS,
+                        "rejected_reason": None if pillar_id in PILLAR_IDS else f"pillar_id '{pillar_id}' not in {PILLAR_IDS}",
                     })
 
                 audit_report = await guardian_agent.audit_committee(audit_input)

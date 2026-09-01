@@ -326,9 +326,13 @@ class TaskMemoryService:
 
     async def record_task_proposal(self, proposal: Any) -> Dict[str, Any]:
         """Record proposal timing without replacing a known outcome.
-        
+
         Accepts both TaskProposal objects and dicts with equivalent keys.
+        With no database session (e.g. lightweight committee runs) the
+        record is skipped instead of crashing the proposal phase.
         """
+        if self.db is None:
+            return {"status": "skipped", "reason": "no database session"}
         try:
             now = datetime.utcnow()
             # Handle both object attributes and dict keys

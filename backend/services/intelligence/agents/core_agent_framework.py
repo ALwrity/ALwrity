@@ -1394,24 +1394,101 @@ class StrategyOrchestratorAgent(BaseALwrityAgent):
         return future.result(timeout=120)
 
     def _market_signal_detector_tool_sync(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Detects current market signals (competitor moves, SERP changes, social
+        trends) and returns the latest signals with a threat level assessment.
+
+        Args:
+            context: Input parameters for the tool. No required keys; may be empty.
+
+        Returns:
+            A dictionary with signals_detected, latest_signals, threat_level and
+            a timestamp (or an "error" key on failure).
+        """
         return self._run_async_tool_sync(self._market_signal_detector_tool(context))
 
     def _google_trends_fetcher_tool_sync(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Fetches Google Trends data for the given keywords, timeframe, and geo,
+        and indexes the results for semantic search.
+
+        Args:
+            context: Input parameters for the tool. Example keys:
+                - keywords: list of keywords to fetch trends for (required)
+                - timeframe: trends window, e.g. "today 12-m"
+                - geo: country code, e.g. "US"
+
+        Returns:
+            A dictionary with the trends envelope, or an "error" key on failure.
+        """
         return self._run_async_tool_sync(self._google_trends_fetcher_tool(context))
 
     def _agent_coordinator_tool_sync(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Lists available sub-agents and their coordination status so the caller
+        can discover which specialist agents can be delegated to.
+
+        Args:
+            context: Input parameters for the tool. No required keys; may be empty.
+
+        Returns:
+            A dictionary describing available sub-agents and their status.
+        """
         return self._run_async_tool_sync(self._agent_coordinator_tool(context))
 
     def _performance_analyzer_tool_sync(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Analyzes performance metrics across all agents and returns overall
+        performance data, efficiency scores, and optimization recommendations.
+
+        Args:
+            context: Input parameters for the tool. No required keys; may be empty.
+
+        Returns:
+            A dictionary with performance metrics and recommendations.
+        """
         return self._run_async_tool_sync(self._performance_analyzer_tool(context))
 
     def _kickoff_gsc_first_pass_tool_sync(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Invokes the SEO and Content agents' default GSC (Google Search Console)
+        first-pass plans and combines the results.
+
+        Args:
+            context: Input parameters for the tool. Example keys:
+                - start_date: GSC window start date
+                - end_date: GSC window end date
+
+        Returns:
+            A dictionary combining the agents' first-pass GSC results.
+        """
         return self._run_async_tool_sync(self._kickoff_gsc_first_pass_tool(context))
 
     def _strategy_synthesizer_tool_sync(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Synthesizes active strategies into a unified marketing strategy.
+
+        Args:
+            context: Input parameters for the tool. No required keys; may be empty.
+
+        Returns:
+            A dictionary with the current strategy count and synthesis status.
+        """
         return self._run_async_tool_sync(self._strategy_synthesizer_tool(context))
 
     def _delegate_task_tool_sync(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Delegates a specific task to a specialized sub-agent.
+
+        Args:
+            context: Input parameters for the tool. Example keys:
+                - agent_name: sub-agent key (see agent_coordinator) (required)
+                - instruction: the task to perform (required)
+                - task_context: optional additional context (dict)
+
+        Returns:
+            A dictionary with the delegation outcome.
+        """
         return self._run_async_tool_sync(self._delegate_task_tool(context))
     
     async def _market_signal_detector_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
