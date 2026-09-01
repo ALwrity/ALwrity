@@ -9,6 +9,21 @@ from datetime import datetime
 
 from models.base import Base
 
+# Strategic input fields that count toward completion percentage. Kept as a
+# module-level constant so the completion endpoint and calculate_completion_percentage
+# stay in sync instead of drifting apart.
+STRATEGY_REQUIRED_FIELDS = [
+    'business_objectives', 'target_metrics', 'content_budget', 'team_size',
+    'implementation_timeline', 'market_share', 'competitive_position',
+    'content_preferences', 'consumption_patterns', 'audience_pain_points',
+    'buying_journey', 'seasonal_trends', 'engagement_metrics',
+    'top_competitors', 'competitor_content_strategies', 'market_gaps',
+    'industry_trends', 'emerging_trends', 'preferred_formats',
+    'content_mix', 'content_frequency', 'optimal_timing',
+    'quality_metrics', 'editorial_guidelines', 'brand_voice',
+    'traffic_sources', 'conversion_rates', 'content_roi_targets'
+]
+
 class EnhancedContentStrategy(Base):
     """Enhanced Content Strategy model with 30+ strategic inputs."""
     
@@ -184,20 +199,8 @@ class EnhancedContentStrategy(Base):
     
     def calculate_completion_percentage(self):
         """Calculate the percentage of required fields that have been filled."""
-        required_fields = [
-            'business_objectives', 'target_metrics', 'content_budget', 'team_size',
-            'implementation_timeline', 'market_share', 'competitive_position',
-            'content_preferences', 'consumption_patterns', 'audience_pain_points',
-            'buying_journey', 'seasonal_trends', 'engagement_metrics',
-            'top_competitors', 'competitor_content_strategies', 'market_gaps',
-            'industry_trends', 'emerging_trends', 'preferred_formats',
-            'content_mix', 'content_frequency', 'optimal_timing',
-            'quality_metrics', 'editorial_guidelines', 'brand_voice',
-            'traffic_sources', 'conversion_rates', 'content_roi_targets'
-        ]
-        
-        filled_fields = sum(1 for field in required_fields if getattr(self, field) is not None)
-        self.completion_percentage = (filled_fields / len(required_fields)) * 100
+        filled_fields = sum(1 for field in STRATEGY_REQUIRED_FIELDS if getattr(self, field) is not None)
+        self.completion_percentage = (filled_fields / len(STRATEGY_REQUIRED_FIELDS)) * 100
         return self.completion_percentage
 
 class EnhancedAIAnalysisResult(Base):

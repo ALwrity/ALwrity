@@ -17,7 +17,7 @@ from ....services.enhanced_strategy_service import EnhancedStrategyService
 from ....services.enhanced_strategy_db_service import EnhancedStrategyDBService
 
 # Import models
-from models.enhanced_strategy_models import EnhancedContentStrategy, EnhancedAIAnalysisResult
+from models.enhanced_strategy_models import EnhancedContentStrategy, EnhancedAIAnalysisResult, STRATEGY_REQUIRED_FIELDS
 
 # Import authentication
 from middleware.auth_middleware import get_current_user
@@ -161,13 +161,17 @@ async def get_enhanced_strategy_completion_stats(
             strategy_id, current_user, db_service
         )
 
-        # Calculate completion stats
+        # Calculate completion stats against the canonical strategic fields
+        # (shared with the model's calculate_completion_percentage), so the
+        # counts never go negative and always match the stored percentage.
+        filled_fields = sum(1 for f in STRATEGY_REQUIRED_FIELDS if getattr(strategy, f) is not None)
+        total_fields = len(STRATEGY_REQUIRED_FIELDS)
         completion_stats = {
             "strategy_id": strategy_id,
-            "completion_percentage": strategy.completion_percentage,
-            "total_fields": 30,  # 30+ strategic inputs
-            "filled_fields": len([f for f in strategy.__dict__.keys() if getattr(strategy, f) is not None]),
-            "missing_fields": 30 - len([f for f in strategy.__dict__.keys() if getattr(strategy, f) is not None]),
+            "completion_percentage": strategy.calculate_completion_percentage(),
+            "total_fields": total_fields,
+            "filled_fields": filled_fields,
+            "missing_fields": max(0, total_fields - filled_fields),
             "last_updated": strategy.updated_at.isoformat() if strategy.updated_at else None
         }
         

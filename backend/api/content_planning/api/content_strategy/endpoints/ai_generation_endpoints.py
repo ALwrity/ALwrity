@@ -383,9 +383,6 @@ def _validate_component_grounding(
         return {"passed": True, "score": 0.0, "status": "error", "error": str(e)}
 
 
-# Global storage for latest strategies (more persistent than task status)
-_latest_strategies = {}
-
 @router.post("/generate-comprehensive-strategy")
 async def generate_comprehensive_strategy(
     current_user: Dict[str, Any] = Depends(get_current_user),
@@ -1034,15 +1031,7 @@ async def generate_comprehensive_strategy_polling(
                 logger.info(f"🎯 Final status update for task {task_id}: {final_status}")
                 logger.info(f"🎯 Task status after update: {generate_comprehensive_strategy_polling._task_status[task_id]}")
                 
-                # Store in global latest strategies for persistent access
-                _latest_strategies[user_id] = {
-                    "strategy": comprehensive_strategy,
-                    "completed_at": datetime.utcnow().isoformat(),
-                    "task_id": task_id
-                }
-                
                 logger.info(f"✅ Background strategy generation completed for task: {task_id}")
-                logger.info(f"💾 Strategy stored in global storage for user: {user_id}")
                 
             except Exception as e:
                 logger.error(f"❌ Error in background strategy generation for task {task_id}: {str(e)}")
