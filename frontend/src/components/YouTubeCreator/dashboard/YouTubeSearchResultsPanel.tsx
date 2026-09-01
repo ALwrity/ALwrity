@@ -16,6 +16,10 @@ import {
   YouTubeSearchUploadDateFilters,
   type YouTubeSearchUploadDateFilter,
 } from "./YouTubeSearchUploadDateFilters";
+import {
+  YouTubeSearchFeatureFilters,
+  type YouTubeSearchFeatureFilter,
+} from "./YouTubeSearchFeatureFilters";
 import "./youtubeSearchResultsPanel.css";
 
 export type YouTubeSearchFilter = "all" | "videos" | "shorts" | "recent" | "live";
@@ -23,6 +27,7 @@ export type {
   YouTubeSearchTypeFilter,
   YouTubeSearchDurationFilter,
   YouTubeSearchUploadDateFilter,
+  YouTubeSearchFeatureFilter,
 };
 
 export type YouTubeSearchHit = {
@@ -60,10 +65,12 @@ export interface YouTubeSearchResultsPanelProps {
   selectedType?: YouTubeSearchTypeFilter;
   selectedDuration?: YouTubeSearchDurationFilter;
   selectedUploadDate?: YouTubeSearchUploadDateFilter;
+  selectedFeature?: YouTubeSearchFeatureFilter;
   onFilterChange?: (filter: YouTubeSearchFilter) => void;
   onTypeChange?: (type: YouTubeSearchTypeFilter) => void;
   onDurationChange?: (duration: YouTubeSearchDurationFilter) => void;
   onUploadDateChange?: (uploadDate: YouTubeSearchUploadDateFilter) => void;
+  onFeatureChange?: (feature: YouTubeSearchFeatureFilter) => void;
   onClose?: () => void;
 }
 
@@ -121,10 +128,12 @@ export const YouTubeSearchResultsPanel: React.FC<YouTubeSearchResultsPanelProps>
   selectedType,
   selectedDuration,
   selectedUploadDate,
+  selectedFeature,
   onFilterChange,
   onTypeChange,
   onDurationChange,
   onUploadDateChange,
+  onFeatureChange,
   onClose,
 }) => {
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -194,6 +203,22 @@ export const YouTubeSearchResultsPanel: React.FC<YouTubeSearchResultsPanelProps>
       );
     }
     closeSearchFilters("upload-date", { uploadDate });
+  };
+
+  const applyFeatureAndClose = (feature: YouTubeSearchFeatureFilter) => {
+    try {
+      console.info("[YouTubeSearchResultsPanel] Feature filter selected", {
+        videoFeature: feature,
+      });
+      onFeatureChange?.(feature);
+    } catch (error) {
+      console.error(
+        "[YouTubeSearchResultsPanel] Feature filter apply failed",
+        { videoFeature: feature },
+        error,
+      );
+    }
+    closeSearchFilters("feature", { videoFeature: feature });
   };
 
   useEffect(() => {
@@ -313,7 +338,10 @@ export const YouTubeSearchResultsPanel: React.FC<YouTubeSearchResultsPanelProps>
               selectedUploadDate={selectedUploadDate}
               onUploadDateChange={applyUploadDateAndClose}
             />
-            {/* Features, Prioritise — later slices */}
+            <YouTubeSearchFeatureFilters
+              selectedFeature={selectedFeature}
+              onFeatureChange={applyFeatureAndClose}
+            />
           </div>
         </div>
       ) : null}

@@ -12,7 +12,8 @@
  *   Playlists → type=playlist
  *   Movies    → type=video + videoType=movie
  *
- * Out of scope here: Features, Prioritise, Unwatched/Watched.
+ * Out of scope here: Prioritise, Unwatched/Watched.
+ * FEATURES is a sibling dialog column, not part of YouTubeSearchTypeFilters.
  * Duration and Upload Date are sibling columns, not part of
  * YouTubeSearchTypeFilters. Do not change chip-row behavior.
  */
@@ -74,7 +75,7 @@ describe("YouTube search Filters icon", () => {
     expect(within(dialog).getByRole("button", { name: /^channels$/i })).toBeTruthy();
     expect(within(dialog).getByRole("button", { name: /^playlists$/i })).toBeTruthy();
     expect(within(dialog).getByRole("button", { name: /^movies$/i })).toBeTruthy();
-    expect(within(dialog).queryByRole("group", { name: /^features$/i })).toBeNull();
+    expect(within(dialog).getByRole("group", { name: /^features$/i })).toBeTruthy();
     expect(within(dialog).queryByRole("button", { name: /unwatched/i })).toBeNull();
   });
 

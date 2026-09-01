@@ -13,7 +13,7 @@
  * Frontend sends upload_date: today | week | month | year.
  * Duration 4-minute buckets, TYPE, and chips stay as they are.
  *
- * Out of scope: Features, Prioritise, Unwatched/Watched, Last hour.
+ * Out of scope: Prioritise, Unwatched/Watched, Last hour. FEATURES is a separate column.
  * Do not restyle Disconnect, Channel Pulse, or wedges.
  *
  * Product Upload Date UI/Hub wiring is not implemented yet — those tests
@@ -55,7 +55,7 @@ describe("YouTube search Upload Date column in Search filters", () => {
     expect(within(dialog).queryByRole("button", { name: /last hour/i })).toBeNull();
   });
 
-  it("keeps TYPE and Duration beside Upload Date and does not add later columns", async () => {
+  it("keeps TYPE and Duration beside Upload Date, includes FEATURES, and does not add Prioritise", async () => {
     const { YouTubeSearchResultsPanel } = await loadPanel();
     render(<YouTubeSearchResultsPanel isOpen items={[SAMPLE_HIT]} />);
 
@@ -65,7 +65,7 @@ describe("YouTube search Upload Date column in Search filters", () => {
     expect(within(dialog).getByRole("group", { name: /^type$/i })).toBeTruthy();
     expect(within(dialog).getByRole("group", { name: /^duration$/i })).toBeTruthy();
     expect(within(dialog).getByRole("group", { name: /^upload date$/i })).toBeTruthy();
-    expect(within(dialog).queryByRole("group", { name: /^features$/i })).toBeNull();
+    expect(within(dialog).getByRole("group", { name: /^features$/i })).toBeTruthy();
     expect(within(dialog).queryByRole("group", { name: /^prioritise$/i })).toBeNull();
   });
 

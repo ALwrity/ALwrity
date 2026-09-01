@@ -31,6 +31,7 @@ def search_by_keyword(
     search_type: Optional[str] = Query(None),
     upload_date: Optional[str] = Query(None),
     time_zone: Optional[str] = Query(None),
+    video_feature: Optional[str] = Query(None),
     user: dict = Depends(get_current_user),
     service: YouTubeSearchService = Depends(get_search_service),
 ):
@@ -42,7 +43,8 @@ def search_by_keyword(
         logger.info(
             "YouTube search route user_id={} query_length={} max_results={} "
             "has_page_token={} token_id_set={} order={} event_type={} "
-            "video_duration={} search_type={} upload_date={} time_zone={}",
+            "video_duration={} search_type={} upload_date={} time_zone={} "
+            "video_feature={}",
             user_id,
             len(q.strip()),
             max_results,
@@ -54,6 +56,7 @@ def search_by_keyword(
             search_type,
             upload_date,
             time_zone,
+            video_feature,
         )
         result = service.search_by_keyword(
             user_id,
@@ -67,15 +70,17 @@ def search_by_keyword(
             search_type=search_type,
             upload_date=upload_date,
             time_zone=time_zone,
+            video_feature=video_feature,
         )
         if not result.get("success"):
             logger.warning(
                 "YouTube search route unsuccessful user_id={} error_code={} "
-                "upload_date={} time_zone={}",
+                "upload_date={} time_zone={} video_feature={}",
                 user_id,
                 result.get("error_code"),
                 upload_date,
                 time_zone,
+                video_feature,
             )
         else:
             logger.info(

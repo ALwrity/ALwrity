@@ -19,6 +19,10 @@ from googleapiclient.errors import HttpError
 from loguru import logger
 
 from services.youtube.youtube_oauth_service import YouTubeOAuthService
+from services.youtube.youtube_search_features import (
+    apply_youtube_search_video_feature,
+    strip_youtube_search_video_only_params,
+)
 from services.youtube.youtube_search_upload_date import (
     _youtube_search_utc_now,
     published_after_for_upload_date,
@@ -99,15 +103,11 @@ def _apply_search_type(list_kwargs: Dict[str, Any], search_type: Optional[str], 
         return
     if search_type == "channel":
         list_kwargs["type"] = "channel"
-        list_kwargs.pop("videoDuration", None)
-        list_kwargs.pop("videoType", None)
-        list_kwargs.pop("eventType", None)
+        strip_youtube_search_video_only_params(list_kwargs)
         return
     if search_type == "playlist":
         list_kwargs["type"] = "playlist"
-        list_kwargs.pop("videoDuration", None)
-        list_kwargs.pop("videoType", None)
-        list_kwargs.pop("eventType", None)
+        strip_youtube_search_video_only_params(list_kwargs)
         return
     if search_type == "movie":
         list_kwargs["type"] = "video"
@@ -162,11 +162,13 @@ class YouTubeSearchService:
         search_type: Optional[str] = None,
         upload_date: Optional[str] = None,
         time_zone: Optional[str] = None,
+        video_feature: Optional[str] = None,
     ) -> Dict[str, Any]:
         logger.info(
             "YouTube search_by_keyword start user_id={} query_length={} max_results={} "
             "has_page_token={} token_id_set={} order={} event_type={} "
-            "video_duration={} search_type={} upload_date={} time_zone={}",
+            "video_duration={} search_type={} upload_date={} time_zone={} "
+            "video_feature={}",
             user_id,
             len((query or "").strip()),
             max_results,
@@ -178,6 +180,7 @@ class YouTubeSearchService:
             search_type,
             upload_date,
             time_zone,
+            video_feature,
         )
         stripped = (query or "").strip()
         if not stripped:
@@ -254,12 +257,27 @@ class YouTubeSearchService:
                 )
             if published_after:
                 list_kwargs["publishedAfter"] = published_after
+            try:
+                apply_youtube_search_video_feature(
+                    list_kwargs,
+                    video_feature,
+                    search_type,
+                    user_id,
+                )
+            except Exception:
+                logger.exception(
+                    "YouTube search_by_keyword video_feature mapping failed "
+                    "user_id={} video_feature={} search_type={}",
+                    user_id,
+                    video_feature,
+                    search_type,
+                )
             _apply_search_type(list_kwargs, search_type, user_id)
 
             logger.info(
                 "YouTube Search.list request user_id={} part={} type={} maxResults={} "
                 "has_page_token={} order={} event_type={} video_duration={} video_type={} "
-                "published_after={}",
+                "published_after={} video_definition={} video_caption={} video_license={}",
                 user_id,
                 list_kwargs["part"],
                 list_kwargs["type"],
@@ -270,6 +288,9 @@ class YouTubeSearchService:
                 list_kwargs.get("videoDuration"),
                 list_kwargs.get("videoType"),
                 list_kwargs.get("publishedAfter"),
+                list_kwargs.get("videoDefinition"),
+                list_kwargs.get("videoCaption"),
+                list_kwargs.get("videoLicense"),
             )
             results = youtube.search().list(**list_kwargs).execute()
             items: List[Dict[str, str]] = []

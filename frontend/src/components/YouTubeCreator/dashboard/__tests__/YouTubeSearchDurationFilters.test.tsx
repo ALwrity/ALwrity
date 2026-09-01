@@ -9,7 +9,7 @@
  * Google has no 3-minute Search.list cutoff. Do not invent one.
  * Duration short is NOT the Shorts chip/TYPE: no #shorts hashtag keep.
  *
- * Out of scope: Features, Prioritise, Unwatched/Watched.
+ * Out of scope: Prioritise, Unwatched/Watched. FEATURES is a separate column.
  * Do not restyle Disconnect, Channel Pulse, or wedges.
  * Do not change chip-row behavior.
  *
@@ -57,7 +57,7 @@ describe("YouTube search Duration column in Search filters", () => {
     ).toBeTruthy();
   });
 
-  it("keeps TYPE beside Duration and does not add later columns", async () => {
+  it("keeps TYPE beside Duration, includes FEATURES, and does not add Prioritise", async () => {
     const { YouTubeSearchResultsPanel } = await loadPanel();
     render(<YouTubeSearchResultsPanel isOpen items={[SAMPLE_HIT]} />);
 
@@ -66,7 +66,7 @@ describe("YouTube search Duration column in Search filters", () => {
     const dialog = screen.getByRole("dialog", { name: /search filters/i });
     expect(within(dialog).getByRole("group", { name: /^type$/i })).toBeTruthy();
     expect(within(dialog).getByRole("group", { name: /^duration$/i })).toBeTruthy();
-    expect(within(dialog).queryByRole("group", { name: /^features$/i })).toBeNull();
+    expect(within(dialog).getByRole("group", { name: /^features$/i })).toBeTruthy();
     expect(within(dialog).queryByRole("group", { name: /^prioritise$/i })).toBeNull();
   });
 

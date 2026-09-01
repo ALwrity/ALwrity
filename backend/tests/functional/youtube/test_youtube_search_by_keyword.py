@@ -35,6 +35,7 @@ class _StudioYouTubeSearchStub:
         search_type: str | None = None,
         upload_date: str | None = None,
         time_zone: str | None = None,
+        video_feature: str | None = None,
     ) -> dict:
         assert user_id
         self.calls.append(
@@ -49,6 +50,7 @@ class _StudioYouTubeSearchStub:
                 "video_duration": video_duration,
                 "upload_date": upload_date,
                 "time_zone": time_zone,
+                "video_feature": video_feature,
             }
         )
         if not self.connected:

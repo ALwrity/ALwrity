@@ -96,6 +96,7 @@ export const youtubeStudioApi = {
     search_type?: string;
     upload_date?: string;
     time_zone?: string;
+    video_feature?: string;
   }) {
     const response = await apiClient.get(`${API_BASE}/search`, { params });
     return response.data;

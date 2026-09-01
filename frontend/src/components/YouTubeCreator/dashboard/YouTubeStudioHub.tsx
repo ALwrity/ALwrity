@@ -12,6 +12,7 @@ import type {
 import {
   searchYouTubeByChip,
   searchYouTubeByDuration,
+  searchYouTubeByFeature,
   searchYouTubeByType,
   searchYouTubeByUploadDate,
 } from "./youtubeHubSearchRequests";
@@ -46,6 +47,7 @@ const YOUTUBE_HUB_OVERLAY_SEARCH = {
   searchYouTubeByType,
   searchYouTubeByDuration,
   searchYouTubeByUploadDate,
+  searchYouTubeByFeature,
 };
 
 export interface YouTubeStudioHubProps {
@@ -95,9 +97,12 @@ export function YouTubeStudioHub({
     setSearchDuration,
     searchUploadDate,
     setSearchUploadDate,
+    searchFeature,
+    setSearchFeature,
     handleSearchTypeChange,
     handleSearchDurationChange,
     handleSearchUploadDateChange,
+    handleSearchFeatureChange,
   } = useYouTubeStudioHubOverlaySearch(
     searchQuery,
     setSearchItems,
@@ -130,6 +135,7 @@ export function YouTubeStudioHub({
         setSearchType(undefined);
         setSearchDuration(undefined);
         setSearchUploadDate(undefined);
+        setSearchFeature(undefined);
         console.info("[YouTubeStudioHub] Search results panel opened", {
           queryLength: (detail.query || "").length,
           itemCount: Array.isArray(detail.items) ? detail.items.length : 0,
@@ -261,10 +267,12 @@ export function YouTubeStudioHub({
           selectedType={searchType}
           selectedDuration={searchDuration}
           selectedUploadDate={searchUploadDate}
+          selectedFeature={searchFeature}
           onFilterChange={handleSearchFilterChange}
           onTypeChange={handleSearchTypeChange}
           onDurationChange={handleSearchDurationChange}
           onUploadDateChange={handleSearchUploadDateChange}
+          onFeatureChange={handleSearchFeatureChange}
           onClose={() => {
             try {
               setSearchOpen(false);

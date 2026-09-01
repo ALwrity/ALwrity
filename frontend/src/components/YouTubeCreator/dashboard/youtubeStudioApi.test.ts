@@ -145,4 +145,42 @@ describe("youtubeStudioApi", () => {
       params: { q: "dogs", max_results: 25, upload_date: "year" },
     });
   });
+
+  it("forwards video_feature for the FEATURES Search.list filter", async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: { success: true, items: [] },
+    });
+    await youtubeStudioApi.searchByKeyword({
+      q: "dogs",
+      max_results: 25,
+      video_feature: "live",
+    });
+    await youtubeStudioApi.searchByKeyword({
+      q: "dogs",
+      max_results: 25,
+      video_feature: "hd",
+    });
+    await youtubeStudioApi.searchByKeyword({
+      q: "dogs",
+      max_results: 25,
+      video_feature: "subtitles",
+    });
+    await youtubeStudioApi.searchByKeyword({
+      q: "dogs",
+      max_results: 25,
+      video_feature: "creative_commons",
+    });
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/search", {
+      params: { q: "dogs", max_results: 25, video_feature: "live" },
+    });
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/search", {
+      params: { q: "dogs", max_results: 25, video_feature: "hd" },
+    });
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/search", {
+      params: { q: "dogs", max_results: 25, video_feature: "subtitles" },
+    });
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/search", {
+      params: { q: "dogs", max_results: 25, video_feature: "creative_commons" },
+    });
+  });
 });
