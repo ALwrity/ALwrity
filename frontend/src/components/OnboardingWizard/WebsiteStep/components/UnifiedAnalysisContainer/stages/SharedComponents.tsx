@@ -2,10 +2,12 @@ import React from 'react';
 import { Box, Typography, Button, Alert, Paper, Chip } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
 import StrategicInsightsSection from '../../StrategicInsightsSection';
 import ContentStrategyInsightsSection from '../../ContentStrategyInsightsSection';
 import StyleAnalysisSection from '../../StyleAnalysisSection';
 import CrawlResultSections from '../../CrawlResultSections';
+import SectionHeader from '../../SectionHeader';
 import type { StyleAnalysis } from '../../AnalysisResultsDisplay';
 
 export const EmptyState: React.FC<{ message: string }> = ({ message }) => (
@@ -145,7 +147,12 @@ export const StrategicPanel: React.FC<StrategicPanelProps> = ({
         onUpdate={(field, value) => onUpdate('strategic_insights', field, value)}
       />
       {analysis.content_strategy_insights && (
-        <Box sx={{ mt: 3 }}>
+        <Box sx={{ mt: 4 }}>
+          <SectionHeader
+            title="SWOT & Content Strategy Insights"
+            icon={<AnalyticsIcon sx={{ color: '#F59E0B' }} />}
+            tooltip="SWOT analysis (Strengths, Weaknesses, Opportunities, Threats) and recommended improvements for your content strategy."
+          />
           <ContentStrategyInsightsSection
             insights={analysis.content_strategy_insights}
             isEditable={isEditable}

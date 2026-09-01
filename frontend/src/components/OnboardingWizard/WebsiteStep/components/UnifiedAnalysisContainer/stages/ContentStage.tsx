@@ -49,13 +49,6 @@ const ContentStage: React.FC<ContentStageProps> = ({
             onUpdate={(field, value) => onUpdate('content_type', field, value)}
           />
         )}
-        {analysis.content_strategy_insights && (
-          <ContentStrategyInsightsSection
-            insights={analysis.content_strategy_insights}
-            isEditable={false}
-            onUpdate={(field, value) => onUpdate('content_strategy_insights', field, value)}
-          />
-        )}
       </Box>
     );
   }

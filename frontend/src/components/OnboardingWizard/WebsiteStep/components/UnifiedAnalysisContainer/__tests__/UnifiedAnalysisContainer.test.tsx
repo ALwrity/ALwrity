@@ -284,6 +284,7 @@ describe('Content Matrix — Overview', () => {
     expect(screen.getByText('AI Generation Settings')).toBeInTheDocument();
     expect(screen.getByText('Tone: Professional')).toBeInTheDocument();
     expect(screen.getByText('Audience: Intermediate')).toBeInTheDocument();
+    expect(screen.queryByText('Content Strategy Insights')).not.toBeInTheDocument();
   });
 
   it('Overview × Guidelines renders EnhancedGuidelinesSection', () => {
@@ -417,10 +418,11 @@ describe('Content Matrix — Site Footprint', () => {
     expect(within(stage).getAllByLabelText('info').length).toBeGreaterThanOrEqual(3);
   });
 
-  it('Footprint × Refine & Actions auto-resets domain to overview', () => {
+  it('Footprint × Refine & Actions preserves footprint domain and shows platform nudge', () => {
     openFootprint();
     fireEvent.click(screen.getByTestId('top-tab-refine_actions'));
-    expect(screen.getByTestId('sidebar-domain-overview')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('sidebar-domain-footprint')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText(/Platform Connections/i)).toBeInTheDocument();
   });
 
   it('Footprint × Guidelines auto-resets domain to overview', () => {
@@ -451,8 +453,8 @@ describe('SectionHeader tooltips in dashboard matrix', () => {
     const stage = screen.getByTestId('content-stage');
     expect(within(stage).getByText('Content Characteristics')).toBeInTheDocument();
     expect(within(stage).getByText('Content Type Analysis')).toBeInTheDocument();
-    expect(within(stage).getByText('Content Strategy Insights')).toBeInTheDocument();
-    expect(within(stage).getAllByLabelText('info').length).toBeGreaterThanOrEqual(3);
+    expect(within(stage).queryByText('Content Strategy Insights')).not.toBeInTheDocument();
+    expect(within(stage).getAllByLabelText('info').length).toBeGreaterThanOrEqual(2);
   });
 
   it('Overview › Guidelines shows Style Guidelines SectionHeader', () => {
@@ -471,12 +473,13 @@ describe('SectionHeader tooltips in dashboard matrix', () => {
     expect(within(stage).getAllByLabelText('info').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('Overview › Refine & Actions shows Strategic Action Plan SectionHeader', () => {
+  it('Overview › Refine & Actions shows Strategic Action Plan and SWOT SectionHeaders', () => {
     renderContainer();
     fireEvent.click(screen.getByTestId('top-tab-refine_actions'));
     const stage = screen.getByTestId('content-stage');
     expect(within(stage).getByText('Strategic Action Plan')).toBeInTheDocument();
-    expect(within(stage).getByLabelText('info')).toBeInTheDocument();
+    expect(within(stage).getByText('SWOT & Content Strategy Insights')).toBeInTheDocument();
+    expect(within(stage).getAllByLabelText('info').length).toBeGreaterThanOrEqual(2);
   });
 });
 

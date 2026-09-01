@@ -101,10 +101,8 @@ const AnalysisSidebar: React.FC<AnalysisSidebarProps> = ({
   crawlResult,
   activeTab,
 }) => {
-  // Filter configs based on tab correspondence
-  const visibleConfigs = DOMAIN_CONFIGS.filter((cfg) =>
-    TAB_CORRESPONDING_DOMAINS[activeTab].includes(cfg.key)
-  );
+  // Keep vertical tabs constant and always visible
+  const visibleConfigs = DOMAIN_CONFIGS;
 
   return (
     <Box
@@ -123,14 +121,33 @@ const AnalysisSidebar: React.FC<AnalysisSidebarProps> = ({
       {visibleConfigs.map((cfg) => {
         const isActive = activeDomain === cfg.key;
         const hasData = cfg.hasData(analysis, crawlResult);
+        const isDomainValidForTab = TAB_CORRESPONDING_DOMAINS[activeTab].includes(cfg.key);
+        const isClickable = isDomainValidForTab;
         const badge = cfg.getBadge?.(analysis);
         const accent = DOMAIN_ACCENT[cfg.key];
 
+        // Format a helpful tooltip if the domain is disabled under the current tab
+        const tooltipTitle = !isDomainValidForTab
+          ? `${cfg.tooltip} (Not applicable under ${
+              activeTab === 'refine_actions'
+                ? 'Refine & Actions'
+                : activeTab === 'guidelines'
+                ? 'Guidelines'
+                : 'Insights'
+            } tab)`
+          : !hasData
+          ? `${cfg.tooltip} (No data available)`
+          : cfg.tooltip;
+
         return (
-          <Tooltip key={cfg.key} title={cfg.tooltip} placement="right" arrow>
+          <Tooltip key={cfg.key} title={tooltipTitle} placement="right" arrow>
             <Box
               data-testid={`sidebar-domain-${cfg.key}`}
-              onClick={() => onDomainChange(cfg.key)}
+              onClick={() => {
+                if (isClickable) {
+                  onDomainChange(cfg.key);
+                }
+              }}
               sx={{
                 display: 'flex',
                 alignItems: 'center',
@@ -140,12 +157,12 @@ const AnalysisSidebar: React.FC<AnalysisSidebarProps> = ({
                 mx: 1,
                 mb: 0.25,
                 borderRadius: 2,
-                cursor: hasData ? 'pointer' : 'default',
-                opacity: hasData ? 1 : 0.4,
+                cursor: !isDomainValidForTab ? 'not-allowed' : hasData ? 'pointer' : 'default',
+                opacity: !isDomainValidForTab ? 0.4 : hasData ? 1 : 0.4,
                 bgcolor: isActive ? `${accent}18` : 'transparent',
                 borderLeft: isActive ? `3px solid ${accent}` : '3px solid transparent',
                 transition: 'all 0.18s ease',
-                '&:hover': hasData
+                '&:hover': isClickable
                   ? {
                       bgcolor: `${accent}12`,
                       borderLeftColor: accent,
