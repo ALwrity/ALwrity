@@ -3,54 +3,104 @@ import {
   getDefaultLandingRoute,
   shouldSkipOnboarding,
   isFeatureOnlyMode,
+  isPodcastOnlyDemoMode,
   resetEnabledFeaturesCacheForTests,
 } from '../demoMode';
 
-describe('Pricing Page Redirect Logic after Restart (#Bug Fix)', () => {
+describe('Pricing Page Redirect Logic & Feature Gating (#Bug Fix)', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
     resetEnabledFeaturesCacheForTests();
   });
 
-  it('detects feature mode and routes to /podcast-maker when enabled_features=podcast', () => {
-    localStorage.setItem('enabled_features', 'podcast');
-    resetEnabledFeaturesCacheForTests();
+  describe('Podcast-Only Feature Mode (ALWRITY_ENABLED_FEATURES=podcast)', () => {
+    beforeEach(() => {
+      localStorage.setItem('enabled_features', 'podcast');
+      resetEnabledFeaturesCacheForTests();
+    });
 
-    // In podcast feature-only mode
-    const isFeatureLimited = shouldSkipOnboarding() || isFeatureOnlyMode();
-    expect(isFeatureLimited).toBe(true);
-    expect(getDefaultLandingRoute()).toBe('/podcast-maker');
+    it('identifies podcast-only mode correctly', () => {
+      expect(shouldSkipOnboarding()).toBe(true);
+      expect(isFeatureOnlyMode()).toBe(true);
+      expect(isPodcastOnlyDemoMode()).toBe(true);
+      expect(getDefaultLandingRoute()).toBe('/podcast-maker');
+    });
+
+    it('routes to /podcast-maker when onboarding is incomplete (never lands on /onboarding)', () => {
+      const isOnboardingComplete = false;
+      const isFeatureLimited = shouldSkipOnboarding() || isFeatureOnlyMode() || isPodcastOnlyDemoMode();
+      expect(isFeatureLimited).toBe(true);
+
+      const destination = isFeatureLimited
+        ? getDefaultLandingRoute()
+        : isOnboardingComplete
+          ? '/dashboard'
+          : '/onboarding';
+
+      expect(destination).toBe('/podcast-maker');
+      expect(destination).not.toBe('/onboarding');
+    });
+
+    it('routes to /podcast-maker on fresh session with empty localStorage', () => {
+      expect(localStorage.getItem('onboarding_complete')).toBeNull();
+
+      const isFeatureLimited = shouldSkipOnboarding() || isFeatureOnlyMode() || isPodcastOnlyDemoMode();
+      const destination = isFeatureLimited ? getDefaultLandingRoute() : '/dashboard';
+
+      expect(destination).toBe('/podcast-maker');
+      expect(destination).not.toBe('/onboarding');
+    });
+
+    it('blocks direct /onboarding route access and signals redirect to /podcast-maker', () => {
+      const shouldRedirect = shouldSkipOnboarding();
+      expect(shouldRedirect).toBe(true);
+      expect(getDefaultLandingRoute()).toBe('/podcast-maker');
+    });
   });
 
-  it('routes to /podcast-maker on fresh session without relying on volatile localStorage onboarding flag', () => {
-    localStorage.setItem('enabled_features', 'podcast');
-    resetEnabledFeaturesCacheForTests();
+  describe('Full Platform Mode (ALWRITY_ENABLED_FEATURES=all)', () => {
+    beforeEach(() => {
+      localStorage.setItem('enabled_features', 'all');
+      resetEnabledFeaturesCacheForTests();
+    });
 
-    // Fresh session: no onboarding_complete in localStorage
-    expect(localStorage.getItem('onboarding_complete')).toBeNull();
+    it('identifies full platform mode correctly', () => {
+      expect(shouldSkipOnboarding()).toBe(false);
+      expect(isFeatureOnlyMode()).toBe(false);
+      expect(isPodcastOnlyDemoMode()).toBe(false);
+      expect(getDefaultLandingRoute()).toBe('/dashboard');
+    });
 
-    // The fixed isFeatureLimitedMode evaluation
-    const isFeatureLimited = shouldSkipOnboarding() || isFeatureOnlyMode();
-    const destination = isFeatureLimited ? getDefaultLandingRoute() : '/dashboard';
+    it('CASE: full mode + onboarding complete -> routes to /dashboard', () => {
+      const isOnboardingComplete = true;
+      const isFeatureLimited = shouldSkipOnboarding() || isFeatureOnlyMode() || isPodcastOnlyDemoMode();
+      expect(isFeatureLimited).toBe(false);
 
-    expect(destination).toBe('/podcast-maker');
-    expect(destination).not.toBe('/onboarding');
-  });
+      const isComplete = isOnboardingComplete || localStorage.getItem('onboarding_complete') === 'true';
+      const destination = isFeatureLimited
+        ? getDefaultLandingRoute()
+        : isComplete
+          ? '/dashboard'
+          : '/onboarding';
 
-  it('in full mode (enabled_features=all), uses isOnboardingComplete context state instead of failing to null', () => {
-    localStorage.setItem('enabled_features', 'all');
-    resetEnabledFeaturesCacheForTests();
+      expect(destination).toBe('/dashboard');
+    });
 
-    const isFeatureLimited = shouldSkipOnboarding() || isFeatureOnlyMode();
-    expect(isFeatureLimited).toBe(false);
+    it('CASE: full mode + onboarding incomplete -> routes to /onboarding', () => {
+      const isOnboardingComplete = false;
+      const isFeatureLimited = shouldSkipOnboarding() || isFeatureOnlyMode() || isPodcastOnlyDemoMode();
+      expect(isFeatureLimited).toBe(false);
 
-    // If isOnboardingComplete is true from backend/context
-    const isOnboardingComplete = true;
-    const isComplete = isOnboardingComplete || localStorage.getItem('onboarding_complete') === 'true';
-    const destination = isComplete ? '/dashboard' : '/onboarding';
+      const isComplete = isOnboardingComplete || localStorage.getItem('onboarding_complete') === 'true';
+      const destination = isFeatureLimited
+        ? getDefaultLandingRoute()
+        : isComplete
+          ? '/dashboard'
+          : '/onboarding';
 
-    expect(destination).toBe('/dashboard');
-    expect(destination).not.toBe('/onboarding');
+      expect(destination).toBe('/onboarding');
+    });
   });
 });
+

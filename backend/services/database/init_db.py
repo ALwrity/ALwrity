@@ -88,8 +88,11 @@ _BASELINE_SENTINEL_TABLES = (
 )
 
 
+_BASELINE_REVISION = "a4fe799f2cab"
+
+
 def _auto_stamp_existing_db(engine, user_id: str) -> bool:
-    """Stamp an existing user DB at Alembic head if it looks like a complete
+    """Stamp an existing user DB at Alembic baseline if it looks like a complete
     pre-Alembic (``Base.metadata.create_all`` era) schema.
 
     A DB qualifies for stamping only when it has tables, lacks an
@@ -97,7 +100,8 @@ def _auto_stamp_existing_db(engine, user_id: str) -> bool:
     Partially-initialized DBs — e.g. one holding only raw-SQL OAuth tables
     created before Alembic ever ran — are left unstamped so that
     ``command.upgrade(head)`` builds the baseline schema alongside them.
-    Stamping such a DB would pin it at head and permanently skip the baseline.
+    Stamping at baseline ensures that any subsequent incremental migrations
+    are applied cleanly by ``command.upgrade(head)``.
 
     Returns ``True`` if stamping was performed.
     """
@@ -129,8 +133,8 @@ def _auto_stamp_existing_db(engine, user_id: str) -> bool:
 
         cfg = AlembicConfig(str(_ALEMBIC_INI_PATH))
         cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
-        command.stamp(cfg, "a4fe799f2cab")
-        logger.info(f"Stamped existing DB for user {user_id} at Alembic baseline a4fe799f2cab")
+        command.stamp(cfg, _BASELINE_REVISION)
+        logger.info(f"Stamped existing DB for user {user_id} at Alembic baseline {_BASELINE_REVISION}")
         return True
     except Exception as exc:
         logger.warning(f"Could not auto-stamp DB for user {user_id}: {exc}")

@@ -24,7 +24,13 @@ import { useNavigate, useSearchParams, Link as RouterLink } from 'react-router-d
 import { useClerk, useAuth } from '@clerk/clerk-react';
 import { apiClient, getApiUrl } from '../../api/client';
 import { saveNavigationState, restoreNavigationState, saveCurrentPhaseForTool } from '../../utils/navigationState';
-import { getEnabledFeatures, getDefaultLandingRoute, shouldSkipOnboarding, isFeatureOnlyMode } from '../../utils/demoMode';
+import {
+  getEnabledFeatures,
+  getDefaultLandingRoute,
+  shouldSkipOnboarding,
+  isFeatureOnlyMode,
+  isPodcastOnlyDemoMode,
+} from '../../utils/demoMode';
 import { useOnboarding } from '../../contexts/OnboardingContext';
 import PricingPageLayout from './PricingPageLayout';
 import PricingComparisonGrid from './PricingComparisonGrid';
@@ -209,7 +215,8 @@ const PricingPage: React.FC = () => {
       envDemoMode === 'true' ||
       envDemoMode === '1' ||
       shouldSkipOnboarding() ||
-      isFeatureOnlyMode()
+      isFeatureOnlyMode() ||
+      isPodcastOnlyDemoMode()
     );
   };
 
@@ -231,8 +238,10 @@ const PricingPage: React.FC = () => {
       return;
     }
 
-    const isComplete = isOnboardingComplete || localStorage.getItem('onboarding_complete') === 'true';
-    navigate(isComplete ? '/dashboard' : '/onboarding');
+    const onboardingComplete =
+      isOnboardingComplete ||
+      localStorage.getItem('onboarding_complete') === 'true';
+    navigate(onboardingComplete ? '/dashboard' : '/onboarding');
   };
 
   const fetchPlans = async () => {

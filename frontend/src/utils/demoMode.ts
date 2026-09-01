@@ -56,7 +56,19 @@ export function getEnabledFeatures(): Set<string> {
   }
 
   // Env var is the authoritative source (deployment config)
-  const envValue = process.env[PRIMARY_ENV_KEY];
+  let envValue: string | undefined = undefined;
+  try {
+    envValue = process.env.REACT_APP_ENABLED_FEATURES;
+  } catch {}
+  if (!envValue) {
+    try {
+      envValue = (import.meta as any).env?.REACT_APP_ENABLED_FEATURES;
+    } catch {}
+  }
+  if (!envValue && typeof process !== 'undefined' && process.env) {
+    envValue = process.env[PRIMARY_ENV_KEY];
+  }
+
   if (envValue) {
     const features = envValue.toLowerCase().split(',').map(f => f.trim());
     if (features.includes('all')) {
