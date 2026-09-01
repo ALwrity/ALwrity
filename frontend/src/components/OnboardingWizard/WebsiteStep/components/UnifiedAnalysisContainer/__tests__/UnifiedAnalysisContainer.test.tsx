@@ -298,6 +298,10 @@ describe('Content Matrix — Overview', () => {
     const matches = screen.getAllByText(/Strategy Overview|Core Strategy/i);
     expect(matches.length).toBeGreaterThan(0);
 
+    // Switch to the Competitive Edge tab to make its panel active
+    fireEvent.click(screen.getByText(/Competitive Edge/i));
+    expect(screen.getByText(/Your Competitive Advantages/i)).toBeInTheDocument();
+
     const editSwitch = within(screen.getByTestId('edit-mode-switch')).getByRole('checkbox');
     fireEvent.click(editSwitch);
     expect(screen.getAllByRole('textbox').length).toBeGreaterThan(0);
@@ -321,12 +325,6 @@ describe('Content Matrix — Brand Voice', () => {
     const editSwitch = within(screen.getByTestId('edit-mode-switch')).getByRole('checkbox');
     fireEvent.click(editSwitch);
     expect(screen.getAllByRole('textbox').length).toBeGreaterThan(0);
-  });
-
-  it('Brand × Refine & Actions renders competitive advantages', () => {
-    fireEvent.click(screen.getByTestId('top-tab-refine_actions'));
-    const stage = screen.getByTestId('content-stage');
-    expect(within(stage).getByText(/Your Competitive Advantages/i)).toBeInTheDocument();
   });
 });
 
@@ -357,10 +355,9 @@ describe('Content Matrix — Sitemap Intel', () => {
     expect(screen.getByText(/142 URLs/i)).toBeInTheDocument();
   });
 
-  it('Sitemap × Refine & Actions renders growth recommendations', () => {
+  it('Sitemap × Refine & Actions auto-resets domain to overview', () => {
     fireEvent.click(screen.getByTestId('top-tab-refine_actions'));
-    expect(screen.getByText(/Growth Recommendations/i)).toBeInTheDocument();
-    expect(screen.getByText(/Add a resource hub/i)).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-domain-overview')).toHaveAttribute('aria-pressed', 'true');
   });
 });
 
@@ -378,8 +375,8 @@ describe('Content Matrix — Audience', () => {
   it('Audience × Refine & Actions renders pain points and motivations', () => {
     fireEvent.click(screen.getByTestId('top-tab-refine_actions'));
     const stage = screen.getByTestId('content-stage');
-    expect(within(stage).getByText('Too much manual work', { selector: 'p' })).toBeInTheDocument();
-    expect(within(stage).getByText('Save time', { selector: 'p' })).toBeInTheDocument();
+    expect(within(stage).getByText(/Too much manual work/i)).toBeInTheDocument();
+    expect(within(stage).getByText(/Save time/i)).toBeInTheDocument();
   });
 
   it('Audience × Guidelines renders audience considerations', () => {
@@ -420,18 +417,16 @@ describe('Content Matrix — Site Footprint', () => {
     expect(within(stage).getAllByLabelText('info').length).toBeGreaterThanOrEqual(3);
   });
 
-  it('Footprint × Refine & Actions renders complete CrawlResultSections plus platform nudge', () => {
+  it('Footprint × Refine & Actions auto-resets domain to overview', () => {
     openFootprint();
     fireEvent.click(screen.getByTestId('top-tab-refine_actions'));
-    const stage = screen.getByTestId('content-stage');
-    expect(within(stage).getByText(/Platform Connections/i)).toBeInTheDocument();
-    expectFullCrawlPanels(stage);
+    expect(screen.getByTestId('sidebar-domain-overview')).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('Footprint × Guidelines renders complete CrawlResultSections', () => {
+  it('Footprint × Guidelines auto-resets domain to overview', () => {
     openFootprint();
     fireEvent.click(screen.getByTestId('top-tab-guidelines'));
-    expectFullCrawlPanels(screen.getByTestId('content-stage'));
+    expect(screen.getByTestId('sidebar-domain-overview')).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('Footprint shows empty state when crawlResult is missing', () => {

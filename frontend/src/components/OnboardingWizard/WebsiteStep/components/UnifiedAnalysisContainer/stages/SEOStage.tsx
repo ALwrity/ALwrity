@@ -36,17 +36,7 @@ const SEOStage: React.FC<SEOStageProps> = ({
   }
 
   if (activeTab === 'refine_actions') {
-    return (
-      <Box sx={{ p: 2 }}>
-        <EnhancedGuidelinesSection
-          guidelines={{
-            seo_optimization: analysis.guidelines?.seo_optimization,
-            conversion_optimization: analysis.guidelines?.conversion_optimization,
-          }}
-          domainName={domainName}
-        />
-      </Box>
-    );
+    return null;
   }
 
   if (activeTab === 'guidelines') {

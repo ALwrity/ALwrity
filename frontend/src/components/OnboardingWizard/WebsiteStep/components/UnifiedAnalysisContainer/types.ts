@@ -39,6 +39,6 @@ export interface DomainConfig {
 // Correspondence mapping between horizontal tabs and vertical domains (all constant now)
 export const TAB_CORRESPONDING_DOMAINS: Record<TabKey, DomainKey[]> = {
   insights: ['overview', 'brand', 'audience', 'content', 'seo', 'sitemap', 'footprint'],
-  guidelines: ['overview', 'brand', 'audience', 'content', 'seo', 'sitemap', 'footprint'],
-  refine_actions: ['overview', 'brand', 'audience', 'content', 'seo', 'sitemap', 'footprint'],
+  guidelines: ['overview', 'brand', 'audience', 'content', 'seo'],
+  refine_actions: ['overview', 'brand', 'audience', 'content'],
 };

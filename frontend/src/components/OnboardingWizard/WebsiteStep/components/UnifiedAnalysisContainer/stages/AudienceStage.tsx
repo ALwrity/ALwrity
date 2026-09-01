@@ -41,10 +41,6 @@ const AudienceStage: React.FC<AudienceStageProps> = ({
 
   if (activeTab === 'refine_actions') {
     if (!analysis.target_audience) return <EmptyState message="No audience data available." />;
-    const items = [
-      ...(analysis.target_audience?.pain_points ?? []),
-      ...(analysis.target_audience?.motivations ?? []),
-    ];
     return (
       <Box sx={{ p: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -62,31 +58,6 @@ const AudienceStage: React.FC<AudienceStageProps> = ({
           onUpdate={(field, value) => onUpdate('target_audience', field, value)}
           hideHeader={true}
         />
-        {items.length > 0 && (
-          <Box sx={{ mt: 3, p: 2, border: '1px solid #E2E8F0', borderRadius: 2, bgcolor: '#FFFFFF' }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5, color: '#1E293B' }}>
-              Audience Pain Points & Motivations
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {items.map((item, i) => (
-                <Box
-                  key={i}
-                  sx={{
-                    py: 0.75,
-                    px: 1.5,
-                    borderRadius: 1.5,
-                    bgcolor: '#F0FDF4',
-                    border: '1px solid #BBF7D0',
-                  }}
-                >
-                  <Typography variant="body2" sx={{ color: '#166534', fontWeight: 500 }}>
-                    {item}
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
-          </Box>
-        )}
       </Box>
     );
   }

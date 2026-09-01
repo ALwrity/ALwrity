@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Tabs, Tab, Tooltip, FormControlLabel, Switch, Button, Chip, Typography } from '@mui/material';
+import { Box, Tooltip, FormControlLabel, Switch, Button, Chip, Typography } from '@mui/material';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import TuneIcon from '@mui/icons-material/Tune';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -65,52 +65,83 @@ const AnalysisTopBar: React.FC<AnalysisTopBarProps> = ({
     <Box
       data-testid="analysis-top-bar"
       sx={{
-        borderBottom: '1px solid #E2E8F0',
         bgcolor: '#FFFFFF',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'stretch',
         justifyContent: 'space-between',
-        px: 2,
         flexWrap: 'wrap',
-        gap: 1,
         width: '100%',
+        minHeight: 64,
       }}
     >
       {/* Tabs */}
-      <Tabs
-        value={currentTabIndex === -1 ? 0 : currentTabIndex}
-        onChange={(_, idx) => onTabChange(TABS[idx].key)}
+      <Box
         sx={{
-          minHeight: 48,
-          '& .MuiTab-root': {
-            textTransform: 'none',
-            fontWeight: 600,
-            minHeight: 48,
-            fontSize: '0.82rem',
-            color: '#64748B',
-            '&.Mui-selected': { color: accent },
-          },
-          '& .MuiTabs-indicator': {
-            backgroundColor: accent,
-            height: 3,
-            borderRadius: '3px 3px 0 0',
-          },
+          display: 'flex',
+          alignItems: 'stretch',
+          flexWrap: 'wrap',
         }}
       >
-        {TABS.map((tab) => (
-          <Tooltip key={tab.key} title={tab.tooltip} placement="bottom" arrow>
-            <Tab
-              data-testid={`top-tab-${tab.key}`}
-              icon={tab.icon}
-              iconPosition="start"
-              label={tab.label}
-            />
-          </Tooltip>
-        ))}
-      </Tabs>
+        {TABS.map((tab) => {
+          const isActive = tab.key === activeTab;
+          return (
+            <Tooltip key={tab.key} title={tab.tooltip} placement="bottom" arrow>
+              <Box
+                data-testid={`top-tab-${tab.key}`}
+                onClick={() => onTabChange(tab.key)}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  px: { xs: 2.5, sm: 3.5 },
+                  py: 1,
+                  minWidth: { xs: 120, sm: 160 },
+                  cursor: 'pointer',
+                  bgcolor: isActive ? '#FFFFFF' : '#F8FAFC',
+                  color: isActive ? accent : '#64748B',
+                  borderRight: '1px solid #E2E8F0',
+                  borderBottom: isActive ? `3px solid ${accent}` : '3px solid transparent',
+                  transition: 'all 0.2s ease',
+                  gap: 1.2,
+                  '&:hover': {
+                    bgcolor: isActive ? '#FFFFFF' : '#F1F5F9',
+                    color: isActive ? accent : '#475569',
+                  },
+                }}
+              >
+                <Box
+                  sx={{
+                    color: isActive ? accent : '#94A3B8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    '& svg': {
+                      fontSize: '1.2rem',
+                    },
+                  }}
+                >
+                  {tab.icon}
+                </Box>
+                <Typography
+                  sx={{
+                    fontWeight: 600,
+                    fontSize: '0.82rem',
+                    textAlign: 'left',
+                    textTransform: 'none',
+                    letterSpacing: '0.01em',
+                  }}
+                >
+                  {tab.label}
+                </Typography>
+              </Box>
+            </Tooltip>
+          );
+        })}
+      </Box>
 
       {/* Global controls */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', py: 0.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap', px: 2, py: 1 }}>
         {/* Confidence chip - always show */}
         {confidence !== undefined && (
           <Tooltip title="AI confidence in the accuracy of this analysis." arrow>
@@ -136,16 +167,33 @@ const AnalysisTopBar: React.FC<AnalysisTopBarProps> = ({
                   <Switch
                     checked={isEditable}
                     onChange={(e) => onEditableChange(e.target.checked)}
-                    color="primary"
-                    size="small"
+                    sx={{
+                      '& .MuiSwitch-switchBase': {
+                        color: '#94A3B8 !important', // Inactive floating circle is standard grey
+                        '&.Mui-checked': {
+                          color: `${accent} !important`, // Active floating circle gets the accent color
+                          '& + .MuiSwitch-track': {
+                            backgroundColor: '#E2E8F0 !important', // Track remains solid light grey
+                            opacity: '1 !important',
+                          },
+                        },
+                      },
+                      '& .MuiSwitch-track': {
+                        backgroundColor: '#CBD5E1 !important', // Track is grey when unchecked
+                        opacity: '1 !important',
+                      },
+                    }}
                   />
                 }
-                label={
-                  <Typography variant="caption" sx={{ fontWeight: 600, color: '#374151' }}>
-                    Edit Mode
-                  </Typography>
-                }
-                sx={{ m: 0 }}
+                label="Edit Mode"
+                sx={{
+                  m: 0,
+                  '& .MuiTypography-root': {
+                    color: '#4a5568 !important',
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                  },
+                }}
               />
             )}
 

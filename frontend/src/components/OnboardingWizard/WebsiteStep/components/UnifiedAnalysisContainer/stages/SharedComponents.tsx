@@ -3,6 +3,7 @@ import { Box, Typography, Button, Alert, Paper, Chip } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import StrategicInsightsSection from '../../StrategicInsightsSection';
+import ContentStrategyInsightsSection from '../../ContentStrategyInsightsSection';
 import StyleAnalysisSection from '../../StyleAnalysisSection';
 import CrawlResultSections from '../../CrawlResultSections';
 import type { StyleAnalysis } from '../../AnalysisResultsDisplay';
@@ -78,17 +79,32 @@ export const RecommendedSettingsPanel: React.FC<RecommendedSettingsPanelProps> =
         AI Generation Settings
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        These settings will be applied when generating content with ALwrity. You can update them by
-        switching to the <strong>Insights</strong> tab and enabling Edit Mode.
+        These settings are automatically derived from your website analysis and will be applied when generating content with ALwrity. You can fine-tune other brand parameters under the <strong>Refine & Actions</strong> tab in Edit Mode.
       </Typography>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+      <Paper variant="outlined" sx={{ p: 2, bgcolor: '#F8FAFC', borderColor: '#E2E8F0' }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
           {chips.map((c) => (
             <Chip
               key={c.label}
               size="small"
               label={`${c.label}: ${c.value}`}
-              sx={{ bgcolor: '#F1F5F9', border: '1px solid #CBD5E1', fontWeight: 500 }}
+              sx={{
+                bgcolor: '#FFFFFF !important',
+                border: '1px solid #CBD5E1',
+                borderRadius: '8px',
+                height: 'auto',
+                py: 0.75,
+                px: 0.5,
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                '& .MuiChip-label': {
+                  whiteSpace: 'normal',
+                  lineHeight: 1.4,
+                  display: 'inline-block',
+                  px: 1.5,
+                  fontWeight: 600,
+                  color: '#1E293B',
+                },
+              }}
             />
           ))}
         </Box>
@@ -109,14 +125,6 @@ export const StrategicPanel: React.FC<StrategicPanelProps> = ({
   onUpdate,
   domainName,
 }) => {
-  const stylePatternsInner =
-    analysis.style_patterns &&
-    typeof analysis.style_patterns === 'object' &&
-    !Array.isArray(analysis.style_patterns) &&
-    'patterns' in analysis.style_patterns
-      ? (analysis.style_patterns as any).patterns
-      : analysis.style_patterns;
-
   return (
     <Box sx={{ p: 2 }}>
       <StrategicInsightsSection
@@ -136,16 +144,16 @@ export const StrategicPanel: React.FC<StrategicPanelProps> = ({
         isEditable={isEditable}
         onUpdate={(field, value) => onUpdate('strategic_insights', field, value)}
       />
-      <Box sx={{ mt: 3 }}>
-        <StyleAnalysisSection
-          patterns={stylePatternsInner}
-          consistency={analysis.style_consistency}
-          uniqueElements={analysis.unique_elements}
-          domainName={domainName}
-          isEditable={isEditable}
-          onUpdate={onUpdate}
-        />
-      </Box>
+      {analysis.content_strategy_insights && (
+        <Box sx={{ mt: 3 }}>
+          <ContentStrategyInsightsSection
+            insights={analysis.content_strategy_insights}
+            isEditable={isEditable}
+            onUpdate={(field, value) => onUpdate('content_strategy_insights', field, value)}
+            hideHeader={true}
+          />
+        </Box>
+      )}
     </Box>
   );
 };

@@ -5,8 +5,8 @@ import ArticleIcon from '@mui/icons-material/Article';
 import ContentCharacteristicsSection from '../../ContentCharacteristicsSection';
 import ContentTypeAnalysisSection from '../../ContentTypeAnalysisSection';
 import ContentStrategyInsightsSection from '../../ContentStrategyInsightsSection';
-import StrategicInsightsSection from '../../StrategicInsightsSection';
 import EnhancedGuidelinesSection from '../../EnhancedGuidelinesSection';
+import StyleAnalysisSection from '../../StyleAnalysisSection';
 import SectionHeader from '../../SectionHeader';
 import { EmptyState } from './SharedComponents';
 import type { StyleAnalysis } from '../AnalysisResultsDisplay';
@@ -74,6 +74,25 @@ const ContentStage: React.FC<ContentStageProps> = ({
           />
           {refineControls}
         </Box>
+
+        <Box sx={{ mb: 4 }}>
+          <StyleAnalysisSection
+            patterns={
+              analysis.style_patterns &&
+              typeof analysis.style_patterns === 'object' &&
+              !Array.isArray(analysis.style_patterns) &&
+              'patterns' in analysis.style_patterns
+                ? (analysis.style_patterns as any).patterns
+                : analysis.style_patterns
+            }
+            consistency={analysis.style_consistency}
+            uniqueElements={analysis.unique_elements}
+            domainName={domainName}
+            isEditable={isEditable}
+            onUpdate={onUpdate}
+          />
+        </Box>
+
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           {analysis.content_characteristics && (
             <ContentCharacteristicsSection
@@ -88,14 +107,6 @@ const ContentStage: React.FC<ContentStageProps> = ({
               contentType={analysis.content_type}
               isEditable={isEditable}
               onUpdate={(field, value) => onUpdate('content_type', field, value)}
-              hideHeader={true}
-            />
-          )}
-          {analysis.content_strategy_insights && (
-            <ContentStrategyInsightsSection
-              insights={analysis.content_strategy_insights}
-              isEditable={isEditable}
-              onUpdate={(field, value) => onUpdate('content_strategy_insights', field, value)}
               hideHeader={true}
             />
           )}
@@ -139,17 +150,6 @@ const ContentStage: React.FC<ContentStageProps> = ({
             )}
           </Box>
         )}
-
-        <Box sx={{ mt: 4 }}>
-          <StrategicInsightsSection
-            contentCalendarSuggestions={
-              analysis.content_calendar_suggestions ||
-              analysis.strategic_insights?.content_calendar_suggestions
-            }
-            isEditable={isEditable}
-            onUpdate={(field, value) => onUpdate('strategic_insights', field, value)}
-          />
-        </Box>
       </Box>
     );
   }
@@ -165,6 +165,7 @@ const ContentStage: React.FC<ContentStageProps> = ({
             vocabulary_suggestions: analysis.guidelines?.vocabulary_suggestions,
           }}
           domainName={domainName}
+          avoidElements={analysis.avoid_elements}
         />
       </Box>
     );

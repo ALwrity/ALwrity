@@ -59,16 +59,6 @@ const BrandStage: React.FC<BrandStageProps> = ({
           onUpdate={(field, value) => onUpdate('brand_analysis', field, value)}
           hideHeader={true}
         />
-        <Box sx={{ mt: 3 }}>
-          <StrategicInsightsSection
-            competitiveAdvantages={
-              analysis.competitive_advantages ||
-              analysis.strategic_insights?.competitive_advantages
-            }
-            isEditable={isEditable}
-            onUpdate={(field, value) => onUpdate('strategic_insights', field, value)}
-          />
-        </Box>
       </Box>
     );
   }

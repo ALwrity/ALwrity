@@ -26,17 +26,17 @@ const OverviewStage: React.FC<OverviewStageProps> = ({
   if (activeTab === 'insights') {
     return (
       <Box sx={{ p: 2 }}>
+        {analysis.recommended_settings && (
+          <Box sx={{ mb: 3 }}>
+            <RecommendedSettingsPanel settings={analysis.recommended_settings} />
+          </Box>
+        )}
         <KeyInsightsGrid
           writing_style={analysis.writing_style}
           target_audience={analysis.target_audience}
           content_type={analysis.content_type}
           confidence={analysis.meta?.confidence}
         />
-        {analysis.recommended_settings && (
-          <Box sx={{ mt: 3 }}>
-            <RecommendedSettingsPanel settings={analysis.recommended_settings} />
-          </Box>
-        )}
       </Box>
     );
   }
@@ -44,9 +44,6 @@ const OverviewStage: React.FC<OverviewStageProps> = ({
   if (activeTab === 'refine_actions') {
     return (
       <Box>
-        {analysis.recommended_settings && (
-          <RecommendedSettingsPanel settings={analysis.recommended_settings} />
-        )}
         <StrategicPanel
           analysis={analysis}
           isEditable={isEditable}

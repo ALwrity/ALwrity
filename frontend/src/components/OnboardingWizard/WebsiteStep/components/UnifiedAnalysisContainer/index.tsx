@@ -183,7 +183,7 @@ const UnifiedAnalysisContainer: React.FC<UnifiedAnalysisContainerProps> = ({
           </Box>
 
           {/* Right: Horizontal Tabs & Controls */}
-          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center' }}>
+          <Box sx={{ flex: 1, display: 'flex', alignItems: 'stretch' }}>
             <AnalysisTopBar
               activeTab={activeTab}
               activeDomain={activeDomain}
