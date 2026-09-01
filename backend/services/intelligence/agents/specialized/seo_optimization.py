@@ -151,7 +151,7 @@ class SEOOptimizationAgent(BaseALwrityAgent):
                 hints=[website_url],
                 fallback=f"seo website analysis {website_url}",
             )
-            results = await intelligence.search(query, limit=10)
+            results = await self.sif_search(query, limit=10, trigger="seo_audit")
             return {
                 "health": "reviewed",
                 "website_url": website_url,
@@ -181,7 +181,7 @@ class SEOOptimizationAgent(BaseALwrityAgent):
                         hints=["seo issues errors fixes", website_url] if website_url else ["seo issues errors fixes"],
                         fallback="seo issue problem error fix",
                     )
-                    results = await intelligence.search(query, limit=5)
+                    results = await self.sif_search(query, limit=5, trigger="seo_issues")
                     issues_found = len(results)
             except Exception as e:
                 logger.debug(f"[SEOOptimizationAgent] SIF search for issues failed: {e}")

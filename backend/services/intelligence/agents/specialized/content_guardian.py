@@ -68,7 +68,7 @@ class ContentGuardianAgent(SIFBaseAgent):
                 hints=[website_url],
                 fallback=f"website content analysis {website_url}",
             )
-            results = await self.intelligence.search(audit_query, limit=10)
+            results = await self.sif_search(audit_query, limit=10, trigger="guardian_site_audit")
             audit: Dict[str, Any] = {"website_url": website_url, "audit_timestamp": datetime.utcnow().isoformat(), "total_pages_crawled": len(results), "content_quality": None, "brand_voice_consistency": None, "safety_issues": None, "cannibalization_issues": None}
             if not results: return audit
             quality_scores, style_scores, safety_flags = [], [], []

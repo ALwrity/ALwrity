@@ -78,7 +78,7 @@ class CitationExpert(SIFBaseAgent):
                     hints=["statistics data research study"],
                     fallback="statistics data research study",
                 )
-                results = await self.intelligence.search(stats_query, limit=5)
+                results = await self.sif_search(stats_query, limit=5, trigger="citation_stats")
                 indexed_count = len(results)
             except Exception as e:
                 logger.debug(f"[CitationExpert] SIF search failed: {e}")

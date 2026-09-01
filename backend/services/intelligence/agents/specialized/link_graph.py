@@ -34,7 +34,7 @@ class LinkGraphAgent(SIFBaseAgent):
                 hints=["pillar hub guide overview"],
                 fallback="pillar core foundation guide overview",
             )
-            hub_results = await self.intelligence.search(hub_query, limit=10)
+            hub_results = await self.sif_search(hub_query, limit=10, trigger="link_hubs")
 
             # Search for orphan candidates (specific niche content not linking to pillars)
             orphan_query = self._sif_query(
@@ -42,7 +42,7 @@ class LinkGraphAgent(SIFBaseAgent):
                 hints=["niche deep dive specific detail"],
                 fallback="specific detailed deep dive",
             )
-            orphan_results = await self.intelligence.search(orphan_query, limit=10)
+            orphan_results = await self.sif_search(orphan_query, limit=10, trigger="link_orphans")
 
             return {
                 "node_count": len(hub_results) + len(orphan_results),
@@ -80,7 +80,7 @@ class LinkGraphAgent(SIFBaseAgent):
                     hints=["pillar hub guide"],
                     fallback="pillar guide",
                 )
-                hub_results = await self.intelligence.search(hub_query, limit=5)
+                hub_results = await self.sif_search(hub_query, limit=5, trigger="link_hubs_proposal")
                 hub_count = len(hub_results)
             except Exception as e:
                 logger.debug(f"[LinkGraphAgent] SIF analysis failed: {e}")

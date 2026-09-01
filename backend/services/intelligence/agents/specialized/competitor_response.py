@@ -113,7 +113,7 @@ class CompetitorResponseAgent(BaseALwrityAgent):
                 hints=[focus_area, website_url] if website_url else [focus_area],
                 fallback=f"competitor {focus_area} {website_url}",
             )
-            results = await intelligence.search(query, limit=10)
+            results = await self.sif_search(query, limit=10, trigger="competitor_analysis")
             return {
                 "competitors": [{"url": r.get("id", ""), "snippet": r.get("text", "")[:200]} for r in results],
                 "threats": [],
@@ -143,7 +143,7 @@ class CompetitorResponseAgent(BaseALwrityAgent):
                         hints=[focus_area],
                         fallback=f"competitor {focus_area}",
                     )
-                    results = await intelligence.search(query, limit=5)
+                    results = await self.sif_search(query, limit=5, trigger="competitor_proposal")
                     competitor_count = len(results)
             except Exception as e:
                 logger.debug(f"[CompetitorResponseAgent] SIF competitor search failed: {e}")

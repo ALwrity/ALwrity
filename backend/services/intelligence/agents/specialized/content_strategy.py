@@ -397,9 +397,10 @@ class ContentStrategyAgent(BaseALwrityAgent):
                     fallback="content gaps",
                 )
                 sif_items = self._run_async_tool(
-                    self.sif_service.intelligence_service.search(
+                    self.sif_search(
                         sif_query,
                         limit=int(context.get("limit") or 10),
+                        trigger="content_analyzer",
                     )
                 ) or []
             except Exception as exc:
@@ -500,9 +501,10 @@ class ContentStrategyAgent(BaseALwrityAgent):
                 fallback=topic_hint,
             )
             results = self._run_async_tool(
-                intelligence.search(
+                self.sif_search(
                     sif_query,
                     limit=int(context.get("limit") or 10),
+                    trigger="semantic_gap_detector",
                 )
             )
             items = [
