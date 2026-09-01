@@ -31,3 +31,5 @@ export { default as YouTubeIntegrationTab } from './YouTubeIntegrationTab';
 export { default as LinkedInIntegrationTab } from './LinkedInIntegrationTab';
 export { default as WebsiteStepHeader } from './WebsiteStepHeader';
 export type { Competitor } from './CompetitorsGrid';
+export { default as UnifiedAnalysisContainer } from './UnifiedAnalysisContainer/index';
+export type { UnifiedAnalysisContainerProps, DomainKey, TabKey } from './UnifiedAnalysisContainer/types';
