@@ -14,7 +14,7 @@ import asyncio
 from datetime import datetime
 
 # Import database
-from services.database import get_db_session
+from services.database import get_db_session, get_session_for_user
 
 # Import authentication middleware
 from middleware.auth_middleware import get_current_user, get_current_user_with_query_token
@@ -333,11 +333,11 @@ async def stream_ai_generation_status(
     request: Request,
     strategy_id: int = Query(..., description="Strategy ID"),
     current_user: Dict[str, Any] = Depends(get_current_user_with_query_token),
-    db: Session = Depends(get_db)
 ):
     """Stream AI generation status for a strategy with real-time updates."""
     
     async def status_generator():
+        db_session = None
         try:
             clerk_user_id = str(current_user.get('id', ''))
             if not clerk_user_id:
@@ -350,18 +350,27 @@ async def stream_ai_generation_status(
             
             yield {"type": "progress", "detail": "Fetching AI generation status...", "progress": 10}
             
-            db_service = EnhancedStrategyDBService(db)
-            enhanced_service = EnhancedStrategyService(db_service)
+            # Open a fresh per-user session. The request-scoped ``db``
+            # dependency yields None (the deprecated get_db_session() without
+            # a user_id returns None) and would be closed by the time the
+            # stream body is generated, so open a session we own here.
+            db_session = get_session_for_user(authenticated_user_id)
+            if not db_session:
+                yield {"type": "error", "detail": "Database unavailable", "progress": 0}
+                return
             
-            strategy = await enhanced_service.get_enhanced_strategy(strategy_id, authenticated_user_id, db)
+            db_service = EnhancedStrategyDBService(db_session)
             
-            if not strategy or strategy.get("status") == "not_found":
+            # get_enhanced_strategy returns an ORM model (or None), not a dict.
+            strategy = await db_service.get_enhanced_strategy(strategy_id, authenticated_user_id)
+            
+            if not strategy:
                 yield {"type": "error", "detail": "Strategy not found", "progress": 0}
                 return
             
             yield {"type": "progress", "detail": "Checking AI analysis status...", "progress": 30}
             
-            ai_recommendations = strategy.get("ai_recommendations")
+            ai_recommendations = getattr(strategy, "ai_recommendations", None)
             if ai_recommendations:
                 if isinstance(ai_recommendations, str):
                     try:
@@ -383,6 +392,9 @@ async def stream_ai_generation_status(
         except Exception as e:
             logger.error(f"❌ Error in AI generation status stream: {str(e)}")
             yield {"type": "error", "detail": str(e), "progress": 0}
+        finally:
+            if db_session:
+                db_session.close()
     
     return StreamingResponse(
         stream_data(status_generator()),

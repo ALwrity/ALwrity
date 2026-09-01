@@ -971,9 +971,15 @@ async def generate_comprehensive_strategy_polling(
                     }
                 )
                 
-                # Save the comprehensive strategy to database
+                # Save the comprehensive strategy to database.
+                # Open a fresh per-user session here: the request-scoped
+                # session (Depends(get_db)) is closed when the POST returns,
+                # before this background task commits, so it must NOT be
+                # reused. A fresh session via get_session_for_user is safe
+                # inside asyncio.create_task and persists independently.
                 try:
                     from models.enhanced_strategy_models import EnhancedContentStrategy
+                    from services.database import get_session_for_user
                     
                     # Create enhanced strategy record
                     enhanced_strategy = EnhancedContentStrategy(
@@ -992,10 +998,16 @@ async def generate_comprehensive_strategy_polling(
                         updated_at=datetime.utcnow()
                     )
                     
-                    # Add to database
-                    db.add(enhanced_strategy)
-                    db.commit()
-                    db.refresh(enhanced_strategy)
+                    # Add to database using a fresh session
+                    save_db = get_session_for_user(str(user_id))
+                    if not save_db:
+                        raise RuntimeError("Could not open database session to save strategy")
+                    try:
+                        save_db.add(enhanced_strategy)
+                        save_db.commit()
+                        save_db.refresh(enhanced_strategy)
+                    finally:
+                        save_db.close()
                     
                     logger.info(f"💾 Strategy saved to database with ID: {enhanced_strategy.id}")
                     

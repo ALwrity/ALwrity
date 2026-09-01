@@ -38,10 +38,12 @@ class DataProcessorService:
             Dictionary of raw integrated onboarding data sources
         """
         try:
-            from services.database import get_db_session
+            from services.database import get_session_for_user
             from ..onboarding.data_integration import OnboardingDataIntegrationService
-            temp_db = get_db_session()
+            temp_db = get_session_for_user(user_id)
             try:
+                if not temp_db:
+                    raise RuntimeError(f"Could not open database session for user {user_id}")
                 integration = OnboardingDataIntegrationService()
                 integrated_data = await integration.process_onboarding_data(user_id, temp_db)
                 self.logger.info(f"Retrieved raw integrated onboarding data for user {user_id}")
@@ -50,7 +52,8 @@ class DataProcessorService:
                 self.logger.error(f"Error getting onboarding data: {str(e)}")
                 raise
             finally:
-                temp_db.close()
+                if temp_db:
+                    temp_db.close()
         except Exception as e:
             self.logger.error(f"Error getting onboarding data: {str(e)}")
             raise
