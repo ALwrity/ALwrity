@@ -5,8 +5,12 @@ import {
   Fade,
   Slide,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  IconButton,
+  Typography,
 } from '@mui/material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloseIcon from '@mui/icons-material/Close';
 import { getCurrentStep, setCurrentStep } from '../../api/onboarding';
 import { apiClient } from '../../api/client';
 import { useOnboarding } from '../../contexts/OnboardingContext';
@@ -60,6 +64,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   const [showHelp, setShowHelp] = useState(false);
   const [showProgressMessage, setShowProgressMessage] = useState(false);
   const [progressMessage, setProgressMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   // Retry state for step completion failures
   const [retryStepNumber, setRetryStepNumber] = useState<number | null>(null);
   const [retryStepData, setRetryStepData] = useState<any>(null);
@@ -729,6 +734,8 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         email={email}
         backgroundTasks={backgroundTasks}
         onViewBackgroundResults={handleViewBackgroundResults}
+        success={successMessage}
+        setSuccess={setSuccessMessage}
       />
     );
 
@@ -851,19 +858,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           dismissRetry={dismissRetry}
         />
 
-        {/* Background tasks banner on steps 1+ (step 0 uses compact chip in OnboardingTabBar) */}
-        {activeStep > 0 &&
-          backgroundTasks &&
-          backgroundTasks.tasks &&
-          Object.keys(backgroundTasks.tasks).length > 0 && (
-          <SystemStatusChip
-            activeTasks={backgroundTasks.total - backgroundTasks.completed_count - backgroundTasks.failed_count}
-            totalTasks={backgroundTasks.total}
-            tasks={backgroundTasks.tasks}
-            onViewResults={handleViewBackgroundResults}
-          />
-        )}
-
         {/* Content */}
         <Box sx={{
           p: { xs: 2, md: 4 },
@@ -871,7 +865,68 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           flexGrow: 1,
           width: '100%',
           overflow: 'visible',
+          position: 'relative',
         }}>
+          {/* Top Right Floating Controls Container */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: { xs: 4, md: 8 },
+              right: { xs: 16, md: 32 },
+              zIndex: 1300,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+              gap: 1.5,
+              pointerEvents: 'none',
+              '& > *': { pointerEvents: 'auto' },
+            }}
+          >
+            {/* Background Tasks Button */}
+            {backgroundTasks &&
+              backgroundTasks.tasks &&
+              Object.keys(backgroundTasks.tasks).length > 0 && (
+              <SystemStatusChip
+                variant="compact"
+                activeTasks={backgroundTasks.total - backgroundTasks.completed_count - backgroundTasks.failed_count}
+                totalTasks={backgroundTasks.total}
+                tasks={backgroundTasks.tasks}
+                onViewResults={handleViewBackgroundResults}
+              />
+            )}
+
+            {/* Floating Success Message */}
+            {successMessage && (successMessage.toLowerCase().includes('previous analysis') || successMessage.toLowerCase().includes('loaded previous')) && (
+              <Box
+                sx={{
+                  bgcolor: '#FFFFFF',
+                  border: '1px solid #10B981',
+                  borderRadius: 2,
+                  boxShadow: '0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                  p: 1.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  width: 'fit-content',
+                  maxWidth: { xs: '280px', sm: '360px' },
+                  animation: 'fadeIn 0.3s ease-out',
+                }}
+              >
+                <CheckCircleIcon sx={{ color: '#10B981', fontSize: 20, flexShrink: 0 }} />
+                <Typography variant="body2" sx={{ color: '#1F2937', fontWeight: 600, fontSize: '0.875rem', lineHeight: 1.4 }}>
+                  {successMessage}
+                </Typography>
+                <IconButton 
+                  size="small" 
+                  onClick={() => setSuccessMessage(null)}
+                  sx={{ ml: 'auto', p: 0.25, color: '#9CA3AF', '&:hover': { color: '#4B5563' }, flexShrink: 0 }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            )}
+          </Box>
+
           <Fade in={true} timeout={400}>
             <Box sx={{ width: '100%', overflow: 'visible' }}>
               {renderStepContent(activeStep)}

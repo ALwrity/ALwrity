@@ -116,7 +116,7 @@ const UnifiedAnalysisContainer: React.FC<UnifiedAnalysisContainerProps> = ({
         sx={{
           px: 3,
           py: 2,
-          background: 'linear-gradient(135deg, #EFF6FF 0%, #F5F3FF 100%)',
+          bgcolor: '#FFFFFF',
           borderBottom: '1px solid #E2E8F0',
           display: 'flex',
           alignItems: 'center',
@@ -161,7 +161,7 @@ const UnifiedAnalysisContainer: React.FC<UnifiedAnalysisContainerProps> = ({
               width: 200,
               flexShrink: 0,
               borderRight: '1px solid #E2E8F0',
-              bgcolor: '#F8FAFC',
+              bgcolor: '#FFFFFF',
               display: 'flex',
               alignItems: 'center',
               px: 2,
@@ -211,7 +211,7 @@ const UnifiedAnalysisContainer: React.FC<UnifiedAnalysisContainerProps> = ({
             sx={{
               flex: 1,
               overflow: 'auto',
-              bgcolor: '#FAFAFA',
+              bgcolor: '#FFFFFF',
               '& .MuiTypography-root': { color: '#111827' },
               '& .MuiPaper-root': { backgroundColor: '#ffffff' },
               '& .MuiCard-root': { backgroundColor: '#ffffff' },

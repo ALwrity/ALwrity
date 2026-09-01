@@ -113,7 +113,7 @@ const AnalysisSidebar: React.FC<AnalysisSidebarProps> = ({
         width: 200,
         flexShrink: 0,
         borderRight: '1px solid #E2E8F0',
-        bgcolor: '#F8FAFC',
+        bgcolor: '#FFFFFF',
         display: 'flex',
         flexDirection: 'column',
         py: 1,

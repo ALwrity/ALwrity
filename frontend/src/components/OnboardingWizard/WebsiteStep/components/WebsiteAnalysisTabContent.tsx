@@ -145,7 +145,7 @@ const WebsiteAnalysisTabContent: React.FC<WebsiteAnalysisTabContentProps> = ({
         </Alert>
       )}
 
-      {success && (
+      {success && !(success.toLowerCase().includes('previous analysis') || success.toLowerCase().includes('loaded previous')) && (
         <Alert severity="success" sx={{ mb: 3, borderRadius: 2 }}>
           {success}
         </Alert>
