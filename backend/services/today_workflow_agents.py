@@ -26,7 +26,6 @@ from services.today_workflow_service import (
     _stamp_synthesis_mode,
     _derive_onboarding_evidence_links,
     _ensure_pillar_coverage,
-    build_grounding_context,
     PILLAR_IDS,
     MIN_TASK_EVIDENCE_LINKS,
     AgentActivityService,
@@ -43,6 +42,32 @@ from services.today_workflow_service import (
     resolve_recommendation_action,
     llm_text_gen,
 )
+from services import today_workflow_service as _today_svc
+
+
+def build_grounding_context(db, user_id, date):
+    """Late-bound delegate to the service's grounding builder.
+
+    Tests monkeypatch ``today_workflow_service.build_grounding_context`` (the
+    service/indexed convention) OR ``today_workflow_agents.build_grounding_context``
+    (this module's own name). Delegating here keeps both styles working
+    regardless of which module was imported first, matching the note above
+    about monkeypatching reaching this module.
+
+    The service module is resolved from ``sys.modules`` at call time so the
+    call always reaches whatever module object the caller monkeypatched, even
+    if ``services.today_workflow_service`` was re-imported mid-process (e.g.
+    by env-override test fixtures such as ``test_sif3_quick_wins_round2``).
+    Binding the module at import time (``_today_svc`` above) would freeze the
+    reference to this module's first import and miss later patches once the
+    service is re-loaded under a new module object.
+    """
+    import sys as _sys
+
+    _mod = _sys.modules.get("services.today_workflow_service")
+    if _mod is None:
+        from services import today_workflow_service as _mod
+    return _mod.build_grounding_context(db, user_id, date)
 
 
 async def generate_agent_enhanced_plan(
@@ -53,6 +78,8 @@ async def generate_agent_enhanced_plan(
     strict_contextuality: bool = False,
     allow_preview: bool = False,
     manual_override: bool = False,
+    retry_agents: Optional[List[str]] = None,
+    skip_meeting_lifecycle: bool = False,
 ) -> Dict[str, Any]:
     import asyncio
 
@@ -67,13 +94,19 @@ async def generate_agent_enhanced_plan(
         workflow_config.get("timezone") or workflow_config.get("time_zone") or
         onboarding.get("timezone") or onboarding.get("time_zone") or "UTC"
     ) if isinstance(workflow_config, dict) and isinstance(onboarding, dict) else "UTC"
-    meeting = start_daily_meeting(
-        db,
-        user_id,
-        date,
-        source="manual" if manual_override else "scheduled",
-        tenant_timezone=tenant_timezone,
-    )
+    # A retry is a scoped, transient re-run: it must NOT create a fresh
+    # meeting record or enqueue another digest email. Skipping the lifecycle
+    # means ``meeting`` stays None and ``finish_meeting`` stays a no-op for
+    # meeting persistence (it still returns the transient result dict).
+    meeting = None
+    if not skip_meeting_lifecycle:
+        meeting = start_daily_meeting(
+            db,
+            user_id,
+            date,
+            source="manual" if manual_override else "scheduled",
+            tenant_timezone=tenant_timezone,
+        )
     meeting_id = meeting.meeting_id if meeting else None
 
     def finish_meeting(result: Dict[str, Any], status: str = "completed", error_message: Optional[str] = None) -> Dict[str, Any]:
@@ -81,31 +114,46 @@ async def generate_agent_enhanced_plan(
         result["meeting_id"] = meeting_id
         result["meeting_status"] = status
         finish_daily_meeting(db, meeting, status, result, error_message=error_message)
-        
-        # Enqueue daily digest email (non-blocking)
+
+        # Enqueue daily digest email (non-blocking). Never let a digest
+        # failure break the meeting flow, but surface the *outcome* on the
+        # result so callers/UI can see why an email did or didn't fire.
         # Import here to avoid circular imports
-        try:
-            from services.daily_email_digest import enqueue_digest
-            from models.onboarding import OnboardingSession
-            
-            # Get user's contact email and timezone from onboarding
-            onboarding = db.query(OnboardingSession).filter(
-                OnboardingSession.user_id == user_id
-            ).first()
-            contact_email = onboarding.contact_email if onboarding and onboarding.contact_email else None
-            
-            if contact_email and (onboarding.email_digest_opt_in if onboarding else False):
-                # Enqueue asynchronously (non-blocking)
-                enqueue_digest(user_id, date, contact_email)
-                logger.info(f"Enqueued daily digest for user {user_id} to {contact_email}")
-            elif onboarding and not onboarding.email_digest_opt_in:
-                logger.debug(f"User {user_id} has opted out of email digest")
-            else:
-                logger.debug(f"No contact email for user {user_id}, skipping digest")
-        except Exception as e:
-            # Never fail the meeting flow if digest fails
-            logger.warning(f"Failed to enqueue digest for user {user_id}: {e}")
-        
+        digest = {"status": "skipped", "reason": "not_attempted"}
+        if skip_meeting_lifecycle:
+            # A retry is a transient re-run: never re-fire the digest email.
+            digest = {"status": "skipped", "reason": "retry"}
+        else:
+            try:
+                from services.daily_email_digest import enqueue_digest
+                from models.onboarding import OnboardingSession
+
+                # Get user's contact email and timezone from onboarding
+                onboarding = db.query(OnboardingSession).filter(
+                    OnboardingSession.user_id == user_id
+                ).first()
+                contact_email = onboarding.contact_email if onboarding and onboarding.contact_email else None
+
+                if onboarding is None:
+                    digest = {"status": "skipped", "reason": "no_onboarding_session"}
+                    logger.debug(f"No onboarding session for user {user_id}, skipping digest")
+                elif not onboarding.email_digest_opt_in:
+                    digest = {"status": "skipped", "reason": "opted_out"}
+                    logger.debug(f"User {user_id} has opted out of email digest")
+                elif not contact_email:
+                    digest = {"status": "skipped", "reason": "no_contact_email"}
+                    logger.debug(f"No contact email for user {user_id}, skipping digest")
+                else:
+                    # Enqueue asynchronously (non-blocking)
+                    enqueue_digest(user_id, date, contact_email)
+                    digest = {"status": "enqueued", "reason": None, "contact_email": contact_email}
+                    logger.info(f"Enqueued daily digest for user {user_id} to {contact_email}")
+            except Exception as e:
+                # Never fail the meeting flow if digest fails
+                logger.warning(f"Failed to enqueue digest for user {user_id}: {e}")
+                digest = {"status": "failed", "reason": str(e)}
+        result["digest"] = digest
+
         return result
 
     meeting_preflight = run_daily_meeting_preflight(user_id, db, grounding, date)
@@ -193,6 +241,13 @@ async def generate_agent_enhanced_plan(
             ("competitor_analyst", orchestrator.agents.get('competitor')),
             ("content_gap_radar", orchestrator.agents.get('content_gap_radar')),
         ]
+        if retry_agents:
+            # A retry is a scoped re-run: only the explicitly listed agents
+            # participate so we surface just their fresh outcome.
+            retry_set = set(retry_agents)
+            candidate_agents = [
+                (key, agent) for (key, agent) in candidate_agents if key in retry_set
+            ]
         profiles_by_key = {}
         try:
             from models.agent_activity_models import AgentProfile
@@ -217,7 +272,9 @@ async def generate_agent_enhanced_plan(
         schedule_now = datetime.now(timezone.utc)
         schedule_decisions = []
         active_agents = []
-        effective_manual_override = manual_override or db is None
+        # A retry must force participation for the scoped agent(s) regardless
+        # of their schedule, so a disabled/timed-out agent still runs on demand.
+        effective_manual_override = manual_override or db is None or bool(retry_agents)
         for agent_key, agent in candidate_agents:
             catalog = catalog_by_key.get(agent_key, {})
             decision = evaluate_agent_schedule(
@@ -255,6 +312,26 @@ async def generate_agent_enhanced_plan(
             if decision["participates"]
         ]
         for (agent_key, _agent), res in zip(active_pairs, results):
+            from services.intelligence.agents.core_agent_framework import (
+                AgentDeclined,
+                AGENT_DECLINE_MESSAGE,
+            )
+            if isinstance(res, AgentDeclined):
+                agent_evidence.append({
+                    "agent": agent_key,
+                    "evidence": [],
+                    "analysis": "",
+                    "proposed_tasks": [],
+                    "confidence": 0.0,
+                    "expected_impact": [],
+                    "effort": [],
+                    "kpi": [],
+                    "required_action_parameters": [],
+                    "declined": True,
+                    "message": str(res) or AGENT_DECLINE_MESSAGE,
+                })
+                logger.info(f"Agent {agent_key} declined: {res}")
+                continue
             if isinstance(res, Exception):
                 agent_evidence.append({
                     "agent": agent_key,

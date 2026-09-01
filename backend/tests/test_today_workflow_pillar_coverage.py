@@ -1,9 +1,10 @@
 from types import SimpleNamespace
 
+import json
+
 import pytest
 
 from services.intelligence.agents.core_agent_framework import TaskProposal
-from services import today_workflow_service as svc
 
 
 class DummyActivity:
@@ -54,6 +55,12 @@ def _covered_pillars(result):
 
 @pytest.mark.asyncio
 async def test_generate_agent_enhanced_plan_preserves_full_committee_coverage(monkeypatch):
+    # Import inside the test (not at module level) so ``svc`` binds to the
+    # CURRENT sys.modules entry. Some suites re-import
+    # ``services.today_workflow_service`` mid-run (env-override tests); a
+    # module-level binding would patch an orphaned module object.
+    from services import today_workflow_service as svc
+
     proposals = [
         TaskProposal("P", "desc", "plan", "high", 10, "content", "why", {}, "navigate", "/content-planning-dashboard"),
         TaskProposal("G", "desc", "generate", "high", 10, "content", "why", {}, "navigate", "/blog-writer"),
@@ -76,7 +83,12 @@ async def test_generate_agent_enhanced_plan_preserves_full_committee_coverage(mo
 
 
 @pytest.mark.asyncio
-async def test_generate_agent_enhanced_plan_backfills_missing_committee_pillars(monkeypatch):
+async def test_generate_agent_enhanced_plan_backfill_off_leaves_missing_pillars_uncovered(monkeypatch):
+    # Default backfill mode is ``off``: pillars the committee didn't cover
+    # stay honestly absent rather than being filled with a generic template
+    # or an invented LLM task.
+    from services import today_workflow_service as svc
+
     proposals = [
         TaskProposal("P", "desc", "plan", "high", 10, "content", "why", {}, "navigate", "/content-planning-dashboard"),
         TaskProposal("G", "desc", "generate", "high", 10, "content", "why", {}, "navigate", "/blog-writer"),
@@ -90,12 +102,16 @@ async def test_generate_agent_enhanced_plan_backfills_missing_committee_pillars(
 
     result = await svc.generate_agent_enhanced_plan(db=None, user_id="u1", date="2026-01-01")
 
-    assert _covered_pillars(result) == set(svc.PILLAR_IDS)
+    assert _covered_pillars(result) == {"plan", "generate"}
     assert {"P", "G"}.issubset({task["title"] for task in result["tasks"]})
 
 
 @pytest.mark.asyncio
-async def test_generate_agent_enhanced_plan_full_fallback_path_still_covers_all_pillars(monkeypatch):
+async def test_generate_agent_enhanced_plan_full_fallback_returns_empty_when_backfill_off(monkeypatch):
+    # With backfill off and a fully dead committee (orchestrator agents None),
+    # no pillar is uncovered with a fabricated template.
+    from services import today_workflow_service as svc
+
     async def _get_orchestrator(user_id):
         return _mock_orchestrator_with_agents()
 
@@ -110,12 +126,52 @@ async def test_generate_agent_enhanced_plan_full_fallback_path_still_covers_all_
 
     result = await svc.generate_agent_enhanced_plan(db=None, user_id="u1", date="2026-01-01")
 
+    assert result["tasks"] == []
+    assert _covered_pillars(result) == set()
+
+
+@pytest.mark.asyncio
+async def test_generate_agent_enhanced_plan_backfill_on_restores_coverage(monkeypatch):
+    # Explicitly opting in via env re-enables coverage (LLM backfill with
+    # controlled fallback). Missing pillars are covered again.
+    monkeypatch.setenv("TODAY_WORKFLOW_PILLAR_BACKFILL", "on")
+    from services import today_workflow_service as svc
+
+    proposals = [
+        TaskProposal("P", "desc", "plan", "high", 10, "content", "why", {}, "navigate", "/content-planning-dashboard"),
+        TaskProposal("G", "desc", "generate", "high", 10, "content", "why", {}, "navigate", "/blog-writer"),
+    ]
+
+    async def _get_orchestrator(user_id):
+        return _mock_orchestrator_with_agents(content_proposals=proposals)
+
+    monkeypatch.setattr(svc, "build_grounding_context", lambda db, user_id, date: {})
+    monkeypatch.setattr(svc.orchestration_service, "get_or_create_orchestrator", _get_orchestrator)
+
+    def _fake_llm(*args, **kwargs):
+        return json.dumps({
+            "pillarId": "publish",
+            "title": "Review publishing queue",
+            "description": "Sanity check the queue",
+            "priority": "medium",
+            "estimatedTime": 15,
+            "actionType": "navigate",
+            "actionUrl": "/scheduler-dashboard",
+            "enabled": True,
+            "metadata": {},
+        })
+
+    monkeypatch.setattr(svc, "llm_text_gen", _fake_llm)
+
+    result = await svc.generate_agent_enhanced_plan(db=None, user_id="u1", date="2026-01-01")
+
     assert _covered_pillars(result) == set(svc.PILLAR_IDS)
-    assert len(result["tasks"]) >= len(svc.PILLAR_IDS)
 
 
 @pytest.mark.asyncio
 async def test_generate_agent_enhanced_plan_strategy_plan_task_survives_dedupe_and_coverage(monkeypatch):
+    from services import today_workflow_service as svc
+
     content_proposals = [
         TaskProposal(
             "Review Strategic Goals",
@@ -157,7 +213,7 @@ async def test_generate_agent_enhanced_plan_strategy_plan_task_survives_dedupe_a
 
     result = await svc.generate_agent_enhanced_plan(db=None, user_id="u1", date="2026-01-01")
 
-    assert _covered_pillars(result) == set(svc.PILLAR_IDS)
+    assert _covered_pillars(result) == {"plan"}
     plan_tasks = [task for task in result["tasks"] if task["pillarId"] == "plan"]
     assert any(
         task["title"] == "Review Strategic Goals"

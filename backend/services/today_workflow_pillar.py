@@ -27,16 +27,18 @@ _VALID_BACKFILL_MODES = {"on", "off", "llm_only"}
 def _pillar_backfill_mode() -> str:
     """Operator gate for the pillar-backfill cost path.
 
-    ``on`` (default): weekly-cadenced LLM backfill with controlled fallback.
-    ``off``: no coverage enforcement at all — uncovered pillars stay
-    uncovered (honest absence).
+    ``off`` (default): no coverage enforcement — uncovered pillars stay
+    uncovered (honest absence). If an agent failed to cover a pillar, the
+    user sees the failed agent and can retry it instead of receiving a
+    generic template or an invented LLM task.
+    ``on``: weekly-cadenced LLM backfill with controlled fallback.
     ``llm_only``: LLM generation runs, but a failed generation yields no
     template task.
-    Invalid values fall back to ``on`` so a typo can't silently disable
-    coverage.
+    Invalid/missing values fall back to ``off`` so a typo can't silently
+    enable an invented-coverage cost path.
     """
     raw = str(os.getenv("TODAY_WORKFLOW_PILLAR_BACKFILL", "")).strip().lower()
-    return raw if raw in _VALID_BACKFILL_MODES else "on"
+    return raw if raw in _VALID_BACKFILL_MODES else "off"
 
 
 def count_template_fallback_tasks(tasks: List[Dict[str, Any]]) -> int:

@@ -92,6 +92,12 @@ class TaskStatusUpdateRequest(BaseModel):
     )
 
 
+class RetryAgentRequest(BaseModel):
+    """Body for re-running a single failed committee agent."""
+
+    agent_key: str = Field(..., description="Committee agent key to retry, e.g. content_strategist")
+
+
 class TaskExecutionRequest(BaseModel):
     """Optional execution details for an executable workflow task."""
 
@@ -375,6 +381,32 @@ async def get_generation_progress_endpoint(
     }
 
 
+def _derive_agent_states(agent_evidence: list) -> list:
+    """Classify each committee agent's outcome for transparency/retry.
+
+    Returns one dict per evidence entry with a ``state`` of:
+      - ``error``     : the agent raised an exception (retryable).
+      - ``declined``  : the agent honestly reported nothing to contribute
+                        (informational, not retryable).
+      - ``ok``        : the agent produced proposals (or was not eligible).
+    """
+    states = []
+    for ev in agent_evidence if isinstance(agent_evidence, list) else []:
+        if not isinstance(ev, dict):
+            continue
+        agent = str(ev.get("agent") or "unknown").strip()
+        state = "ok"
+        detail = None
+        if ev.get("error"):
+            state = "error"
+            detail = ev.get("error")
+        elif ev.get("declined"):
+            state = "declined"
+            detail = ev.get("message") or "I have nothing to contribute"
+        states.append({"agent": agent, "state": state, "detail": detail})
+    return states
+
+
 @router.post("/preview")
 async def preview_workflow(
     date: Optional[str] = None,
@@ -420,6 +452,30 @@ async def preview_workflow(
 
     from services.today_workflow_pillar import count_template_fallback_tasks
 
+    # Surface the reason a template task was substituted, instead of hiding
+    # the degraded backfill. Collected from task metadata written by
+    # _controlled_pillar_fallback / the pillar-coverage guardrail.
+    backfill_errors = []
+    for task in response_tasks:
+        meta = task.get("metadata") if isinstance(task.get("metadata"), dict) else {}
+        if meta.get("synthesis_mode") == "template_fallback":
+            backfill_errors.append({
+                "pillar": task.get("pillarId"),
+                "title": task.get("title"),
+                "error": meta.get("generation_error"),
+                "reason": meta.get("reasoning"),
+            })
+
+    # Persisted digest outcome recorded at meeting completion (why an email
+    # did or didn't fire). Absent on plans created before the digest-surfacing
+    # change; the frontend treats a missing value as "no status recorded".
+    plan_json = plan.plan_json if isinstance(plan.plan_json, dict) else {}
+    digest = plan_json.get("digest")
+
+    agent_states = _derive_agent_states(plan_json.get("agent_evidence", []))
+    failed_agents = [s for s in agent_states if s["state"] == "error"]
+    declined_agents = [s for s in agent_states if s["state"] == "declined"]
+
     return {
         "success": True,
         "data": {
@@ -433,6 +489,118 @@ async def preview_workflow(
             # Transparency: how many suggestions are static templates
             # because agent analysis was unavailable.
             "template_fallback_count": count_template_fallback_tasks(response_tasks),
+            "backfill_errors": backfill_errors,
+            "digest": digest,
+            "agent_states": agent_states,
+            "failed_agents": failed_agents,
+            "declined_agents": declined_agents,
+        },
+    }
+
+
+@router.post("/retry-agent")
+async def retry_agent(
+    body: RetryAgentRequest,
+    date: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Re-run a single failed committee agent and merge its fresh proposals.
+
+    Only agents in the plan's ``failed_agents`` set are retryable; declined
+    agents (which honestly reported nothing to contribute) are informational
+    and rejected here. The retry replaces just that agent's tasks and leaves
+    the meeting/digest lifecycle untouched.
+    """
+    from starlette.concurrency import run_in_threadpool
+    from services.today_workflow_service import retry_agent_proposals
+
+    user_id = str(current_user.get("id"))
+    date_str = date or _today_date_str()
+    agent_key = (body.agent_key or "").strip()
+
+    plan = (
+        db.query(DailyWorkflowPlan)
+        .filter(DailyWorkflowPlan.user_id == user_id, DailyWorkflowPlan.date == date_str)
+        .first()
+    )
+    if plan is None:
+        raise HTTPException(status_code=404, detail="No daily workflow plan exists to retry")
+
+    plan_json = plan.plan_json if isinstance(plan.plan_json, dict) else {}
+    agent_states = _derive_agent_states(plan_json.get("agent_evidence", []))
+    failed_keys = {s["agent"] for s in agent_states if s["state"] == "error"}
+    declined_keys = {s["agent"] for s in agent_states if s["state"] == "declined"}
+
+    if agent_key in declined_keys:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Agent {agent_key} declined with nothing to contribute; not retryable",
+        )
+    if agent_key not in failed_keys:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Agent {agent_key} is not currently in a failed state",
+        )
+
+    result = await retry_agent_proposals(db, user_id, agent_key, date=date_str)
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Retry failed"))
+
+    def _fetch_tasks():
+        from services.database import get_session_for_user
+        thread_db = get_session_for_user(user_id)
+        if thread_db is None:
+            return []
+        try:
+            return (
+                thread_db.query(DailyWorkflowTask)
+                .filter(DailyWorkflowTask.plan_id == plan.id, DailyWorkflowTask.user_id == user_id)
+                .order_by(DailyWorkflowTask.created_at.asc())
+                .all()
+            )
+        finally:
+            thread_db.close()
+
+    tasks = await run_in_threadpool(_fetch_tasks)
+    refreshed = _build_workflow_payload(user_id, plan, tasks)["workflow"]["tasks"]
+
+    proposals_by_agent: Dict[str, list] = {}
+    for task in refreshed:
+        agent = ((task.get("metadata") or {}).get("source_agent")) or "unknown"
+        proposals_by_agent.setdefault(agent, []).append(task)
+
+    from services.today_workflow_pillar import count_template_fallback_tasks
+
+    backfill_errors = []
+    for task in refreshed:
+        meta = task.get("metadata") if isinstance(task.get("metadata"), dict) else {}
+        if meta.get("synthesis_mode") == "template_fallback":
+            backfill_errors.append({
+                "pillar": task.get("pillarId"),
+                "title": task.get("title"),
+                "error": meta.get("generation_error"),
+                "reason": meta.get("reasoning"),
+            })
+
+    db.refresh(plan)
+    plan_json = plan.plan_json if isinstance(plan.plan_json, dict) else {}
+    agent_states = _derive_agent_states(plan_json.get("agent_evidence", []))
+
+    return {
+        "success": True,
+        "data": {
+            "agent": agent_key,
+            "date": date_str,
+            "plan_id": plan.id,
+            "tasks": refreshed,
+            "proposals_by_agent": proposals_by_agent,
+            "template_fallback_count": count_template_fallback_tasks(refreshed),
+            "backfill_errors": backfill_errors,
+            "digest": plan_json.get("digest"),
+            "agent_states": agent_states,
+            "failed_agents": [s for s in agent_states if s["state"] == "error"],
+            "declined_agents": [s for s in agent_states if s["state"] == "declined"],
         },
     }
 

@@ -5,7 +5,6 @@ mapping, and the AI-Assisted provenance label.
 """
 import ast
 import re
-import sys
 from pathlib import Path
 
 BACKEND_ROOT = Path(r"C:/Users/diksha rawat/Desktop/ALwrity_github/windsurf/ALwrity/backend")
@@ -155,8 +154,12 @@ def test_resolve_backfill_provider_smoke():
     """Round-trip the resolver with a synthetic user_id; the function
     must not raise and must return a 2-tuple of (provider, model).
     """
-    if "services.today_workflow_service" in sys.modules:
-        del sys.modules["services.today_workflow_service"]
+    # Note: this intentionally does NOT evict ``services.today_workflow_service``
+    # from sys.modules. Deleting and re-importing the module mid-suite breaks
+    # module identity for every other test that monkeypatches that module (the
+    # re-import creates a fresh module object, so sibling tests' monkeypatches
+    # point at a stale module). _resolve_backfill_provider lazily imports its
+    # own dependencies, so it does not need a freshly loaded service module.
     from services.today_workflow_service import _resolve_backfill_provider
     provider, model = _resolve_backfill_provider("provider_smoke_user_xyz")
     assert provider is None or isinstance(provider, str)
