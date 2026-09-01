@@ -6,6 +6,7 @@ Cache management and optimization.
 import logging
 import json
 import hashlib
+import os
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 
@@ -56,14 +57,24 @@ class CachingService:
         self.redis_available = False
         if REDIS_AVAILABLE:
             try:
-                self.redis_client = redis.Redis(
-                    host='localhost',
-                    port=6379,
-                    db=0,
-                    decode_responses=True,
-                    socket_connect_timeout=5,
-                    socket_timeout=5
-                )
+                redis_url = os.environ.get("REDIS_URL")
+                if redis_url:
+                    self.redis_client = redis.Redis.from_url(
+                        redis_url,
+                        decode_responses=True,
+                        socket_connect_timeout=5,
+                        socket_timeout=5
+                    )
+                else:
+                    self.redis_client = redis.Redis(
+                        host=os.environ.get("REDIS_HOST", "localhost"),
+                        port=int(os.environ.get("REDIS_PORT", "6379")),
+                        db=int(os.environ.get("REDIS_DB", "0")),
+                        password=os.environ.get("REDIS_PASSWORD") or None,
+                        decode_responses=True,
+                        socket_connect_timeout=5,
+                        socket_timeout=5
+                    )
                 # Test connection
                 self.redis_client.ping()
                 self.redis_available = True
