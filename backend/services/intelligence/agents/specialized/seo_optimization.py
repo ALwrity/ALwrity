@@ -72,10 +72,17 @@ class SEOOptimizationAgent(BaseALwrityAgent):
         )
     
     # Tool Implementations (sync — called by txtai Agent)
-    
+
     def _seo_auditor_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
         SEO audit tool. Returns availability and directs caller to async method for full analysis.
+
+        Args:
+            context: Input parameters for the tool. Example keys:
+                - website_url: Optional URL of the site to audit
+
+        Returns:
+            A dictionary describing SIF availability or how to fetch detailed data.
         """
         website_url = context.get("website_url", "unknown")
         if not self.sif_service:
@@ -85,6 +92,14 @@ class SEOOptimizationAgent(BaseALwrityAgent):
     def _keyword_researcher_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Keyword research tool. Returns SIF availability and sample context if present.
+
+        Args:
+            context: Input parameters for the tool. Example keys:
+                - seed_keywords: Optional list of seed keywords
+                - topic: Optional topic string (fallback for seed keywords)
+
+        Returns:
+            A dictionary describing SIF availability or how to fetch keyword data.
         """
         seed = context.get("seed_keywords", context.get("topic", "unknown"))
         if not self.sif_service:
@@ -92,11 +107,28 @@ class SEOOptimizationAgent(BaseALwrityAgent):
         return unavailable_tool("sif", f"Use async search_keywords(topic='{seed}') for keyword data")
 
     def _on_page_optimizer_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """On-page optimization tool. Requires async analysis."""
+        """
+        On-page optimization tool. Requires async analysis.
+
+        Args:
+            context: Input parameters for the tool. No required keys; may be empty.
+
+        Returns:
+            A dictionary explaining that on-page optimization is unavailable.
+        """
         return unavailable_tool("seo", "On-page optimization provider is unavailable")
 
     def _technical_fixer_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Technical SEO fixer tool. Auto-fix not implemented."""
+        """
+        Technical SEO fixer tool. Auto-fix not implemented.
+
+        Args:
+            context: Input parameters for the tool. Example keys:
+                - issue_id: Optional identifier of the issue to fix
+
+        Returns:
+            A dictionary explaining that the issue requires manual review.
+        """
         issue_id = context.get("issue_id", "unknown")
         return unavailable_tool("seo", f"Issue '{issue_id}' requires manual review; automated fixes are not implemented")
 
