@@ -206,10 +206,16 @@ export interface RetryAgentResult {
   declined_agents?: TodayPlanPreview["declined_agents"];
 }
 
-export async function previewTodayPlan(): Promise<TodayPlanPreview> {
+export async function previewTodayPlan(force = false): Promise<TodayPlanPreview> {
   // Use long-running API client for this heavy operation
   const { longRunningApiClient } = await import('./client');
-  const res: AxiosResponse<any> = await longRunningApiClient.post('/api/today-workflow/preview');
+  // force=true re-runs the committee even when a plan already exists for
+  // today ("Re-run preview"); without it the call is idempotent.
+  const res: AxiosResponse<any> = await longRunningApiClient.post(
+    '/api/today-workflow/preview',
+    null,
+    { params: force ? { force: true } : undefined },
+  );
   return res.data?.data;
 }
 

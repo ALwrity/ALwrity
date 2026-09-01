@@ -42,6 +42,8 @@ const DIGEST_REASON_LABELS: Record<string, string> = {
   no_onboarding_session: "No onboarding session was found for this account.",
   not_attempted: "The digest was not attempted for this preview.",
   not_recorded_this_plan: "Digest status was not recorded for this plan.",
+  retry: "No new digest email was sent — the daily digest was already enqueued when the plan was first generated.",
+  rerun: "No new digest email was sent — the daily digest was already enqueued when the plan was first generated.",
 };
 
 const digestMessage = (digest?: TodayPlanPreview["digest"]): string | null => {
@@ -169,13 +171,16 @@ const AgentGroupCard: React.FC<{
           </>
         )}
       </Stack>
-      {stateInfo?.detail && (isError || isDeclined) && (
+      {(isError || isDeclined) && (
         <Typography
           variant="caption"
           component="div"
           sx={{ mb: 1, opacity: 0.85, ...(isError ? (modal ? { color: "error.main" } : { color: "#fca5a5" }) : {}) }}
         >
-          {stateInfo.detail}
+          {stateInfo?.detail ||
+            (isError
+              ? "Agent proposal failed with an unknown error. Click Retry to re-run it."
+              : "I have nothing to contribute")}
         </Typography>
       )}
       <Stack spacing={1}>
@@ -267,7 +272,7 @@ export const AgentTeamPreview: React.FC = () => {
     return () => clearInterval(interval);
   }, [loading]);
 
-  const handlePreview = async () => {
+  const handlePreview = async (force = false) => {
     setLoading(true);
     currentStageRef.current = 0;
     setCurrentStage(0);
@@ -278,7 +283,9 @@ export const AgentTeamPreview: React.FC = () => {
     setRetryError(null);
     setRetryNotice(null);
     try {
-      const data = await previewTodayPlan();
+      // force=true ("Re-run preview") re-runs the committee and replaces the
+      // persisted plan instead of replaying today's cached/first-run plan.
+      const data = await previewTodayPlan(force);
       setPreview(data);
       onboardingCache.saveFinalStepData({ todayPlanPreview: data });
       setResultModalOpen(true);
@@ -383,7 +390,7 @@ export const AgentTeamPreview: React.FC = () => {
       {!preview && (
         <Button
           variant="contained"
-          onClick={handlePreview}
+          onClick={() => handlePreview(false)}
           disabled={loading}
           startIcon={loading ? <CircularProgress size={16} sx={{ color: "#4f46e5" }} /> : <RocketLaunchIcon />}
           sx={{
@@ -466,7 +473,7 @@ export const AgentTeamPreview: React.FC = () => {
             </Button>
             <Button
               variant="outlined"
-              onClick={handlePreview}
+              onClick={() => handlePreview(true)}
               disabled={loading}
               sx={{ textTransform: "none", borderColor: "rgba(255,255,255,0.4)", color: "#e5e7eb", "&:hover": { borderColor: "#e5e7eb" } }}
             >
