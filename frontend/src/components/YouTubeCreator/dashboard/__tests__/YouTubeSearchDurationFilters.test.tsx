@@ -283,9 +283,10 @@ describe("Hub Duration wiring", () => {
 
   it("Duration requests do not apply Shorts hashtag keep", () => {
     const requests = fs.readFileSync(HUB_SEARCH_REQUESTS, "utf8");
-    const durationFn = requests.slice(
-      requests.indexOf("export async function searchYouTubeByDuration"),
-    );
+    const start = requests.indexOf("export async function searchYouTubeByDuration");
+    const fromFn = requests.slice(start);
+    const nextExport = fromFn.indexOf("\nexport async function ");
+    const durationFn = nextExport === -1 ? fromFn : fromFn.slice(0, nextExport);
     expect(requests).toContain("export async function searchYouTubeByDuration");
     expect(durationFn).toContain('video_duration: duration');
     expect(durationFn).not.toContain("isYouTubeShortsTitle");
