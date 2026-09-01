@@ -318,6 +318,122 @@ async def test_agent_declined_is_not_classified_as_error(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_committee_surfaces_self_heal_limitation(monkeypatch):
+    """When an agent's SIF search self-healed the index during this run, the
+    committee must surface that in the plan's limitations (transparency)."""
+    from services import today_workflow_service as svc
+    from services.today_workflow_agents import generate_agent_enhanced_plan
+
+    class _HealedAgent:
+        last_sif_heal = {"healed": True, "bootstrap_indexed": 3}
+
+        async def propose_daily_tasks(self, grounding):
+            return []
+
+    async def _get_orchestrator(user_id):
+        return SimpleNamespace(agents={
+            "content": _HealedAgent(),
+            "strategy": None,
+            "seo": None,
+            "social": None,
+            "competitor": None,
+            "content_gap_radar": None,
+        })
+
+    monkeypatch.setattr(svc.orchestration_service, "get_or_create_orchestrator", _get_orchestrator)
+
+    result = await generate_agent_enhanced_plan(
+        db=None, user_id="u1", date="2026-01-01", grounding={"onboarding_data": {}}
+    )
+
+    limitations = " | ".join(result.get("limitations", []))
+    assert "self-healed" in limitations.lower(), f"heal limitation missing: {limitations}"
+
+
+@pytest.mark.asyncio
+async def test_committee_writes_shared_note_and_activity_log(monkeypatch):
+    """G3: after a committee run, the outcome is recorded in the VFS shared
+    scratchpad (collaboration note + activity log) as the cross-agent
+    coordination substrate."""
+    import json
+    import uuid
+    import shutil
+    from pathlib import Path
+
+    from services import today_workflow_service as svc
+    from services.today_workflow_agents import generate_agent_enhanced_plan
+
+    user_id = "pytest_committee_note_" + uuid.uuid4().hex[:8]
+    # The workspace root resolves to the REPOSITORY root (utils.storage_paths),
+    # not the backend/ directory.
+    backend_root = Path(__file__).resolve().parents[2]
+    workspace = backend_root / "workspace" / f"workspace_{user_id}"
+
+    class _RecordingAgent:
+        async def propose_daily_tasks(self, grounding):
+            from services.intelligence.agents.core_agent_framework import TaskProposal
+            return [TaskProposal(
+                title="Write grounded post",
+                description="grounded in brand voice",
+                pillar_id="generate",
+                priority="high",
+                estimated_time=30,
+                source_agent="content_strategist",
+                reasoning="SIF evidence",
+            )]
+
+    audit_seen = {}
+
+    class _AuditingGuardian:
+        async def audit_committee(self, audit_input):
+            audit_seen["input"] = audit_input
+            return {
+                "health_score": 88,
+                "alerts": [],
+                "agent_critiques": [],
+                "coverage_gaps": [],
+                "overlaps": [],
+            }
+
+    async def _get_orchestrator(user):
+        return SimpleNamespace(agents={
+            "content": _RecordingAgent(),
+            "strategy": None,
+            "seo": None,
+            "social": None,
+            "competitor": None,
+            "content_gap_radar": None,
+            "guardian": _AuditingGuardian(),
+        })
+
+    monkeypatch.setattr(svc.orchestration_service, "get_or_create_orchestrator", _get_orchestrator)
+
+    try:
+        result = await generate_agent_enhanced_plan(
+            db=None, user_id=user_id, date="2026-01-01", grounding={"onboarding_data": {}}
+        )
+
+        scratchpad = workspace / "scratchpad"
+        note_file = scratchpad / "collaboration.md"
+        log_file = scratchpad / "activity_log.jsonl"
+
+        assert note_file.exists(), f"shared note missing: {note_file}"
+        assert log_file.exists(), f"activity log missing: {log_file}"
+
+        note_text = note_file.read_text(encoding="utf-8")
+        assert "today_workflow_committee" in note_text
+        assert "committee run completed" in note_text.lower()
+
+        entries = [json.loads(l) for l in log_file.read_text(encoding="utf-8").splitlines() if l.strip()]
+        assert any(e.get("event_type") == "committee_run_completed" for e in entries), f"missing run entry: {entries}"
+        run_entry = next(e for e in entries if e.get("event_type") == "committee_run_completed")
+        assert run_entry.get("details", {}).get("accepted_tasks", 0) >= 1
+    finally:
+        if workspace.exists():
+            shutil.rmtree(workspace, ignore_errors=True)
+
+
+@pytest.mark.asyncio
 async def test_agent_error_is_classified_as_error(monkeypatch):
     """A generic agent exception is recorded as an error state."""
     from services import today_workflow_service as svc

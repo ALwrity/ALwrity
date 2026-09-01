@@ -271,6 +271,13 @@ class AgentPerformance:
     last_action_at: str
     efficiency_score: float  # 0.0 to 1.0
 
+def _maybe_self_heal_index_impl(sif_service: Any, **kwargs) -> Any:
+    """Indirection so tests can stub the heal without importing SIF deps."""
+    from services.intelligence.sif_self_heal import maybe_self_heal_index
+
+    return maybe_self_heal_index(sif_service, **kwargs)
+
+
 class BaseALwrityAgent(ABC):
     """Base class for all ALwrity marketing agents"""
 
@@ -279,6 +286,136 @@ class BaseALwrityAgent(ABC):
     _CONTEXT_CACHE_TTL_SECONDS = 600
     _prompt_context_cache: Dict[str, Any] = {}  # user_id -> (expires_at, context)
     _profile_cache: Dict[str, Any] = {}  # user_id:agent_key -> (expires_at, profile_data)
+    def _resolve_sif_intelligence(self) -> Any:
+        """Locate the txtai intelligence service for this agent.
+
+        SIFBaseAgent subclasses carry ``self.intelligence`` directly; plain
+        BaseALwrityAgent agents (SEO, competitor, content strategy, social)
+        carry ``self.sif_service`` whose ``intelligence_service`` is the same
+        per-user txtai singleton.
+        """
+        intel = getattr(self, "intelligence", None)
+        if intel is not None:
+            return intel
+        return getattr(getattr(self, "sif_service", None), "intelligence_service", None)
+
+    async def sif_search(
+        self,
+        query: str,
+        *,
+        limit: int = 5,
+        trigger: str = "agent_search",
+        min_index_items: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """Search the SIF index with self-healing on empty results.
+
+        Central choke point for every specialized agent's SIF search:
+        - runs the query through the intelligence service (initializing it
+          lazily when needed),
+        - on an EMPTY result, triggers the once-per-day self-heal
+          (bootstrap-index the flat context documents + watermark-guarded
+          website sync) and retries the search once,
+        - never raises: search or heal failures degrade to ``[]``.
+        """
+        intelligence = self._resolve_sif_intelligence()
+        results: List[Dict[str, Any]] = []
+        if intelligence is not None:
+            try:
+                ensure = getattr(intelligence, "_ensure_initialized_async", None)
+                if callable(ensure):
+                    try:
+                        await ensure()
+                    except Exception as init_exc:
+                        logger.debug(f"[{type(self).__name__}] SIF init failed: {init_exc}")
+                results = list(await intelligence.search(query, limit=limit) or [])
+            except Exception as exc:
+                logger.debug(f"[{type(self).__name__}] SIF search failed: {exc}")
+                results = []
+        if results:
+            return results
+
+        # Miss: heal the index once (day-guarded) and retry the search.
+        try:
+            from services.intelligence.sif_integration import SIFIntegrationService
+
+            sif = getattr(self, "sif_service", None)
+            if sif is None:
+                try:
+                    sif = SIFIntegrationService(self.user_id)
+                except Exception:
+                    sif = None
+            if sif is not None:
+                heal = await _maybe_self_heal_index_impl(
+                    sif, trigger=trigger, min_index_items=min_index_items
+                )
+                if heal.get("healed") and intelligence is not None:
+                    # Record the heal on the agent so the committee can
+                    # surface it in the plan's limitations (transparency:
+                    # the evidence base was repaired from local context).
+                    try:
+                        self.last_sif_heal = heal
+                    except Exception:
+                        pass
+                    logger.info(
+                        f"[{type(self).__name__}] SIF index healed "
+                        f"(+{heal.get('bootstrap_indexed')} docs); retrying search"
+                    )
+                    try:
+                        results = list(await intelligence.search(query, limit=limit) or [])
+                    except Exception as retry_exc:
+                        logger.debug(f"[{type(self).__name__}] SIF retry after heal failed: {retry_exc}")
+        except Exception as exc:
+            logger.debug(f"[{type(self).__name__}] Self-heal attempt failed: {exc}")
+        return results
+
+
+
+    def _remember_grounding(self, context: Any) -> None:
+        """Cache the latest committee grounding on this agent instance.
+
+        ``propose_daily_tasks`` receives the committee grounding dict; txtai
+        tool calls do not. Remembering it here lets every SIF query composed
+        later (``_sif_query``) be user-specific instead of a generic keyword
+        bag. Failures are non-fatal: a missing grounding just means the
+        query builder falls back to the caller's legacy query.
+        """
+        try:
+            if isinstance(context, dict):
+                self._latest_grounding = context
+        except Exception:
+            pass
+
+    def _sif_query(
+        self,
+        agent_key: Optional[str] = None,
+        *,
+        hints: Optional[List[str]] = None,
+        fallback: str = "",
+        max_terms: int = 8,
+    ) -> str:
+        """Compose a user-specific SIF search query for this agent.
+
+        Uses the remembered committee grounding (see ``_remember_grounding``)
+        and, when it is thin, the user's flat-context documents via
+        ``AgentContextVFS``. With no context at all the caller's legacy
+        ``fallback`` string is returned verbatim.
+        """
+        try:
+            from services.intelligence.sif_query_builder import build_contextual_query
+
+            key = agent_key or getattr(self, "agent_type", "") or ""
+            return build_contextual_query(
+                key,
+                getattr(self, "_latest_grounding", None),
+                user_id=self.user_id,
+                hints=hints,
+                fallback=fallback,
+                max_terms=max_terms,
+            )
+        except Exception as exc:
+            logger.debug(f"[{type(self).__name__}] Query build failed, using fallback: {exc}")
+            return fallback
+
     
     def __init__(self, user_id: str, agent_type: str, model_name: str = "Qwen/Qwen2.5-1.5B-Instruct", llm: Any = None, enable_tracing: bool = True, **kwargs):
         self.user_id = user_id

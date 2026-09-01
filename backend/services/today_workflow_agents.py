@@ -45,6 +45,55 @@ from services.today_workflow_service import (
 from services import today_workflow_service as _today_svc
 
 
+def _record_committee_shared_note(
+    user_id: str,
+    *,
+    agents_polled_count: int,
+    accepted_count: int,
+    total_proposals: int,
+    guardian_health: Any = None,
+    healed: bool = False,
+    fallback_used: bool = False,
+) -> None:
+    """Append the committee outcome to the VFS shared scratchpad.
+
+    Writes a collaboration note + a ``committee_run_completed`` activity-log
+    entry so agents and operators can see prior-run observations (the
+    cross-agent coordination substrate). Failures are logged and swallowed —
+    the note is observability, never a correctness dependency.
+    """
+    summary_bits = [
+        f"committee run completed: polled={agents_polled_count} agents",
+        f"accepted={accepted_count}/{total_proposals} proposals",
+    ]
+    if guardian_health is not None:
+        summary_bits.append(f"guardian_health={guardian_health}")
+    if healed:
+        summary_bits.append("sif_index_self_healed=true")
+    if fallback_used:
+        summary_bits.append("committee_returned_no_tasks=true (LLM fallback used)")
+    note = "; ".join(summary_bits)
+    try:
+        from services.intelligence.agent_context_vfs import AgentContextVFS
+
+        vfs = AgentContextVFS(user_id)
+        vfs.write_shared_note(note, agent_id="today_workflow_committee")
+        vfs.append_activity_log(
+            event_type="committee_run_completed",
+            actor="today_workflow_committee",
+            details={
+                "agents_polled": agents_polled_count,
+                "accepted_tasks": accepted_count,
+                "total_proposals": total_proposals,
+                "guardian_health": guardian_health,
+                "sif_healed": healed,
+                "fallback_used": fallback_used,
+            },
+        )
+    except Exception as exc:
+        logger.debug(f"[today_workflow_agents] Shared note write failed for {user_id}: {exc}")
+
+
 def _proposal_field(proposal, key: str, default=None):
     """Read a field from a TaskProposal object or a dict-shaped proposal.
 
@@ -607,6 +656,35 @@ async def generate_agent_enhanced_plan(
         logger.error(f"Committee proposal phase failed: {e}")
         # Continue to fallback or LLM generation if committee fails
 
+    # Surface any SIF self-heal that happened during this run so the
+    # plan records that its evidence base was repaired from local
+    # onboarding context (transparency for operators and the user).
+    # Computed before final selection so BOTH the committee-success and
+    # the LLM-fallback paths can include it.
+    heal_limitations = []
+    for polled_agent in active_agents:
+        heal = getattr(polled_agent, "last_sif_heal", None)
+        if isinstance(heal, dict) and heal.get("healed"):
+            heal_limitations.append(
+                "SIF index was self-healed from local onboarding context before this run "
+                f"(+{int(heal.get('bootstrap_indexed') or 0)} docs, "
+                f"+{int(heal.get('website_sync_new') or 0)} synced pages)"
+            )
+
+    # Cross-agent coordination substrate: record the committee outcome in
+    # the VFS shared scratchpad (collaboration note + activity log) so
+    # agents and operators can see prior-run observations. Never fatal.
+    _record_committee_shared_note(
+        user_id,
+        agents_polled_count=agents_polled_count,
+        accepted_count=len(agent_tasks) if agent_tasks else 0,
+        total_proposals=len(raw_proposals) if raw_proposals else 0,
+        guardian_health=(guardian_review.get("summary", {}) or {}).get("health_score")
+        if isinstance(guardian_review, dict) else None,
+        healed=bool(heal_limitations),
+        fallback_used=not bool(agent_tasks),
+    )
+
     # 4. Final Selection
     # Use grounded committee tasks; tenant-backed empty meetings stay limited.
     if agent_tasks and not strict_contextuality:
@@ -687,7 +765,7 @@ async def generate_agent_enhanced_plan(
             "agent_evidence": agent_evidence,
             "proposal_review": proposal_review,
             "guardian_review": guardian_review,
-            "limitations": meeting_preflight["limitations"],
+            "limitations": [*meeting_preflight["limitations"], *heal_limitations],
         })
 
     if db is not None:
@@ -823,7 +901,7 @@ async def generate_agent_enhanced_plan(
         "committee_agent_count": 0,
         "meeting_preflight": meeting_preflight,
         "agent_evidence": agent_evidence,
-        "limitations": meeting_preflight["limitations"],
+        "limitations": [*meeting_preflight["limitations"], *heal_limitations],
     }
 
     activity.log_event(

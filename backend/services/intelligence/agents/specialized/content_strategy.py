@@ -390,10 +390,17 @@ class ContentStrategyAgent(BaseALwrityAgent):
         sif_items = []
         if self.sif_service and getattr(self.sif_service, "intelligence_service", None):
             try:
+                topic_hint = str(context.get("topic") or context.get("target_url") or "").strip()
+                sif_query = self._sif_query(
+                    "content_strategist",
+                    hints=[topic_hint] if topic_hint else ["content gaps"],
+                    fallback="content gaps",
+                )
                 sif_items = self._run_async_tool(
-                    self.sif_service.intelligence_service.search(
-                        str(context.get("topic") or context.get("target_url") or "content gaps"),
+                    self.sif_search(
+                        sif_query,
                         limit=int(context.get("limit") or 10),
+                        trigger="content_analyzer",
                     )
                 ) or []
             except Exception as exc:
@@ -486,10 +493,18 @@ class ContentStrategyAgent(BaseALwrityAgent):
             intelligence = getattr(self.sif_service, "intelligence_service", None)
             if not intelligence:
                 return unavailable_tool("sif", "SIF intelligence service is unavailable")
+            topics = [str(item) for item in (context.get("topics") or []) if str(item).strip()]
+            topic_hint = " ".join(topics) if topics else "content gaps"
+            sif_query = self._sif_query(
+                "content_strategist",
+                hints=[topic_hint],
+                fallback=topic_hint,
+            )
             results = self._run_async_tool(
-                intelligence.search(
-                    " ".join(str(item) for item in context.get("topics", []) or ["content gaps"]),
+                self.sif_search(
+                    sif_query,
                     limit=int(context.get("limit") or 10),
+                    trigger="semantic_gap_detector",
                 )
             )
             items = [
@@ -534,6 +549,7 @@ class ContentStrategyAgent(BaseALwrityAgent):
         Derives content pillars, industry, and competitor info to
         generate personalized daily content suggestions.
         """
+        self._remember_grounding(context)
         default_proposals = []
 
         onboarding = context.get("onboarding_data", {})

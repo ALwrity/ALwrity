@@ -112,6 +112,7 @@ class SocialAmplificationAgent(BaseALwrityAgent):
         Propose social media tasks based on user's onboarding context.
         Derives platforms and content types from user data.
         """
+        self._remember_grounding(context)
         default_proposals = []
 
         onboarding = context.get("onboarding_data", {})

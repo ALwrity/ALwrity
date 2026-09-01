@@ -17,6 +17,33 @@ class StrategyArchitectAgent(SIFBaseAgent):
     def __init__(self, intelligence_service: TxtaiIntelligenceService, user_id: str, **kwargs):
         super().__init__(intelligence_service, user_id, agent_type="strategy_architect", **kwargs)
 
+    def _known_content_pillars(self) -> List[str]:
+        """Content pillars already known from the user's onboarding context.
+
+        Reads the remembered committee grounding (multiple sources, in
+        priority order: website style insights, sitemap analysis, research
+        preferences). Used when SIF clustering cannot detect pillars so the
+        agent proposes pillar-grounded work instead of a generic fallback.
+        """
+        onboarding = {}
+        grounding = getattr(self, "_latest_grounding", None)
+        if isinstance(grounding, dict) and isinstance(grounding.get("onboarding_data"), dict):
+            onboarding = grounding["onboarding_data"]
+        website = onboarding.get("website_analysis") if isinstance(onboarding.get("website_analysis"), dict) else {}
+        research = onboarding.get("research_preferences") if isinstance(onboarding.get("research_preferences"), dict) else {}
+        style_analysis = website.get("style_analysis") if isinstance(website.get("style_analysis"), dict) else {}
+        insights = style_analysis.get("content_strategy_insights") if isinstance(style_analysis.get("content_strategy_insights"), dict) else {}
+        sitemap_analysis = style_analysis.get("sitemap_analysis") if isinstance(style_analysis.get("sitemap_analysis"), dict) else {}
+        pillars = (
+            insights.get("content_pillars")
+            or sitemap_analysis.get("content_pillars")
+            or research.get("content_pillars")
+            or []
+        )
+        if not isinstance(pillars, list):
+            pillars = [pillars]
+        return [str(p).strip() for p in pillars if str(p).strip()][:6]
+
     async def discover_pillars(self) -> List[Dict[str, Any]]:
         """Identify content pillars through semantic clustering."""
         self._log_agent_operation("Discovering content pillars")
@@ -60,6 +87,7 @@ class StrategyArchitectAgent(SIFBaseAgent):
 
     async def propose_daily_tasks(self, context: Dict[str, Any]) -> List[TaskProposal]:
         """Propose PLAN pillar tasks based on semantic analysis."""
+        self._remember_grounding(context)
         default_proposals = []
         
         # 1. Pillar Health Check
@@ -67,17 +95,43 @@ class StrategyArchitectAgent(SIFBaseAgent):
             # We use a shorter timeout or cached check if possible, but discover_pillars is fairly fast
             pillars = await self.discover_pillars()
             if not pillars:
-                default_proposals.append(TaskProposal(
-                    title="Establish Content Pillars",
-                    description="Your content strategy lacks defined pillars. Let's analyze your niche to find core topics.",
-                    pillar_id="plan",
-                    priority="high",
-                    estimated_time=15,
-                    source_agent="StrategyArchitectAgent",
-                    reasoning="No content pillars detected via SIF clustering.",
-                    action_type="navigate",
-                    action_url="/content-planning-dashboard"
-                ))
+                # Pillar-aware fallback: when SIF clustering is unavailable
+                # (empty/thin index, clustering failure), use the pillars
+                # already known from the user's onboarding context instead
+                # of a generic "Establish Content Pillars" task.
+                known_pillars = self._known_content_pillars()
+                if known_pillars:
+                    for pillar_name in known_pillars[:3]:
+                        default_proposals.append(TaskProposal(
+                            title=f"Build Out Content Pillar: {pillar_name}",
+                            description=(
+                                f"SIF clustering found no pillar structure yet, but onboarding "
+                                f"identified '{pillar_name}' as a core pillar. Create a pillar page "
+                                f"with supporting topic clusters around it."
+                            ),
+                            pillar_id="plan",
+                            priority="high",
+                            estimated_time=45,
+                            source_agent="StrategyArchitectAgent",
+                            reasoning=(
+                                f"Pillar '{pillar_name}' comes from your onboarding content strategy "
+                                f"(SIF clustering unavailable this run)."
+                            ),
+                            action_type="navigate",
+                            action_url="/content-planning-dashboard"
+                        ))
+                else:
+                    default_proposals.append(TaskProposal(
+                        title="Establish Content Pillars",
+                        description="Your content strategy lacks defined pillars. Let's analyze your niche to find core topics.",
+                        pillar_id="plan",
+                        priority="high",
+                        estimated_time=15,
+                        source_agent="StrategyArchitectAgent",
+                        reasoning="No content pillars detected via SIF clustering.",
+                        action_type="navigate",
+                        action_url="/content-planning-dashboard"
+                    ))
             elif len(pillars) < 3:
                 default_proposals.append(TaskProposal(
                     title="Expand Content Pillars",
@@ -228,7 +282,15 @@ class StrategyArchitectAgent(SIFBaseAgent):
                 f"select id, text, object from txtai limit {limit}",
                 f"select id, text, tags from txtai limit {limit}"
             ])
-        candidate_queries.extend(["marketing", "content", "seo", "strategy", "social media"])
+        # Prefer a user-specific keyword query (brand/industry/pillars) over
+        # the old generic single-word list; the generic list remains the
+        # fallback when no onboarding context is available.
+        contextual = self._sif_query(
+            "strategy_architect",
+            fallback="marketing content seo strategy social media",
+            max_terms=8,
+        )
+        candidate_queries.extend([contextual])
 
         seen_ids = set()
         for query in candidate_queries:
