@@ -371,6 +371,67 @@ async def test_retry_returns_zero_when_agent_still_fails(monkeypatch, dbsession)
 
 
 @pytest.mark.asyncio
+async def test_retry_writes_shared_note_and_activity_log(monkeypatch, dbsession):
+    """A successful per-agent retry is recorded in the VFS shared scratchpad
+    (collaboration note + activity log) for cross-agent coordination."""
+    import json
+    import uuid
+    import shutil
+    from pathlib import Path
+
+    from services import today_workflow_service as svc
+
+    user_id = "u1"
+    plan = _make_plan(dbsession)
+    _make_task(dbsession, plan.id, user_id, "plan", "old-content-task", "content_strategist")
+    dbsession.commit()
+
+    retried_tasks = [{
+        "pillarId": "plan",
+        "title": "new-content-task",
+        "description": "fresh",
+        "priority": "high",
+        "estimatedTime": 20,
+        "actionType": "navigate",
+        "actionUrl": None,
+        "enabled": True,
+        "metadata": {"source_agent": "content_strategist"},
+    }]
+
+    async def _fake_generate(db, user_id, date, grounding=None, strict_contextuality=False,
+                             retry_agents=None, skip_meeting_lifecycle=False, **kwargs):
+        return {
+            "tasks": retried_tasks,
+            "agent_evidence": [{"agent": "content_strategist", "error": None}],
+            "meeting_id": None,
+            "digest": {"status": "skipped", "reason": "retry"},
+        }
+
+    monkeypatch.setattr(svc, "generate_agent_enhanced_plan", _fake_generate)
+    monkeypatch.setattr(svc, "build_grounding_context", lambda db, uid, d: {"onboarding_data": {}})
+
+    workspace = Path(__file__).resolve().parents[2] / "workspace" / f"workspace_{user_id}"
+    try:
+        result = await svc.retry_agent_proposals(dbsession, user_id, "content_strategist", date="2026-01-01")
+        assert result["success"] is True
+
+        scratchpad = workspace / "scratchpad"
+        note_file = scratchpad / "collaboration.md"
+        log_file = scratchpad / "activity_log.jsonl"
+
+        assert note_file.exists(), f"retry note missing: {note_file}"
+        note_text = note_file.read_text(encoding="utf-8")
+        assert "content_strategist" in note_text
+        assert "retry" in note_text.lower()
+
+        entries = [json.loads(l) for l in log_file.read_text(encoding="utf-8").splitlines() if l.strip()]
+        assert any(e.get("event_type") == "agent_retry_completed" for e in entries), f"missing retry entry: {entries}"
+    finally:
+        if workspace.exists():
+            shutil.rmtree(workspace, ignore_errors=True)
+
+
+@pytest.mark.asyncio
 async def test_retry_requires_existing_plan(dbsession):
     """Retrying with no existing plan returns an explicit not-found error."""
     from services import today_workflow_service as svc

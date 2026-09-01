@@ -349,6 +349,13 @@ class BaseALwrityAgent(ABC):
                     sif, trigger=trigger, min_index_items=min_index_items
                 )
                 if heal.get("healed") and intelligence is not None:
+                    # Record the heal on the agent so the committee can
+                    # surface it in the plan's limitations (transparency:
+                    # the evidence base was repaired from local context).
+                    try:
+                        self.last_sif_heal = heal
+                    except Exception:
+                        pass
                     logger.info(
                         f"[{type(self).__name__}] SIF index healed "
                         f"(+{heal.get('bootstrap_indexed')} docs); retrying search"

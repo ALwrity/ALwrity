@@ -405,6 +405,31 @@ async def generate_agent_enhanced_plan(
     )
 
 
+def _record_retry_shared_note(user_id: str, agent_key: str, added: int, replaced: int) -> None:
+    """Append a per-agent retry outcome to the VFS shared scratchpad.
+
+    Collaboration note + ``agent_retry_completed`` activity-log entry so
+    agents and operators can see prior retry outcomes (cross-agent
+    coordination substrate). Failures are swallowed: the note is
+    observability, never a correctness dependency.
+    """
+    try:
+        from services.intelligence.agent_context_vfs import AgentContextVFS
+
+        vfs = AgentContextVFS(user_id)
+        vfs.write_shared_note(
+            f"agent retry completed: {agent_key} added={added} replaced={replaced}",
+            agent_id="today_workflow_committee",
+        )
+        vfs.append_activity_log(
+            event_type="agent_retry_completed",
+            actor="today_workflow_committee",
+            details={"agent": agent_key, "added": added, "replaced": replaced},
+        )
+    except Exception as exc:
+        logger.debug(f"[today_workflow_service] Retry note write failed for {user_id}: {exc}")
+
+
 def _merge_retried_agent_tasks(
     db: Session,
     plan: DailyWorkflowPlan,
@@ -578,6 +603,8 @@ async def retry_agent_proposals(
     plan.fallback_used = bool(plan_json.get("fallback_used", False))
     db.add(plan)
     db.commit()
+
+    _record_retry_shared_note(user_id, agent_key, merge["added"], merge["removed"])
 
     return {
         "success": True,

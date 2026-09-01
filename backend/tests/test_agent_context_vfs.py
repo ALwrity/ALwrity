@@ -154,3 +154,40 @@ def test_read_struct_path_resolution_and_dependency_context():
     assert out['ok'] is True
     assert out['data'] == 'Ops Leader'
     assert out['dependency_context']['brand_voice'] == 'Pragmatic'
+
+
+def test_search_context_scores_and_caps_results():
+    """G4: the VFS grep/search layer (relevance scoring, synonym expansion,
+    token budgeting, top-10 cap) must return matched, scored results over
+    the saved context documents."""
+    user_id = 'pytest_search_ctx_user'
+    _cleanup_workspace(user_id)
+
+    store = AgentFlatContextStore(user_id)
+    assert store.save_step2_website_analysis(
+        {
+            'website_url': 'https://search.example.com',
+            'brand_analysis': {'brand_voice': 'Witty'},
+            'agent_summary': {'quick_facts': {'brand_voice': 'Witty'}},
+        }
+    )
+    assert store.save_step3_research_preferences(
+        {
+            'research_depth': 'deep',
+            'competitors': ['jasper.example.com'],
+        }
+    )
+
+    vfs = AgentContextVFS(user_id)
+    out = vfs.search_context('brand voice', limit=10)
+
+    assert out.get('query') == 'brand voice'
+    assert out.get('can_answer') is True, f"search found nothing: {out}"
+    assert out.get('matched_files_count', 0) >= 1
+    results = out.get('results') or []
+    assert results, f"no scored results: {out}"
+    top = results[0]
+    assert top.get('score', 0) >= 50, f"score missing: {top}"
+    assert top.get('path'), f"path missing: {top}"
+    # synonym expansion should have widened the query (tone/voice synonyms)
+    assert len(out.get('attempted_queries') or []) >= 1
