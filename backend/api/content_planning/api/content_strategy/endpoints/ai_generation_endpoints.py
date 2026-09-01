@@ -67,7 +67,7 @@ from datetime import datetime
 import os
 
 # Import database
-from services.database import get_db_session
+from services.database import get_db
 
 # Import services
 from ....services.content_strategy.ai_generation import AIStrategyGenerator, StrategyGenerationConfig
@@ -134,15 +134,6 @@ def _prune_expired_tasks() -> None:
     for task_id in expired:
         store.pop(task_id, None)
         expires_at.pop(task_id, None)
-
-# Helper function to get database session
-def get_db():
-    db = get_db_session()
-    try:
-        yield db
-    finally:
-        db.close()
-
 
 # ============================================================================
 # Grounding validation helpers (quality gates wiring)
