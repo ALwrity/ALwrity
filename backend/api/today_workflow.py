@@ -410,6 +410,7 @@ def _derive_agent_states(agent_evidence: list) -> list:
 @router.post("/preview")
 async def preview_workflow(
     date: Optional[str] = None,
+    force: bool = False,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -418,13 +419,25 @@ async def preview_workflow(
     Runs the agent committee (bypassing the onboarding-completion gate so it
     works in the onboarding final step) and persists a DailyWorkflowPlan so the
     result is durable and feeds the dashboard's today-workflow directly.
+
+    ``force=true`` re-runs the committee even when a plan already exists for
+    the date: the existing plan row is kept (same id, digest and meeting
+    linkage) but its tasks and ``plan_json`` are replaced with fresh output.
+    Without it the call is idempotent — an existing plan is returned as-is.
     """
     from starlette.concurrency import run_in_threadpool
+    # Import lazily (matching the retry endpoint below) so the call always
+    # resolves the current services.today_workflow_service module object —
+    # env-override tests re-import that module mid-suite, and a top-level
+    # binding would keep calling a stale copy whose monkeypatches never land.
+    from services.today_workflow_service import get_or_create_daily_workflow_plan
+
     user_id = str(current_user.get("id"))
     date_str = date or _today_date_str()
 
     plan, created = await get_or_create_daily_workflow_plan(
-        db, user_id, date=date_str, creation_source="preview", allow_preview=True
+        db, user_id, date=date_str, creation_source="preview", allow_preview=True,
+        force_rerun=force,
     )
 
     def _fetch_tasks():

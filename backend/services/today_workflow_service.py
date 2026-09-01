@@ -590,6 +590,54 @@ async def retry_agent_proposals(
     }
 
 
+def _persist_workflow_tasks(
+    thread_db: Session,
+    plan_id: int,
+    user_id: str,
+    tasks: List[Dict[str, Any]],
+) -> int:
+    """Persist plan tasks as ``DailyWorkflowTask`` rows on ``thread_db``.
+
+    Tasks whose ``pillarId`` is not a valid pillar are skipped with a
+    warning (bad agent output stays debuggable). Returns the number of
+    rows persisted. Shared by the create and forced-re-run paths so both
+    keep identical persistence semantics.
+    """
+    persisted = 0
+    for t in tasks:
+        pillar_id = str(t.get("pillarId") or "").lower().strip()
+        if pillar_id not in PILLAR_IDS:
+            agent = None
+            metadata = t.get("metadata")
+            if isinstance(metadata, dict):
+                agent = metadata.get("source_agent")
+            logger.warning(
+                f"Skipping task persistence for invalid pillar_id={pillar_id!r} "
+                f"from agent {agent or 'unknown'}: title={t.get('title', '')}"
+            )
+            continue
+        task = DailyWorkflowTask(
+            plan_id=plan_id,
+            user_id=user_id,
+            pillar_id=pillar_id,
+            title=str(t.get("title") or "Task").strip()[:255],
+            description=str(t.get("description") or "").strip(),
+            status=_coerce_status(t.get("status")),
+            priority=_coerce_priority(t.get("priority")),
+            estimated_time=int(t.get("estimatedTime") or 15),
+            action_type=str(t.get("actionType") or "navigate").strip()[:20],
+            action_url=str(t.get("actionUrl") or "").strip(),
+            dependencies=json.dumps(t.get("dependencies") or []),
+            metadata_json=t.get("metadata") or {},
+            enabled=bool(t.get("enabled", True)),
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        thread_db.add(task)
+        persisted += 1
+    return persisted
+
+
 async def get_or_create_daily_workflow_plan(
     db: Session,
     user_id: str,
@@ -597,7 +645,17 @@ async def get_or_create_daily_workflow_plan(
     creation_source: str = "manual",
     allow_preview: bool = False,
     manual_override: Optional[bool] = None,
+    force_rerun: bool = False,
 ) -> tuple[DailyWorkflowPlan, bool]:
+    """Return today's persisted plan, creating it via the committee when absent.
+
+    ``force_rerun`` re-runs the full committee even when a plan already exists
+    for the date (the "Re-run preview" path): the existing plan row is kept
+    (same id, same digest, same meeting linkage) but its tasks and
+    ``plan_json`` are replaced with fresh committee output. The re-run uses
+    ``skip_meeting_lifecycle=True`` so it never creates a second meeting
+    record or re-fires the digest email.
+    """
     from starlette.concurrency import run_in_threadpool
 
     date_str = date or _today_date_str()
@@ -621,9 +679,13 @@ async def get_or_create_daily_workflow_plan(
             thread_db.close()
 
     existing = await run_in_threadpool(_get_existing)
-    
-    if existing:
+
+    # The short-circuit only applies when the caller did not ask for a
+    # re-run; otherwise fall through to full regeneration below.
+    if existing and not force_rerun:
         return existing, False
+    # ``rerunning`` is True exactly when an existing plan is being replaced.
+    rerunning = existing is not None
 
     grounding = build_grounding_context(db, user_id, date_str)
 
@@ -632,10 +694,14 @@ async def get_or_create_daily_workflow_plan(
     calendar_task_titles = {t.get("title") for t in calendar_plan.get("tasks", []) if t.get("title")}
 
     # Step 2: Agent committee → proposals for plan + analyze + engage + publish + remarket
+    # A forced re-run replaces an existing plan's content, so it must not
+    # create a second meeting record or re-fire the digest email — same
+    # lifecycle-skipping semantics as the per-agent retry path.
     agent_plan_data = await generate_agent_enhanced_plan(
         db, user_id, date_str, grounding=grounding, strict_contextuality=False,
         allow_preview=allow_preview,
         manual_override=(creation_source in {"manual", "preview"}) if manual_override is None else manual_override,
+        skip_meeting_lifecycle=rerunning,
     )
     # ``fallback_used`` is set by the committee function when the
     # orchestrator raises or is uninitialised. Surface it here so
@@ -750,40 +816,68 @@ async def get_or_create_daily_workflow_plan(
                 return existing, False
             thread_db.refresh(plan)
 
-            for t in tasks:
-                pillar_id = str(t.get("pillarId") or "").lower().strip()
-                if pillar_id not in PILLAR_IDS:
-                    agent = None
-                    metadata = t.get("metadata")
-                    if isinstance(metadata, dict):
-                        agent = metadata.get("source_agent")
-                    logger.warning(f"Skipping task persistence for invalid pillar_id={pillar_id!r} "
-                                   f"from agent {agent or 'unknown'}: title={t.get('title', '')}")
-                    continue
-                task = DailyWorkflowTask(
-                    plan_id=plan.id,
-                    user_id=user_id,
-                    pillar_id=pillar_id,
-                    title=str(t.get("title") or "Task").strip()[:255],
-                    description=str(t.get("description") or "").strip(),
-                    status=_coerce_status(t.get("status")),
-                    priority=_coerce_priority(t.get("priority")),
-                    estimated_time=int(t.get("estimatedTime") or 15),
-                    action_type=str(t.get("actionType") or "navigate").strip()[:20],
-                    action_url=str(t.get("actionUrl") or "").strip(),
-                    dependencies=json.dumps(t.get("dependencies") or []),
-                    metadata_json=t.get("metadata") or {},
-                    enabled=bool(t.get("enabled", True)),
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
-                )
-                thread_db.add(task)
-
+            _persist_workflow_tasks(thread_db, plan.id, user_id, tasks)
             thread_db.commit()
             return plan, True
         finally:
             thread_db.close()
 
+    def _replace_plan():
+        """Replace an existing plan's content with fresh committee output.
+
+        Keeps the plan row itself (same id — dashboard links, meeting
+        linkage and digest history stay intact), swaps in the new
+        ``plan_json`` and deletes + re-inserts every task row. The first
+        run's digest and meeting id are preserved so a re-run never
+        re-fires the digest email or orphans the meeting record.
+        """
+        from services.database import get_session_for_user
+        thread_db = get_session_for_user(user_id)
+        if thread_db is None:
+            raise RuntimeError(f"Failed to open DB session for user {user_id}")
+        thread_db.expire_on_commit = False
+        try:
+            plan_row = (
+                thread_db.query(DailyWorkflowPlan)
+                .filter(DailyWorkflowPlan.user_id == user_id, DailyWorkflowPlan.date == date_str)
+                .first()
+            )
+            if plan_row is None:
+                # The plan vanished between the short-circuit read and the
+                # replace (a concurrent delete); surface it honestly.
+                raise RuntimeError(
+                    f"Plan for user {user_id} on {date_str} disappeared during re-run"
+                )
+            old_json = plan_row.plan_json if isinstance(plan_row.plan_json, dict) else {}
+            if old_json.get("digest"):
+                plan_data["digest"] = old_json["digest"]
+            if old_json.get("meeting_id") and not plan_data.get("meeting_id"):
+                plan_data["meeting_id"] = old_json["meeting_id"]
+
+            plan_row.generation_mode = (
+                "calendar_driven" if calendar_source else _derive_generation_mode(plan_data)
+            )
+            plan_row.committee_agent_count = (
+                committee_polled_count or _count_committee_agents(tasks)
+            )
+            plan_row.fallback_used = bool(plan_data.get("fallback_used", False))
+            plan_row.plan_json = plan_data
+            plan_row.updated_at = datetime.utcnow()
+
+            thread_db.query(DailyWorkflowTask).filter(
+                DailyWorkflowTask.plan_id == plan_row.id,
+                DailyWorkflowTask.user_id == user_id,
+            ).delete(synchronize_session=False)
+            _persist_workflow_tasks(thread_db, plan_row.id, user_id, tasks)
+            thread_db.commit()
+            thread_db.refresh(plan_row)
+            return plan_row
+        finally:
+            thread_db.close()
+
+    if rerunning:
+        plan = await run_in_threadpool(_replace_plan)
+        return plan, False
     plan, created = await run_in_threadpool(_create_plan)
     if created:
         attach_daily_meeting_tasks(

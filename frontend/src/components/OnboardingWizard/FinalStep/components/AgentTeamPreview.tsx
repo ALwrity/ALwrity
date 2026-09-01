@@ -272,7 +272,7 @@ export const AgentTeamPreview: React.FC = () => {
     return () => clearInterval(interval);
   }, [loading]);
 
-  const handlePreview = async () => {
+  const handlePreview = async (force = false) => {
     setLoading(true);
     currentStageRef.current = 0;
     setCurrentStage(0);
@@ -283,7 +283,9 @@ export const AgentTeamPreview: React.FC = () => {
     setRetryError(null);
     setRetryNotice(null);
     try {
-      const data = await previewTodayPlan();
+      // force=true ("Re-run preview") re-runs the committee and replaces the
+      // persisted plan instead of replaying today's cached/first-run plan.
+      const data = await previewTodayPlan(force);
       setPreview(data);
       onboardingCache.saveFinalStepData({ todayPlanPreview: data });
       setResultModalOpen(true);
@@ -388,7 +390,7 @@ export const AgentTeamPreview: React.FC = () => {
       {!preview && (
         <Button
           variant="contained"
-          onClick={handlePreview}
+          onClick={() => handlePreview(false)}
           disabled={loading}
           startIcon={loading ? <CircularProgress size={16} sx={{ color: "#4f46e5" }} /> : <RocketLaunchIcon />}
           sx={{
@@ -471,7 +473,7 @@ export const AgentTeamPreview: React.FC = () => {
             </Button>
             <Button
               variant="outlined"
-              onClick={handlePreview}
+              onClick={() => handlePreview(true)}
               disabled={loading}
               sx={{ textTransform: "none", borderColor: "rgba(255,255,255,0.4)", color: "#e5e7eb", "&:hover": { borderColor: "#e5e7eb" } }}
             >
