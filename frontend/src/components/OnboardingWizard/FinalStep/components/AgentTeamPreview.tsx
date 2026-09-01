@@ -4,6 +4,7 @@ import {
   Button,
   Typography,
   CircularProgress,
+  LinearProgress,
   Chip,
   Stack,
   Alert,
@@ -385,6 +386,41 @@ export const AgentTeamPreview: React.FC = () => {
         <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
           {error}
         </Alert>
+      )}
+
+      {loading && (
+        <Box
+          sx={{
+            mb: 2,
+            p: 2,
+            borderRadius: 2,
+            bgcolor: "rgba(255,255,255,0.08)",
+            border: "1px solid rgba(255,255,255,0.15)",
+          }}
+        >
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+            <CircularProgress size={16} sx={{ color: "#a5b4fc" }} />
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {PROGRESS_STAGES[Math.min(currentStage, PROGRESS_STAGES.length - 1)]?.message ??
+                "Initializing agent committee..."}
+            </Typography>
+          </Stack>
+          <LinearProgress
+            variant="determinate"
+            value={progressPercent}
+            sx={{
+              height: 6,
+              borderRadius: 3,
+              bgcolor: "rgba(255,255,255,0.12)",
+              "& .MuiLinearProgress-bar": { bgcolor: "#a5b4fc" },
+            }}
+          />
+          <Typography variant="caption" sx={{ mt: 1, display: "block", opacity: 0.75 }}>
+            {completedAgents.length > 0
+              ? `Completed: ${completedAgents.join(", ")}`
+              : "Agents are analyzing your site — this can take 1–3 minutes."}
+          </Typography>
+        </Box>
       )}
 
       {!preview && (

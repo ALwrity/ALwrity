@@ -80,27 +80,50 @@ class TxtaiIntelligenceService:
         
         # Lock to serialize embeddings operations and prevent "Recursive use of cursors" errors
         self._embeddings_lock = threading.Lock()
-        
+
+        # Lock serializing LAZY INITIALIZATION across both the sync path
+        # (background thread in _ensure_initialized) and the async path
+        # (executor in _ensure_initialized_async). Without it, both paths
+        # can run _initialize_embeddings concurrently on the same instance
+        # (double-checking self._initialized is not enough because neither
+        # path sets it until its own init finishes), causing duplicated
+        # embeddings/weights loading and a mid-load embeddings.close().
+        self._lazy_init_lock = threading.Lock()
+
         # Mark as initialized for singleton pattern
         self._singleton_initialized = True
         
         # Lazy initialization - do not initialize embeddings on startup
         # self._initialize_embeddings()
 
+    def _guarded_initialize(self):
+        """Run lazy initialization exactly once, serialized across callers.
+
+        Both the sync background-thread path and the async executor path
+        funnel through here: the threading lock serializes them and the
+        re-check inside the lock makes the second caller a no-op once the
+        first finished (or while it is still running — the second blocks
+        until the lock is released instead of re-initializing).
+        """
+        with self._lazy_init_lock:
+            if self._initialized:
+                return
+            self._initialize_embeddings()
+
     def _ensure_initialized(self):
         """Lazy initialization helper - non-blocking version for API calls."""
         if self._initialized:
             # Already initialized, no-op
             return
-        
+
         if self._initialization_in_progress:
             # Initialization already triggered, skip to avoid blocking
             logger.debug(f"Initialization already in progress for user {self.user_id}, skipping redundant call")
             return
-        
+
         # Mark as in progress and initialize in background thread
         self._initialization_in_progress = True
-        thread = threading.Thread(target=self._initialize_embeddings, daemon=True)
+        thread = threading.Thread(target=self._guarded_initialize, daemon=True)
         thread.start()
         logger.debug(f"Background initialization started for user {self.user_id}")
     
@@ -118,10 +141,13 @@ class TxtaiIntelligenceService:
             # Double-check after acquiring lock
             if self._initialized:
                 return
-            
-            # Run initialization in thread pool to avoid blocking event loop
+
+            # Run the guarded initialization in thread pool to avoid
+            # blocking the event loop. The threading lock inside makes
+            # this the single initializer even if the sync background
+            # thread is mid-run (it waits instead of racing it).
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, self._initialize_embeddings)
+            await loop.run_in_executor(None, self._guarded_initialize)
 
     # Phase 2.1: thin wrapper to keep the service file small. The
     # actual implementation lives in ``sif_async_helpers.py``.
