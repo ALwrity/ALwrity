@@ -269,6 +269,35 @@ async def test_sif_search_heals_on_miss_and_retries(workspace_clean, monkeypatch
     results = await agent.sif_search("anything", limit=5)
     assert search_state["count"] == 2, "search must be retried after heal"
     assert results and results[0]["id"] == "healed-doc"
+    # G2: the heal summary must be recorded on the agent so the committee
+    # can surface it in the plan's limitations.
+    heal_summary = getattr(agent, "last_sif_heal", None)
+    assert isinstance(heal_summary, dict), f"heal summary not recorded: {heal_summary}"
+    assert heal_summary.get("healed") is True
+    assert heal_summary.get("bootstrap_indexed") == 2
+
+
+@pytest.mark.asyncio
+async def test_sif_search_does_not_record_heal_when_not_healed(workspace_clean, monkeypatch):
+    backend_root, user_id, store = workspace_clean
+    agent = _make_hook_agent(user_id)
+
+    class _Intel:
+        async def search(self, query, limit=5):
+            return []
+
+    agent.intelligence = _Intel()
+
+    async def _no_heal(sif_service, **kwargs):
+        return {"healed": False, "reason": "already_healed_today"}
+
+    import services.intelligence.agents.core_agent_framework as caf
+
+    monkeypatch.setattr(caf, "_maybe_self_heal_index_impl", _no_heal, raising=False)
+
+    results = await agent.sif_search("anything", limit=5)
+    assert results == []
+    assert getattr(agent, "last_sif_heal", None) is None
 
 
 @pytest.mark.asyncio
