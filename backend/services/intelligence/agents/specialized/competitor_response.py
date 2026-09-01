@@ -108,7 +108,11 @@ class CompetitorResponseAgent(BaseALwrityAgent):
             if not intelligence:
                 return {"competitors": [], "threats": [], "error": "Intelligence service unavailable"}
 
-            query = f"competitor {focus_area} {website_url}"
+            query = self._sif_query(
+                "competitor_analyst",
+                hints=[focus_area, website_url] if website_url else [focus_area],
+                fallback=f"competitor {focus_area} {website_url}",
+            )
             results = await intelligence.search(query, limit=10)
             return {
                 "competitors": [{"url": r.get("id", ""), "snippet": r.get("text", "")[:200]} for r in results],
@@ -125,6 +129,7 @@ class CompetitorResponseAgent(BaseALwrityAgent):
         """
         Propose tasks based on competitive intel from the SIF index.
         """
+        self._remember_grounding(context)
         default_proposals = []
         competitor_count = 0
         focus_area = context.get("focus_area", "content strategy")
@@ -133,7 +138,12 @@ class CompetitorResponseAgent(BaseALwrityAgent):
             try:
                 intelligence = getattr(self.sif_service, "intelligence_service", None)
                 if intelligence:
-                    results = await intelligence.search(f"competitor {focus_area}", limit=5)
+                    query = self._sif_query(
+                        "competitor_analyst",
+                        hints=[focus_area],
+                        fallback=f"competitor {focus_area}",
+                    )
+                    results = await intelligence.search(query, limit=5)
                     competitor_count = len(results)
             except Exception as e:
                 logger.debug(f"[CompetitorResponseAgent] SIF competitor search failed: {e}")

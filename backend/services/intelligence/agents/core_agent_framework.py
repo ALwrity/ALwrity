@@ -279,6 +279,53 @@ class BaseALwrityAgent(ABC):
     _CONTEXT_CACHE_TTL_SECONDS = 600
     _prompt_context_cache: Dict[str, Any] = {}  # user_id -> (expires_at, context)
     _profile_cache: Dict[str, Any] = {}  # user_id:agent_key -> (expires_at, profile_data)
+
+    def _remember_grounding(self, context: Any) -> None:
+        """Cache the latest committee grounding on this agent instance.
+
+        ``propose_daily_tasks`` receives the committee grounding dict; txtai
+        tool calls do not. Remembering it here lets every SIF query composed
+        later (``_sif_query``) be user-specific instead of a generic keyword
+        bag. Failures are non-fatal: a missing grounding just means the
+        query builder falls back to the caller's legacy query.
+        """
+        try:
+            if isinstance(context, dict):
+                self._latest_grounding = context
+        except Exception:
+            pass
+
+    def _sif_query(
+        self,
+        agent_key: Optional[str] = None,
+        *,
+        hints: Optional[List[str]] = None,
+        fallback: str = "",
+        max_terms: int = 8,
+    ) -> str:
+        """Compose a user-specific SIF search query for this agent.
+
+        Uses the remembered committee grounding (see ``_remember_grounding``)
+        and, when it is thin, the user's flat-context documents via
+        ``AgentContextVFS``. With no context at all the caller's legacy
+        ``fallback`` string is returned verbatim.
+        """
+        try:
+            from services.intelligence.sif_query_builder import build_contextual_query
+
+            key = agent_key or getattr(self, "agent_type", "") or ""
+            return build_contextual_query(
+                key,
+                getattr(self, "_latest_grounding", None),
+                user_id=self.user_id,
+                hints=hints,
+                fallback=fallback,
+                max_terms=max_terms,
+            )
+        except Exception as exc:
+            logger.debug(f"[{type(self).__name__}] Query build failed, using fallback: {exc}")
+            return fallback
+
     
     def __init__(self, user_id: str, agent_type: str, model_name: str = "Qwen/Qwen2.5-1.5B-Instruct", llm: Any = None, enable_tracing: bool = True, **kwargs):
         self.user_id = user_id

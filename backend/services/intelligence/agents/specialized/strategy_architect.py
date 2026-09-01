@@ -60,6 +60,7 @@ class StrategyArchitectAgent(SIFBaseAgent):
 
     async def propose_daily_tasks(self, context: Dict[str, Any]) -> List[TaskProposal]:
         """Propose PLAN pillar tasks based on semantic analysis."""
+        self._remember_grounding(context)
         default_proposals = []
         
         # 1. Pillar Health Check
@@ -228,7 +229,15 @@ class StrategyArchitectAgent(SIFBaseAgent):
                 f"select id, text, object from txtai limit {limit}",
                 f"select id, text, tags from txtai limit {limit}"
             ])
-        candidate_queries.extend(["marketing", "content", "seo", "strategy", "social media"])
+        # Prefer a user-specific keyword query (brand/industry/pillars) over
+        # the old generic single-word list; the generic list remains the
+        # fallback when no onboarding context is available.
+        contextual = self._sif_query(
+            "strategy_architect",
+            fallback="marketing content seo strategy social media",
+            max_terms=8,
+        )
+        candidate_queries.extend([contextual])
 
         seen_ids = set()
         for query in candidate_queries:

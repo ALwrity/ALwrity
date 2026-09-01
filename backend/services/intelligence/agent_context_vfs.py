@@ -66,18 +66,30 @@ def _advisory_lock(file_handle, exclusive: bool = True):
     else:
         try:
             import msvcrt as _msvcrt
-            # ``_locking`` expects a 32-bit count. Use 1 byte as
-            # the lock region; this serialises writers but the
-            # critical section is short (a few KB append).
-            LK_NBLCK = 0x80000000  # non-blocking flag, ignored
-            LK_LOCK = 0x80000000 | 1  # exclusive lock, 1 byte
-            LK_UNLCK = 0x80000000 | 2  # unlock
-            # 32-bit count: 0xFFFFFFFF = 1 file
-            _msvcrt.locking(file_handle.fileno(), LK_LOCK, 0xFFFFFFFF)
+            # CPython's msvcrt module re-exports the Win32 lock modes as
+            # small C ints (LK_UNLCK=0, LK_LOCK=1, LK_NBLCK=2, ...). The
+            # previous hand-rolled 0x80000000-style flags overflow the C
+            # ``mode``/``nbytes`` parameters on Windows ("Python int too
+            # large to convert to C int"), so every locked append failed
+            # with OverflowError and shared notes were never written.
+            # We lock a single byte region and use the call as a mutex
+            # over the whole file. LK_NBLCK raises OSError on contention;
+            # per this helper's best-effort contract we then proceed
+            # unlocked rather than failing the append.
+            locked = False
+            try:
+                _msvcrt.locking(file_handle.fileno(), _msvcrt.LK_NBLCK, 1)
+                locked = True
+            except OSError:
+                locked = False  # contention: fall through best-effort
             try:
                 yield
             finally:
-                _msvcrt.locking(file_handle.fileno(), LK_UNLCK, 0xFFFFFFFF)
+                if locked:
+                    try:
+                        _msvcrt.locking(file_handle.fileno(), _msvcrt.LK_UNLCK, 1)
+                    except OSError:
+                        pass
         except ImportError:
             yield
 

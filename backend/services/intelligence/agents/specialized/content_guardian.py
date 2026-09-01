@@ -46,6 +46,7 @@ class ContentGuardianAgent(SIFBaseAgent):
         return None
 
     async def propose_daily_tasks(self, context: Dict[str, Any]) -> List[TaskProposal]:
+        self._remember_grounding(context)
         default_proposals = [TaskProposal(title="Audit Old Content", description="Review top performing posts from >6 months ago for updates.", pillar_id="analyze", priority="low", estimated_time=30, source_agent="ContentGuardianAgent", reasoning="Maintains content relevance and authority.", action_type="navigate", action_url="/content-planning-dashboard")]
 
         return await self._synthesize_task_proposals(
@@ -62,7 +63,12 @@ class ContentGuardianAgent(SIFBaseAgent):
     async def perform_site_audit(self, website_url: str) -> Dict[str, Any]:
         self._log_agent_operation("Performing site audit", website_url=website_url)
         try:
-            results = await self.intelligence.search(f"website content analysis {website_url}", limit=10)
+            audit_query = self._sif_query(
+                "content_guardian",
+                hints=[website_url],
+                fallback=f"website content analysis {website_url}",
+            )
+            results = await self.intelligence.search(audit_query, limit=10)
             audit: Dict[str, Any] = {"website_url": website_url, "audit_timestamp": datetime.utcnow().isoformat(), "total_pages_crawled": len(results), "content_quality": None, "brand_voice_consistency": None, "safety_issues": None, "cannibalization_issues": None}
             if not results: return audit
             quality_scores, style_scores, safety_flags = [], [], []
@@ -134,7 +140,12 @@ class ContentGuardianAgent(SIFBaseAgent):
             if not text: return {"compliance_score":0.0,"issues":["No text provided"]}
             if not style_guidelines and self.sif_service:
                 try:
-                    r=await self.intelligence.search("website analysis brand voice style",limit=1)
+                    voice_query = self._sif_query(
+                        "content_guardian",
+                        fallback="website analysis brand voice style",
+                        max_terms=6,
+                    )
+                    r=await self.intelligence.search(voice_query,limit=1)
                     if r:
                         m_raw=r[0].get('object'); m=json.loads(m_raw) if isinstance(m_raw,str) else (m_raw or r[0])
                         if m.get('type')=='website_analysis':

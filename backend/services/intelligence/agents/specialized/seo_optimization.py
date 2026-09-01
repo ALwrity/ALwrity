@@ -146,7 +146,12 @@ class SEOOptimizationAgent(BaseALwrityAgent):
             if not intelligence:
                 return {"health": "unknown", "issues": [], "error": "Intelligence service unavailable"}
 
-            results = await intelligence.search(f"seo website analysis {website_url}", limit=10)
+            query = self._sif_query(
+                "seo_specialist",
+                hints=[website_url],
+                fallback=f"seo website analysis {website_url}",
+            )
+            results = await intelligence.search(query, limit=10)
             return {
                 "health": "reviewed",
                 "website_url": website_url,
@@ -162,6 +167,7 @@ class SEOOptimizationAgent(BaseALwrityAgent):
         """
         Propose SEO-focused tasks based on real SIF index data.
         """
+        self._remember_grounding(context)
         default_proposals = []
         issues_found = 0
         website_url = context.get("website_url", "")
@@ -170,7 +176,12 @@ class SEOOptimizationAgent(BaseALwrityAgent):
             try:
                 intelligence = getattr(self.sif_service, "intelligence_service", None)
                 if intelligence:
-                    results = await intelligence.search("seo issue problem error fix", limit=5)
+                    query = self._sif_query(
+                        "seo_specialist",
+                        hints=["seo issues errors fixes", website_url] if website_url else ["seo issues errors fixes"],
+                        fallback="seo issue problem error fix",
+                    )
+                    results = await intelligence.search(query, limit=5)
                     issues_found = len(results)
             except Exception as e:
                 logger.debug(f"[SEOOptimizationAgent] SIF search for issues failed: {e}")

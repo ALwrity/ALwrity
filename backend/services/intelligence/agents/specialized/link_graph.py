@@ -27,11 +27,22 @@ class LinkGraphAgent(SIFBaseAgent):
             cluster_indices = await self.intelligence.cluster(min_score=0.5)
             cluster_count = len(cluster_indices) if cluster_indices else 0
 
-            # Search for content hub candidates
-            hub_results = await self.intelligence.search("pillar core foundation guide overview", limit=10)
+            # Search for content hub candidates — contextual query keeps
+            # hubs anchored in the user's actual pillars/industry.
+            hub_query = self._sif_query(
+                "strategy_architect",
+                hints=["pillar hub guide overview"],
+                fallback="pillar core foundation guide overview",
+            )
+            hub_results = await self.intelligence.search(hub_query, limit=10)
 
             # Search for orphan candidates (specific niche content not linking to pillars)
-            orphan_results = await self.intelligence.search("specific detailed deep dive", limit=10)
+            orphan_query = self._sif_query(
+                "content_strategist",
+                hints=["niche deep dive specific detail"],
+                fallback="specific detailed deep dive",
+            )
+            orphan_results = await self.intelligence.search(orphan_query, limit=10)
 
             return {
                 "node_count": len(hub_results) + len(orphan_results),
@@ -54,6 +65,7 @@ class LinkGraphAgent(SIFBaseAgent):
         """
         Propose internal linking tasks based on real SIF cluster and search data.
         """
+        self._remember_grounding(context)
         proposals = []
         cluster_count = 0
         hub_count = 0
@@ -63,7 +75,12 @@ class LinkGraphAgent(SIFBaseAgent):
                 cluster_indices = await self.intelligence.cluster(min_score=0.5)
                 cluster_count = len(cluster_indices) if cluster_indices else 0
 
-                hub_results = await self.intelligence.search("pillar guide", limit=5)
+                hub_query = self._sif_query(
+                    "strategy_architect",
+                    hints=["pillar hub guide"],
+                    fallback="pillar guide",
+                )
+                hub_results = await self.intelligence.search(hub_query, limit=5)
                 hub_count = len(hub_results)
             except Exception as e:
                 logger.debug(f"[LinkGraphAgent] SIF analysis failed: {e}")

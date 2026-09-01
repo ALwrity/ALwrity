@@ -67,12 +67,18 @@ class CitationExpert(SIFBaseAgent):
         """
         Propose fact-checking tasks based on SIF index coverage.
         """
+        self._remember_grounding(context)
         proposals = []
         indexed_count = 0
 
         if self.intelligence.is_initialized():
             try:
-                results = await self.intelligence.search("statistics data research study", limit=5)
+                stats_query = self._sif_query(
+                    "citation_expert",
+                    hints=["statistics data research study"],
+                    fallback="statistics data research study",
+                )
+                results = await self.intelligence.search(stats_query, limit=5)
                 indexed_count = len(results)
             except Exception as e:
                 logger.debug(f"[CitationExpert] SIF search failed: {e}")

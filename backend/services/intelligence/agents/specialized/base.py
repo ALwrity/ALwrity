@@ -57,6 +57,11 @@ class SIFBaseAgent(BaseALwrityAgent):
         if kwargs:
             logger.debug(f"[{self.__class__.__name__}] Parameters: {kwargs}")
 
+    # NOTE: ``_remember_grounding`` and ``_sif_query`` live on the shared
+    # ancestor ``BaseALwrityAgent`` (core_agent_framework.py) so every
+    # specialized agent — both SIFBaseAgent and plain BaseALwrityAgent
+    # subclasses — can compose user-specific SIF queries.
+
     async def _ensure_intelligence_ready(self) -> bool:
         """Ensure txtai intelligence service is initialized without blocking the event loop."""
         try:
