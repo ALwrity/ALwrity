@@ -848,13 +848,20 @@ useEffect(() => {
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setAvatarTab(newValue);
     if (newValue === 0) {
-      // Switch to brand avatar tab - it's already pre-fetched on mount
+      // AI Studio Host tab - clear custom avatar so AI studio presenter anchor is used
+      setAvatarUrl(null);
+      setAvatarPreview(null);
+      setAvatarFile(null);
     } else if (newValue === 1) {
+      // Brand avatar tab - pre-fetched on mount
+    } else if (newValue === 2) {
       // Asset Library tab - clear current selection so user must choose
       setAvatarUrl(null);
       setAvatarPreview(null);
       setAvatarFile(null);
-    } else if (newValue === 2) {
+    } else if (newValue === 3) {
+      // Selfie tab
+    } else if (newValue === 4) {
       // Upload tab - clear if no file uploaded yet to show dropzone clean state
       if (!avatarFile) {
         setAvatarUrl(null);

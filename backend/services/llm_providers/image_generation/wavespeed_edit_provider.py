@@ -472,6 +472,9 @@ class WaveSpeedEditProvider(ImageEditProvider):
                 if key not in handled_params:
                     payload[key] = value
         
+        # Ensure async submission with polling to prevent synchronous gateway socket timeouts
+        payload["enable_sync_mode"] = False
+
         logger.info(f"[WaveSpeed Edit] Submitting edit request to {url} (model={model_path}, prompt_length={len(prompt)})")
         
         # Make API call - REUSES same pattern as ImageGenerator
@@ -480,7 +483,7 @@ class WaveSpeedEditProvider(ImageEditProvider):
                 url,
                 headers=self.client._headers(),
                 json=payload,
-                timeout=120
+                timeout=60
             )
             
             if response.status_code != 200:
@@ -529,7 +532,7 @@ class WaveSpeedEditProvider(ImageEditProvider):
             # Poll for result - REUSES polling utility
             result = self.client.poll_until_complete(
                 prediction_id,
-                timeout_seconds=180,
+                timeout_seconds=300,
                 interval_seconds=2.0,
             )
             
