@@ -4,7 +4,7 @@ Handles utility endpoints for enhanced content strategies.
 """
 
 from typing import Dict, Any
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 
 from middleware.auth_middleware import get_current_user

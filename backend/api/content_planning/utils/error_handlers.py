@@ -4,6 +4,7 @@ Standardized error handling patterns extracted from the main content planning fi
 """
 
 from typing import Dict, Any, Optional
+from datetime import datetime
 from fastapi import HTTPException, status
 from loguru import logger
 import traceback
@@ -87,7 +88,7 @@ class ContentPlanningErrorHandler:
             "error_type": error_type,
             "message": message,
             "status_code": status_code,
-            "timestamp": "2024-08-01T10:00:00Z"  # This should be dynamic
+            "timestamp": datetime.utcnow().isoformat()
         }
         
         if details:
