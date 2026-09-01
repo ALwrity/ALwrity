@@ -170,19 +170,6 @@ const OnboardingTabBar: React.FC<OnboardingTabBarProps> = ({
           </Box>
         </Tooltip>
       </Box>
-
-      {/* Status chip — width fits text only */}
-      {backgroundTasks && (
-        <Box sx={{ ml: 1, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-          <SystemStatusChip
-            variant="compact"
-            activeTasks={backgroundTasks.total - backgroundTasks.completed_count - backgroundTasks.failed_count}
-            totalTasks={backgroundTasks.total}
-            tasks={backgroundTasks.tasks}
-            onViewResults={onViewResults}
-          />
-        </Box>
-      )}
     </Box>
   );
 };

@@ -4,7 +4,11 @@ import {
   Box,
   Dialog,
   DialogContent,
+  IconButton,
+  Typography,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 // Extracted components
 import {
@@ -30,51 +34,17 @@ import {
   fetchLastAnalysis
 } from './WebsiteStep/utils';
 
-interface BackgroundTasksState {
-  tasks: Record<string, {
-    status: string;
-    started_at: string | null;
-    progress_pct: number;
-    failure_reason?: string | null;
-    recurring?: boolean;
-    last_success?: string | null;
-    next_execution?: string | null;
-  }>;
-  total: number;
-  completed_count: number;
-  failed_count: number;
-  all_done: boolean;
-}
+// Constants and interfaces
+import {
+  BackgroundTasksState,
+  WebsiteStepProps,
+  AnalysisProgress,
+  ExistingAnalysis,
+  INITIAL_PROGRESS_STEPS,
+} from './WebsiteStep/utils/constants';
 
-interface WebsiteStepProps {
-  onContinue: (stepData?: any) => void;
-  updateHeaderContent: (content: { title: string; description: string }) => void;
-  onValidationChange?: (isValid: boolean) => void;
-  onDataReady?: (getData: () => any) => void;
-  initialData?: any;
-  email?: string;
-  backgroundTasks?: BackgroundTasksState | null;
-  onViewBackgroundResults?: (taskKey: string) => void;
-}
-
-interface AnalysisProgress {
-  step: number;
-  message: string;
-  subMessage?: string;
-  completed: boolean;
-}
-
-interface ExistingAnalysis {
-  exists: boolean;
-  analysis_date?: string;
-  analysis_id?: number;
-  summary?: {
-    writing_style?: any;
-    target_audience?: any;
-    content_type?: any;
-  };
-  error?: string;
-}
+// Custom hook
+import { useWebsiteStepEffects } from './WebsiteStep/hooks/useWebsiteStepEffects';
 
 // =============================================================================
 // MAIN COMPONENT
@@ -89,11 +59,17 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   email: propEmail,
   backgroundTasks,
   onViewBackgroundResults,
+  success: propSuccess,
+  setSuccess: propSetSuccess,
 }) => {
   const [website, setWebsite] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [internalSuccess, setInternalSuccess] = useState<string | null>(null);
+
+  const success = propSuccess !== undefined ? propSuccess : internalSuccess;
+  const setSuccess = propSetSuccess !== undefined ? propSetSuccess : setInternalSuccess;
+
   const [analysisWarning, setAnalysisWarning] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<StyleAnalysis | null>(null);
   const [crawlResult, setCrawlResult] = useState<any>(null);
@@ -105,49 +81,32 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   const [activeTab, setActiveTab] = useState<'website' | 'linkedin' | 'youtube'>('website');
   const [integrationData, setIntegrationData] = useState<any>(null);
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
-  const [linkedinProfile, setLinkedinProfile] = useState<any>(null);
   const urlWasPreFilledRef = useRef(false);
   const { user } = useUser();
-  const [email, setEmail] = useState<string>('');
   const [emailDigestOptIn, setEmailDigestOptIn] = useState<boolean>(true);
   const [userTimezone, setUserTimezone] = useState<string>('UTC');
 
   const linkedinConnected = connectedPlatforms.includes('linkedin');
   const youtubeConnected = connectedPlatforms.includes('youtube');
 
-  // Fetch LinkedIn profile summary when connected or from initialData
-  useEffect(() => {
-    if (initialData?.linkedin_profile) {
-      setLinkedinProfile(initialData.linkedin_profile);
-      return;
-    }
-    if (!linkedinConnected) return;
-    let cancelled = false;
-    const fetchProfile = async () => {
-      try {
-        const { apiClient: client } = await import('../../api/client');
-        const resp = await client.get('/api/linkedin-social/profile/summary');
-        if (!cancelled && resp.data?.analyzed) {
-          setLinkedinProfile(resp.data);
-        }
-      } catch (e) {
-        console.debug('LinkedIn profile summary not yet available');
-      }
-    };
-    const timer = setTimeout(fetchProfile, 3000);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [linkedinConnected, initialData?.linkedin_profile]);
+  // Use custom hook for LinkedIn profile summary, Clerk email, and validation changes
+  const {
+    linkedinProfile,
+    setLinkedinProfile,
+    email,
+    setEmail,
+  } = useWebsiteStepEffects({
+    initialData,
+    linkedinConnected,
+    user,
+    propEmail,
+    website,
+    analysis,
+    onValidationChange,
+  });
 
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
-  const [progress, setProgress] = useState<AnalysisProgress[]>([
-    { step: 1, message: 'Validating website URL & connection', subMessage: 'Ensuring your site is accessible and ready for analysis', completed: false },
-    { step: 2, message: 'Crawling website pages & structure', subMessage: 'Scanning public pages to map your content architecture', completed: false },
-    { step: 3, message: 'Extracting content & SEO metadata', subMessage: 'Analyzing page titles, headings, body text, and meta descriptions', completed: false },
-    { step: 4, message: 'Analyzing brand voice & tone', subMessage: 'Identifying your unique writing patterns, vocabulary, and emotional resonance', completed: false },
-    { step: 5, message: 'Evaluating content characteristics', subMessage: 'Measuring readability, sentence structure, and content variety', completed: false },
-    { step: 6, message: 'Identifying target audience signals', subMessage: 'Detecting audience expertise level, pain points, and content preferences', completed: false },
-    { step: 7, message: 'Generating custom AI guidelines', subMessage: 'Building your brand playbook to guide future AI-generated content', completed: false }
-  ]);
+  const [progress, setProgress] = useState<AnalysisProgress[]>(INITIAL_PROGRESS_STEPS);
 
   useEffect(() => {
     // Update header content when component mounts
@@ -156,34 +115,6 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
       description: 'Let Alwrity analyze your website to understand your brand voice, writing style, and content characteristics. This helps us generate content that matches your existing tone and resonates with your audience.'
     });
   }, [updateHeaderContent]);
-
-  // Get user email from Clerk
-  useEffect(() => {
-    if (user && !propEmail) {
-      const primaryEmail = user.primaryEmailAddress?.emailAddress;
-      const firstEmail = user.emailAddresses?.[0]?.emailAddress;
-      const resolvedEmail = primaryEmail || firstEmail || '';
-      if (resolvedEmail) setEmail(resolvedEmail);
-    }
-  }, [user, propEmail]);
-
-  // Sync email from parent prop when it changes
-  useEffect(() => {
-    if (propEmail !== undefined && propEmail !== '') {
-      setEmail(propEmail);
-    }
-  }, [propEmail]);
-
-  // Notify parent when validation state changes (guard against infinite loops)
-  const prevValidRef = useRef<boolean | null>(null);
-  useEffect(() => {
-    const hasWebsiteAnalysis = !!(website.trim() && analysis);
-    const isValid = hasWebsiteAnalysis || linkedinConnected;
-    if (isValid !== prevValidRef.current && onValidationChange) {
-      prevValidRef.current = isValid;
-      onValidationChange(isValid);
-    }
-  }, [website, analysis, linkedinConnected, onValidationChange]);
 
   useEffect(() => {
     // Prefill from last session analysis on mount
@@ -468,6 +399,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
       px: { xs: 1.5, md: 2 },
       pb: { xs: 1.5, md: 2 },
       pt: { xs: 0.375, md: 0.625 },
+      position: 'relative',
       '@keyframes fadeIn': {
         '0%': { opacity: 0, transform: 'translateY(10px)' },
         '100%': { opacity: 1, transform: 'translateY(0)' }

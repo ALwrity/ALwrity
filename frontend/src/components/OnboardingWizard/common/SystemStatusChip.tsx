@@ -101,18 +101,18 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
 }) => (
   <Box
     sx={{
-      p: 1.75,
-      borderRadius: 2,
+      p: 2.25,
+      borderRadius: 2.5,
       border: '1px solid #e2e8f0',
       bgcolor: '#f8fafc',
-      boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
+      boxShadow: '0 12px 32px rgba(15, 23, 42, 0.16)',
     }}
   >
-    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1e293b' }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>
         Background Tasks
       </Typography>
-      <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600 }}>
+      <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600, fontSize: '0.8rem' }}>
         {completed} of {totalTasks} done
       </Typography>
     </Box>
@@ -121,18 +121,18 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
       variant="determinate"
       value={overallPct}
       sx={{
-        height: 6,
-        borderRadius: 3,
-        mb: 1.25,
+        height: 8,
+        borderRadius: 4,
+        mb: 1.75,
         bgcolor: '#e2e8f0',
         '& .MuiLinearProgress-bar': {
           bgcolor: failed > 0 && completed + failed >= totalTasks ? '#ef4444' : '#10b981',
-          borderRadius: 3,
+          borderRadius: 4,
         },
       }}
     />
 
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
       {entries.map(([key, t]) => {
         const pct = t.progress_pct ?? (t.status === 'completed' ? 100 : t.status === 'running' ? 50 : 0);
         const isRunning = t.status === 'running';
@@ -141,13 +141,13 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
 
         return (
           <Box key={key}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.25 }}>
-              <Typography variant="caption" sx={{ color: '#334155', fontWeight: 600 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+              <Typography variant="caption" sx={{ color: '#334155', fontWeight: 600, fontSize: '0.8rem' }}>
                 {TASK_LABELS[key] || key}
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
                 {t.failure_reason && isFailed && (
-                  <Typography variant="caption" sx={{ color: '#dc2626', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <Typography variant="caption" sx={{ color: '#dc2626', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.75rem' }}>
                     {t.failure_reason}
                   </Typography>
                 )}
@@ -161,9 +161,9 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
                       color: '#2563eb',
                       bgcolor: 'transparent',
                       borderRadius: 1.5,
-                      px: 1,
-                      py: 0.25,
-                      fontSize: '0.65rem',
+                      px: 1.25,
+                      py: 0.5,
+                      fontSize: '0.75rem',
                       fontWeight: 600,
                       cursor: 'pointer',
                       lineHeight: 1.4,
@@ -179,7 +179,7 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
               variant={isRunning ? 'indeterminate' : 'determinate'}
               value={isRunning ? undefined : pct}
               sx={{
-                height: 3,
+                height: 4,
                 borderRadius: 2,
                 bgcolor: '#e2e8f0',
                 '& .MuiLinearProgress-bar': {
@@ -193,7 +193,7 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
       })}
     </Box>
 
-    <Typography variant="caption" sx={{ display: 'block', mt: 1.25, color: '#64748b', lineHeight: 1.4 }}>
+    <Typography variant="caption" sx={{ display: 'block', mt: 1.75, color: '#64748b', lineHeight: 1.4, fontSize: '0.75rem' }}>
       These run in the background — you can continue onboarding now. Results appear here as each task finishes.
     </Typography>
   </Box>
@@ -244,12 +244,12 @@ const SystemStatusChip: React.FC<SystemStatusChipProps> = ({
   const isCompact = variant === 'compact';
 
   const chipContent = (
-    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: isCompact ? 0.625 : 1 }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
       <Box
         component="span"
         sx={{
-          width: isCompact ? 10 : 8,
-          height: isCompact ? 10 : 8,
+          width: 10,
+          height: 10,
           borderRadius: '50%',
           bgcolor: dotColor,
           display: 'inline-block',
@@ -259,24 +259,34 @@ const SystemStatusChip: React.FC<SystemStatusChipProps> = ({
               ? '0 0 6px rgba(37,99,235,0.35)'
               : '0 0 6px rgba(16,185,129,0.35)',
           animation: running + pending > 0 ? `${pulse} 2s ease-in-out infinite` : 'none',
+          flexShrink: 0,
         }}
       />
-      {!isCompact && (
-        <Typography variant="caption" sx={{ fontWeight: 600, color: '#1e293b' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+        <Typography
+          variant="caption"
+          sx={{
+            fontWeight: 700,
+            color: '#1e293b',
+            fontSize: '0.75rem',
+            lineHeight: 1.2,
+          }}
+        >
           ⚙️ Background Tasks
         </Typography>
-      )}
-      <Typography
-        variant="caption"
-        sx={{
-          color: '#64748B',
-          fontWeight: isCompact ? 600 : 500,
-          fontSize: isCompact ? '0.8125rem' : undefined,
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {chipSummary}
-      </Typography>
+        <Typography
+          variant="caption"
+          sx={{
+            color: '#64748B',
+            fontWeight: 600,
+            fontSize: '0.7rem',
+            lineHeight: 1.2,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {chipSummary}
+        </Typography>
+      </Box>
     </Box>
   );
 
@@ -304,13 +314,18 @@ const SystemStatusChip: React.FC<SystemStatusChipProps> = ({
             alignItems: 'center',
             justifyContent: 'flex-start',
             width: 'fit-content',
-            px: 1.25,
-            py: 0.625,
-            borderRadius: '999px',
-            border: '1px solid #BBF7D0',
-            bgcolor: '#F0FDF4',
-            cursor: 'default',
-            '&:hover': { bgcolor: '#ECFDF5' },
+            px: 1.5,
+            py: 0.75,
+            borderRadius: '10px',
+            border: '1px solid #e2e8f0',
+            bgcolor: '#FFFFFF',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            '&:hover': { 
+              bgcolor: '#f8fafc',
+              borderColor: '#cbd5e1',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
+            },
           }}
         >
           {chipContent}
@@ -323,8 +338,8 @@ const SystemStatusChip: React.FC<SystemStatusChipProps> = ({
               top: 'calc(100% + 8px)',
               right: 0,
               zIndex: 1400,
-              width: 360,
-              maxWidth: 'min(360px, 92vw)',
+              width: 468,
+              maxWidth: 'min(468px, 92vw)',
             }}
           >
             {taskPanel}

@@ -91,6 +91,7 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light', showPlanChip
   const [emailPrefsOpen, setEmailPrefsOpen] = useState(false);
   const [menuOpenCounter, setMenuOpenCounter] = useState(0);
   const [menuAnchorPosition, setMenuAnchorPosition] = useState<{ top: number; left: number } | null>(null);
+  const [menuAlign, setMenuAlign] = useState<'left' | 'right'>('right');
   const badgeAnchorRef = React.useRef<HTMLDivElement>(null);
   const open = Boolean(anchorEl);
 
@@ -173,9 +174,11 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light', showPlanChip
     const anchor = badgeAnchorRef.current ?? e.currentTarget;
     setAnchorEl(anchor);
     const rect = anchor.getBoundingClientRect();
+    const isLeftHalf = rect.left < window.innerWidth / 2;
+    setMenuAlign(isLeftHalf ? 'left' : 'right');
     setMenuAnchorPosition({
       top: rect.bottom + USER_MENU_ANCHOR_TOP_GAP,
-      left: window.innerWidth - USER_MENU_VIEWPORT_RIGHT_INSET,
+      left: isLeftHalf ? rect.left : rect.right,
     });
     setMenuOpenCounter((c) => c + 1);
   };
@@ -290,8 +293,8 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light', showPlanChip
         anchorPosition={menuAnchorPosition ?? undefined}
         anchorEl={anchorEl}
         onClose={handleClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: menuAlign }}
+        transformOrigin={{ vertical: 'top', horizontal: menuAlign }}
         disableScrollLock
         marginThreshold={0}
         PaperProps={{
