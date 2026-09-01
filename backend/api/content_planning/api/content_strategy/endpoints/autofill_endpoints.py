@@ -9,20 +9,13 @@ from sqlalchemy.orm import Session
 from loguru import logger
 from datetime import datetime
 
-from services.database import get_db_session
+from services.database import get_db
 from ....services.content_strategy.autofill.autofill_service import AutoFillService
 from middleware.auth_middleware import get_current_user
 from ....utils.error_handlers import ContentPlanningErrorHandler
 from ....utils.response_builders import ResponseBuilder
 
 router = APIRouter(tags=["Strategy Autofill"])
-
-def get_db():
-    db = get_db_session()
-    try:
-        yield db
-    finally:
-        db.close()
 
 @router.post("/autofill/generate")
 async def generate_autofill(

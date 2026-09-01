@@ -13,7 +13,7 @@ from loguru import logger
 from middleware.auth_middleware import get_current_user
 
 # Import database service
-from services.database import get_db_session, get_db
+from services.database import get_db, get_session_for_user
 from services.content_planning_db import ContentPlanningDBService
 
 # Import utilities
@@ -54,7 +54,7 @@ async def check_backend_health(
         # Test database connection
         try:
             from sqlalchemy import text
-            db_session = get_db_session()
+            db_session = get_session_for_user(str(current_user.get('id')))
             result = db_session.execute(text("SELECT 1"))
             result.fetchone()
             health_status["services"]["database_connection"] = True
@@ -233,7 +233,7 @@ async def comprehensive_health_check(
         
         # Check database health
         try:
-            db_session = get_db_session()
+            db_session = get_session_for_user(str(current_user.get('id')))
             db_service = ContentPlanningDBService(db_session)
             db_health = await db_service.health_check()
         except Exception as e:
