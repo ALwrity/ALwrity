@@ -1,4 +1,4 @@
-import { resolveYouTubeSearchTimeZone } from "./youtubeSearchTimeZone";
+import { resolveYouTubeSearchTimeZone } from "../youtubeSearchTimeZone";
 
 describe("resolveYouTubeSearchTimeZone", () => {
   it("returns the browser IANA time zone without hardcoding a city", () => {
