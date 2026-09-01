@@ -32,6 +32,10 @@ def test_normalize_proposal_has_stable_shared_contract():
         "action_type", "action_parameters", "confidence",
         # Phase 2 honesty contract: how the proposal text was produced.
         "synthesis_mode",
+        # Backward-compatibility aliases documented on the normalize output:
+        # dict-shaped consumers read pillar_id / source_agent, and downstream
+        # capacity math reads estimated_time.
+        "pillar_id", "source_agent", "estimated_time",
     }
     assert result["recommendation_id"].startswith("rec-")
     assert result["evidence"] == ["gsc:page:/guide"]

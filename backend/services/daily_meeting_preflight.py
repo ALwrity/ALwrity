@@ -177,6 +177,23 @@ def run_daily_meeting_preflight(
     }
 
 
+def _proposal_field(obj: Any, key: str, default: Any = None) -> Any:
+    """Read a field from a TaskProposal object or a dict-shaped proposal.
+
+    Agents may return dict-shaped LLM output instead of TaskProposal
+    instances; dict shapes may carry ``pillar`` as an alias for
+    ``pillar_id``. Direct attribute access on a dict would raise
+    AttributeError and abort the whole committee evidence phase.
+    """
+    if isinstance(obj, dict):
+        aliases = ("pillar_id", "pillar") if key == "pillar_id" else (key,)
+        for alias in aliases:
+            if obj.get(alias) is not None:
+                return obj.get(alias)
+        return default
+    return getattr(obj, key, default)
+
+
 def build_agent_evidence(agent_key: str, result: Any) -> Dict[str, Any]:
     """Wrap one eligible agent's proposals in the Phase 5 evidence envelope."""
     proposals = result if isinstance(result, list) else []
@@ -185,26 +202,28 @@ def build_agent_evidence(agent_key: str, result: Any) -> Dict[str, Any]:
     analyses: List[str] = []
     confidences: List[float] = []
     for proposal in proposals:
-        context = getattr(proposal, "context_data", None) or {}
-        if getattr(proposal, "evidence", None):
-            evidence.append(proposal.evidence)
-        if getattr(proposal, "reasoning", None):
-            analyses.append(proposal.reasoning)
+        context = _proposal_field(proposal, "context_data", None) or {}
+        proposal_evidence = _proposal_field(proposal, "evidence", None)
+        if proposal_evidence:
+            evidence.append(proposal_evidence)
+        reasoning = _proposal_field(proposal, "reasoning", None)
+        if reasoning:
+            analyses.append(reasoning)
         try:
             confidences.append(float(context.get("confidence", context.get("confidence_score", 0.0))))
         except (TypeError, ValueError):
             confidences.append(0.0)
         proposed_tasks.append({
-            "title": proposal.title,
-            "description": proposal.description,
-            "pillar": proposal.pillar_id,
-            "priority": proposal.priority,
-            "expected_impact": proposal.expected_impact,
-            "effort": proposal.effort,
-            "kpi": proposal.kpi,
-            "deadline": proposal.deadline,
-            "action_type": proposal.action_type,
-            "action_parameters": proposal.action_parameters or {},
+            "title": _proposal_field(proposal, "title", ""),
+            "description": _proposal_field(proposal, "description", ""),
+            "pillar": _proposal_field(proposal, "pillar_id", ""),
+            "priority": _proposal_field(proposal, "priority", ""),
+            "expected_impact": _proposal_field(proposal, "expected_impact", ""),
+            "effort": _proposal_field(proposal, "effort", ""),
+            "kpi": _proposal_field(proposal, "kpi", ""),
+            "deadline": _proposal_field(proposal, "deadline", ""),
+            "action_type": _proposal_field(proposal, "action_type", "navigate"),
+            "action_parameters": _proposal_field(proposal, "action_parameters", None) or {},
         })
     return {
         "agent": agent_key,

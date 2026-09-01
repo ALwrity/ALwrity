@@ -349,3 +349,70 @@ async def test_agent_error_is_classified_as_error(monkeypatch):
     content_state = [s for s in states if s["agent"] == "content_strategist"][0]
     assert content_state["state"] == "error"
 
+
+@pytest.mark.asyncio
+async def test_dict_shaped_proposals_survive_review_and_watchdog(monkeypatch):
+    """Some agents return dict-shaped LLM output using 'pillar' instead of
+    'pillar_id'. The meeting log, watchdog audit and review must all tolerate
+    that shape: no 'dict' object has no attribute' crash, the alias is
+    accepted as a valid pillar, and the guardian still receives audit input.
+    """
+    from services import today_workflow_agents as twa
+
+    dict_proposal = {
+        "title": "Dict-shaped task",
+        "description": "raw llm output",
+        "pillar": "plan",
+        "priority": "high",
+        "estimated_time": 20,
+        "source_agent": "content_strategist",
+        "reasoning": "dict reasoning",
+        "synthesis_mode": "llm",
+        "actionType": "navigate",
+        "actionUrl": "/content-planning-dashboard",
+    }
+
+    class _DictAgent:
+        async def propose_daily_tasks(self, grounding):
+            return [dict_proposal]
+
+    audit_received = []
+
+    class _FakeGuardian:
+        async def audit_committee(self, audit_input):
+            audit_received.extend(audit_input)
+            return {
+                "health_score": 90,
+                "alerts": [],
+                "agent_critiques": [],
+                "coverage_gaps": [],
+                "overlaps": [],
+            }
+
+    async def _get_orchestrator(user_id):
+        return SimpleNamespace(agents={
+            "content": _DictAgent(),
+            "strategy": None,
+            "seo": None,
+            "social": None,
+            "competitor": None,
+            "content_gap_radar": None,
+            "guardian": _FakeGuardian(),
+        })
+
+    monkeypatch.setattr(twa, "build_grounding_context", lambda db, uid, d: {"onboarding_data": {}})
+    monkeypatch.setattr(twa, "_get_orchestration_service", lambda: SimpleNamespace(get_or_create_orchestrator=_get_orchestrator))
+
+    result = await twa.generate_agent_enhanced_plan(
+        db=None, user_id="u1", date="2026-01-01", grounding={"onboarding_data": {}}
+    )
+
+    titles = {t.get("title") for t in result.get("tasks", [])}
+    assert "Dict-shaped task" in titles, "pillar-alias dict proposal must be accepted by review"
+    assert audit_received, "watchdog audit must receive audit input for dict proposals"
+    entry = audit_received[0]
+    assert entry["pillar_id"] == "plan", "dict 'pillar' alias must surface as pillar_id in the audit"
+    assert entry["agent"] == "content_strategist"
+    assert entry["valid"] is True
+    assert not result.get("fallback_used", False)
+

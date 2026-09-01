@@ -48,7 +48,9 @@ def normalize_proposal(proposal: Any, agent_key: Optional[str] = None) -> Dict[s
         "agent": agent,
         "title": _text(_get(proposal, "title", "")),
         "description": _text(_get(proposal, "description", "")),
-        "pillar": _text(_get(proposal, "pillar_id", "")),
+        # Dict-shaped proposals may carry "pillar" instead of "pillar_id"
+        # (agents returning raw LLM dicts); accept both spellings.
+        "pillar": _text(_get(proposal, "pillar_id", "") or _get(proposal, "pillar", "")),
         "action_parameters": action_parameters,
     }
     recommendation_id = "rec-" + hashlib.sha256(
