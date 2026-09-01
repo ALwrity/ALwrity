@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { youtubeApi } from '../services/youtubeApi';
+import { youtubePublishSourceMeta } from './youtubePublishLog';
 
 interface YouTubeChannel {
   token_id: number;
@@ -58,9 +59,14 @@ export function useYouTubePublish() {
 
   const checkStatus = useCallback(async () => {
     try {
+      console.info("[useYouTubePublish] Status check start");
       setStatus((prev) => ({ ...prev, loading: true, error: null }));
       const result = await youtubeApi.getYouTubeStatus();
       if (result.success) {
+        console.info("[useYouTubePublish] Status check complete", {
+          connected: result.connected,
+          channelCount: (result.channels || []).length,
+        });
         setStatus({
           connected: result.connected,
           channels: result.channels || [],
@@ -68,21 +74,30 @@ export function useYouTubePublish() {
           error: null,
         });
       } else {
+        console.warn("[useYouTubePublish] Status check unsuccessful");
         setStatus({ connected: false, channels: [], loading: false, error: 'Failed to check status' });
       }
     } catch (e: any) {
+      console.error("[useYouTubePublish] Status check failed", {
+        errorName: e?.name || "Error",
+      });
       setStatus({ connected: false, channels: [], loading: false, error: e?.message || 'Status check failed' });
     }
   }, []);
 
   const connect = useCallback(async () => {
     try {
+      console.info("[useYouTubePublish] Connect start");
       setStatus((prev) => ({ ...prev, loading: true, error: null }));
 
       const data = await youtubeApi.getYouTubeAuthUrl();
       if (!data.auth_url) {
         throw new Error('Failed to get authorization URL');
       }
+
+      console.info("[useYouTubePublish] Connect popup opening", {
+        authUrlLength: data.auth_url.length,
+      });
 
       // Open popup
       const w = 600;
@@ -141,20 +156,33 @@ export function useYouTubePublish() {
       });
 
       if (result.success) {
+        console.info("[useYouTubePublish] Connect succeeded");
         await checkStatus();
       } else {
+        console.warn("[useYouTubePublish] Connect did not complete", {
+          hasError: Boolean(result.error),
+        });
         setStatus((prev) => ({ ...prev, loading: false, error: result.error || 'Connection failed' }));
       }
     } catch (e: any) {
+      console.error("[useYouTubePublish] Connect failed", {
+        errorName: e?.name || "Error",
+      });
       setStatus((prev) => ({ ...prev, loading: false, error: e?.message || 'Connection failed' }));
     }
   }, [checkStatus]);
 
   const disconnect = useCallback(async (tokenId: number) => {
     try {
+      console.info("[useYouTubePublish] Disconnect start", { tokenId });
       await youtubeApi.disconnectYouTube(tokenId);
       await checkStatus();
+      console.info("[useYouTubePublish] Disconnect complete", { tokenId });
     } catch (e: any) {
+      console.error("[useYouTubePublish] Disconnect failed", {
+        tokenId,
+        errorName: e?.name || "Error",
+      });
       setStatus((prev) => ({ ...prev, error: e?.message || 'Disconnect failed' }));
     }
   }, [checkStatus]);
@@ -173,11 +201,21 @@ export function useYouTubePublish() {
   ) => {
     const channel = status.channels.find((c) => c.is_active);
     if (!channel) {
+      console.warn("[useYouTubePublish] Publish skipped: no active channel");
       setPublishState((prev) => ({ ...prev, error: 'No active YouTube channel connected. Please connect first.' }));
       return;
     }
 
+    const sourceMeta = youtubePublishSourceMeta(videoSource);
     try {
+      console.info("[useYouTubePublish] Publish start", {
+        tokenId: channel.token_id,
+        titleLength: title.length,
+        tagCount: options?.tags?.length || 0,
+        privacy: options?.privacy_status || "unlisted",
+        hasSchedule: Boolean(options?.publish_at),
+        ...sourceMeta,
+      });
       setPublishState({
         publishing: true,
         taskId: null,
@@ -201,10 +239,16 @@ export function useYouTubePublish() {
 
       const taskId = result.task_id;
       if (!result.success || !taskId) {
+        console.warn("[useYouTubePublish] Publish start unsuccessful", {
+          hasTaskId: Boolean(taskId),
+          hasError: Boolean(result.error),
+          ...sourceMeta,
+        });
         setPublishState((prev) => ({ ...prev, publishing: false, error: result.error || 'Failed to start publish' }));
         return;
       }
 
+      console.info("[useYouTubePublish] Publish task started", { taskId, ...sourceMeta });
       setPublishState((prev) => ({
         ...prev,
         taskId,
@@ -213,11 +257,18 @@ export function useYouTubePublish() {
 
       // Start polling for status
       if (publishPollRef.current) clearInterval(publishPollRef.current);
+      let pollCount = 0;
       publishPollRef.current = setInterval(async () => {
+        pollCount += 1;
         try {
           const pollResult = await youtubeApi.getPublishStatus(taskId);
           if (pollResult.success && pollResult.video_url) {
             if (publishPollRef.current) clearInterval(publishPollRef.current);
+            console.info("[useYouTubePublish] Publish complete", {
+              taskId,
+              pollCount,
+              hasVideoId: Boolean(pollResult.video_id),
+            });
             setPublishState({
               publishing: false,
               taskId,
@@ -228,6 +279,11 @@ export function useYouTubePublish() {
             });
           } else if (!pollResult.success && pollResult.error) {
             if (publishPollRef.current) clearInterval(publishPollRef.current);
+            console.error("[useYouTubePublish] Publish failed", {
+              taskId,
+              pollCount,
+              hasError: true,
+            });
             setPublishState({
               publishing: false,
               taskId,
@@ -237,6 +293,9 @@ export function useYouTubePublish() {
               error: pollResult.error,
             });
           } else {
+            if (pollCount === 1 || pollCount % 10 === 0) {
+              console.info("[useYouTubePublish] Poll waiting", { taskId, pollCount });
+            }
             setPublishState((prev) => ({
               ...prev,
               progress: pollResult.message || 'Uploading to YouTube...',
@@ -244,10 +303,18 @@ export function useYouTubePublish() {
           }
         } catch (e: any) {
           // Don't stop polling on transient errors
-          console.warn('Publish poll error:', e?.message);
+          console.warn("[useYouTubePublish] Poll transient error", {
+            taskId,
+            pollCount,
+            errorName: e?.name || "Error",
+          });
         }
       }, 3000);
     } catch (e: any) {
+      console.error("[useYouTubePublish] Publish request failed", {
+        errorName: e?.name || "Error",
+        ...sourceMeta,
+      });
       setPublishState({
         publishing: false,
         taskId: null,
@@ -260,6 +327,7 @@ export function useYouTubePublish() {
   }, [status.channels]);
 
   const resetPublishState = useCallback(() => {
+    console.info("[useYouTubePublish] Publish state reset");
     if (publishPollRef.current) clearInterval(publishPollRef.current);
     setPublishState({
       publishing: false,

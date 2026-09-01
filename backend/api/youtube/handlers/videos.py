@@ -26,7 +26,7 @@ async def list_videos(
 ) -> VideoListResponse:
     """
     List videos for the current user from the asset library (source: youtube_creator).
-    Used to rescue/persist scene videos after reloads.
+    Used to rescue/persist scene clips and combined videos after reloads.
     """
     try:
         user_id = require_authenticated_user(current_user)
@@ -42,23 +42,40 @@ async def list_videos(
         videos = []
         for asset in assets:
             try:
+                metadata = asset.asset_metadata or {}
                 videos.append({
-                    "scene_number": asset.asset_metadata.get("scene_number") if asset.asset_metadata else None,
+                    "scene_number": metadata.get("scene_number"),
                     "video_url": asset.file_url,
                     "filename": asset.filename,
                     "created_at": asset.created_at.isoformat() if asset.created_at else None,
-                    "resolution": asset.asset_metadata.get("resolution") if asset.asset_metadata else None,
+                    "resolution": metadata.get("resolution"),
+                    "scene_count": metadata.get("scene_count"),
                 })
             except Exception as asset_error:
-                logger.warning(f"[YouTubeAPI] Error processing asset {asset.id if hasattr(asset, 'id') else 'unknown'}: {asset_error}")
+                asset_id = asset.id if hasattr(asset, "id") else "unknown"
+                logger.warning(
+                    f"[YouTubeAPI] Error processing asset id={asset_id} "
+                    f"error_type={type(asset_error).__name__}"
+                )
                 continue  # Skip this asset and continue with others
 
-        logger.info(f"[YouTubeAPI] Listed {len(videos)} videos for user {user_id}")
+        scene_listed = sum(1 for item in videos if item.get("scene_number") is not None)
+        combined_listed = len(videos) - scene_listed
+        logger.info(
+            f"[YouTubeAPI] Listed {len(videos)} videos for user {user_id} "
+            f"scenes={scene_listed} combined={combined_listed}"
+        )
         return VideoListResponse(videos=videos)
     except Exception as e:
-        logger.error(f"[YouTubeAPI] Error listing videos: {e}", exc_info=True)
-        # Return empty list on error rather than failing completely
-        return VideoListResponse(videos=[], success=False, message=f"Failed to list videos: {str(e)}")
+        logger.error(
+            f"[YouTubeAPI] Error listing videos error_type={type(e).__name__}",
+            exc_info=True,
+        )
+        return VideoListResponse(
+            videos=[],
+            success=False,
+            message="Failed to list videos. Please try again.",
+        )
 
 
 @router.get("/videos/{video_filename}")
@@ -98,7 +115,9 @@ async def serve_youtube_video(
         if not video_path.is_file():
             raise HTTPException(status_code=400, detail="Invalid video path")
 
-        logger.debug(f"[YouTubeAPI] Serving video: {video_filename} from {video_path}")
+        logger.debug(
+            f"[YouTubeAPI] Serving video user_id={user_id} filename_length={len(video_filename)}"
+        )
 
         return FileResponse(
             path=str(video_path),
@@ -109,8 +128,11 @@ async def serve_youtube_video(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"[YouTubeAPI] Error serving video: {e}", exc_info=True)
+        logger.error(
+            f"[YouTubeAPI] Error serving video error_type={type(e).__name__}",
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to serve video: {str(e)}"
+            detail="Failed to serve video. Please try again.",
         )

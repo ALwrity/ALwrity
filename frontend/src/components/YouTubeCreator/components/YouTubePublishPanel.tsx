@@ -17,6 +17,7 @@ import {
 import { Scene, VideoPlan } from '../../../services/youtubeApi';
 import { useYouTubePublish } from '../../../hooks/useYouTubePublish';
 import { toYouTubePublishAtIso } from './youtubePublishSchedule';
+import { youtubePublishSourceMeta } from '../../../hooks/youtubePublishLog';
 
 interface YouTubePublishPanelProps {
   videoUrl: string | null;
@@ -61,14 +62,32 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
   const publishDescription = useMemo(() => buildVideoDescription(videoPlan), [videoPlan]);
 
   const handlePublish = () => {
-    if (!videoUrl) return;
-    const publishAt = toYouTubePublishAtIso(scheduleLocal);
-    youtube.publishToYouTube(videoUrl, publishTitle, {
-      description: publishDescription,
-      tags: ['alwrity', 'youtube', 'ai-video'],
-      privacy_status: publishAt ? 'private' : privacy,
-      publish_at: publishAt,
-    });
+    try {
+      if (!videoUrl) {
+        console.warn("[YouTubePublishPanel] Publish skipped: no video URL");
+        return;
+      }
+      const publishAt = toYouTubePublishAtIso(scheduleLocal);
+      console.info("[YouTubePublishPanel] Publish clicked", {
+        ...youtubePublishSourceMeta(videoUrl),
+        titleLength: publishTitle.length,
+        descriptionLength: publishDescription.length,
+        hasSchedule: Boolean(publishAt),
+        privacy: publishAt ? "private" : privacy,
+        connected: youtube.connected,
+        hasActiveChannel: Boolean(activeChannel),
+      });
+      youtube.publishToYouTube(videoUrl, publishTitle, {
+        description: publishDescription,
+        tags: ['alwrity', 'youtube', 'ai-video'],
+        privacy_status: publishAt ? 'private' : privacy,
+        publish_at: publishAt,
+      });
+    } catch (error) {
+      console.error("[YouTubePublishPanel] Publish click failed", {
+        errorName: error instanceof Error ? error.name : "Error",
+      });
+    }
   };
 
   return (
