@@ -42,6 +42,8 @@ const DIGEST_REASON_LABELS: Record<string, string> = {
   no_onboarding_session: "No onboarding session was found for this account.",
   not_attempted: "The digest was not attempted for this preview.",
   not_recorded_this_plan: "Digest status was not recorded for this plan.",
+  retry: "No new digest email was sent — the daily digest was already enqueued when the plan was first generated.",
+  rerun: "No new digest email was sent — the daily digest was already enqueued when the plan was first generated.",
 };
 
 const digestMessage = (digest?: TodayPlanPreview["digest"]): string | null => {
@@ -169,13 +171,16 @@ const AgentGroupCard: React.FC<{
           </>
         )}
       </Stack>
-      {stateInfo?.detail && (isError || isDeclined) && (
+      {(isError || isDeclined) && (
         <Typography
           variant="caption"
           component="div"
           sx={{ mb: 1, opacity: 0.85, ...(isError ? (modal ? { color: "error.main" } : { color: "#fca5a5" }) : {}) }}
         >
-          {stateInfo.detail}
+          {stateInfo?.detail ||
+            (isError
+              ? "Agent proposal failed with an unknown error. Click Retry to re-run it."
+              : "I have nothing to contribute")}
         </Typography>
       )}
       <Stack spacing={1}>

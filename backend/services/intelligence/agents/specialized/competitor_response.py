@@ -66,15 +66,29 @@ class CompetitorResponseAgent(BaseALwrityAgent):
     def _competitor_monitor_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Competitor monitoring tool. Returns SIF availability and directs to async method.
+
+        Args:
+            context: Input parameters for the tool. Example keys:
+                - competitor_url: Optional URL of the competitor to monitor
+
+        Returns:
+            A dictionary describing SIF availability or how to fetch detailed data.
         """
         competitor_url = context.get("competitor_url", "any")
         if not self.sif_service:
             return unavailable_tool("sif", "SIF not initialized")
         return unavailable_tool("sif", "Use async analyze_competitors() for detailed competitor data")
-    
+
     def _threat_analyzer_tool(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Threat analysis tool. Returns SIF status.
+
+        Args:
+            context: Input parameters for the tool. Example keys:
+                - focus_area: Optional focus area for the threat scan
+
+        Returns:
+            A dictionary describing SIF availability or how to fetch threat data.
         """
         focus = context.get("focus_area", "general")
         if not self.sif_service:
