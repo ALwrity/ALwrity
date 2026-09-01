@@ -1,10 +1,11 @@
 /**
- * Hub Search.list requests for chip filters, TYPE, Duration, and Upload Date.
+ * Hub Search.list requests for chip filters, TYPE, Duration, Upload Date, and Features.
  */
 import { youtubeStudioApi } from "../../../services/youtubeStudioApi";
 import {
   isYouTubeShortsTitle,
   type YouTubeSearchDurationFilter,
+  type YouTubeSearchFeatureFilter,
   type YouTubeSearchFilter,
   type YouTubeSearchHit,
   type YouTubeSearchTypeFilter,
@@ -212,6 +213,43 @@ export async function searchYouTubeByUploadDate(
     console.error(
       "[youtubeHubSearchRequests] Upload date search failed",
       { uploadDate, timeZone, queryLength: query.length },
+      error,
+    );
+    throw error;
+  }
+}
+
+export async function searchYouTubeByFeature(
+  query: string,
+  feature: YouTubeSearchFeatureFilter,
+): Promise<YouTubeHubSearchResult> {
+  try {
+    console.info("[youtubeHubSearchRequests] Feature search start", {
+      videoFeature: feature,
+      queryLength: query.length,
+    });
+    const data = await youtubeStudioApi.searchByKeyword({
+      q: query,
+      max_results: 25,
+      video_feature: feature,
+    });
+    if (!data?.success) {
+      console.warn("[youtubeHubSearchRequests] Feature search unsuccessful", {
+        videoFeature: feature,
+        errorCode: data?.error_code || null,
+      });
+      return { items: [], message: data?.message || "Search failed." };
+    }
+    const items = asHits(data);
+    console.info("[youtubeHubSearchRequests] Feature search complete", {
+      videoFeature: feature,
+      itemCount: items.length,
+    });
+    return { items, message: items.length === 0 ? "No videos found." : null };
+  } catch (error) {
+    console.error(
+      "[youtubeHubSearchRequests] Feature search failed",
+      { videoFeature: feature },
       error,
     );
     throw error;

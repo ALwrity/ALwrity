@@ -1,10 +1,11 @@
 /**
- * Hub Search filters overlay: TYPE, Duration, and Upload Date.
+ * Hub Search filters overlay: TYPE, Duration, Upload Date, and Features.
  * Chip-row search stays in YouTubeStudioHub.
  */
 import { useCallback, useState } from "react";
 import type {
   YouTubeSearchDurationFilter,
+  YouTubeSearchFeatureFilter,
   YouTubeSearchHit,
   YouTubeSearchTypeFilter,
   YouTubeSearchUploadDateFilter,
@@ -24,6 +25,10 @@ type OverlaySearchFns = {
     query: string,
     uploadDate: YouTubeSearchUploadDateFilter,
   ) => Promise<YouTubeHubSearchResult>;
+  searchYouTubeByFeature: (
+    query: string,
+    feature: YouTubeSearchFeatureFilter,
+  ) => Promise<YouTubeHubSearchResult>;
 };
 
 export function useYouTubeStudioHubOverlaySearch(
@@ -41,12 +46,16 @@ export function useYouTubeStudioHubOverlaySearch(
   const [searchUploadDate, setSearchUploadDate] = useState<
     YouTubeSearchUploadDateFilter | undefined
   >(undefined);
+  const [searchFeature, setSearchFeature] = useState<
+    YouTubeSearchFeatureFilter | undefined
+  >(undefined);
 
   const handleSearchTypeChange = useCallback(
     async (searchTypeNext: YouTubeSearchTypeFilter) => {
       try {
         setSearchType(searchTypeNext);
         setSearchDuration(undefined);
+        setSearchFeature(undefined);
         const query = searchQuery.trim();
         if (!query) {
           console.info("[YouTubeStudioHub] Search type skipped empty query", {
@@ -76,6 +85,7 @@ export function useYouTubeStudioHubOverlaySearch(
       try {
         setSearchDuration(durationNext);
         setSearchType(undefined);
+        setSearchFeature(undefined);
         const query = searchQuery.trim();
         if (!query) {
           console.info("[YouTubeStudioHub] Search duration skipped empty query", {
@@ -152,6 +162,48 @@ export function useYouTubeStudioHubOverlaySearch(
     [searchQuery, setSearchItems, setSearchMessage, overlaySearch],
   );
 
+  const handleSearchFeatureChange = useCallback(
+    async (featureNext: YouTubeSearchFeatureFilter) => {
+      try {
+        setSearchFeature(featureNext);
+        setSearchType(undefined);
+        setSearchDuration(undefined);
+        const query = searchQuery.trim();
+        if (!query) {
+          console.info("[YouTubeStudioHub] Search feature skipped empty query", {
+            videoFeature: featureNext,
+          });
+          return;
+        }
+        console.info("[YouTubeStudioHub] Search feature changed", {
+          videoFeature: featureNext,
+          queryLength: query.length,
+        });
+        setSearchMessage("Searching...");
+        const result = await overlaySearch.searchYouTubeByFeature(query, featureNext);
+        setSearchItems(result.items);
+        setSearchMessage(result.message);
+        console.info("[YouTubeStudioHub] Search feature complete", {
+          videoFeature: featureNext,
+          itemCount: result.items.length,
+          hasMessage: Boolean(result.message),
+        });
+      } catch (error) {
+        console.error(
+          "[YouTubeStudioHub] Search feature request failed",
+          {
+            videoFeature: featureNext,
+            queryLength: searchQuery.trim().length,
+          },
+          error,
+        );
+        setSearchItems([]);
+        setSearchMessage("Search failed.");
+      }
+    },
+    [searchQuery, setSearchItems, setSearchMessage, overlaySearch],
+  );
+
   return {
     searchType,
     setSearchType,
@@ -159,8 +211,11 @@ export function useYouTubeStudioHubOverlaySearch(
     setSearchDuration,
     searchUploadDate,
     setSearchUploadDate,
+    searchFeature,
+    setSearchFeature,
     handleSearchTypeChange,
     handleSearchDurationChange,
     handleSearchUploadDateChange,
+    handleSearchFeatureChange,
   };
 }
