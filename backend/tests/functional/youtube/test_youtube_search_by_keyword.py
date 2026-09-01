@@ -128,3 +128,20 @@ class TestYouTubeSearchByKeywordJourney:
         assert call["order"] == "date"
         assert call["event_type"] == "live"
         assert call["video_duration"] == "short"
+
+    def test_forwards_video_duration_medium_and_long(self):
+        stub = _StudioYouTubeSearchStub()
+        client = _client(stub)
+
+        resp_medium = client.get(
+            "/api/youtube/search",
+            params={"q": "dogs", "video_duration": "medium"},
+        )
+        resp_long = client.get(
+            "/api/youtube/search",
+            params={"q": "dogs", "video_duration": "long"},
+        )
+        assert_status(resp_medium, 200)
+        assert_status(resp_long, 200)
+        assert stub.calls[0]["video_duration"] == "medium"
+        assert stub.calls[1]["video_duration"] == "long"

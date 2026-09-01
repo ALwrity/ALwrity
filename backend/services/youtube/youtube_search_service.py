@@ -23,6 +23,8 @@ from services.youtube.youtube_oauth_service import YouTubeOAuthService
 # Search.list maxResults documented range is 0–50; sample uses 25.
 _YOUTUBE_SEARCH_MAX_RESULTS = 50
 _DEFAULT_MAX_RESULTS = 25
+# Documented Search.list videoDuration values (requires type=video).
+_SEARCH_LIST_VIDEO_DURATIONS = frozenset({"short", "medium", "long"})
 
 # Documented Search.list 400 badRequest reasons (YouTube Data API v3).
 _SEARCH_LIST_BAD_REQUEST = {
@@ -219,8 +221,8 @@ class YouTubeSearchService:
                     event_type,
                     user_id,
                 )
-            if video_duration == "short":
-                list_kwargs["videoDuration"] = "short"
+            if video_duration in _SEARCH_LIST_VIDEO_DURATIONS:
+                list_kwargs["videoDuration"] = video_duration
             elif video_duration:
                 logger.warning(
                     "YouTube search_by_keyword ignoring unsupported video_duration={} user_id={}",
