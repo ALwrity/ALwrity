@@ -213,22 +213,43 @@ def bootstrap_local_llm_models() -> BootstrapResult:
 # Bootstrap linguistic models BEFORE any imports that might need them
 BOOTSTRAP_RESULTS = []
 
-# Load .env file early so ALWRITY_ENABLED_FEATURES is available
-from dotenv import load_dotenv
-from pathlib import Path
+# NOTE: This module must stay import-safe. When uvicorn runs with reload=True it
+# spawns a child process that re-executes this file (Windows spawn semantics).
+# Any top-level side effect (prints, dotenv loads) would therefore run twice,
+# making it look like the server started twice. All startup side effects live
+# in main() or under `if __name__ == "__main__"`, which the spawned child skips.
 
-# Load from backend/.env specifically
-backend_dir = Path(__file__).parent
-load_dotenv(backend_dir / '.env')
 
-# Debug: Print what PORT is set to - IMMEDIATELY at startup
-import os
-print(f"[STARTUP] PORT env: {os.getenv('PORT')}", flush=True)
-print(f"[STARTUP] RENDER env: {os.getenv('RENDER')}", flush=True)
-print(f"[STARTUP] ALWRITY_ENABLED_FEATURES: {os.getenv('ALWRITY_ENABLED_FEATURES')}", flush=True)
-print(f"[STARTUP] HOST env: {os.getenv('HOST')}", flush=True)
+_env_loaded = False
+
+
+def load_backend_env() -> None:
+    """Load backend/.env early so ALWRITY_ENABLED_FEATURES is set before bootstrap.
+
+    Idempotent: safe to call from both the bootstrap block and main().
+    """
+    global _env_loaded
+    if _env_loaded:
+        return
+    _env_loaded = True
+
+    from dotenv import load_dotenv
+
+    backend_dir = Path(__file__).parent
+    load_dotenv(backend_dir / ".env")
+
+    # Debug: print what key env vars are set to at startup
+    print(f"[STARTUP] PORT env: {os.getenv('PORT')}", flush=True)
+    print(f"[STARTUP] RENDER env: {os.getenv('RENDER')}", flush=True)
+    print(f"[STARTUP] ALWRITY_ENABLED_FEATURES: {os.getenv('ALWRITY_ENABLED_FEATURES')}", flush=True)
+    print(f"[STARTUP] HOST env: {os.getenv('HOST')}", flush=True)
 
 if __name__ == "__main__":
+    # Load backend/.env before reading ALWRITY_ENABLED_FEATURES. Guarded by
+    # __name__ == "__main__", so uvicorn's reload-spawned child (which runs with
+    # __name__ == "__mp_main__") never re-executes this or main().
+    load_backend_env()
+
     enabled_features = get_enabled_features()
     features_str = ",".join(sorted(enabled_features))
     os.environ["ALWRITY_ENABLED_FEATURES"] = features_str
@@ -435,6 +456,8 @@ def start_backend(enable_reload=False, production_mode=False):
 def main():
     """Main function to set up and start the backend."""
     configure_console_utf8()
+    # Load .env early so ALWRITY_ENABLED_FEATURES / PORT / HOST are available.
+    load_backend_env()
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="ALwrity Backend Server")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
