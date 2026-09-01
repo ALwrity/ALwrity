@@ -17,6 +17,7 @@ import FeatureRoute from './components/shared/FeatureRoute';
 import MainPricingRoute from './components/Pricing/MainPricingRoute';
 import ContactPage from './components/Landing/ContactPage';
 import { GifMakerFloatingPanel } from './components/GifMaker/GifMakerFloatingPanel';
+import { shouldSkipOnboarding, getDefaultLandingRoute } from './utils/demoMode';
 const LinkedInPricingPage = React.lazy(() => import('./components/Pricing/LinkedInPricingPage'));
 
 // ΓöÇΓöÇΓöÇ Lazy loaded route components ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
@@ -40,6 +41,9 @@ const WixCallbackPage = React.lazy(() => import('./components/WixCallbackPage/Wi
 
 const WizardWithNavigate = () => {
   const navigate = useNavigate();
+  if (shouldSkipOnboarding()) {
+    return <Navigate to={getDefaultLandingRoute()} replace />;
+  }
   return <Wizard onComplete={() => navigate('/dashboard')} />;
 };
 
