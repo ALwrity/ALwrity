@@ -107,4 +107,42 @@ describe("youtubeStudioApi", () => {
       params: { q: "dogs", max_results: 25, video_duration: "long" },
     });
   });
+
+  it("forwards upload_date for the Upload Date Search.list filter", async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: { success: true, items: [] },
+    });
+    await youtubeStudioApi.searchByKeyword({
+      q: "dogs",
+      max_results: 25,
+      upload_date: "today",
+    });
+    await youtubeStudioApi.searchByKeyword({
+      q: "dogs",
+      max_results: 25,
+      upload_date: "week",
+    });
+    await youtubeStudioApi.searchByKeyword({
+      q: "dogs",
+      max_results: 25,
+      upload_date: "month",
+    });
+    await youtubeStudioApi.searchByKeyword({
+      q: "dogs",
+      max_results: 25,
+      upload_date: "year",
+    });
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/search", {
+      params: { q: "dogs", max_results: 25, upload_date: "today" },
+    });
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/search", {
+      params: { q: "dogs", max_results: 25, upload_date: "week" },
+    });
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/search", {
+      params: { q: "dogs", max_results: 25, upload_date: "month" },
+    });
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/search", {
+      params: { q: "dogs", max_results: 25, upload_date: "year" },
+    });
+  });
 });

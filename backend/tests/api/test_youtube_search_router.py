@@ -174,6 +174,69 @@ class TestYouTubeSearchRouter:
         ]
         assert durations == ["medium", "long"]
 
+    def test_forwards_upload_date(self):
+        service = MagicMock()
+        service.search_by_keyword.return_value = {
+            "success": True,
+            "items": [],
+            "next_page_token": None,
+        }
+        client = youtube_studio_client(
+            {_get_search_service(): lambda: service}
+        )
+
+        resp_today = client.get(
+            "/api/youtube/search",
+            params={"q": "dogs", "upload_date": "today"},
+        )
+        resp_week = client.get(
+            "/api/youtube/search",
+            params={"q": "dogs", "upload_date": "week"},
+        )
+        resp_month = client.get(
+            "/api/youtube/search",
+            params={"q": "dogs", "upload_date": "month"},
+        )
+        resp_year = client.get(
+            "/api/youtube/search",
+            params={"q": "dogs", "upload_date": "year"},
+        )
+
+        assert resp_today.status_code == 200
+        assert resp_week.status_code == 200
+        assert resp_month.status_code == 200
+        assert resp_year.status_code == 200
+        upload_dates = [
+            call.kwargs.get("upload_date")
+            for call in service.search_by_keyword.call_args_list
+        ]
+        assert upload_dates == ["today", "week", "month", "year"]
+
+    def test_forwards_upload_date_time_zone(self):
+        service = MagicMock()
+        service.search_by_keyword.return_value = {
+            "success": True,
+            "items": [],
+            "next_page_token": None,
+        }
+        client = youtube_studio_client(
+            {_get_search_service(): lambda: service}
+        )
+
+        resp = client.get(
+            "/api/youtube/search",
+            params={
+                "q": "dogs",
+                "upload_date": "today",
+                "time_zone": "America/New_York",
+            },
+        )
+
+        assert resp.status_code == 200
+        kwargs = service.search_by_keyword.call_args.kwargs
+        assert kwargs.get("upload_date") == "today"
+        assert kwargs.get("time_zone") == "America/New_York"
+
     def test_forwards_order_and_event_type(self):
         service = MagicMock()
         service.search_by_keyword.return_value = {
