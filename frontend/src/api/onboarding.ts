@@ -174,6 +174,36 @@ export interface TodayPlanPreview {
   fallback_used: boolean;
   proposals_by_agent: Record<string, any[]>;
   template_fallback_count?: number;
+  backfill_errors?: Array<{
+    pillar?: string;
+    title?: string;
+    error?: string | null;
+    reason?: string | null;
+  }>;
+  digest?: {
+    status: string;
+    reason?: string | null;
+    contact_email?: string;
+  };
+  agent_states?: Array<{
+    agent: string;
+    state: "error" | "declined" | "ok";
+    detail?: string | null;
+  }>;
+  failed_agents?: Array<{ agent: string; state: string; detail?: string | null }>;
+  declined_agents?: Array<{ agent: string; state: string; detail?: string | null }>;
+}
+
+export interface RetryAgentResult {
+  success: boolean;
+  agent?: string;
+  proposals_by_agent?: Record<string, any[]>;
+  template_fallback_count?: number;
+  backfill_errors?: TodayPlanPreview["backfill_errors"];
+  digest?: TodayPlanPreview["digest"];
+  agent_states?: TodayPlanPreview["agent_states"];
+  failed_agents?: TodayPlanPreview["failed_agents"];
+  declined_agents?: TodayPlanPreview["declined_agents"];
 }
 
 export async function previewTodayPlan(): Promise<TodayPlanPreview> {
@@ -181,6 +211,14 @@ export async function previewTodayPlan(): Promise<TodayPlanPreview> {
   const { longRunningApiClient } = await import('./client');
   const res: AxiosResponse<any> = await longRunningApiClient.post('/api/today-workflow/preview');
   return res.data?.data;
+}
+
+export async function retryTodayAgent(agentKey: string): Promise<RetryAgentResult> {
+  const { longRunningApiClient } = await import('./client');
+  const res: AxiosResponse<any> = await longRunningApiClient.post(`/api/today-workflow/retry-agent`, {
+    agent_key: agentKey,
+  });
+  return res.data?.data ?? res.data;
 }
 
 export async function generateTodayPlan() {

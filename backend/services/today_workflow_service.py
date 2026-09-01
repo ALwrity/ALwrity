@@ -19,6 +19,11 @@ from services.daily_meeting_preflight import build_agent_evidence, run_daily_mee
 from services.daily_meeting_review import prioritize_proposals, review_proposals
 from services.intelligence.agents.team_catalog import AGENT_TEAM_CATALOG
 
+# Pillars owned by the agent committee (as opposed to calendar-driven
+# 'generate'). Retried agent proposals are confined to these pillars so a
+# retry never clobbers calendar-sourced content tasks.
+_COMMITTEE_PILLARS = {"plan", "analyze", "engage", "publish", "remarket"}
+
 
 class _NoopActivity:
     """Activity sink used by lightweight planning calls without a tenant DB."""
@@ -376,6 +381,8 @@ async def generate_agent_enhanced_plan(
     strict_contextuality: bool = False,
     allow_preview: bool = False,
     manual_override: bool = False,
+    retry_agents: Optional[List[str]] = None,
+    skip_meeting_lifecycle: bool = False,
 ) -> Dict[str, Any]:
     """Generate today's plan using the agent committee.
 
@@ -393,8 +400,194 @@ async def generate_agent_enhanced_plan(
         strict_contextuality=strict_contextuality,
         allow_preview=allow_preview,
         manual_override=manual_override,
+        retry_agents=retry_agents,
+        skip_meeting_lifecycle=skip_meeting_lifecycle,
     )
 
+
+def _merge_retried_agent_tasks(
+    db: Session,
+    plan: DailyWorkflowPlan,
+    agent_key: str,
+    retried_tasks: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Replace a single agent's persisted tasks with the retried proposals.
+
+    Deletes the agent's existing ``DailyWorkflowTask`` rows (matched by
+    ``metadata.source_agent``) and inserts the fresh proposals, leaving all
+    other agents' rows untouched. Returns counts for reporting.
+    """
+    removed = 0
+    old_rows = (
+        db.query(DailyWorkflowTask)
+        .filter(DailyWorkflowTask.plan_id == plan.id, DailyWorkflowTask.user_id == plan.user_id)
+        .all()
+    )
+    for row in old_rows:
+        meta = row.metadata_json if isinstance(row.metadata_json, dict) else {}
+        if meta.get("source_agent") == agent_key:
+            db.delete(row)
+            removed += 1
+
+    added = 0
+    for t in retried_tasks:
+        pillar_id = str(t.get("pillarId") or "").lower().strip()
+        if pillar_id not in PILLAR_IDS:
+            continue
+        db.add(DailyWorkflowTask(
+            plan_id=plan.id,
+            user_id=plan.user_id,
+            pillar_id=pillar_id,
+            title=str(t.get("title") or "Task").strip()[:255],
+            description=str(t.get("description") or "").strip(),
+            status=_coerce_status(t.get("status")),
+            priority=_coerce_priority(t.get("priority")),
+            estimated_time=int(t.get("estimatedTime") or 15),
+            action_type=str(t.get("actionType") or "navigate").strip()[:20],
+            action_url=str(t.get("actionUrl") or "").strip(),
+            dependencies=json.dumps(t.get("dependencies") or []),
+            metadata_json=t.get("metadata") or {},
+            enabled=bool(t.get("enabled", True)),
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        ))
+        added += 1
+    return {"removed": removed, "added": added}
+
+
+async def retry_agent_proposals(
+    db: Session,
+    user_id: str,
+    agent_key: str,
+    date: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Re-run a single failed committee agent and merge its fresh proposals.
+
+    Scopes ``generate_agent_enhanced_plan`` to ``agent_key`` with
+    ``skip_meeting_lifecycle=True`` (so it neither creates a new meeting nor
+    re-fires the digest email), injecting the current meeting context (other
+    agents' accepted tasks + the prior failure) so the retried agent
+    complements rather than duplicates.
+
+    Merge semantics: the retried agent's persisted tasks are *replaced* by
+    whatever the fresh run accepts (possibly zero). Other agents' tasks,
+    the plan's digest outcome, and any calendar-sourced tasks are untouched.
+    """
+    date_str = date or _today_date_str()
+
+    plan = (
+        db.query(DailyWorkflowPlan)
+        .filter(DailyWorkflowPlan.user_id == user_id, DailyWorkflowPlan.date == date_str)
+        .first()
+    )
+    if plan is None:
+        return {
+            "success": False,
+            "agent": agent_key,
+            "error": f"No plan found for user {user_id} on {date_str}",
+        }
+
+    known_keys = {entry["agent_key"] for entry in AGENT_TEAM_CATALOG}
+    if agent_key not in known_keys:
+        return {"success": False, "agent": agent_key, "error": f"Unknown agent '{agent_key}'"}
+
+    plan_json = plan.plan_json if isinstance(plan.plan_json, dict) else {}
+
+    # Gather the current meeting context from *other* agents' persisted tasks so
+    # the retried agent can complement them instead of producing duplicates.
+    existing_rows = (
+        db.query(DailyWorkflowTask)
+        .filter(DailyWorkflowTask.plan_id == plan.id, DailyWorkflowTask.user_id == user_id)
+        .all()
+    )
+    teammate_tasks = []
+    prior_failure = None
+    for row in existing_rows:
+        meta = row.metadata_json if isinstance(row.metadata_json, dict) else {}
+        source = meta.get("source_agent")
+        if source == agent_key:
+            continue
+        teammate_tasks.append({
+            "pillarId": row.pillar_id,
+            "title": row.title,
+            "description": row.description,
+            "source_agent": source,
+            "actionType": row.action_type,
+        })
+
+    for ev in plan_json.get("agent_evidence", []):
+        if isinstance(ev, dict) and ev.get("agent") == agent_key and ev.get("error"):
+            prior_failure = {"state": "error", "message": ev.get("error")}
+            break
+
+    grounding = build_grounding_context(db, user_id, date_str)
+    grounding["retry"] = {
+        "agent": agent_key,
+        "prior_error": prior_failure,
+        "meeting_context": teammate_tasks,
+    }
+
+    retry_data = await generate_agent_enhanced_plan(
+        db,
+        user_id,
+        date_str,
+        grounding=grounding,
+        strict_contextuality=False,
+        retry_agents=[agent_key],
+        skip_meeting_lifecycle=True,
+    )
+
+    retried_tasks = [
+        t for t in retry_data.get("tasks", [])
+        if (t.get("pillarId") or "").lower().strip() in _COMMITTEE_PILLARS
+    ]
+
+    merge = _merge_retried_agent_tasks(db, plan, agent_key, retried_tasks)
+
+    # Refresh the agent's evidence in plan_json (replace old entry for the agent).
+    fresh_evidence = [
+        ev for ev in retry_data.get("agent_evidence", [])
+        if isinstance(ev, dict) and ev.get("agent") == agent_key
+    ]
+    agent_evidence = [
+        ev for ev in plan_json.get("agent_evidence", [])
+        if not (isinstance(ev, dict) and ev.get("agent") == agent_key)
+    ]
+    agent_evidence.extend(fresh_evidence)
+    plan_json["agent_evidence"] = agent_evidence
+
+    # Rebuild the task list in plan_json so downstream consumers that read
+    # plan_json["tasks"] see the merged state (retried agent's tasks replaced,
+    # others preserved in order).
+    preserved_tasks = [
+        t for t in plan_json.get("tasks", [])
+        if (t.get("pillarId") or "").lower().strip() in _COMMITTEE_PILLARS
+    ]
+    replaced_titles = {
+        t["title"] for t in preserved_tasks
+        if (t.get("metadata") or {}).get("source_agent") == agent_key
+    }
+    kept_tasks = [t for t in preserved_tasks if t.get("title") not in replaced_titles]
+    for t in retried_tasks:
+        kept_tasks = [kt for kt in kept_tasks if kt.get("title") != t.get("title")]
+        kept_tasks.append(t)
+    plan_json["tasks"] = kept_tasks
+
+    plan.plan_json = plan_json
+    plan.updated_at = datetime.utcnow()
+    plan.fallback_used = bool(plan_json.get("fallback_used", False))
+    db.add(plan)
+    db.commit()
+
+    return {
+        "success": True,
+        "agent": agent_key,
+        "added_count": merge["added"],
+        "replaced_count": merge["removed"],
+        "tasks": retried_tasks,
+        "digest": plan_json.get("digest"),
+        "agent_evidence": agent_evidence,
+    }
 
 
 async def get_or_create_daily_workflow_plan(
@@ -503,6 +696,10 @@ async def get_or_create_daily_workflow_plan(
     # helper detects llm_pillar_backfill and controlled_fallback
     # sources as secondary signals.
     plan_data["fallback_used"] = committee_fallback_used or _plan_uses_fallback(all_tasks)
+    # Surface the digest outcome (enqueued / skipped_* / failed) that the
+    # committee recorded, so downstream consumers and the API can report
+    # why an email did or didn't fire instead of hiding it.
+    plan_data["digest"] = agent_plan_data.get("digest", {"status": "skipped", "reason": "not_attempted"})
     tasks = plan_data.get("tasks", [])
 
     def _create_plan():

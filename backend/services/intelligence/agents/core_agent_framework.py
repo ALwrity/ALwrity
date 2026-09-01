@@ -159,6 +159,50 @@ class AgentAction:
         if self.created_at is None:
             self.created_at = datetime.utcnow().isoformat()
 
+class AgentDeclined(Exception):
+    """Raised by an agent that honestly has nothing to contribute.
+
+    Distinct from a generic exception: an ``AgentDeclined`` is a *valid*
+    outcome (the agent reviewed the context and chose not to fabricate a
+    recommendation), not a failure. The daily-meeting committee records it
+    as informational and non-retryable.
+    """
+    pass
+
+
+# Canonical wording an agent should use when it has nothing to contribute.
+AGENT_DECLINE_MESSAGE = "I have nothing to contribute"
+
+# Shared instruction appended to agent proposal prompts so LLM-driven agents
+# can honestly decline instead of fabricating a recommendation.
+AGENT_DECLINE_INSTRUCTION = (
+    "\nIf, after reviewing the context, you genuinely have no actionable "
+    "contribution for today (for example the user has no relevant content "
+    "pillars, competitor data, or signals in scope), reply with exactly "
+    f"'{AGENT_DECLINE_MESSAGE}' and do not fabricate a task."
+)
+
+
+def _is_agent_decline(result: Any) -> bool:
+    """Detect an explicit "nothing to contribute" response from the LLM.
+
+    Tolerant of a bare string, a JSON object with a ``declined``/``message``
+    marker, or the canonical wording embedded anywhere in the output.
+    """
+    if result is None:
+        return False
+    if isinstance(result, str):
+        text = result
+    elif isinstance(result, dict):
+        if result.get("declined") is True:
+            return True
+        text = " ".join(str(v) for v in result.values())
+    else:
+        text = str(result)
+    needle = AGENT_DECLINE_MESSAGE.lower()
+    return needle in text.lower()
+
+
 @dataclass
 class TaskProposal:
     """Represents a daily task proposed by an agent"""
@@ -662,6 +706,7 @@ class BaseALwrityAgent(ABC):
         default_proposals: List[TaskProposal],
         instructions: str,
         max_tasks: int = 5,
+        allow_decline: bool = True,
     ) -> List[TaskProposal]:
         """Synthesize contextual daily-task proposals via the LLM.
 
@@ -674,6 +719,12 @@ class BaseALwrityAgent(ABC):
         successfully parsed LLM output is tagged ``llm``; the fallback bundle
         is tagged ``template_fallback`` so downstream review, persistence,
         and the UI can surface degraded synthesis instead of hiding it.
+
+        When ``allow_decline`` is True, the LLM is instructed that it may
+        honestly report "I have nothing to contribute" (raised as
+        ``AgentDeclined``) rather than fabricating tasks out of thin air. An
+        explicit decline is *not* treated as a synthesis failure and will not
+        fall back to ``default_proposals``.
         """
         try:
             role_guidance = get_role_contract(self.agent_key)
@@ -682,8 +733,9 @@ class BaseALwrityAgent(ABC):
                 "risk_level (low, medium, or high), and measurement.\n"
                 + "\n".join(f"- {key}: {value}" for key, value in role_guidance.items())
             )
+            decline_instruction = AGENT_DECLINE_INSTRUCTION if allow_decline else ""
             prompt = self.build_task_prompt(
-                instruction=instructions + contract_instruction,
+                instruction=instructions + contract_instruction + decline_instruction,
                 task_context={"onboarding_data": (context or {}).get("onboarding_data", {})},
             )
             schema = task_output_schema(self.agent_key)
@@ -699,6 +751,11 @@ class BaseALwrityAgent(ABC):
             )
             proposals = self._parse_task_proposals(result, max_tasks)
             if not proposals:
+                if allow_decline and _is_agent_decline(result) and not default_proposals:
+                    # The agent honestly has nothing to contribute and there
+                    # is no deterministic guidance to fall back on — decline
+                    # rather than fabricating a task.
+                    raise AgentDeclined(AGENT_DECLINE_MESSAGE)
                 logger.info(
                     f"[{self.__class__.__name__}] LLM synthesis returned no valid tasks; "
                     "using default proposals."
@@ -707,6 +764,8 @@ class BaseALwrityAgent(ABC):
                     proposal.synthesis_mode = "template_fallback"
                 return default_proposals
             return proposals
+        except AgentDeclined:
+            raise
         except Exception as e:
             logger.warning(
                 f"[{self.__class__.__name__}] LLM task synthesis failed, "

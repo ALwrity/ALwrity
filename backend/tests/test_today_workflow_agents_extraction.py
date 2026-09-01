@@ -270,3 +270,82 @@ def test_new_module_exports_required_items():
             assert hasattr(twa, "_get_orchestration_service")
     except ImportError:
         pytest.skip("New module not yet created")
+
+
+class _DecliningAgent:
+    async def propose_daily_tasks(self, grounding):
+        from services.intelligence.agents.core_agent_framework import AgentDeclined
+        raise AgentDeclined()
+
+
+class _FailingAgent:
+    async def propose_daily_tasks(self, grounding):
+        raise RuntimeError("boom")
+
+
+@pytest.mark.asyncio
+async def test_agent_declined_is_not_classified_as_error(monkeypatch):
+    """An AgentDeclined result is recorded as declined, not as a failure."""
+    from services import today_workflow_service as svc
+    from services.today_workflow_agents import generate_agent_enhanced_plan
+    from api.today_workflow import _derive_agent_states
+
+    async def _get_orchestrator(user_id):
+        return SimpleNamespace(agents={
+            "content": _DecliningAgent(),
+            "strategy": None,
+            "seo": None,
+            "social": None,
+            "competitor": None,
+            "content_gap_radar": None,
+        })
+
+    monkeypatch.setattr(svc.orchestration_service, "get_or_create_orchestrator", _get_orchestrator)
+
+    result = await generate_agent_enhanced_plan(
+        db=None, user_id="u1", date="2026-01-01", grounding={"onboarding_data": {}}
+    )
+
+    declined = [ev for ev in result.get("agent_evidence", []) if ev.get("declined")]
+    errors = [ev for ev in result.get("agent_evidence", []) if ev.get("error")]
+    assert declined, "expected content agent to be recorded as declined"
+    assert not errors, "a decline must not be recorded as an error"
+    assert declined[0]["message"] == "I have nothing to contribute"
+
+    states = _derive_agent_states(result.get("agent_evidence", []))
+    content_state = [s for s in states if s["agent"] == "content_strategist"][0]
+    assert content_state["state"] == "declined"
+
+
+@pytest.mark.asyncio
+async def test_agent_error_is_classified_as_error(monkeypatch):
+    """A generic agent exception is recorded as an error state."""
+    from services import today_workflow_service as svc
+    from services.today_workflow_agents import generate_agent_enhanced_plan
+    from api.today_workflow import _derive_agent_states
+
+    async def _get_orchestrator(user_id):
+        return SimpleNamespace(agents={
+            "content": _FailingAgent(),
+            "strategy": None,
+            "seo": None,
+            "social": None,
+            "competitor": None,
+            "content_gap_radar": None,
+        })
+
+    monkeypatch.setattr(svc.orchestration_service, "get_or_create_orchestrator", _get_orchestrator)
+
+    result = await generate_agent_enhanced_plan(
+        db=None, user_id="u1", date="2026-01-01", grounding={"onboarding_data": {}}
+    )
+
+    errors = [ev for ev in result.get("agent_evidence", []) if ev.get("error")]
+    declined = [ev for ev in result.get("agent_evidence", []) if ev.get("declined")]
+    assert errors and "boom" in errors[0]["error"]
+    assert not declined
+
+    states = _derive_agent_states(result.get("agent_evidence", []))
+    content_state = [s for s in states if s["agent"] == "content_strategist"][0]
+    assert content_state["state"] == "error"
+

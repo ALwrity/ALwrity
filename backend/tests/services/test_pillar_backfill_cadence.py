@@ -116,6 +116,10 @@ class TestCoverageGating:
     def pillar_module(self, monkeypatch):
         import services.today_workflow_pillar as pillar
 
+        # Cadence gating only runs when backfill is explicitly enabled;
+        # the suite default is ``off`` (honest absence).
+        monkeypatch.setenv("TODAY_WORKFLOW_PILLAR_BACKFILL", "on")
+
         calls = {"built": []}
 
         def fake_build(user_id, date, pillar_id, grounding):
@@ -250,11 +254,13 @@ class TestBackfillModeGate:
         pillar.built_source = built_source
         return pillar
 
-    def test_mode_defaults_to_on_on_invalid_value(self, monkeypatch):
+    def test_mode_defaults_to_off_on_invalid_value(self, monkeypatch):
+        # Invalid values fall back to ``off`` so a typo can't silently enable
+        # an invented-coverage cost path (honest absence is the default).
         monkeypatch.setenv("TODAY_WORKFLOW_PILLAR_BACKFILL", "sometimes")
-        assert _pillar_backfill_mode() == "on"
+        assert _pillar_backfill_mode() == "off"
 
-    @pytest.mark.parametrize("value,expected", [("on", "on"), ("off", "off"), ("LLM_ONLY", "llm_only"), ("", "on")])
+    @pytest.mark.parametrize("value,expected", [("on", "on"), ("off", "off"), ("LLM_ONLY", "llm_only"), ("", "off")])
     def test_mode_reads_env(self, monkeypatch, value, expected):
         monkeypatch.setenv("TODAY_WORKFLOW_PILLAR_BACKFILL", value)
         assert _pillar_backfill_mode() == expected
