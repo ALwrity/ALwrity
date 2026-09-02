@@ -5,13 +5,18 @@ Uses stored OAuth credentials for authentication.
 """
 
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 from loguru import logger
 
 from middleware.auth_middleware import get_current_user
 from services.youtube.youtube_oauth_service import YouTubeOAuthService
 from services.youtube.youtube_publish_service import YouTubePublishService
+from services.youtube.youtube_publish_log import (
+    user_safe_publish_error,
+    youtube_publish_error_log_fields,
+    youtube_publish_source_meta,
+)
 from .oauth_router import get_oauth_service
 from .task_manager import task_manager
 
@@ -21,7 +26,10 @@ router = APIRouter(prefix="/publish", tags=["youtube-publish"])
 
 class PublishRequest(BaseModel):
     token_id: int = Field(..., description="YouTube OAuth token row ID (which channel to publish to)")
-    video_source: str = Field(..., description="URL or local file path to the video")
+    video_source: str = Field(
+        ...,
+        description="Creator /api/youtube/videos/<file> path, http(s) URL, or local file path",
+    )
     title: str = Field(..., min_length=1, max_length=100, description="Video title (max 100 chars)")
     description: str = Field("", description="Video description")
     tags: List[str] = Field(default_factory=list, description="Video tags")
@@ -62,18 +70,40 @@ def start_publish(
         if not user_id:
             raise HTTPException(status_code=401, detail="Authentication required")
 
+        source_meta = youtube_publish_source_meta(request.video_source)
+        logger.info(
+            "[youtube_publish] Start request user_id={} token_id={} title_length={} "
+            "tag_count={} privacy={} has_publish_at={} source_kind={} source_length={}",
+            user_id,
+            request.token_id,
+            len(request.title),
+            len(request.tags),
+            request.privacy_status,
+            bool(request.publish_at),
+            source_meta["source_kind"],
+            source_meta["source_length"],
+        )
+
         # Verify token belongs to user
         oauth_service = publish_service.oauth_service
         status = oauth_service.get_connection_status(user_id)
         tokens = [c for c in status.get("channels", []) if c["token_id"] == request.token_id and c["is_active"]]
         if not tokens:
+            logger.warning(
+                "[youtube_publish] Invalid or inactive token_id user_id={} token_id={}",
+                user_id,
+                request.token_id,
+            )
             raise HTTPException(status_code=400, detail="Invalid or inactive token_id")
 
         # Create background task
         task_id = task_manager.create_task("youtube_publish")
         logger.info(
-            f"YouTube publish: created task {task_id} for user {user_id}, "
-            f"title='{request.title[:50]}', channel={tokens[0].get('channel_name', 'unknown')}"
+            "[youtube_publish] Task created task_id={} user_id={} token_id={} source_kind={}",
+            task_id,
+            user_id,
+            request.token_id,
+            source_meta["source_kind"],
         )
 
         background_tasks.add_task(
@@ -101,8 +131,13 @@ def start_publish(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"YouTube publish: error starting task: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        fields = youtube_publish_error_log_fields(e)
+        logger.error(
+            "[youtube_publish] Start task failed error_type={} http_status={}",
+            fields["error_type"],
+            fields["http_status"],
+        )
+        raise HTTPException(status_code=500, detail="Failed to start publish. Please try again.")
 
 
 @router.get("/{task_id}", response_model=PublishResponse)
@@ -117,7 +152,17 @@ def get_publish_status(
             raise HTTPException(status_code=401, detail="Authentication required")
 
         task_status = task_manager.get_task_status(task_id)
+        logger.debug(
+            "[youtube_publish] Status poll user_id={} task_id={} found={}",
+            user_id,
+            task_id,
+            bool(task_status),
+        )
         if not task_status:
+            logger.warning(
+                "[youtube_publish] Task not found task_id={}",
+                task_id,
+            )
             return PublishResponse(
                 success=False,
                 error="Task not found",
@@ -127,6 +172,20 @@ def get_publish_status(
         status = task_status.get("status", "unknown")
         result = task_status.get("result") or {}
         error = task_status.get("error")
+        if status in ("completed", "failed"):
+            logger.info(
+                "[youtube_publish] Status poll result task_id={} status={} has_video_id={}",
+                task_id,
+                status,
+                bool(result.get("video_id")),
+            )
+        else:
+            logger.debug(
+                "[youtube_publish] Status poll result task_id={} status={} has_video_id={}",
+                task_id,
+                status,
+                bool(result.get("video_id")),
+            )
 
         if status == "completed":
             return PublishResponse(
@@ -153,8 +212,14 @@ def get_publish_status(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"YouTube publish: status check error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        fields = youtube_publish_error_log_fields(e)
+        logger.error(
+            "[youtube_publish] Status check failed task_id={} error_type={} http_status={}",
+            task_id,
+            fields["error_type"],
+            fields["http_status"],
+        )
+        raise HTTPException(status_code=500, detail="Failed to check publish status. Please try again.")
 
 
 def _execute_publish_task(
@@ -172,7 +237,13 @@ def _execute_publish_task(
     publish_at: Optional[str] = None,
 ):
     """Background task to execute video publish."""
-    logger.info(f"YouTube publish: background task {task_id} starting for user {user_id}")
+    logger.info(
+        "[youtube_publish] Background task start task_id={} user_id={} token_id={} source_kind={}",
+        task_id,
+        user_id,
+        token_id,
+        youtube_publish_source_meta(video_source)["source_kind"],
+    )
 
     try:
         task_manager.update_task_status(
@@ -197,16 +268,21 @@ def _execute_publish_task(
                 task_id,
                 "completed",
                 progress=100.0,
-                message=f"Published successfully: {result.get('video_url', '')}",
+                message="Published successfully",
                 result=result,
             )
             logger.info(
-                f"YouTube publish: task {task_id} completed — "
-                f"video_id={result.get('video_id')}, url={result.get('video_url')}"
+                "[youtube_publish] Background task complete task_id={} has_video_id={}",
+                task_id,
+                bool(result.get("video_id")),
             )
         else:
             error_msg = result.get("error", "Unknown publish error")
-            logger.error(f"YouTube publish: task {task_id} failed: {error_msg}")
+            logger.error(
+                "[youtube_publish] Background task failed task_id={} has_error={}",
+                task_id,
+                bool(error_msg),
+            )
             task_manager.update_task_status(
                 task_id,
                 "failed",
@@ -216,11 +292,18 @@ def _execute_publish_task(
             )
 
     except Exception as e:
-        logger.error(f"YouTube publish: background task {task_id} error: {e}")
+        fields = youtube_publish_error_log_fields(e)
+        logger.error(
+            "[youtube_publish] Background task error task_id={} error_type={} http_status={}",
+            task_id,
+            fields["error_type"],
+            fields["http_status"],
+        )
+        safe = user_safe_publish_error(e)
         task_manager.update_task_status(
             task_id,
             "failed",
-            error=str(e),
+            error=safe,
             message="Publish error",
-            result={"error": str(e)},
+            result={"error": safe},
         )

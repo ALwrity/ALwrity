@@ -206,6 +206,8 @@ export interface VideoListItem {
   filename: string;
   created_at?: string;
   resolution?: string;
+  /** Combined library rows include this; scene clips omit it. */
+  scene_count?: number | null;
 }
 
 export interface VideoListResponse {

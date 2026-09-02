@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { youtubePublishSourceMeta } from '../../../hooks/youtubePublishLog';
 import {
   youtubeApi,
   Scene,
@@ -6,6 +7,10 @@ import {
   TaskStatus,
   VideoPlan,
 } from '../../../services/youtubeApi';
+import {
+  mapYouTubeSceneVideosByNumber,
+  pickYouTubeCombinedVideoUrl,
+} from './youtubeRenderVideoRescue';
 
 type SceneStatus = 'idle' | 'running' | 'completed' | 'failed';
 
@@ -209,45 +214,58 @@ export function useYouTubeRenderQueue({
       .then((result) => {
         if (!result.videos || result.videos.length === 0) return;
 
-        const videoMap = new Map<number, string>();
-        result.videos.forEach((video: any) => {
-          const sceneNum = video.scene_number;
-          if (sceneNum !== null && sceneNum !== undefined) {
-            // Use the most recent video for each scene number
-            if (!videoMap.has(sceneNum)) {
-              videoMap.set(sceneNum, video.video_url);
-            }
+        try {
+          const combinedUrl = pickYouTubeCombinedVideoUrl(result.videos);
+          if (combinedUrl) {
+            setFinalVideoUrl((prev) => prev ?? combinedUrl);
+            console.info("[YouTubeRenderQueue] Restored combined video from library", {
+              ...youtubePublishSourceMeta(combinedUrl),
+              videoCount: result.videos.length,
+            });
+          } else {
+            console.info("[YouTubeRenderQueue] Library rescue: no combined video", {
+              videoCount: result.videos.length,
+            });
           }
-        });
+        } catch (error) {
+          console.error("[YouTubeRenderQueue] Combined video rescue failed", {
+            errorName: error instanceof Error ? error.name : "Error",
+          });
+        }
 
-        // Update scenes with existing video URLs
-        const updatedScenes = scenes.map((s) => {
-          const videoUrl = videoMap.get(s.scene_number);
-          if (videoUrl && !s.videoUrl) {
-            return { ...s, videoUrl };
-          }
-          return s;
-        });
-
-        // Only update if we found videos
-        const hasUpdates = updatedScenes.some((s, idx) => s.videoUrl !== scenes[idx].videoUrl);
-        if (hasUpdates) {
-          onScenesUpdate(updatedScenes);
-          // Also update scene statuses to reflect completed state
-          updatedScenes.forEach((s) => {
-            if (s.videoUrl) {
-              updateSceneStatus(s.scene_number, {
-                status: 'completed',
-                progress: 100,
-                videoUrl: s.videoUrl,
-              });
+        try {
+          const videoMap = mapYouTubeSceneVideosByNumber(result.videos);
+          const updatedScenes = scenes.map((s) => {
+            const videoUrl = videoMap.get(s.scene_number);
+            if (videoUrl && !s.videoUrl) {
+              return { ...s, videoUrl };
             }
+            return s;
+          });
+
+          const hasUpdates = updatedScenes.some((s, idx) => s.videoUrl !== scenes[idx].videoUrl);
+          if (hasUpdates) {
+            onScenesUpdate(updatedScenes);
+            updatedScenes.forEach((s) => {
+              if (s.videoUrl) {
+                updateSceneStatus(s.scene_number, {
+                  status: 'completed',
+                  progress: 100,
+                  videoUrl: s.videoUrl,
+                });
+              }
+            });
+          }
+        } catch (error) {
+          console.error("[YouTubeRenderQueue] Scene video rescue failed", {
+            errorName: error instanceof Error ? error.name : "Error",
           });
         }
       })
       .catch((error) => {
-        console.error('[YouTubeRenderQueue] Failed to list existing videos:', error);
-        // Don't show error to user - this is just for restoring state
+        console.error("[YouTubeRenderQueue] Failed to list existing videos", {
+          errorName: error instanceof Error ? error.name : "Error",
+        });
       });
   }, []); // Only run on mount
 
@@ -260,16 +278,7 @@ export function useYouTubeRenderQueue({
       // Check for videos every 2 minutes while rendering is active
       try {
         const videoList = await youtubeApi.listVideos();
-        
-        const videoMap = new Map<number, string>();
-        videoList.videos.forEach((video: any) => {
-          const sceneNum = video.scene_number;
-          if (sceneNum !== null && sceneNum !== undefined) {
-            if (!videoMap.has(sceneNum)) {
-              videoMap.set(sceneNum, video.video_url);
-            }
-          }
-        });
+        const videoMap = mapYouTubeSceneVideosByNumber(videoList.videos);
 
         // Update jobs for scenes that have videos but no videoUrl set
         scenes.forEach((scene) => {
@@ -297,7 +306,9 @@ export function useYouTubeRenderQueue({
           }
         });
       } catch (error) {
-        console.error('[YouTubeRenderQueue] Failed to rescue videos:', error);
+        console.error("[YouTubeRenderQueue] Failed to rescue videos", {
+          errorName: error instanceof Error ? error.name : "Error",
+        });
       }
     }, 120000); // Check every 2 minutes
 
