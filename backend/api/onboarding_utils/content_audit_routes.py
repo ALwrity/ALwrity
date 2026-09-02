@@ -168,6 +168,11 @@ async def run_content_audit(
         freshness = {}
         if sitemap_result.get("success"):
             metrics = sitemap_result.get("metrics", {})
+            # Refresh the sitemap SSOT so other consumers (tasks, SEO audit,
+            # SIF indexing) read the inventory instead of re-fetching.
+            from services.seo.sitemap_ssot import save_sitemap_inventory
+            if metrics.get("inventory"):
+                save_sitemap_inventory(db, user_id, website_url, effective_url, metrics["inventory"])
             audit_urls = metrics.get("audit_sample_urls", [])
             url_structure = metrics.get("url_structure", {})
             freshness = {
@@ -332,6 +337,12 @@ async def run_site_health(
         if not sitemap_result.get("success"):
             logger.warning(f"[SiteHealth] Sitemap analysis failed for {effective_url}: {sitemap_result.get('error')}")
             raise HTTPException(status_code=502, detail=f"Site health analysis failed: {sitemap_result.get('error')}")
+
+        # Refresh the sitemap SSOT so other consumers never re-fetch.
+        from services.seo.sitemap_ssot import save_sitemap_inventory
+        site_health_metrics = sitemap_result.get("metrics", {})
+        if site_health_metrics.get("inventory"):
+            save_sitemap_inventory(db, user_id, website_url, effective_url, site_health_metrics["inventory"])
 
         # Persist into WebsiteAnalysis.seo_audit.site_health + AdvertoolsTask record
         executor = AdvertoolsExecutor()

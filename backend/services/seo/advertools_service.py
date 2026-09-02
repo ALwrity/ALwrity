@@ -42,6 +42,47 @@ _SITEMAP_CACHE_LOCK = threading.Lock()
 _SITEMAP_CACHE_TTL = 600  # 10 minutes
 _DOMAIN_LOCK_TIMEOUT = 60.0  # max wait to acquire per-domain lock
 
+# ── Single-flight sitemap fetching ────────────────────────────────────
+# Two concurrent pipelines (e.g. duplicate content_audit tasks) that start
+# at the same instant both miss the caches and both fetch the same URL,
+# doubling origin load and amplifying HTTP 429s.  A per-URL lock with a
+# double-checked cache read coalesces them: the second caller waits, then
+# hits the cache.  A short negative memo prevents an immediate re-fetch of
+# a URL that just exhausted its retries (e.g. persistent 429/404).
+_URL_FETCH_LOCKS: Dict[str, threading.Lock] = {}
+_URL_FETCH_LOCKS_GUARD = threading.Lock()
+_FAILED_FETCH_UNTIL: Dict[str, float] = {}
+_FAILED_FETCH_TTL = 60.0  # seconds to remember a failed fetch
+
+
+def _get_url_fetch_lock(url: str) -> threading.Lock:
+    with _URL_FETCH_LOCKS_GUARD:
+        lock = _URL_FETCH_LOCKS.get(url)
+        if lock is None:
+            lock = threading.Lock()
+            _URL_FETCH_LOCKS[url] = lock
+        return lock
+
+
+def _fetch_recently_failed(url: str) -> bool:
+    with _URL_FETCH_LOCKS_GUARD:
+        until = _FAILED_FETCH_UNTIL.get(url, 0.0)
+        if until and _time.monotonic() < until:
+            return True
+        if until:
+            del _FAILED_FETCH_UNTIL[url]
+    return False
+
+
+def _note_failed_fetch(url: str) -> None:
+    with _URL_FETCH_LOCKS_GUARD:
+        now = _time.monotonic()
+        # Opportunistic cleanup of expired entries to bound dict growth.
+        expired = [u for u, t in _FAILED_FETCH_UNTIL.items() if t <= now]
+        for u in expired:
+            del _FAILED_FETCH_UNTIL[u]
+        _FAILED_FETCH_UNTIL[url] = now + _FAILED_FETCH_TTL
+
 
 def _extract_domain(url: str) -> str:
     try:
@@ -155,6 +196,23 @@ class AdvertoolsService:
                 return None  # HTTP-date form — fall back to jittered backoff
 
         def _fetch_once(url: str, retries: int) -> pd.DataFrame:
+            """Single-flight wrapper: coalesce concurrent fetches of the same URL.
+
+            The first caller performs the actual fetch; concurrent callers block
+            on the per-URL lock and then hit the cache (or the failed-fetch
+            memo), so duplicate pipelines no longer multiply origin load.
+            """
+            if _fetch_recently_failed(url):
+                logger.debug(f"sitemap_to_df: skipping {url} (failed fetch memoized recently)")
+                return pd.DataFrame()
+            with _get_url_fetch_lock(url):
+                # Double-check the memo after acquiring: another thread may
+                # have just exhausted its retries while we waited.
+                if _fetch_recently_failed(url):
+                    return pd.DataFrame()
+                return _fetch_once_locked(url, retries)
+
+        def _fetch_once_locked(url: str, retries: int) -> pd.DataFrame:
             domain = _extract_domain(url)
             df = pd.DataFrame()
 
@@ -197,6 +255,7 @@ class AdvertoolsService:
                         logger.warning(
                             f"sitemap_to_df HTTP {e.code} for {url} — permanent, skipping"
                         )
+                        _note_failed_fetch(url)
                         return pd.DataFrame()
                     if e.code == 429:
                         _note_429(domain)
@@ -233,6 +292,10 @@ class AdvertoolsService:
                         f"retrying in {sleep_secs:.1f}s..."
                     )
                     _time.sleep(sleep_secs)
+            if df is None or df.empty:
+                # Memoize the failure briefly so a concurrent pipeline does not
+                # immediately re-fetch a URL that just exhausted its retries.
+                _note_failed_fetch(url)
             return df
 
         df = _fetch_once(sitemap_url, max_retries)
@@ -348,6 +411,25 @@ class AdvertoolsService:
             else:
                 audit_urls = df['loc'].head(15).tolist()
 
+            # --- Sitemap inventory for the per-user SSOT ---
+            # Callers (executor / interactive routes) persist this into the
+            # user's DB so other consumers can read the URL list without
+            # re-fetching a rate-limited sitemap.
+            inventory_urls = df['loc'].dropna().astype(str).tolist() if 'loc' in df.columns else []
+            lastmod_min = lastmod_max = None
+            if 'lastmod' in df.columns and not df['lastmod'].isna().all():
+                lm_min = df['lastmod'].min()
+                lm_max = df['lastmod'].max()
+                lastmod_min = lm_min.isoformat() if pd.notna(lm_min) else None
+                lastmod_max = lm_max.isoformat() if pd.notna(lm_max) else None
+            inventory = {
+                "total_urls": total_urls,
+                "urls": inventory_urls,
+                "lastmod_min": lastmod_min,
+                "lastmod_max": lastmod_max,
+                "fetched_at": datetime.utcnow().isoformat(),
+            }
+
             return {
                 "success": True,
                 "metrics": {
@@ -360,7 +442,8 @@ class AdvertoolsService:
                     "publishing_trend": freshness.get("publishing_trend"),
                     "top_pillars": pillars,
                     "url_structure": url_structure,
-                    "audit_sample_urls": audit_urls
+                    "audit_sample_urls": audit_urls,
+                    "inventory": inventory
                 },
                 "timestamp": datetime.utcnow().isoformat()
             }
@@ -785,6 +868,7 @@ class AdvertoolsService:
                 result["success"] = False
                 result["error"] = "Could not fetch or parse robots.txt"
                 result["accessible"] = False
+                result["degraded"] = True
                 return result
 
             result["total_directives"] = len(robots_df)
@@ -847,7 +931,16 @@ class AdvertoolsService:
 
         except Exception as e:
             self.logger.error(f"Robots.txt analysis failed: {e}")
-            return {"success": False, "error": str(e), "url": robots_url if 'robots_url' in locals() else website_url}
+            return {
+                "success": False,
+                "error": str(e),
+                "url": robots_url if 'robots_url' in locals() else website_url,
+                # Callers key off sitemap_urls for crawl-budget fallbacks; the
+                # key must exist even when the analysis fails, and degraded
+                # marks that this is a partial result, not "no sitemaps".
+                "sitemap_urls": [],
+                "degraded": True,
+            }
 
     def _parse_robots_txt_manual(self, url: str) -> pd.DataFrame:
         """Fallback: manually fetch and parse robots.txt."""
