@@ -20,6 +20,10 @@ import socket
 import re
 import threading
 
+# RCA observability counters (tracker #520): duplicate-skip, single-flight
+# hit, circuit-break and failed-fetch-memo events.
+from services.seo import advertools_metrics
+
 # ── Per-domain rate limiter ───────────────────────────────────────────
 # Multiple background tasks (deep competitor analysis, onboarding sitemap
 # analysis, crawl budget) can all hit the same origin simultaneously,
@@ -258,12 +262,14 @@ class AdvertoolsService:
             memo), so duplicate pipelines no longer multiply origin load.
             """
             if _fetch_recently_failed(url):
+                advertools_metrics.incr(advertools_metrics.EVENT_FAILED_FETCH_MEMO)
                 logger.debug(f"sitemap_to_df: skipping {url} (failed fetch memoized recently)")
                 return pd.DataFrame()
             with _get_url_fetch_lock(url):
                 # Double-check the memo after acquiring: another thread may
                 # have just exhausted its retries while we waited.
                 if _fetch_recently_failed(url):
+                    advertools_metrics.incr(advertools_metrics.EVENT_FAILED_FETCH_MEMO)
                     return pd.DataFrame()
                 return _fetch_once_locked(url, retries)
 
@@ -277,6 +283,7 @@ class AdvertoolsService:
                 if cached is not None:
                     cached_df, cached_at = cached
                     if _time.monotonic() - cached_at < _SITEMAP_CACHE_TTL:
+                        advertools_metrics.incr(advertools_metrics.EVENT_SINGLE_FLIGHT_HIT)
                         logger.debug(f"advertools cache HIT for {url} (age={_time.monotonic() - cached_at:.0f}s)")
                         return cached_df.copy()
                     else:
@@ -291,6 +298,7 @@ class AdvertoolsService:
                     if restored_df is not None and not restored_df.empty:
                         with _SITEMAP_CACHE_LOCK:
                             _SITEMAP_CACHE[url] = (restored_df, _time.monotonic())
+                        advertools_metrics.incr(advertools_metrics.EVENT_SINGLE_FLIGHT_HIT)
                         logger.debug(f"advertools cache HIT from DB for {url}")
                         return restored_df
             except Exception:
@@ -365,6 +373,7 @@ class AdvertoolsService:
                 # (>= threshold 429s in the window), stop the fan-out and
                 # return the partial result instead of hammering it.
                 if _domain_circuit_open(domain):
+                    advertools_metrics.incr(advertools_metrics.EVENT_CIRCUIT_BREAK)
                     logger.warning(
                         f"429 circuit OPEN for {domain}: stopping sub-sitemap "
                         f"fan-out after {len(frames)} successful sub-sitemap(s)"

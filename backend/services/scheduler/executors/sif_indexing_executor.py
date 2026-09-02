@@ -214,6 +214,14 @@ class SIFIndexingExecutor(TaskExecutor):
                     sitemap_total = ad.get("total_urls", 0) or 0
             except Exception:
                 pass
+            if not sitemap_total:
+                # SSOT fallback (Phase 1 plan): the persisted sitemap inventory
+                # may know the site size even when seo_audit has no analysis.
+                try:
+                    from services.seo.sitemap_ssot import get_inventory_total
+                    sitemap_total = get_inventory_total(db, user_id) or 0
+                except Exception:
+                    pass
 
             _update_phase("indexing_content", pages_harvested=pages_harvested, indexed_pages=indexed_pages, sitemap_total=sitemap_total)
             content_synced = pages_harvested > 0

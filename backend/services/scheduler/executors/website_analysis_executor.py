@@ -519,10 +519,14 @@ class WebsiteAnalysisExecutor(TaskExecutor):
         try:
             self.logger.info(f"Starting full site scan for {website_url}")
             from services.seo_tools.sitemap_service import SitemapService
+            from services.seo.sitemap_ssot import get_or_discover_sitemap_url
             sitemap_service = SitemapService()
             
-            # 1. Discover Sitemap
-            sitemap_url = await sitemap_service.discover_sitemap_url(website_url)
+            # 1. Resolve sitemap URL — SSOT first (no re-discovery re-hitting
+            # a rate-limited origin); discovery only when nothing is stored.
+            sitemap_url = await get_or_discover_sitemap_url(
+                user_id, website_url, sitemap_service, db=db
+            )
             if not sitemap_url:
                 self.logger.warning(f"No sitemap found for {website_url}, skipping full site scan")
                 return

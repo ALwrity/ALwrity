@@ -40,11 +40,13 @@ class DeepCrawlService:
             raise Exception("Database connection failed")
 
         try:
-            # 1. Sitemap Discovery
+            # 1. Sitemap Discovery (SSOT first; discovery only when absent)
             sitemap_urls = set()
             try:
-                # Discover sitemap URL
-                sitemap_url = await self.sitemap_service.discover_sitemap_url(website_url)
+                from services.seo.sitemap_ssot import get_or_discover_sitemap_url
+                sitemap_url = await get_or_discover_sitemap_url(
+                    user_id, website_url, self.sitemap_service, db=db
+                )
                 if not sitemap_url:
                     sitemap_url = f"{website_url.rstrip('/')}/sitemap.xml"
                 
