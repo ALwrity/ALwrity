@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from services.seo.advertools_service import AdvertoolsService
+from services.seo.advertools_run_lock import release, try_acquire
 from services.seo.sitemap_ssot import (
     get_fresh_inventory,
     get_stored_sitemap_url,
@@ -29,6 +30,41 @@ class AdvertoolsExecutor(TaskExecutor):
         self.sitemap_service = SitemapService()
         self.logger = logger.bind(service="AdvertoolsExecutor")
 
+    def _pause_other_active_duplicates(
+        self, db: Session, user_id: str, website_url: str, task_type: str, keep_task_id: int
+    ) -> int:
+        """Self-heal: pause other 'active' duplicates of the same type.
+
+        Older versions of ``schedule_step2_tasks`` appended a NEW task row on
+        every step-2 save, so duplicate rows for the same (user, site, type)
+        exist in some databases. Once one row runs successfully, the others
+        are paused (not deleted, to preserve AdvertoolsExecutionLog history).
+        Returns the number of rows paused.
+        """
+        paused = 0
+        try:
+            rows = db.query(AdvertoolsTask).filter(
+                AdvertoolsTask.user_id == user_id,
+                AdvertoolsTask.website_url == website_url,
+                AdvertoolsTask.status == 'active',
+            ).all()
+            for row in rows:
+                if row.id == keep_task_id:
+                    continue
+                if (row.payload or {}).get('type') != task_type:
+                    continue
+                row.status = 'paused'
+                row.payload = {**(row.payload or {}), 'deduped_into': keep_task_id}
+                db.add(row)
+                paused += 1
+                self.logger.info(
+                    f"Paused duplicate {task_type} task id={row.id} "
+                    f"(superseded by successful run of task {keep_task_id})"
+                )
+        except Exception as e:
+            self.logger.warning(f"Duplicate self-heal failed (non-blocking): {e}")
+        return paused
+
     async def execute_task(self, task: Any, db: Session) -> TaskExecutionResult:
         """Execute an Advertools intelligence task."""
         start_time = datetime.utcnow()
@@ -45,6 +81,41 @@ class AdvertoolsExecutor(TaskExecutor):
         task_record = None
         if isinstance(task_id, int):
             task_record = db.query(AdvertoolsTask).filter(AdvertoolsTask.id == task_id).first()
+
+        # Cross-path execution mutex: another pipeline for the same
+        # (user, site, type) may already be running — duplicate task rows each
+        # got their own scheduler lease, or the user fired the interactive
+        # route. Skip instead of double-crawling an already rate-limited
+        # origin. The skipped row re-checks in 15 minutes (by then the winner
+        # has usually finished and paused duplicates via self-heal).
+        lock_acquired = False
+        if user_id and website_url and task_type:
+            lock_acquired = try_acquire(
+                user_id, website_url, task_type,
+                db=db,
+                exclude_task_id=task_id if isinstance(task_id, int) else None,
+            )
+            if not lock_acquired:
+                self.logger.warning(
+                    f"Advertools task {task_id} ({task_type}) SKIPPED — "
+                    f"another pipeline is already running for {website_url}"
+                )
+                if task_record:
+                    try:
+                        task_record.status = 'active'
+                        task_record.next_execution = datetime.utcnow() + timedelta(minutes=15)
+                        db.commit()
+                    except Exception:
+                        db.rollback()
+                return TaskExecutionResult(
+                    success=True,
+                    result_data={
+                        "skipped": True,
+                        "reason": "another pipeline already running for this site",
+                    },
+                    execution_time_ms=0,
+                    retryable=False,
+                )
 
         try:
             if not website_url:
@@ -183,6 +254,13 @@ class AdvertoolsExecutor(TaskExecutor):
             success = result.get('success', False)
             execution_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
 
+            # Self-heal pre-existing duplicate rows: once this run succeeded,
+            # pause other 'active' duplicates so they stop re-firing.
+            if success and isinstance(task_id, int) and user_id and website_url and task_type:
+                self._pause_other_active_duplicates(
+                    db, user_id, website_url, task_type, keep_task_id=task_id
+                )
+
             # Update task state
             if task_record:
                 task_record.last_executed = datetime.utcnow()
@@ -255,6 +333,9 @@ class AdvertoolsExecutor(TaskExecutor):
                 retryable=True,
                 retry_delay=300
             )
+        finally:
+            if lock_acquired:
+                release(user_id, website_url, task_type)
 
     def calculate_next_execution(self, task: Any, frequency: str, last_execution: Optional[datetime] = None) -> datetime:
         base = last_execution or datetime.utcnow()

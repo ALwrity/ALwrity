@@ -49,6 +49,91 @@ def _upsert_task(db, model_cls, user_id: str, filters: dict, defaults: dict):
         return row
 
 
+def _upsert_advertools_task(
+    db: Session,
+    user_id: str,
+    website_url: str,
+    task_type: str,
+    defaults: dict,
+):
+    """Insert-or-update an AdvertoolsTask keyed by (user, site, payload type).
+
+    ``payload['type']`` lives inside a JSON column (not a queryable column on
+    all backends), so matching is done in Python over the user's rows. This
+    replaces the previous raw ``db.add()`` which appended a NEW task row on
+    every step-2 save — duplicate rows all became due together and the
+    scheduler ran the full pipeline for each one concurrently.
+    """
+    from models.advertools_monitoring_models import AdvertoolsTask
+
+    existing_rows = db.query(AdvertoolsTask).filter(
+        AdvertoolsTask.user_id == user_id,
+        AdvertoolsTask.website_url == website_url,
+    ).all()
+    for row in existing_rows:
+        if (row.payload or {}).get("type") == task_type:
+            for key, value in defaults.items():
+                setattr(row, key, value)
+            row.payload = {"type": task_type, "website_url": website_url, **(defaults.get("payload") or {})}
+            db.add(row)
+            return row
+
+    # Merge the type identity into the payload; defaults must not carry a
+    # second 'payload' kwarg (TypeError: multiple values for keyword argument).
+    task_payload = {"type": task_type, "website_url": website_url}
+    task_payload.update(defaults.get("payload") or {})
+    construct_defaults = {k: v for k, v in defaults.items() if k != "payload"}
+    row = AdvertoolsTask(
+        user_id=user_id,
+        website_url=website_url,
+        payload=task_payload,
+        **construct_defaults,
+    )
+    db.add(row)
+    return row
+
+
+def _pause_duplicate_advertools_tasks(db: Session, user_id: str, website_url: str) -> int:
+    """Collapse pre-existing duplicate AdvertoolsTask rows per (user, site, type).
+
+    Keeps the most recently updated row per type active and pauses the rest.
+    Rows are paused (not deleted) to preserve AdvertoolsExecutionLog foreign
+    keys and keep an auditable history. Returns the number of rows paused.
+    """
+    from models.advertools_monitoring_models import AdvertoolsTask
+
+    rows = db.query(AdvertoolsTask).filter(
+        AdvertoolsTask.user_id == user_id,
+        AdvertoolsTask.website_url == website_url,
+    ).all()
+
+    by_type: Dict[str, list] = {}
+    for row in rows:
+        task_type = (row.payload or {}).get("type") or "unknown"
+        by_type.setdefault(task_type, []).append(row)
+
+    paused = 0
+    for _task_type, group in by_type.items():
+        if len(group) <= 1:
+            continue
+        group.sort(
+            key=lambda r: (r.updated_at or r.created_at or datetime.min),
+            reverse=True,
+        )
+        for duplicate in group[1:]:
+            if duplicate.status == "paused":
+                continue
+            duplicate.status = "paused"
+            duplicate.payload = {**(duplicate.payload or {}), "deduped": True}
+            db.add(duplicate)
+            paused += 1
+            logger.info(
+                f"[advertools_dedup] Paused duplicate {duplicate.payload.get('type')} "
+                f"task id={duplicate.id} for {user_id} (duplicate of a newer row)"
+            )
+    return paused
+
+
 def schedule_step2_tasks(
     user_id: str,
     db: Session,
@@ -178,38 +263,45 @@ def schedule_step2_tasks(
         logger.info(f"[onboarding_step2] Skipped website analysis tasks for {website_url} (user deferred)")
 
     # 5. Advertools intelligence (content audit + site health)
+    # Upsert (not raw add) keyed by (user, site, type) so repeated step-2
+    # saves never create duplicate rows; and opportunistically pause any
+    # duplicates created by older versions of this function.
     delay_content = _delay_for("advertools_content")
     delay_health = _delay_for("advertools_health")
     try:
-        from models.advertools_monitoring_models import AdvertoolsTask
+        from models.advertools_monitoring_models import AdvertoolsTask  # noqa: F401
 
-        audit = AdvertoolsTask(
-            user_id=user_id,
-            website_url=website_url,
-            status="active" if delay_content is not None else "paused",
-            next_execution=delay_content,
-            frequency_days=7,
-            payload={
-                "type": "content_audit",
-                "website_url": website_url,
-                "created_from": "onboarding_step2",
+        _pause_duplicate_advertools_tasks(db, user_id, website_url)
+
+        _upsert_advertools_task(
+            db,
+            user_id,
+            website_url,
+            "content_audit",
+            defaults={
+                "status": "active" if delay_content is not None else "paused",
+                "next_execution": delay_content,
+                "frequency_days": 7,
+                "payload": {
+                    "created_from": "onboarding_step2",
+                },
             },
         )
-        db.add(audit)
 
-        health = AdvertoolsTask(
-            user_id=user_id,
-            website_url=website_url,
-            status="active" if delay_health is not None else "paused",
-            next_execution=delay_health,
-            frequency_days=7,
-            payload={
-                "type": "site_health",
-                "website_url": website_url,
-                "created_from": "onboarding_step2",
+        _upsert_advertools_task(
+            db,
+            user_id,
+            website_url,
+            "site_health",
+            defaults={
+                "status": "active" if delay_health is not None else "paused",
+                "next_execution": delay_health,
+                "frequency_days": 7,
+                "payload": {
+                    "created_from": "onboarding_step2",
+                },
             },
         )
-        db.add(health)
         db.commit()
         logger.info(f"[onboarding_step2] Scheduled Advertools tasks for {website_url} (content={delay_content is not None}, health={delay_health is not None})")
         _record_task_in_session(db, user_id, "advertools_content_audit", step=2, details={"website_url": website_url})

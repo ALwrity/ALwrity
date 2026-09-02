@@ -12,6 +12,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 from middleware.auth_middleware import get_current_user
+from services.seo.advertools_run_lock import release, try_acquire
 
 router = APIRouter(prefix="/api/onboarding", tags=["Onboarding Content Audit"])
 
@@ -130,7 +131,50 @@ async def run_content_audit(
     if not db:
         raise HTTPException(status_code=503, detail="Database connection failed")
 
+    completed = False
+    lock_owned = False
+    task_row_id = None
     try:
+        # Cross-path mutex: a scheduler content_audit for this site may
+        # already be running (duplicate rows each got their own scheduler
+        # lease). Skip instead of double-crawling a rate-limited origin.
+        lock_owned = try_acquire(user_id, website_url, "content_audit", db=db)
+        if not lock_owned:
+            logger.warning(f"[ContentAudit] Skipped for user={user_id}: pipeline already running for {website_url}")
+            return {
+                "success": False,
+                "skipped": True,
+                "error": "A content audit for this site is already running. Please wait a few minutes and try again.",
+            }
+
+        # Mark our task row running so the status endpoint and the DB-level
+        # mutex reflect the interactive run (scheduler rows are marked the
+        # same way by the execution wrapper).
+        from models.advertools_monitoring_models import AdvertoolsTask
+        from datetime import datetime as _dt
+        task_row = None
+        for t in db.query(AdvertoolsTask).filter(
+            AdvertoolsTask.user_id == user_id,
+            AdvertoolsTask.website_url == website_url,
+        ).all():
+            if (t.payload or {}).get("type") == "content_audit":
+                task_row = t
+                break
+        if task_row is None:
+            task_row = AdvertoolsTask(
+                user_id=user_id,
+                website_url=website_url,
+                status="running",
+                started_at=_dt.utcnow(),
+                payload={"type": "content_audit", "website_url": website_url},
+            )
+            db.add(task_row)
+        else:
+            task_row.status = "running"
+            task_row.started_at = _dt.utcnow()
+        db.commit()
+        task_row_id = task_row.id
+
         # Reuse the sitemap URL from the initial website analysis if available,
         # avoiding a redundant discover_sitemap_url call that may trigger 429s.
         discovered_sitemap = None
@@ -264,6 +308,7 @@ async def run_content_audit(
         db.commit()
 
         logger.info(f"[ContentAudit] Completed for user={user_id} url={website_url}")
+        completed = True
 
         return {
             "success": result.get("success", False),
@@ -274,6 +319,20 @@ async def run_content_audit(
         logger.error(f"[ContentAudit] Failed for {website_url}: {e}")
         raise HTTPException(status_code=500, detail=f"Content audit failed: {e}")
     finally:
+        if lock_owned:
+            release(user_id, website_url, "content_audit")
+        # If we marked the row running but the request failed before the
+        # success path reset it, restore 'active' so it is not stuck (the
+        # stale-task recovery would also catch it after 2h).
+        if task_row_id is not None and not completed:
+            try:
+                from models.advertools_monitoring_models import AdvertoolsTask
+                row = db.query(AdvertoolsTask).filter(AdvertoolsTask.id == task_row_id).first()
+                if row is not None and row.status == "running":
+                    row.status = "active"
+                    db.commit()
+            except Exception:
+                db.rollback()
         db.close()
 
 
@@ -304,7 +363,46 @@ async def run_site_health(
     if not db:
         raise HTTPException(status_code=503, detail="Database connection failed")
 
+    completed = False
+    lock_owned = False
+    task_row_id = None
     try:
+        # Cross-path mutex (see /content-audit/run).
+        lock_owned = try_acquire(user_id, website_url, "site_health", db=db)
+        if not lock_owned:
+            logger.warning(f"[SiteHealth] Skipped for user={user_id}: pipeline already running for {website_url}")
+            return {
+                "success": False,
+                "skipped": True,
+                "error": "A site health analysis for this site is already running. Please wait a few minutes and try again.",
+            }
+
+        # Mark our task row running (same convention as the scheduler wrapper).
+        from models.advertools_monitoring_models import AdvertoolsTask
+        from datetime import datetime as _dt
+        task_row = None
+        for t in db.query(AdvertoolsTask).filter(
+            AdvertoolsTask.user_id == user_id,
+            AdvertoolsTask.website_url == website_url,
+        ).all():
+            if (t.payload or {}).get("type") == "site_health":
+                task_row = t
+                break
+        if task_row is None:
+            task_row = AdvertoolsTask(
+                user_id=user_id,
+                website_url=website_url,
+                status="running",
+                started_at=_dt.utcnow(),
+                payload={"type": "site_health", "website_url": website_url},
+            )
+            db.add(task_row)
+        else:
+            task_row.status = "running"
+            task_row.started_at = _dt.utcnow()
+        db.commit()
+        task_row_id = task_row.id
+
         # Reuse the sitemap URL from the initial website analysis if available,
         # avoiding a redundant discover_sitemap_url call that may trigger 429s.
         discovered_sitemap = None
@@ -393,6 +491,7 @@ async def run_site_health(
         }
 
         logger.info(f"[SiteHealth] Completed for user={user_id} url={website_url}")
+        completed = True
 
         return {
             "success": True,
@@ -405,4 +504,15 @@ async def run_site_health(
         logger.error(f"[SiteHealth] Failed for {website_url}: {e}")
         raise HTTPException(status_code=500, detail=f"Site health analysis failed: {e}")
     finally:
+        if lock_owned:
+            release(user_id, website_url, "site_health")
+        if task_row_id is not None and not completed:
+            try:
+                from models.advertools_monitoring_models import AdvertoolsTask
+                row = db.query(AdvertoolsTask).filter(AdvertoolsTask.id == task_row_id).first()
+                if row is not None and row.status == "running":
+                    row.status = "active"
+                    db.commit()
+            except Exception:
+                db.rollback()
         db.close()
