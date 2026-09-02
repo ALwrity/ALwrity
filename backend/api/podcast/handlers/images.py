@@ -245,8 +245,10 @@ async def generate_podcast_scene_image(
         logger.info(f"[Podcast] custom_prompt={request.custom_prompt}")
         logger.info(f"[Podcast] style={request.style}, rendering_speed={request.rendering_speed}, aspect_ratio={request.aspect_ratio}")
         
-        # Check user plan tier to determine if Path A (Ideogram Character) is allowed
-        # Free tier is strictly restricted to Path B (FLUX studio generation, $0.04/image)
+        # Check user plan tier to determine image generation model path
+        # Pro/Enterprise/Basic: Path A (Ideogram Character)
+        # Free tier with uploaded avatar: Free-Tier Face Cloning (FLUX Kontext Pro img2img edit, $0.04/image)
+        # Free tier without avatar: Path B (FLUX studio presenter from scratch / reference anchor, $0.04/image)
         is_free_tier = True
         try:
             from services.subscription import PricingService
@@ -260,13 +262,8 @@ async def generate_podcast_scene_image(
             logger.warning(f"[Podcast] Error checking user plan for {user_id}: {exc}")
             is_free_tier = True
         
-        if is_free_tier:
-            # Free tier NEVER uses base avatar or Ideogram Character ($0.30)
-            if request.base_avatar_url:
-                logger.info(f"[Podcast] User {user_id} is on Free tier. Bypassing Path A (Ideogram Character, $0.30/image) and forcing Path B (FLUX studio presenter, $0.04/image).")
-            base_avatar_bytes = None
-        elif request.base_avatar_url:
-            # Load base avatar image for reference (Pro / Paid tier)
+        if request.base_avatar_url:
+            # Load base avatar image for reference (both Free tier FLUX img2img and Pro Ideogram Character)
             from ..utils import load_podcast_image_bytes
             try:
                 logger.info(f"[Podcast] Attempting to load base avatar from: {request.base_avatar_url}")
@@ -328,68 +325,6 @@ async def generate_podcast_scene_image(
         }
         
         if base_avatar_bytes:
-            # Use Ideogram Character API for consistent character generation
-            # Use custom prompt if provided, otherwise build scene-specific prompt
-            if request.custom_prompt:
-                # User provided custom prompt - use it directly
-                image_prompt = request.custom_prompt
-                logger.info(f"[Podcast] Using custom prompt from user for scene {request.scene_id}")
-            else:
-                # Build scene-specific prompt that respects the base avatar & fixed studio session
-                prompt_parts = []
-                
-                # 1. Host appearance character lock (consistent visual subject, locked skin tone, and locked wardrobe)
-                character_desc = _resolve_or_create_character_lock(user_id, request, bible_obj, db)
-                prompt_parts.append(f"Host Appearance: {character_desc}, identical natural skin tone, same locked wardrobe and outfit")
-                
-                # 2. Fixed Studio Environment (Identical set and room across all scenes)
-                env_desc = bible_obj.visual_style.environment if bible_obj else "Professional modern office studio set, fixed studio room and background"
-                prompt_parts.append(f"Studio Set: {env_desc}, identical fixed studio set and background across all scenes")
-                if bible_obj:
-                    prompt_parts.append(f"Style: {bible_obj.visual_style.style_preset}")
-
-                # 3. Dynamic Host Facial Expression (Driven by scene emotion)
-                scene_emotion = (request.scene_emotion or "neutral").lower().strip()
-                prompt_parts.append(emotion_expression.get(scene_emotion, emotion_expression["neutral"]))
-
-                # 4. Bounded Dynamic Lighting Tone (preserves calibrated skin exposure and white balance)
-                lighting_tone = emotion_lighting.get(scene_emotion, emotion_lighting["neutral"])
-                if request.visual_atmosphere and request.visual_atmosphere.strip():
-                    prompt_parts.append(f"Lighting: {lighting_tone}, subtle background ambience: {request.visual_atmosphere.strip()}, constant subject exposure across scenes")
-                else:
-                    prompt_parts.append(f"Lighting: {lighting_tone}")
-
-                # 5. Framing directives — driven by camera_angle from scene JSON with strong positive headroom
-                _camera_angle_map = {
-                    "wide_shot": ["wide shot", "full body visible", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "centered vertical-third", "35mm equivalent"],
-                    "medium_shot": ["medium shot", "chest-up portrait", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "centered vertical-third", "35mm equivalent"],
-                    "close_up": ["medium close-up portrait", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "centered composition", "35mm equivalent"],
-                    "over_shoulder": ["three-quarter angle shot", "slight side angle view of host", "unobstructed clear view of host, no foreground occlusions", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "35mm equivalent"],
-                }
-                scene_camera_angle = (request.camera_angle or "medium_shot").strip()
-                framing_directives = _camera_angle_map.get(scene_camera_angle, _camera_angle_map["medium_shot"])
-                prompt_parts.extend(framing_directives)
-
-                # 6. Technical & Quality Requirements
-                prompt_parts.extend([
-                    "16:9 aspect ratio, video-optimized composition",
-                    "generous headroom above hair, full hairstyle in frame",
-                    "shoulders and chest visible, not cropped",
-                    "center-focused composition",
-                    "consistent color calibration, natural skin tone preservation, constant subject exposure and white balance across scenes",
-                    "continuous podcast recording session in same studio room, high resolution, sharp focus, professional photography quality"
-                ])
-                
-                image_prompt = ", ".join(prompt_parts)
-            
-            logger.info(f"[Podcast] Using Ideogram Character for scene {request.scene_id} with base avatar")
-            logger.info(f"[Podcast] Scene prompt: {image_prompt[:150]}...")
-            
-            # Use centralized character image generation with subscription checks and tracking
-            # Use custom settings if provided, otherwise use defaults
-            style = request.style or "Realistic"  # Default to Realistic for professional podcast presenters
-            rendering_speed = request.rendering_speed or "Quality"  # Default to Quality for podcast videos
-            
             # Calculate aspect ratio from custom setting or dimensions
             if request.aspect_ratio:
                 aspect_ratio = request.aspect_ratio
@@ -402,62 +337,201 @@ async def generate_podcast_scene_image(
                     (960, 1280): "3:4",
                 }
                 aspect_ratio = aspect_ratio_map.get((request.width, request.height), "16:9")
-            
-            logger.info(f"[Podcast] Ideogram Character settings: style={style}, rendering_speed={rendering_speed}, aspect_ratio={aspect_ratio}")
-            
-            try:
-                image_bytes = generate_character_image(
-                    prompt=image_prompt,
-                    reference_image_bytes=base_avatar_bytes,
-                    user_id=user_id,
-                    style=style,
-                    aspect_ratio=aspect_ratio,
-                    rendering_speed=rendering_speed,
-                    timeout=None,  # No timeout - poll until WaveSpeed says it's done or failed
-                )
-                
-                # Create result object compatible with ImageGenerationResult
-                from services.llm_providers.image_generation.base import ImageGenerationResult
-                result = ImageGenerationResult(
-                    image_bytes=image_bytes,
-                    provider="wavespeed",
-                    model="ideogram-ai/ideogram-character",
-                    width=request.width,
-                    height=request.height,
-                )
-                
-                logger.info(f"[Podcast] ✅ Successfully generated character-consistent scene image")
-            except HTTPException as http_err:
-                # Re-raise HTTPExceptions from wavespeed client as-is
-                logger.error(f"[Podcast] ❌ Ideogram Character HTTPException: {http_err.status_code} - {http_err.detail}")
-                raise
-            except Exception as char_error:
-                error_msg = str(char_error)
-                error_type = type(char_error).__name__
-                logger.error(f"[Podcast] ❌ Ideogram Character failed: {error_type}: {error_msg}", exc_info=True)
-                
-                # If Ideogram Character fails, we should NOT fall back to standard generation
-                # because that would lose character consistency. Instead, raise an error.
-                # However, if it's a timeout/connection issue, we can provide a helpful message.
-                error_msg_lower = error_msg.lower()
-                if "timeout" in error_msg_lower or "connection" in error_msg_lower or "504" in error_msg:
-                    raise HTTPException(
-                        status_code=504,
-                        detail={
-                            "error": "Image generation service unavailable",
-                            "message": "The character-consistent image generation service is currently unavailable. Please try again in a few moments. If the problem persists, the service may be experiencing high load.",
-                            "retry_recommended": True,
-                        },
-                    )
+
+            if is_free_tier:
+                # ── FREE TIER FACE CLONING: FLUX Kontext Pro ($0.04/image) ───────────
+                # When a free-tier user provides an uploaded/captured photo, route through
+                # edit_image() using flux-kontext-pro in image-to-image mode.
+                logger.info(f"[Podcast] Free tier user with base avatar — using FLUX Kontext Pro img2img edit for scene {request.scene_id}")
+
+                scene_emotion = (request.scene_emotion or "neutral").lower().strip()
+                _camera_angle_map = {
+                    "wide_shot": ["wide shot", "full body visible", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "centered vertical-third", "35mm equivalent"],
+                    "medium_shot": ["medium shot", "chest-up portrait", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "centered vertical-third", "35mm equivalent"],
+                    "close_up": ["medium close-up portrait", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "centered composition", "35mm equivalent"],
+                    "over_shoulder": ["three-quarter angle shot", "slight side angle view of host", "unobstructed clear view of host, no foreground occlusions", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "35mm equivalent"],
+                }
+                scene_camera_angle = (request.camera_angle or "medium_shot").strip()
+                framing_directives = _camera_angle_map.get(scene_camera_angle, _camera_angle_map["medium_shot"])
+
+                if request.custom_prompt:
+                    image_prompt = request.custom_prompt
                 else:
+                    edit_prompt_parts = []
+                    # 1. Host facial expression
+                    edit_prompt_parts.append(emotion_expression.get(scene_emotion, emotion_expression["neutral"]))
+
+                    # 2. Bounded lighting (background-only, calibrated subject exposure)
+                    lighting_tone = emotion_lighting.get(scene_emotion, emotion_lighting["neutral"])
+                    if request.visual_atmosphere and request.visual_atmosphere.strip():
+                        edit_prompt_parts.append(
+                            f"Lighting: {lighting_tone}, subtle background ambience: {request.visual_atmosphere.strip()}, constant subject exposure across scenes"
+                        )
+                    else:
+                        edit_prompt_parts.append(f"Lighting: {lighting_tone}")
+
+                    # 3. Camera framing
+                    edit_prompt_parts.extend(framing_directives)
+
+                    # 4. Identity & studio consistency directives
+                    edit_prompt_parts.extend([
+                        "Keep the presenter's exact appearance, identical skin tone, identical face, identical hair, identical wardrobe",
+                        "Consistent color calibration, natural skin tone preservation, constant subject exposure and white balance",
+                        "Professional modern podcast studio background, professional condenser microphone on boom arm",
+                        "16:9 aspect ratio, professional broadcast quality, no text, no logos",
+                    ])
+                    image_prompt = ", ".join(edit_prompt_parts)
+
+                logger.info(f"[Podcast] Free-tier face clone edit prompt (len={len(image_prompt)}): {image_prompt[:120]}...")
+
+                from services.llm_providers.main_image_editing import edit_image
+                try:
+                    result = edit_image(
+                        input_image_bytes=base_avatar_bytes,
+                        prompt=image_prompt,
+                        options={
+                            "provider": "wavespeed",
+                            "model": "flux-kontext-pro",
+                            "aspect_ratio": aspect_ratio,
+                            "guidance_scale": 3.5,
+                            "width": request.width,
+                            "height": request.height,
+                        },
+                        user_id=user_id,
+                    )
+                    logger.info(f"[Podcast] ✅ Successfully generated free-tier face-cloned scene image via FLUX Kontext Pro")
+                except HTTPException as http_err:
+                    logger.error(f"[Podcast] ❌ Free-tier FLUX edit HTTPException: {http_err.status_code} - {http_err.detail}")
+                    raise
+                except Exception as edit_error:
+                    logger.error(f"[Podcast] ❌ Free-tier FLUX edit failed: {edit_error}", exc_info=True)
                     raise HTTPException(
                         status_code=502,
                         detail={
-                            "error": "Character-consistent image generation failed",
-                            "message": f"Failed to generate image with character consistency: {error_msg}",
+                            "error": "Face-cloned image generation failed",
+                            "message": f"Failed to generate face-cloned image: {str(edit_error)}",
                             "retry_recommended": True,
                         },
                     )
+            else:
+                # ── PATH A: Pro / Paid Tier Character Generation via Ideogram Character ($0.10/$0.20) ──
+                # Use Ideogram Character API for consistent character generation
+                # Use custom prompt if provided, otherwise build scene-specific prompt
+                if request.custom_prompt:
+                    # User provided custom prompt - use it directly
+                    image_prompt = request.custom_prompt
+                    logger.info(f"[Podcast] Using custom prompt from user for scene {request.scene_id}")
+                else:
+                    # Build scene-specific prompt that respects the base avatar & fixed studio session
+                    prompt_parts = []
+                    
+                    # 1. Host appearance character lock (consistent visual subject, locked skin tone, and locked wardrobe)
+                    character_desc = _resolve_or_create_character_lock(user_id, request, bible_obj, db)
+                    prompt_parts.append(f"Host Appearance: {character_desc}, identical natural skin tone, same locked wardrobe and outfit")
+                    
+                    # 2. Fixed Studio Environment (Identical set and room across all scenes)
+                    env_desc = bible_obj.visual_style.environment if bible_obj else "Professional modern office studio set, fixed studio room and background"
+                    prompt_parts.append(f"Studio Set: {env_desc}, identical fixed studio set and background across all scenes")
+                    if bible_obj:
+                        prompt_parts.append(f"Style: {bible_obj.visual_style.style_preset}")
+
+                    # 3. Dynamic Host Facial Expression (Driven by scene emotion)
+                    scene_emotion = (request.scene_emotion or "neutral").lower().strip()
+                    prompt_parts.append(emotion_expression.get(scene_emotion, emotion_expression["neutral"]))
+
+                    # 4. Bounded Dynamic Lighting Tone (preserves calibrated skin exposure and white balance)
+                    lighting_tone = emotion_lighting.get(scene_emotion, emotion_lighting["neutral"])
+                    if request.visual_atmosphere and request.visual_atmosphere.strip():
+                        prompt_parts.append(f"Lighting: {lighting_tone}, subtle background ambience: {request.visual_atmosphere.strip()}, constant subject exposure across scenes")
+                    else:
+                        prompt_parts.append(f"Lighting: {lighting_tone}")
+
+                    # 5. Framing directives — driven by camera_angle from scene JSON with strong positive headroom
+                    _camera_angle_map = {
+                        "wide_shot": ["wide shot", "full body visible", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "centered vertical-third", "35mm equivalent"],
+                        "medium_shot": ["medium shot", "chest-up portrait", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "centered vertical-third", "35mm equivalent"],
+                        "close_up": ["medium close-up portrait", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "centered composition", "35mm equivalent"],
+                        "over_shoulder": ["three-quarter angle shot", "slight side angle view of host", "unobstructed clear view of host, no foreground occlusions", "generous headroom above hair", "entire head and complete hairstyle fully visible with clearance above the frame", "shoulders and chest visible, not cropped", "35mm equivalent"],
+                    }
+                    scene_camera_angle = (request.camera_angle or "medium_shot").strip()
+                    framing_directives = _camera_angle_map.get(scene_camera_angle, _camera_angle_map["medium_shot"])
+                    prompt_parts.extend(framing_directives)
+
+                    # 6. Technical & Quality Requirements
+                    prompt_parts.extend([
+                        "16:9 aspect ratio, video-optimized composition",
+                        "generous headroom above hair, full hairstyle in frame",
+                        "shoulders and chest visible, not cropped",
+                        "center-focused composition",
+                        "consistent color calibration, natural skin tone preservation, constant subject exposure and white balance across scenes",
+                        "continuous podcast recording session in same studio room, high resolution, sharp focus, professional photography quality"
+                    ])
+                    
+                    image_prompt = ", ".join(prompt_parts)
+                
+                logger.info(f"[Podcast] Using Ideogram Character for scene {request.scene_id} with base avatar")
+                logger.info(f"[Podcast] Scene prompt: {image_prompt[:150]}...")
+                
+                # Use centralized character image generation with subscription checks and tracking
+                # Use custom settings if provided, otherwise use defaults
+                style = request.style or "Realistic"  # Default to Realistic for professional podcast presenters
+                rendering_speed = request.rendering_speed or "Quality"  # Default to Quality for podcast videos
+                
+                logger.info(f"[Podcast] Ideogram Character settings: style={style}, rendering_speed={rendering_speed}, aspect_ratio={aspect_ratio}")
+                
+                try:
+                    image_bytes = generate_character_image(
+                        prompt=image_prompt,
+                        reference_image_bytes=base_avatar_bytes,
+                        user_id=user_id,
+                        style=style,
+                        aspect_ratio=aspect_ratio,
+                        rendering_speed=rendering_speed,
+                        timeout=None,  # No timeout - poll until WaveSpeed says it's done or failed
+                    )
+                    
+                    # Create result object compatible with ImageGenerationResult
+                    from services.llm_providers.image_generation.base import ImageGenerationResult
+                    result = ImageGenerationResult(
+                        image_bytes=image_bytes,
+                        provider="wavespeed",
+                        model="ideogram-ai/ideogram-character",
+                        width=request.width,
+                        height=request.height,
+                    )
+                    
+                    logger.info(f"[Podcast] ✅ Successfully generated character-consistent scene image")
+                except HTTPException as http_err:
+                    # Re-raise HTTPExceptions from wavespeed client as-is
+                    logger.error(f"[Podcast] ❌ Ideogram Character HTTPException: {http_err.status_code} - {http_err.detail}")
+                    raise
+                except Exception as char_error:
+                    error_msg = str(char_error)
+                    error_type = type(char_error).__name__
+                    logger.error(f"[Podcast] ❌ Ideogram Character failed: {error_type}: {error_msg}", exc_info=True)
+                    
+                    # If Ideogram Character fails, we should NOT fall back to standard generation
+                    # because that would lose character consistency. Instead, raise an error.
+                    # However, if it's a timeout/connection issue, we can provide a helpful message.
+                    error_msg_lower = error_msg.lower()
+                    if "timeout" in error_msg_lower or "connection" in error_msg_lower or "504" in error_msg:
+                        raise HTTPException(
+                            status_code=504,
+                            detail={
+                                "error": "Image generation service unavailable",
+                                "message": "The character-consistent image generation service is currently unavailable. Please try again in a few moments. If the problem persists, the service may be experiencing high load.",
+                                "retry_recommended": True,
+                            },
+                        )
+                    else:
+                        raise HTTPException(
+                            status_code=502,
+                            detail={
+                                "error": "Character-consistent image generation failed",
+                                "message": f"Failed to generate image with character consistency: {error_msg}",
+                                "retry_recommended": True,
+                            },
+                        )
         
         # CRITICAL: If base_avatar_url was provided but we don't have base_avatar_bytes,
         # this means either loading failed (already raised error) or Ideogram Character failed (already raised error)
