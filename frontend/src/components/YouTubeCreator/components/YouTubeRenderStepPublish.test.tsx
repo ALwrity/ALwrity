@@ -51,6 +51,17 @@ function renderStep(
   overrides: {
     finalVideoUrl?: string | null;
     getVideoUrl?: () => string | null;
+    scenes?: Array<{
+      scene_number: number;
+      title: string;
+      narration: string;
+      visual_prompt: string;
+      duration_estimate: number;
+      visual_cues: string[];
+      emphasis_tags: string[];
+      enabled?: boolean;
+      videoUrl?: string;
+    }>;
   } = {},
 ) {
   mockedQueue.mockReturnValue(queueState({ finalVideoUrl: overrides.finalVideoUrl ?? null }));
@@ -62,11 +73,11 @@ function renderStep(
       renderProgress={0}
       resolution="720p"
       combineScenes={false}
-      enabledScenesCount={0}
+      enabledScenesCount={overrides.scenes?.length ?? 0}
       costEstimate={null}
       loadingCostEstimate={false}
       loading={false}
-      scenes={[]}
+      scenes={overrides.scenes ?? []}
       videoPlan={null}
       onResolutionChange={vi.fn()}
       onCombineScenesChange={vi.fn()}
@@ -119,5 +130,29 @@ describe("RenderStep YouTube publish video URL", () => {
     renderStep({ finalVideoUrl: null, getVideoUrl: () => null });
 
     expect(screen.getByTestId("youtube-publish-video-url").textContent).toBe("");
+  });
+
+  it("falls back to the first enabled scene clip when combine and getVideoUrl are empty", () => {
+    renderStep({
+      finalVideoUrl: null,
+      getVideoUrl: () => null,
+      scenes: [
+        {
+          scene_number: 1,
+          title: "Intro",
+          narration: "Narration",
+          visual_prompt: "Visual",
+          duration_estimate: 5,
+          visual_cues: [],
+          emphasis_tags: [],
+          enabled: true,
+          videoUrl: "/api/youtube/videos/scene_1.mp4",
+        },
+      ],
+    });
+
+    expect(screen.getByTestId("youtube-publish-video-url").textContent).toBe(
+      "/api/youtube/videos/scene_1.mp4",
+    );
   });
 });
