@@ -331,13 +331,6 @@ async def combine_scene_videos(
     try:
         user_id = require_authenticated_user(current_user)
 
-        # Subscription validation (reuse scene animation check)
-        pricing_service = PricingService(db)
-        validate_scene_animation_operation(
-            pricing_service=pricing_service,
-            user_id=user_id
-        )
-
         if not request.scene_video_urls or len(request.scene_video_urls) < 2:
             return CombineVideosResponse(
                 success=False,
