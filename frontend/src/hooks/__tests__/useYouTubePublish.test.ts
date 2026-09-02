@@ -1,5 +1,6 @@
 /**
- * useYouTubePublish — Connect / Disconnect OAuth flow (TDD).
+ * useYouTubePublish — Connect / Disconnect OAuth flow.
+ * Publish + poll coverage lives in useYouTubePublish.publish.test.ts.
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { useYouTubePublish } from "../useYouTubePublish";
@@ -189,5 +190,39 @@ describe("useYouTubePublish connect/disconnect", () => {
 
     expect(result.current.error).toBe("Disconnect failed");
     expect(result.current.connected).toBe(true);
+  });
+
+  it("fails clearly when the backend omits auth_url", async () => {
+    const openSpy = vi.spyOn(window, "open");
+    vi.mocked(youtubeApi.getYouTubeAuthUrl).mockResolvedValue({ auth_url: "" });
+
+    const { result } = renderHook(() => useYouTubePublish());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.connect();
+    });
+
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(result.current.error).toMatch(/authorization URL/i);
+    expect(result.current.connected).toBe(false);
+  });
+
+  it("records Failed to check status when the status payload is unsuccessful", async () => {
+    vi.mocked(youtubeApi.getYouTubeStatus).mockResolvedValue({
+      success: false,
+      connected: false,
+      channels: [],
+    });
+
+    const { result } = renderHook(() => useYouTubePublish());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.connected).toBe(false);
+    expect(result.current.error).toBe("Failed to check status");
+    expect(result.current.activeChannel).toBeNull();
   });
 });

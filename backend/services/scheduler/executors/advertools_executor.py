@@ -9,6 +9,11 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from services.seo.advertools_service import AdvertoolsService
 from services.seo.advertools_run_lock import release, try_acquire
+from services.seo.sitemap_ssot import (
+    get_fresh_inventory,
+    get_stored_sitemap_url,
+    save_sitemap_inventory,
+)
 from services.seo_tools.sitemap_service import SitemapService
 from models.advertools_monitoring_models import AdvertoolsTask, AdvertoolsExecutionLog
 from models.onboarding import WebsiteAnalysis, OnboardingSession
@@ -116,9 +121,21 @@ class AdvertoolsExecutor(TaskExecutor):
             if not website_url:
                 raise ValueError("Missing website_url in payload")
 
-            # 1. Discover exact sitemap URL first (essential for Advertools)
-            discovered_sitemap = await self.sitemap_service.discover_sitemap_url(website_url)
-            effective_url = discovered_sitemap if discovered_sitemap else website_url
+            # 1. Sitemap SSOT first: reuse the URL discovered during website
+            # analysis instead of re-discovering it on every run (re-discovery
+            # re-hits an already rate-limited origin). Only discover when the
+            # SSOT has nothing stored.
+            effective_url = None
+            try:
+                effective_url = get_stored_sitemap_url(db, user_id)
+            except Exception as ssot_err:
+                self.logger.warning(f"Sitemap SSOT read failed (non-blocking): {ssot_err}")
+
+            if effective_url:
+                self.logger.info(f"Using SSOT sitemap URL: {effective_url}")
+            else:
+                discovered_sitemap = await self.sitemap_service.discover_sitemap_url(website_url)
+                effective_url = discovered_sitemap if discovered_sitemap else website_url
             
             # Set status to running for UI feedback
             if task_record:
@@ -149,6 +166,12 @@ class AdvertoolsExecutor(TaskExecutor):
                         "publishing_recency": metrics.get('publishing_recency'),
                         "publishing_trend": metrics.get('publishing_trend'),
                     }
+                    # Persist the sitemap inventory into the user's SSOT so
+                    # other consumers never re-fetch a rate-limited sitemap.
+                    if metrics.get('inventory'):
+                        save_sitemap_inventory(
+                            db, user_id, website_url, effective_url, metrics['inventory']
+                        )
                 
                 if not audit_urls:
                     audit_urls = [website_url]
@@ -172,6 +195,19 @@ class AdvertoolsExecutor(TaskExecutor):
                 known_total = None
                 if sitemap_result.get('success'):
                     known_total = sitemap_result.get('metrics', {}).get('total_urls')
+                if not known_total:
+                    # SSOT fallback: a prior successful run may have persisted
+                    # the sitemap inventory. Reuse it instead of degrading to
+                    # "no sitemap data" (root-crawl only).
+                    try:
+                        ssot_inventory = get_fresh_inventory(db, user_id)
+                        if ssot_inventory and ssot_inventory.get('total_urls'):
+                            known_total = ssot_inventory.get('total_urls')
+                            self.logger.info(
+                                f"Crawl budget: reusing SSOT sitemap total {known_total}"
+                            )
+                    except Exception as ssot_err:
+                        self.logger.warning(f"Sitemap SSOT inventory read failed (non-blocking): {ssot_err}")
                 budget_result = await self.advertools_service.analyze_crawl_budget(
                     effective_url, site_domain, fallback_sitemap_urls=robots_sitemaps,
                     known_sitemap_total=known_total, primary_sitemap_attempted=True,
@@ -204,6 +240,12 @@ class AdvertoolsExecutor(TaskExecutor):
                 )
                 
                 if result.get('success'):
+                    # Refresh the SSOT inventory on every successful health check.
+                    health_metrics = result.get('metrics', {})
+                    if health_metrics.get('inventory'):
+                        save_sitemap_inventory(
+                            db, user_id, website_url, effective_url, health_metrics['inventory']
+                        )
                     await self._update_site_health_metrics(user_id, website_url, result, db)
             
             else:

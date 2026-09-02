@@ -13,6 +13,7 @@ import {
   searchYouTubeByChip,
   searchYouTubeByDuration,
   searchYouTubeByFeature,
+  searchYouTubeByOverlay,
   searchYouTubeByType,
   searchYouTubeByUploadDate,
 } from "./youtubeHubSearchRequests";
@@ -44,6 +45,7 @@ import { useYouTubeHeroLayoutMetrics } from "./useYouTubeHeroLayoutMetrics";
 import { HUB_CENTER_LEFT_CSS_VAR } from "./youtubeLayoutConstants";
 
 const YOUTUBE_HUB_OVERLAY_SEARCH = {
+  searchYouTubeByOverlay,
   searchYouTubeByType,
   searchYouTubeByDuration,
   searchYouTubeByUploadDate,

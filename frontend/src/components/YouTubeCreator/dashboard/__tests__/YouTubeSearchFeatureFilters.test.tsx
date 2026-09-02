@@ -195,6 +195,20 @@ describe("YouTubeSearchFeatureFilters", () => {
     expect(onFeatureChange).toHaveBeenCalledWith("creative_commons");
   });
 
+  it("clicking the selected FEATURES option still notifies so it can be cleared", async () => {
+    const { YouTubeSearchFeatureFilters } = await loadFeatureFilters();
+    const onFeatureChange = vi.fn();
+    render(
+      <YouTubeSearchFeatureFilters
+        selectedFeature="hd"
+        onFeatureChange={onFeatureChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^hd$/i }));
+    expect(onFeatureChange).toHaveBeenCalledWith("hd");
+  });
+
   it("marks the selected FEATURES option as pressed and others not", async () => {
     const { YouTubeSearchFeatureFilters } = await loadFeatureFilters();
     render(<YouTubeSearchFeatureFilters selectedFeature="hd" />);
@@ -259,9 +273,10 @@ describe("Hub FEATURES wiring", () => {
 
   it("FEATURES requests do not apply Shorts hashtag keep", () => {
     const requests = fs.readFileSync(HUB_SEARCH_REQUESTS, "utf8");
-    const featureFn = requests.slice(
-      requests.indexOf("export async function searchYouTubeByFeature"),
-    );
+    const start = requests.indexOf("export async function searchYouTubeByFeature");
+    const fromFn = requests.slice(start);
+    const nextExport = fromFn.indexOf("\nexport async function ");
+    const featureFn = nextExport === -1 ? fromFn : fromFn.slice(0, nextExport);
     expect(requests).toContain("export async function searchYouTubeByFeature");
     expect(featureFn).toContain("video_feature: feature");
     expect(featureFn).not.toContain("isYouTubeShortsTitle");

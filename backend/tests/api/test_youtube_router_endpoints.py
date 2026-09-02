@@ -317,6 +317,28 @@ class TestListVideos:
         assert result.success is True
         assert len(result.videos) == 1
         assert result.videos[0]["scene_number"] == 1
+        assert result.videos[0].get("scene_count") is None
+
+    def test_lists_combined_asset_without_scene_number(self):
+        from api.youtube.router import list_videos
+
+        asset = SimpleNamespace(
+            id=2,
+            filename="combined.mp4",
+            file_url="/api/youtube/videos/combined.mp4",
+            created_at=None,
+            asset_metadata={"resolution": "720p", "status": "completed", "scene_count": 2},
+        )
+        mock_db = MagicMock()
+        with patch("api.youtube.handlers.videos.ContentAssetService") as mock_cls:
+            mock_cls.return_value.get_user_assets.return_value = ([asset], 1)
+            result = asyncio.run(list_videos(current_user=_user(), db=mock_db))
+
+        assert result.success is True
+        assert len(result.videos) == 1
+        assert result.videos[0]["scene_number"] is None
+        assert result.videos[0]["scene_count"] == 2
+        assert result.videos[0]["video_url"] == "/api/youtube/videos/combined.mp4"
 
     def test_returns_empty_on_error(self):
         from api.youtube.router import list_videos
@@ -327,6 +349,8 @@ class TestListVideos:
 
         assert result.success is False
         assert result.videos == []
+        assert "db down" not in result.message
+        assert result.message == "Failed to list videos. Please try again."
 
 
 class TestCombineSceneVideos:

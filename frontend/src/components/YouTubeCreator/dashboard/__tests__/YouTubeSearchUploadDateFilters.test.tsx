@@ -302,9 +302,10 @@ describe("Hub Upload Date wiring", () => {
 
   it("Upload Date requests do not apply Shorts hashtag keep", () => {
     const requests = fs.readFileSync(HUB_SEARCH_REQUESTS, "utf8");
-    const uploadFn = requests.slice(
-      requests.indexOf("export async function searchYouTubeByUploadDate"),
-    );
+    const start = requests.indexOf("export async function searchYouTubeByUploadDate");
+    const fromFn = requests.slice(start);
+    const nextExport = fromFn.indexOf("\nexport async function ");
+    const uploadFn = nextExport === -1 ? fromFn : fromFn.slice(0, nextExport);
     expect(requests).toContain("export async function searchYouTubeByUploadDate");
     expect(uploadFn).toContain("upload_date: uploadDate");
     expect(uploadFn).not.toContain("isYouTubeShortsTitle");
