@@ -95,3 +95,14 @@ class TestYouTubeCombineUsesPodcastWorkflow:
         assert "PodcastVideoCombinationService" in source
         assert "generate_story_video" not in source
         assert "StoryVideoGenerationService" not in source
+
+    def test_combine_endpoint_does_not_call_subscription_validation(self):
+        """Regression test for #547: Combining videos should not charge AI calls or enforce limits."""
+        import inspect
+        from api.youtube.handlers.render import combine_scene_videos
+
+        source = inspect.getsource(combine_scene_videos)
+        assert "validate_scene_animation_operation" not in source, (
+            "combine_scene_videos should not validate subscription/video limits (#547)"
+        )
+
