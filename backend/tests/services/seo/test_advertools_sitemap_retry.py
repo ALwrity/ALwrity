@@ -75,10 +75,12 @@ def clean_rate_state():
     svc._DOMAIN_LAST_429.clear()
     svc._DOMAIN_LAST_REQUEST.clear()
     svc._DOMAIN_SEMAPHORES.clear()
+    svc._429_HISTORY.clear()
     yield
     svc._DOMAIN_LAST_429.clear()
     svc._DOMAIN_LAST_REQUEST.clear()
     svc._DOMAIN_SEMAPHORES.clear()
+    svc._429_HISTORY.clear()
 
 
 def _http_error(code, retry_after=None):
@@ -206,12 +208,15 @@ class TestIndexRecursion:
         locs = df["loc"].tolist() if not df.empty else []
         # blog.xml 429s once then succeeds -> recovered within full retries.
         assert any("blog.xml" in loc for loc in locs)
-        # news.xml always succeeds -> included.
-        assert any("news.xml" in loc for loc in locs)
         # cat.xml needs two consecutive successes to survive full retries, but
         # after blog.xml 429'd the remaining subs are capped to 1 retry (2
         # attempts) -> cat.xml is dropped.
         assert not any("cat.xml" in loc for loc in locs)
+        # Phase 3 circuit breaker: blog (1x429) + cat (2x429) cross the
+        # threshold, so the fan-out STOPS before news.xml instead of probing
+        # a clearly throttled origin. (Pre-Phase-3 this asserted news.xml was
+        # still fetched.)
+        assert not any("news.xml" in loc for loc in locs)
         assert svc._domain_429_cooldown("tidx.example.com") > 0
 
     def test_index_skipped_when_locs_are_pages(self, fake_adv, clock):
