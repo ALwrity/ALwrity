@@ -570,10 +570,11 @@ describe('Feature Parity', () => {
     expect(screen.getByTestId('confidence-chip')).toHaveTextContent('85%');
   });
 
-  it('tooltip "What is this?" elements are present in insights tables', () => {
+  it('tooltip info icons are present in insights tables', () => {
     renderContainer();
-    const tooltipTriggers = screen.getAllByText('What is this?');
-    expect(tooltipTriggers.length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByTestId('sidebar-domain-brand'));
+    const infoIcons = screen.getAllByTestId('InfoIcon');
+    expect(infoIcons.length).toBeGreaterThan(0);
   });
 
   it('SEO score chip shows numeric score', () => {

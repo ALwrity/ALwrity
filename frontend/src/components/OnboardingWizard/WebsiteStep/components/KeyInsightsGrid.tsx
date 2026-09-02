@@ -111,16 +111,15 @@ const KeyInsightsGrid: React.FC<KeyInsightsGridProps> = ({
       <Table sx={{ minWidth: 650 }}>
         <TableHead>
           <TableRow sx={{ backgroundColor: '#f8fafc' }}>
-            <TableCell sx={{ fontWeight: 600, color: '#1a202c', width: '25%' }}>Metric</TableCell>
-            <TableCell sx={{ fontWeight: 600, color: '#1a202c', width: '35%' }}>Analysis Result</TableCell>
-            <TableCell sx={{ fontWeight: 600, color: '#1a202c', width: '40%' }}>Description</TableCell>
+            <TableCell sx={{ fontWeight: 600, color: '#1a202c', width: '40%' }}>Metric</TableCell>
+            <TableCell sx={{ fontWeight: 600, color: '#1a202c', width: '60%' }}>Analysis Result</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {Object.entries(groupedRows).map(([category, categoryRows]) => (
             <React.Fragment key={category}>
               <TableRow sx={{ backgroundColor: categoryColors[category] || '#f1f5f9' }}>
-                <TableCell colSpan={3} sx={{ fontWeight: 700, color: '#475569', py: 1 }}>
+                <TableCell colSpan={2} sx={{ fontWeight: 700, color: '#475569', py: 1 }}>
                   {category}
                 </TableCell>
               </TableRow>
@@ -135,6 +134,52 @@ const KeyInsightsGrid: React.FC<KeyInsightsGridProps> = ({
                       <Typography variant="body2" sx={{ fontWeight: 600, color: '#2d3748' }}>
                         {row.label}
                       </Typography>
+                      <Tooltip 
+                        title={row.tooltip} 
+                        arrow 
+                        placement="top"
+                        componentsProps={{
+                          tooltip: {
+                            sx: {
+                              bgcolor: 'rgba(30, 41, 59, 0.95)',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                              maxWidth: 250,
+                              p: 1.5,
+                              borderRadius: 2,
+                              fontSize: '0.75rem',
+                              fontWeight: 500,
+                              lineHeight: 1.4,
+                            }
+                          },
+                          arrow: {
+                            sx: {
+                              color: 'rgba(30, 41, 59, 0.95)'
+                            }
+                          }
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: 18,
+                            height: 18,
+                            borderRadius: '50%',
+                            border: '1px solid #E2E8F0',
+                            cursor: 'pointer',
+                            color: '#94A3B8',
+                            transition: 'all 0.2s ease-in-out',
+                            '&:hover': {
+                              borderColor: '#94A3B8',
+                              color: '#64748B',
+                              bgcolor: '#F1F5F9',
+                            }
+                          }}
+                        >
+                          <InfoIcon sx={{ fontSize: 12 }} />
+                        </Box>
+                      </Tooltip>
                     </Box>
                   </TableCell>
                   <TableCell>
@@ -145,16 +190,6 @@ const KeyInsightsGrid: React.FC<KeyInsightsGridProps> = ({
                       variant="outlined"
                       sx={{ fontWeight: 600 }}
                     />
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip title={row.tooltip} arrow placement="top">
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'help' }}>
-                        <InfoIcon fontSize="small" color="action" />
-                        <Typography variant="caption" color="text.secondary">
-                          What is this?
-                        </Typography>
-                      </Box>
-                    </Tooltip>
                   </TableCell>
                 </TableRow>
               ))}
