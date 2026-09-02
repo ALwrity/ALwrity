@@ -134,7 +134,10 @@ class SerpGapService:
         Check SERP presence for a single topic across all competitor domains.
 
         Removes the dateRestrict and sort=date defaults from Google CSE so we
-        see all-time competitor content (not just last month).
+        see all-time competitor content (not just last month). A per-query
+        failure (SerpBase error, CSE error, network timeout) is recorded as a
+        failed query for that domain and skipped — it never aborts the batch
+        (review feedback on PR #901).
         """
         competitors_found = []
         failed_queries = 0
@@ -163,7 +166,7 @@ class SerpGapService:
                     })
             except Exception as e:
                 logger.warning(
-                    f"GCS query failed for site:{domain} topic='{topic}': {e}"
+                    f"Search query failed for site:{domain} topic='{topic}': {e}"
                 )
                 failed_queries += 1
                 continue
