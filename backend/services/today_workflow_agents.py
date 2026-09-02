@@ -408,7 +408,7 @@ async def generate_agent_enhanced_plan(
                     "effort": [],
                     "kpi": [],
                     "required_action_parameters": [],
-                    "error": str(res),
+                    "error": f"{type(res).__name__}: {res}",
                 })
                 logger.warning(f"Agent proposal failed: {res}")
                 continue
