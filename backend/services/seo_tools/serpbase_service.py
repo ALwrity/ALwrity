@@ -9,9 +9,22 @@ existing behavior is unchanged.
 
 import os
 import json
+import asyncio
 import aiohttp
 from typing import Dict, List, Optional, Any
 from loguru import logger
+
+# One session shared across requests: aiohttp.ClientSession() pools
+# connections, so creating one per request would destroy pooling and risk
+# socket exhaustion under gap-analysis concurrency (see review on PR #901).
+_session: Optional[aiohttp.ClientSession] = None
+
+
+def _get_session() -> aiohttp.ClientSession:
+    global _session
+    if _session is None or _session.closed:
+        _session = aiohttp.ClientSession()
+    return _session
 
 
 class SerpBaseService:
@@ -22,9 +35,16 @@ class SerpBaseService:
     keyword research) works unchanged.
     """
 
+    # Base URL overridable via env for tests/proxies; defaults to the
+    # live SerpBase endpoint (review feedback on PR #901).
+    DEFAULT_BASE_URL = os.getenv("SERPBASE_BASE_URL", "https://api.serpbase.dev/google/search")
+    # aiohttp's default timeout is 5 minutes, which can hang async tasks if
+    # the external API stalls — enforce a strict ceiling.
+    REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=10)
+
     def __init__(self) -> None:
         self.api_key = os.getenv("SERPBASE_API_KEY", "")
-        self.base_url = "https://api.serpbase.dev/google/search"
+        self.base_url = self.DEFAULT_BASE_URL
         self.enabled = bool(self.api_key)
         if self.enabled:
             logger.info("SerpBase Service initialized (SERPBASE_API_KEY set)")
@@ -59,21 +79,28 @@ class SerpBaseService:
             "Content-Type": "application/json",
         }
 
+        session = _get_session()
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.base_url, json=payload, headers=headers
-                ) as response:
-                    if response.status != 200:
-                        error_text = await response.text()
-                        logger.error(
-                            f"SerpBase API error: {response.status} - {error_text}"
-                        )
-                        raise RuntimeError(
-                            f"SerpBase API returned status {response.status}"
-                        )
-                    data = await response.json()
-        except Exception as e:
+            async with session.post(
+                self.base_url, json=payload, headers=headers, timeout=self.REQUEST_TIMEOUT
+            ) as response:
+                # Non-2xx may carry an HTML error body (e.g. 502 from a
+                # gateway proxy) — read text first and surface it rather than
+                # letting response.json() raise an unhandled ContentTypeError.
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(
+                        f"SerpBase API error: {response.status} - {error_text[:500]}"
+                    )
+                    raise RuntimeError(
+                        f"SerpBase API returned status {response.status}"
+                    )
+                try:
+                    data = await response.json(content_type=None)
+                except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
+                    logger.error(f"SerpBase API returned non-JSON body: {e}")
+                    raise RuntimeError("SerpBase API returned a non-JSON response")
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             logger.warning(f"SerpBase request failed: {e}")
             raise
 
@@ -84,7 +111,9 @@ class SerpBaseService:
                 f"SerpBase API error: {data.get('message', 'unknown')}"
             )
 
-        results = data.get("organic", []) if isinstance(data, dict) else []
+        # Defensive extraction: organic may be absent or null — treat
+        # anything falsy as an empty result set instead of crashing.
+        results = data.get("organic") or [] if isinstance(data, dict) else []
         items = []
         for idx, r in enumerate(results):
             if not isinstance(r, dict):
