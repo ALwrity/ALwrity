@@ -18,11 +18,16 @@ import { Scene, VideoPlan } from '../../../services/youtubeApi';
 import { useYouTubePublish } from '../../../hooks/useYouTubePublish';
 import { toYouTubePublishAtIso } from './youtubePublishSchedule';
 import { youtubePublishSourceMeta } from '../../../hooks/youtubePublishLog';
+import type { YouTubePublishMetadata } from './youtubePublishMetadata';
+import { helperSx } from '../styles';
 
 interface YouTubePublishPanelProps {
   videoUrl: string | null;
   scenes: Scene[];
   videoPlan: VideoPlan | null;
+  metadata?: YouTubePublishMetadata;
+  publishLine?: string | null;
+  helperText?: string | null;
 }
 
 function buildVideoTitle(videoPlan: VideoPlan | null, scenes: Scene[]): string {
@@ -52,6 +57,9 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
   videoUrl,
   scenes,
   videoPlan,
+  metadata,
+  publishLine,
+  helperText,
 }) => {
   const youtube = useYouTubePublish();
   const activeChannel = youtube.activeChannel;
@@ -68,20 +76,29 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
         return;
       }
       const publishAt = toYouTubePublishAtIso(scheduleLocal);
+      const title = metadata?.title ?? publishTitle;
+      const description = metadata?.description ?? publishDescription;
+      const tags = metadata ? metadata.tags : ['alwrity', 'youtube', 'ai-video'];
       console.info("[YouTubePublishPanel] Publish clicked", {
         ...youtubePublishSourceMeta(videoUrl),
-        titleLength: publishTitle.length,
-        descriptionLength: publishDescription.length,
+        titleLength: title.length,
+        descriptionLength: description.length,
+        tagCount: tags.length,
+        hasMetadata: Boolean(metadata),
+        hasCategoryId: Boolean(metadata?.category_id),
+        hasPublishLine: Boolean(publishLine),
+        hasHelperText: Boolean(helperText),
         hasSchedule: Boolean(publishAt),
         privacy: publishAt ? "private" : privacy,
         connected: youtube.connected,
         hasActiveChannel: Boolean(activeChannel),
       });
-      youtube.publishToYouTube(videoUrl, publishTitle, {
-        description: publishDescription,
-        tags: ['alwrity', 'youtube', 'ai-video'],
+      youtube.publishToYouTube(videoUrl, title, {
+        description,
+        tags,
         privacy_status: publishAt ? 'private' : privacy,
         publish_at: publishAt,
+        ...(metadata ? { category_id: metadata.category_id } : {}),
       });
     } catch (error) {
       console.error("[YouTubePublishPanel] Publish click failed", {
@@ -140,11 +157,19 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
           </Button>
         )}
 
-        {!videoUrl && (
+        {publishLine ? (
+          <Typography variant="body2" sx={{ ...helperSx, mt: 0, fontWeight: 600 }}>
+            {publishLine}
+          </Typography>
+        ) : null}
+
+        {helperText ? (
+          <Alert severity="info">{helperText}</Alert>
+        ) : !videoUrl ? (
           <Alert severity="info">
             Complete final video rendering first. Publish will be enabled once the final video URL is available.
           </Alert>
-        )}
+        ) : null}
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <FormControl size="small" sx={{ minWidth: 160 }}>

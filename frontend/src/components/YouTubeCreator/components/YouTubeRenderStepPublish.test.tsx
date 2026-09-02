@@ -24,6 +24,9 @@ vi.mock("./YouTubeSceneVideoPromptPanel", () => ({
 }));
 vi.mock("./SceneVideoActions", () => ({ SceneVideoActions: () => null }));
 vi.mock("./ScenePreviewModal", () => ({ ScenePreviewModal: () => null }));
+vi.mock("./YouTubePublishMetadataFields", () => ({
+  YouTubePublishMetadataFields: () => null,
+}));
 vi.mock("./YouTubePublishPanel", () => ({
   YouTubePublishPanel: ({ videoUrl }: { videoUrl: string | null }) => (
     <div data-testid="youtube-publish-video-url">{videoUrl ?? ""}</div>
@@ -38,6 +41,7 @@ function queueState(
   return {
     sceneStatuses: {},
     finalVideoUrl: null,
+    combinedFromThisSession: false,
     combining: false,
     combiningProgress: 0,
     combiningMessage: "",
@@ -50,10 +54,16 @@ function queueState(
 function renderStep(
   overrides: {
     finalVideoUrl?: string | null;
+    combinedFromThisSession?: boolean;
     getVideoUrl?: () => string | null;
   } = {},
 ) {
-  mockedQueue.mockReturnValue(queueState({ finalVideoUrl: overrides.finalVideoUrl ?? null }));
+  mockedQueue.mockReturnValue(
+    queueState({
+      finalVideoUrl: overrides.finalVideoUrl ?? null,
+      combinedFromThisSession: overrides.combinedFromThisSession ?? false,
+    }),
+  );
 
   return render(
     <RenderStep
@@ -85,28 +95,30 @@ describe("RenderStep YouTube publish video URL", () => {
     mockedQueue.mockReset();
   });
 
-  it("passes the combined Creator /api/youtube/videos URL to the publish panel", () => {
-    renderStep({ finalVideoUrl: "/api/youtube/videos/final.mp4" });
+  it("passes this-session combined Creator URL to the publish panel", () => {
+    renderStep({
+      finalVideoUrl: "/api/youtube/videos/final.mp4",
+      combinedFromThisSession: true,
+    });
 
     expect(screen.getByTestId("youtube-publish-video-url").textContent).toBe(
       "/api/youtube/videos/final.mp4",
     );
   });
 
-  it("falls back to getVideoUrl when combine has not produced a final URL", () => {
+  it("does not publish leftover getVideoUrl when this draft has no clip", () => {
     renderStep({
       finalVideoUrl: null,
       getVideoUrl: () => "/api/youtube/videos/scene_1_user_abc.mp4",
     });
 
-    expect(screen.getByTestId("youtube-publish-video-url").textContent).toBe(
-      "/api/youtube/videos/scene_1_user_abc.mp4",
-    );
+    expect(screen.getByTestId("youtube-publish-video-url").textContent).toBe("");
   });
 
-  it("prefers the combined final URL over getVideoUrl", () => {
+  it("prefers this-session combined URL over leftover getVideoUrl", () => {
     renderStep({
       finalVideoUrl: "/api/youtube/videos/final.mp4",
+      combinedFromThisSession: true,
       getVideoUrl: () => "/api/youtube/videos/scene_1.mp4",
     });
 

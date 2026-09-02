@@ -49,6 +49,7 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
     renderProgress,
     resolution,
     combineScenes,
+    publishMetadata,
     activeStep: persistedActiveStep,
   } = state;
 
@@ -334,6 +335,7 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
         handleResetRender={assetHandlers.handleResetRender}
         handleRetryFailedScenes={assetHandlers.handleRetryFailedScenes}
         getVideoUrl={assetHandlers.getVideoUrl}
+        publishMetadata={publishMetadata}
       />
     </Box>
   );

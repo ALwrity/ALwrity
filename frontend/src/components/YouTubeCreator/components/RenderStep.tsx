@@ -1,11 +1,8 @@
 /**
- * Render Step Component
- * 
- * Main component for the render step in YouTube Creator workflow.
- * Orchestrates scene overview, settings, cost estimation, and render status.
+ * Render step: scene overview, settings, cost, render status, and publish.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Paper,
   Typography,
@@ -35,6 +32,10 @@ import { YouTubeSceneVideoPromptPanel } from './YouTubeSceneVideoPromptPanel';
 import { YouTubeFinalVideoPanel } from './YouTubeFinalVideoPanel';
 import { useYouTubeRenderQueue } from '../hooks/useYouTubeRenderQueue';
 import { YouTubePublishPanel } from './YouTubePublishPanel';
+import { YouTubePublishMetadataFields } from './YouTubePublishMetadataFields';
+import type { YouTubePublishMetadata } from './youtubePublishMetadata';
+import { useYouTubePublishMetadataDraft } from '../hooks/useYouTubePublishMetadataDraft';
+import { selectYouTubeDraftPublishVideo, youtubeDraftPublishLogMeta } from './youtubeDraftPublishVideo';
 import Snackbar from '@mui/material/Snackbar';
 import MuiAlert, { AlertColor } from '@mui/material/Alert';
 
@@ -58,6 +59,8 @@ interface RenderStepProps {
   onRetryFailedScenes: (failedScenes: any[]) => void;
   onScenesUpdate: (updatedScenes: Scene[]) => void;
   getVideoUrl: () => string | null;
+  persistedPublishMetadata?: YouTubePublishMetadata | null;
+  onPublishMetadataChange?: (next: YouTubePublishMetadata) => void;
 }
 
 export const RenderStep: React.FC<RenderStepProps> = React.memo(({
@@ -80,6 +83,8 @@ export const RenderStep: React.FC<RenderStepProps> = React.memo(({
   onRetryFailedScenes,
   getVideoUrl,
   onScenesUpdate,
+  persistedPublishMetadata,
+  onPublishMetadataChange,
 }) => {
   const [snackbar, setSnackbar] = React.useState<{ open: boolean; message: string; severity: AlertColor }>({
     open: false,
@@ -89,6 +94,12 @@ export const RenderStep: React.FC<RenderStepProps> = React.memo(({
 
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [previewScene, setPreviewScene] = useState<Scene | null>(null);
+  const { publishMetadata, setPublishMetadata } = useYouTubePublishMetadataDraft({
+    videoPlan,
+    scenes,
+    persistedPublishMetadata,
+    onPublishMetadataChange,
+  });
 
   const showSnackbar = (message: string, severity: AlertColor = 'info') => {
     setSnackbar({ open: true, message, severity });
@@ -102,6 +113,7 @@ export const RenderStep: React.FC<RenderStepProps> = React.memo(({
   const {
     sceneStatuses,
     finalVideoUrl,
+    combinedFromThisSession,
     combining,
     combiningProgress,
     combiningMessage,
@@ -117,7 +129,28 @@ export const RenderStep: React.FC<RenderStepProps> = React.memo(({
     onInfo: (msg) => showSnackbar(msg, 'info'),
   });
 
-  const resolvedVideoUrl = finalVideoUrl || getVideoUrl();
+  let leftoverRenderUrl: string | null = null;
+  try {
+    leftoverRenderUrl = getVideoUrl();
+  } catch (error) {
+    console.error("[RenderStep] getVideoUrl failed", {
+      errorName: error instanceof Error ? error.name : "Error",
+    });
+  }
+  const draftPublish = selectYouTubeDraftPublishVideo({
+    sessionCombinedUrl: combinedFromThisSession ? finalVideoUrl : null,
+    rescuedCombinedUrl: combinedFromThisSession ? null : finalVideoUrl,
+    leftoverRenderUrl,
+    scenes,
+  });
+
+  useEffect(() => {
+    console.info("[RenderStep] Publish video source resolved", youtubeDraftPublishLogMeta(draftPublish, {
+      combinedFromThisSession,
+      hasRescuedCombined: Boolean(finalVideoUrl) && !combinedFromThisSession,
+      hasLeftoverRender: Boolean(leftoverRenderUrl),
+    }));
+  }, [combinedFromThisSession, draftPublish.publishEnabled, draftPublish.source, draftPublish.url, finalVideoUrl, leftoverRenderUrl]);
 
   return (
     <motion.div
@@ -437,13 +470,20 @@ export const RenderStep: React.FC<RenderStepProps> = React.memo(({
         />
       )}
 
+      <YouTubePublishMetadataFields
+        metadata={publishMetadata}
+        onMetadataChange={setPublishMetadata}
+      />
+
       <YouTubePublishPanel
-        videoUrl={resolvedVideoUrl}
+        videoUrl={draftPublish.url}
         scenes={scenes}
         videoPlan={videoPlan}
+        metadata={publishMetadata}
+        publishLine={draftPublish.publishLine}
+        helperText={draftPublish.helperText}
       />
     </motion.div>
   );
 });
-
 RenderStep.displayName = 'RenderStep';
