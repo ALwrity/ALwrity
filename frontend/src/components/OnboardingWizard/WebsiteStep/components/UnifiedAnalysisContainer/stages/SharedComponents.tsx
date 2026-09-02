@@ -76,14 +76,14 @@ export const RecommendedSettingsPanel: React.FC<RecommendedSettingsPanelProps> =
   ].filter((c) => c.value);
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1, color: '#1E293B' }}>
-        AI Generation Settings
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        These settings are automatically derived from your website analysis and will be applied when generating content with ALwrity. You can fine-tune other brand parameters under the <strong>Refine & Actions</strong> tab in Edit Mode.
-      </Typography>
-      <Paper variant="outlined" sx={{ p: 2, bgcolor: '#F8FAFC', borderColor: '#E2E8F0' }}>
+    <Box sx={{ p: 0, mb: 3 }}>
+      <SectionHeader
+        title="AI Generation Settings"
+        icon={<AutoAwesomeIcon sx={{ color: '#6366F1' }} />}
+        tooltip="These settings are automatically derived from your website analysis and will be applied when generating content with ALwrity. You can fine-tune other brand parameters under the Refine & Actions tab in Edit Mode."
+        sx={{ mb: 1 }}
+      />
+      <Paper variant="outlined" sx={{ p: 2, bgcolor: '#F8FAFC', border: '1px solid #e0e0e0', borderRadius: 2 }}>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
           {chips.map((c) => (
             <Chip
