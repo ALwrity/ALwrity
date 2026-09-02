@@ -917,18 +917,6 @@ class BaseALwrityAgent(ABC):
         """Create txtai agent with specific tools and configuration"""
         pass
     
-    def _create_fallback_agent(self):
-        """Fallback agent for development/testing when txtai is not available"""
-        class FallbackAgent:
-            def __init__(self, agent_type: str):
-                self.agent_type = agent_type
-                self.available = False
-            
-            async def run(self, prompt: str, **kwargs) -> str:
-                return f"[FALLBACK] {self.agent_type} agent would process: {prompt[:100]}..."
-        
-        return FallbackAgent(self.agent_type)
-    
     async def run(self, prompt: str) -> str:
         """Run the agent with a prompt directly (compatibility method)"""
         db = None

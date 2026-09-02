@@ -634,21 +634,13 @@ class ContentStrategyAgent(BaseALwrityAgent):
                 reasoning=f"{domain} is your top tracked competitor. Regular reviews help you stay ahead of their content strategy moves.",
                 action_type="navigate",
                 action_url="/seo-dashboard",
-                context_data={"competitor_domain": domain},
+             context_data={"competitor_domain": domain},
             ))
 
-        # Task 3: Content audit (analyze) — always suggested
-        default_proposals.append(TaskProposal(
-            title="Quick content performance audit",
-            description="Review your top 3 pieces from last month. Identify what worked and what to update.",
-            pillar_id="analyze",
-            priority="medium",
-            estimated_time=20,
-            source_agent="ContentStrategyAgent",
-            reasoning="Regular audits surface declining pages that need refreshing and winning formats to double down on.",
-            action_type="navigate",
-            action_url="/content-planning-dashboard",
-        ))
+        # NOTE: the old unconditional "Quick content performance audit"
+        # filler was removed per the honest-absence policy — this agent now
+        # declines or returns empty when neither pillars, competitors, nor
+        # LLM synthesis provide anything grounded.
 
         return await self._synthesize_task_proposals(
             context,

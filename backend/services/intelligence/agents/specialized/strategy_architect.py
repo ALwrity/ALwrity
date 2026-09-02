@@ -147,19 +147,11 @@ class StrategyArchitectAgent(SIFBaseAgent):
         except Exception as e:
             logger.warning(f"[{self.__class__.__name__}] Error checking pillars for proposals: {e}")
 
-        # 2. Strategy Review (Generic fallback)
-        default_proposals.append(TaskProposal(
-            title="Review Strategic Goals",
-            description="Ensure your content output aligns with your quarterly business goals.",
-            pillar_id="plan",
-            priority="low",
-            estimated_time=10,
-            source_agent="StrategyArchitectAgent",
-            reasoning="Routine strategy maintenance.",
-            action_type="navigate",
-            action_url="/content-planning-dashboard"
-        ))
-        
+        # NOTE: the old unconditional "Review Strategic Goals" filler was
+        # removed per the honest-absence policy — when SIF clustering and
+        # onboarding context provide nothing, this agent declines or returns
+        # empty instead of shipping identical-for-everyone advice.
+
         return await self._synthesize_task_proposals(
             context,
             default_proposals,
