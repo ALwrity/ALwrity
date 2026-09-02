@@ -517,12 +517,16 @@ class LimitValidator:
             )
             total_llm_tokens = {}
             total_images = usage.stability_calls or 0
+            total_video_calls = usage.video_calls or 0
+            total_image_edit_calls = getattr(usage, 'image_edit_calls', 0) or 0
+            total_audio_calls = getattr(usage, 'audio_calls', 0) or 0
             
             # Log current usage summary
             logger.info(f"[Pre-flight Check] 📊 Current Usage Summary:")
-            logger.info(f"   └─ Total LLM Calls: {total_llm_calls}")
-            logger.info(f"   └─ Gemini Tokens: {usage.gemini_tokens or 0}, Mistral/HF Tokens: {usage.mistral_tokens or 0}")
-            logger.info(f"   └─ Image Calls: {total_images}")
+            logger.info(f"   ├─ Total LLM Calls: {total_llm_calls}")
+            logger.info(f"   ├─ Gemini Tokens: {usage.gemini_tokens or 0}, Mistral/HF Tokens: {usage.mistral_tokens or 0}")
+            logger.info(f"   ├─ Image Calls: {total_images}")
+            logger.info(f"   └─ Video Calls: {total_video_calls}")
             
             # Validate each operation
             for op_idx, operation in enumerate(operations):
@@ -741,7 +745,6 @@ class LimitValidator:
                 # Check video generation limits
                 elif provider == APIProvider.VIDEO:
                     video_limit = limits.get('video_calls', 0) or 0
-                    total_video_calls = usage.video_calls or 0
                     projected_video_calls = total_video_calls + 1
                     
                     # Enforce limit based on tier (Free: 0=disabled, others: 0=unlimited)
@@ -757,11 +760,12 @@ class LimitValidator:
                             'error_type': 'video_limit',
                             'usage_info': error_info
                         }
+                    
+                    total_video_calls = projected_video_calls
                 
                 # Check image editing limits
                 elif provider == APIProvider.IMAGE_EDIT:
                     image_edit_limit = limits.get('image_edit_calls', 0) or 0
-                    total_image_edit_calls = getattr(usage, 'image_edit_calls', 0) or 0
                     projected_image_edit_calls = total_image_edit_calls + 1
                     
                     # Enforce limit based on tier (Free: 0=disabled, others: 0=unlimited)
@@ -777,6 +781,8 @@ class LimitValidator:
                             'error_type': 'image_edit_limit',
                             'usage_info': error_info
                         }
+                    
+                    total_image_edit_calls = projected_image_edit_calls
                 
                 # Check other provider-specific limits
                 else:
