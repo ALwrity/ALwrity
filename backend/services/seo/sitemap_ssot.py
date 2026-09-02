@@ -162,3 +162,60 @@ def save_sitemap_inventory(
             pass
         logger.warning(f"[sitemap_ssot] Non-blocking: failed to save sitemap inventory for {user_id}: {e}")
         return False
+
+
+def get_inventory_total(db: Session, user_id: str) -> int:
+    """Return the fresh SSOT inventory's URL count (0 when absent/stale).
+
+    Used by consumers that only need the sitemap SIZE (e.g. SIF indexing
+    progress visibility) without touching the origin.
+    """
+    inventory = get_fresh_inventory(db, user_id)
+    if not inventory:
+        return 0
+    total = inventory.get("total_urls") or 0
+    try:
+        return int(total)
+    except (TypeError, ValueError):
+        return 0
+
+
+async def get_or_discover_sitemap_url(
+    user_id: str,
+    website_url: str,
+    sitemap_service: Any,
+    db: Optional[Session] = None,
+) -> Optional[str]:
+    """SSOT-first sitemap URL resolution for the user's OWN website.
+
+    Returns the stored SSOT URL when present (no network), otherwise falls
+    back to ``sitemap_service.discover_sitemap_url``. When no session is
+    supplied (e.g. content_strategy_service has user_id but no db), a
+    short-lived per-user session is opened and closed here.
+
+    NOTE: only for the user's own website — competitor discoveries have no
+    per-user SSOT and must keep calling discovery directly.
+    """
+    stored: Optional[str] = None
+    own_db: Optional[Session] = None
+    try:
+        if db is not None:
+            stored = get_stored_sitemap_url(db, user_id)
+        else:
+            from services.database import get_session_for_user
+
+            own_db = get_session_for_user(user_id)
+            stored = get_stored_sitemap_url(own_db, user_id) if own_db else None
+    except Exception as e:
+        logger.warning(f"[sitemap_ssot] SSOT URL read failed for {user_id} (falling back to discovery): {e}")
+        stored = None
+    finally:
+        if own_db is not None:
+            try:
+                own_db.close()
+            except Exception:
+                pass
+
+    if stored:
+        return stored
+    return await sitemap_service.discover_sitemap_url(website_url)

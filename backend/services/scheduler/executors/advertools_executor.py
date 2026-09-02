@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from services.seo.advertools_service import AdvertoolsService
 from services.seo.advertools_run_lock import release, try_acquire
+from services.seo import advertools_metrics
 from services.seo.sitemap_ssot import (
     get_fresh_inventory,
     get_stored_sitemap_url,
@@ -129,6 +130,7 @@ class AdvertoolsExecutor(TaskExecutor):
                 exclude_task_id=task_id if isinstance(task_id, int) else None,
             )
             if not lock_acquired:
+                advertools_metrics.incr(advertools_metrics.EVENT_DUPLICATE_SKIP)
                 self.logger.warning(
                     f"Advertools task {task_id} ({task_type}) SKIPPED — "
                     f"another pipeline is already running for {website_url}"

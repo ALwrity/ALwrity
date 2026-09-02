@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 from middleware.auth_middleware import get_current_user
 from services.seo.advertools_run_lock import release, try_acquire
+from services.seo import advertools_metrics
 
 router = APIRouter(prefix="/api/onboarding", tags=["Onboarding Content Audit"])
 
@@ -140,6 +141,7 @@ async def run_content_audit(
         # lease). Skip instead of double-crawling a rate-limited origin.
         lock_owned = try_acquire(user_id, website_url, "content_audit", db=db)
         if not lock_owned:
+            advertools_metrics.incr(advertools_metrics.EVENT_DUPLICATE_SKIP)
             logger.warning(f"[ContentAudit] Skipped for user={user_id}: pipeline already running for {website_url}")
             return {
                 "success": False,
@@ -381,6 +383,7 @@ async def run_site_health(
         # Cross-path mutex (see /content-audit/run).
         lock_owned = try_acquire(user_id, website_url, "site_health", db=db)
         if not lock_owned:
+            advertools_metrics.incr(advertools_metrics.EVENT_DUPLICATE_SKIP)
             logger.warning(f"[SiteHealth] Skipped for user={user_id}: pipeline already running for {website_url}")
             return {
                 "success": False,

@@ -47,7 +47,12 @@ class ContentStrategyService:
 
         sitemap_service = SitemapService()
 
-        discovered_user_sitemap = await sitemap_service.discover_sitemap_url(website_url)
+        # SSOT first (Phase 1 plan: no re-discovery of the user's sitemap);
+        # competitor sitemaps have no per-user SSOT and always discover.
+        from services.seo.sitemap_ssot import get_or_discover_sitemap_url
+        discovered_user_sitemap = await get_or_discover_sitemap_url(
+            user_id or "unknown", website_url, sitemap_service
+        )
         user_sitemap_result = None
         if discovered_user_sitemap:
             user_sitemap_result = await sitemap_service.analyze_sitemap(
@@ -178,7 +183,10 @@ class ContentStrategyService:
             sitemap_service = SitemapService()
 
             logger.warning(f"🔍 [PROGRESS] Discovering user sitemap for {website_url}")
-            discovered_user_sitemap = await sitemap_service.discover_sitemap_url(website_url)
+            from services.seo.sitemap_ssot import get_or_discover_sitemap_url
+            discovered_user_sitemap = await get_or_discover_sitemap_url(
+                user_id or "unknown", website_url, sitemap_service
+            )
             user_sitemap_result = None
             user_error = None
             if discovered_user_sitemap:
