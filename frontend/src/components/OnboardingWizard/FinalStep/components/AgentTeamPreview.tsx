@@ -184,6 +184,11 @@ const AgentGroupCard: React.FC<{
               : "I have nothing to contribute")}
         </Typography>
       )}
+      {!isError && !isDeclined && (tasks || []).length === 0 && (
+        <Typography variant="caption" component="div" sx={{ mb: 1, opacity: 0.75 }}>
+          No proposals produced this run — click Re-run preview to try again, or retry after other agents finish.
+        </Typography>
+      )}
       <Stack spacing={1}>
         {(tasks || []).map((t: any, i: number) => (
           <Box key={i} sx={taskCardSx}>
@@ -251,6 +256,7 @@ export const AgentTeamPreview: React.FC = () => {
   const [currentStage, setCurrentStage] = React.useState(0);
   const [progressPercent, setProgressPercent] = React.useState(0);
   const [completedAgents, setCompletedAgents] = React.useState<string[]>([]);
+  const [isRerun, setIsRerun] = React.useState(false);
   const currentStageRef = React.useRef(0);
 
   React.useEffect(() => {
@@ -274,6 +280,7 @@ export const AgentTeamPreview: React.FC = () => {
   }, [loading]);
 
   const handlePreview = async (force = false) => {
+    setIsRerun(force);
     setLoading(true);
     currentStageRef.current = 0;
     setCurrentStage(0);
@@ -388,40 +395,41 @@ export const AgentTeamPreview: React.FC = () => {
         </Alert>
       )}
 
-      {loading && (
-        <Box
-          sx={{
-            mb: 2,
-            p: 2,
-            borderRadius: 2,
-            bgcolor: "rgba(255,255,255,0.08)",
-            border: "1px solid rgba(255,255,255,0.15)",
-          }}
-        >
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-            <CircularProgress size={16} sx={{ color: "#a5b4fc" }} />
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {PROGRESS_STAGES[Math.min(currentStage, PROGRESS_STAGES.length - 1)]?.message ??
-                "Initializing agent committee..."}
+      {/* Loading progress: a MODAL so it is impossible to miss — the Re-run
+          button sits at the bottom of a long proposals list, and an inline
+          panel at the top of the card was never seen by users. */}
+      <Dialog
+        open={loading}
+        disableEscapeKeyDown
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <CircularProgress size={20} sx={{ color: "#4f46e5" }} />
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              {isRerun ? "Re-running your agents…" : "Running your agents…"}
             </Typography>
           </Stack>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1.5, fontWeight: 600 }}>
+            {PROGRESS_STAGES[Math.min(currentStage, PROGRESS_STAGES.length - 1)]?.message ??
+              "Initializing agent committee..."}
+          </Typography>
           <LinearProgress
             variant="determinate"
             value={progressPercent}
-            sx={{
-              height: 6,
-              borderRadius: 3,
-              bgcolor: "rgba(255,255,255,0.12)",
-              "& .MuiLinearProgress-bar": { bgcolor: "#a5b4fc" },
-            }}
+            sx={{ height: 8, borderRadius: 4 }}
           />
-          <Typography variant="caption" sx={{ mt: 1, display: "block", opacity: 0.75 }}>
+          <Typography variant="caption" sx={{ mt: 1.5, display: "block", color: "text.secondary" }}>
             {completedAgents.length > 0
               ? `Completed: ${completedAgents.join(", ")}`
               : "Agents are analyzing your site — this can take 1–3 minutes."}
           </Typography>
-        </Box>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {!preview && (
         <Button
