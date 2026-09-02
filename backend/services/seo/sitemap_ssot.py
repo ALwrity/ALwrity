@@ -14,7 +14,7 @@ holds public sitemap content keyed by URL, never user data.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 from loguru import logger
@@ -71,9 +71,13 @@ def is_inventory_fresh(ssot: Dict[str, Any]) -> bool:
         fetched = datetime.fromisoformat(str(fetched_at))
     except (TypeError, ValueError):
         return False
+    # fetched_at is written with naive-UTC datetime.utcnow(). Comparing it
+    # against local ``datetime.now()`` skews the age by the host's UTC offset
+    # (e.g. +5:30), making fresh inventories look hours old on non-UTC hosts.
+    # Anchor both sides to UTC explicitly.
     if fetched.tzinfo is None:
-        fetched = fetched.replace(tzinfo=datetime.utcnow().tzinfo)
-    age = datetime.now(fetched.tzinfo) - fetched
+        fetched = fetched.replace(tzinfo=timezone.utc)
+    age = datetime.now(timezone.utc) - fetched
     return age <= timedelta(days=SITEMAP_SSOT_TTL_DAYS)
 
 
