@@ -26,6 +26,13 @@ import os
 if os.getenv("ALWRITY_ENABLED_FEATURES", "").strip().lower() not in ("", "all"):
     os.environ["LOG_LEVEL"] = "WARNING"
 
+# Point tldextract's Public Suffix List cache at a writable directory BEFORE
+# any module imports advertools (Phase 5, RCA #520). The default cache dir
+# lives inside site-packages, which is not writable on many deployments, so
+# the PSL would otherwise be re-downloaded over HTTP on every startup.
+from services.seo.tldextract_setup import configure_tldextract_cache
+configure_tldextract_cache()
+
 print(f"[app.py] Starting... ALWRITY_ENABLED_FEATURES={os.getenv('ALWRITY_ENABLED_FEATURES')}", flush=True)
 
 

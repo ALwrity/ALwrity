@@ -10,6 +10,8 @@ from datetime import datetime
 import asyncio
 import json
 import pandas as pd
+# Set TLDEXTRACT_CACHE before advertools imports tldextract (Phase 5, RCA #520).
+import services.seo.tldextract_setup  # noqa: F401
 import advertools as adv
 import tempfile
 import os

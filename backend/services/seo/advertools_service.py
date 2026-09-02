@@ -1,3 +1,7 @@
+# Set TLDEXTRACT_CACHE before advertools imports tldextract so the Public
+# Suffix List cache lands in a writable dir (Phase 5, RCA #520). Importing
+# this module performs the configuration (idempotent).
+import services.seo.tldextract_setup  # noqa: F401
 import advertools as adv
 import pandas as pd
 import asyncio
