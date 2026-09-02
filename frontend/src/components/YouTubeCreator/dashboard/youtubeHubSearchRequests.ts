@@ -1,5 +1,5 @@
 /**
- * Hub Search.list requests for chip filters, TYPE, Duration, Upload Date, and Features.
+ * Hub Search.list requests for chips and combined Search filters overlay.
  */
 import { youtubeStudioApi } from "../../../services/youtubeStudioApi";
 import {
@@ -12,6 +12,7 @@ import {
   type YouTubeSearchUploadDateFilter,
 } from "./YouTubeSearchResultsPanel";
 import { resolveYouTubeSearchTimeZone } from "./youtubeSearchTimeZone";
+import type { YouTubeSearchOverlaySelection } from "./youtubeSearchOverlayCombine";
 
 export type YouTubeHubSearchResult = {
   items: YouTubeSearchHit[];
@@ -250,6 +251,94 @@ export async function searchYouTubeByFeature(
     console.error(
       "[youtubeHubSearchRequests] Feature search failed",
       { videoFeature: feature },
+      error,
+    );
+    throw error;
+  }
+}
+
+export async function searchYouTubeByOverlay(
+  query: string,
+  selection: YouTubeSearchOverlaySelection,
+): Promise<YouTubeHubSearchResult> {
+  let timeZone: string | null = null;
+  try {
+    const searchType = selection.searchType;
+    const isChannelOrPlaylist =
+      searchType === "channel" || searchType === "playlist";
+    const params: {
+      q: string;
+      max_results: number;
+      search_type?: string;
+      video_duration?: string;
+      upload_date?: string;
+      time_zone?: string;
+      video_feature?: string;
+    } = { q: query, max_results: 25 };
+    if (searchType) {
+      params.search_type = searchType;
+    }
+    if (selection.duration && searchType !== "shorts" && !isChannelOrPlaylist) {
+      params.video_duration = selection.duration;
+    }
+    if (selection.feature && !isChannelOrPlaylist) {
+      params.video_feature = selection.feature;
+    }
+    if (selection.uploadDate) {
+      timeZone = resolveYouTubeSearchTimeZone();
+      params.upload_date = selection.uploadDate;
+      params.time_zone = timeZone;
+    }
+    console.info("[youtubeHubSearchRequests] Overlay search start", {
+      searchType: params.search_type || null,
+      videoDuration: params.video_duration || null,
+      uploadDate: params.upload_date || null,
+      timeZone,
+      videoFeature: params.video_feature || null,
+      queryLength: query.length,
+    });
+    const data = await youtubeStudioApi.searchByKeyword(params);
+    if (!data?.success) {
+      console.warn("[youtubeHubSearchRequests] Overlay search unsuccessful", {
+        searchType: params.search_type || null,
+        errorCode: data?.error_code || null,
+      });
+      return { items: [], message: data?.message || "Search failed." };
+    }
+    const items = asHits(data);
+    if (searchType === "shorts") {
+      const shortsItems = items.filter((hit) => isYouTubeShortsTitle(hit.title));
+      console.info("[youtubeHubSearchRequests] Overlay Shorts hashtag filter", {
+        before: items.length,
+        after: shortsItems.length,
+      });
+      return {
+        items: shortsItems,
+        message: shortsItems.length === 0 ? "No Shorts found." : null,
+      };
+    }
+    console.info("[youtubeHubSearchRequests] Overlay search complete", {
+      searchType: params.search_type || null,
+      itemCount: items.length,
+    });
+    const emptyMessage =
+      searchType === "channel"
+        ? "No channels found."
+        : searchType === "playlist"
+          ? "No playlists found."
+          : "No videos found.";
+    return { items, message: items.length === 0 ? emptyMessage : null };
+  } catch (error) {
+    console.error(
+      "[youtubeHubSearchRequests] Overlay search failed",
+      {
+        searchType: selection.searchType || null,
+        videoDuration: selection.duration || null,
+        uploadDate: selection.uploadDate || null,
+        videoFeature: selection.feature || null,
+        timeZone,
+        queryLength: query.length,
+      },
       error,
     );
     throw error;
