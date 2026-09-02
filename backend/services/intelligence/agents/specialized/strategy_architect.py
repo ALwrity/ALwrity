@@ -40,9 +40,26 @@ class StrategyArchitectAgent(SIFBaseAgent):
             or research.get("content_pillars")
             or []
         )
+        if isinstance(pillars, dict):
+            # Dict-shaped payloads (form data like {"0": {...}}): the
+            # values carry the pillar entries; string values are names.
+            pillars = [
+                value.get("topic") or value.get("name") or value.get("title") or str(value)
+                if isinstance(value, dict) else str(value)
+                for value in pillars.values()
+            ]
         if not isinstance(pillars, list):
             pillars = [pillars]
-        return [str(p).strip() for p in pillars if str(p).strip()][:6]
+        cleaned: List[str] = []
+        for p in pillars:
+            name = (
+                p.get("topic") or p.get("name") or p.get("title") or str(p)
+                if isinstance(p, dict) else str(p)
+            )
+            name = str(name).strip()
+            if name and name not in cleaned:
+                cleaned.append(name)
+        return cleaned[:6]
 
     async def discover_pillars(self) -> List[Dict[str, Any]]:
         """Identify content pillars through semantic clustering."""
