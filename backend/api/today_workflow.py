@@ -381,6 +381,62 @@ async def get_generation_progress_endpoint(
     }
 
 
+def _summarize_proposal_review(proposal_review: Any) -> Dict[str, Any]:
+    """Condense the committee's proposal_review into a UI-friendly summary:
+    decision counts plus the rejected/deferred items with their reasons."""
+    review = proposal_review if isinstance(proposal_review, dict) else {}
+    summary = review.get("summary") if isinstance(review.get("summary"), dict) else {}
+    normalized = review.get("normalized_proposals")
+    normalized = normalized if isinstance(normalized, list) else []
+    flagged = []
+    for item in normalized:
+        if not isinstance(item, dict):
+            continue
+        status = item.get("status")
+        if status in {"rejected", "deferred", "quarantined"}:
+            flagged.append({
+                "title": item.get("title"),
+                "agent": item.get("agent"),
+                "status": status,
+                "reasons": [str(r) for r in (item.get("review_reasons") or [])][:3],
+            })
+    return {
+        "counts": {
+            "accepted": int(summary.get("accepted") or 0),
+            "rejected": int(summary.get("rejected") or 0),
+            "merged": int(summary.get("merged") or 0),
+            "deferred": int(summary.get("deferred") or 0),
+            "quarantined": int(summary.get("quarantined") or 0),
+        },
+        "flagged": flagged[:10],
+    }
+
+
+def _transparency_fields(plan_json: Any) -> Dict[str, Any]:
+    """Extract the plan-level transparency block from plan_json.
+
+    Shared by the preview and retry endpoints so both surface the same
+    transparency data (limitations, preflight data-quality checks, per-agent
+    evidence incl. SIF query provenance, review summary, guardian health,
+    quality/contextuality).
+    """
+    plan_json = plan_json if isinstance(plan_json, dict) else {}
+    guardian_review = plan_json.get("guardian_review") if isinstance(plan_json.get("guardian_review"), dict) else {}
+    guardian_summary = guardian_review.get("summary") if isinstance(guardian_review.get("summary"), dict) else {}
+    agent_evidence = plan_json.get("agent_evidence") if isinstance(plan_json.get("agent_evidence"), list) else []
+    return {
+        "limitations": [
+            str(item) for item in (plan_json.get("limitations") or []) if item
+        ],
+        "meeting_preflight": plan_json.get("meeting_preflight") or {},
+        "agent_evidence": agent_evidence,
+        "proposal_review_summary": _summarize_proposal_review(plan_json.get("proposal_review")),
+        "guardian_health": guardian_summary.get("health_score"),
+        "quality_status": plan_json.get("quality_status"),
+        "contextuality_validation": plan_json.get("contextuality_validation") or {},
+    }
+
+
 def _derive_agent_states(agent_evidence: list) -> list:
     """Classify each committee agent's outcome for transparency/retry.
 
@@ -507,6 +563,7 @@ async def preview_workflow(
             "agent_states": agent_states,
             "failed_agents": failed_agents,
             "declined_agents": declined_agents,
+            **_transparency_fields(plan_json),
         },
     }
 
@@ -614,6 +671,7 @@ async def retry_agent(
             "agent_states": agent_states,
             "failed_agents": [s for s in agent_states if s["state"] == "error"],
             "declined_agents": [s for s in agent_states if s["state"] == "declined"],
+            **_transparency_fields(plan_json),
         },
     }
 

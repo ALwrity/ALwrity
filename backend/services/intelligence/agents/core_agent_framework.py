@@ -319,6 +319,7 @@ class BaseALwrityAgent(ABC):
         """
         intelligence = self._resolve_sif_intelligence()
         results: List[Dict[str, Any]] = []
+        search_error: Optional[str] = None
         if intelligence is not None:
             try:
                 ensure = getattr(intelligence, "_ensure_initialized_async", None)
@@ -330,11 +331,21 @@ class BaseALwrityAgent(ABC):
                 results = list(await intelligence.search(query, limit=limit) or [])
             except Exception as exc:
                 logger.debug(f"[{type(self).__name__}] SIF search failed: {exc}")
+                search_error = f"{type(exc).__name__}: {exc}"
                 results = []
+        self._record_sif_query_provenance(
+            query,
+            limit=limit,
+            trigger=trigger,
+            result_count=len(results),
+            outcome="success" if results else ("error" if search_error else "miss"),
+            error=search_error,
+        )
         if results:
             return results
 
         # Miss: heal the index once (day-guarded) and retry the search.
+        heal_summary: Optional[Dict[str, Any]] = None
         try:
             from services.intelligence.sif_integration import SIFIntegrationService
 
@@ -348,6 +359,7 @@ class BaseALwrityAgent(ABC):
                 heal = await _maybe_self_heal_index_impl(
                     sif, trigger=trigger, min_index_items=min_index_items
                 )
+                heal_summary = heal
                 if heal.get("healed") and intelligence is not None:
                     # Record the heal on the agent so the committee can
                     # surface it in the plan's limitations (transparency:
@@ -364,9 +376,65 @@ class BaseALwrityAgent(ABC):
                         results = list(await intelligence.search(query, limit=limit) or [])
                     except Exception as retry_exc:
                         logger.debug(f"[{type(self).__name__}] SIF retry after heal failed: {retry_exc}")
+                # Update the provenance entry with the heal outcome and the
+                # post-heal result count (miss_healed vs still-miss).
+                self._record_sif_query_provenance(
+                    query,
+                    limit=limit,
+                    trigger=trigger,
+                    result_count=len(results),
+                    outcome="miss_healed" if (heal_summary or {}).get("healed") else "miss",
+                    heal=heal_summary,
+                    update_last=True,
+                )
         except Exception as exc:
             logger.debug(f"[{type(self).__name__}] Self-heal attempt failed: {exc}")
         return results
+
+    def _record_sif_query_provenance(
+        self,
+        query: str,
+        *,
+        limit: int,
+        trigger: str,
+        result_count: int,
+        outcome: str,
+        error: Optional[str] = None,
+        heal: Optional[Dict[str, Any]] = None,
+        update_last: bool = False,
+    ) -> None:
+        """Record one SIF search attempt on the agent for plan transparency.
+
+        Appends to ``self.last_sif_queries`` (capped) so the committee can
+        show end users what was searched, with what result. Never raises.
+        """
+        try:
+            provenance = getattr(self, "last_sif_queries", None)
+            if not isinstance(provenance, list):
+                provenance = []
+                self.last_sif_queries = provenance
+            if update_last and provenance:
+                entry = provenance[-1]
+                if entry.get("outcome") != "error":
+                    # A hard search error stays terminal; only a plain miss
+                    # can be upgraded to miss_healed (or stay a miss).
+                    entry["outcome"] = outcome
+                    entry["result_count"] = result_count
+                    if heal is not None:
+                        entry["heal"] = heal
+            else:
+                provenance.append({
+                    "query": query,
+                    "limit": limit,
+                    "trigger": trigger,
+                    "result_count": result_count,
+                    "outcome": outcome,
+                    **({"error": error} if error else {}),
+                    "timestamp": datetime.utcnow().isoformat(),
+                })
+            del provenance[:-20]
+        except Exception:
+            pass
 
 
 
