@@ -18,6 +18,39 @@ from models.advertools_monitoring_models import AdvertoolsTask, AdvertoolsExecut
 from models.onboarding import WebsiteAnalysis, OnboardingSession
 from services.scheduler.core.executor_interface import TaskExecutor, TaskExecutionResult
 
+
+def _richer(existing: Any, incoming: Any) -> Any:
+    """Return the value with more content; ties keep the EXISTING value.
+
+    Used when a DEGRADED audit result would otherwise overwrite richer data
+    stored by an earlier full run (the RCA last-writer-wins bug): a root-only
+    fallback audit must not shrink a 15-URL audit's themes/link health, and
+    its zeroed scalars (freshness_score=0, tiny counts) must never displace
+    stored metrics — hence ties are conservative and keep what is stored.
+    """
+    def _size(value: Any) -> int:
+        if value is None:
+            return -1
+        if isinstance(value, (list, dict, str)):
+            return len(value)
+        return 1  # scalars count as content
+
+    return existing if _size(existing) >= _size(incoming) else incoming
+
+
+# brand_analysis key -> audit_result key
+BRAND_RESULT_KEYS = {
+    'augmented_themes': 'themes',
+    'link_health': 'link_health',
+    'redirect_audit': 'redirect_audit',
+    'image_seo': 'image_seo',
+    'page_status': 'page_status',
+    'url_structure': 'url_structure',
+    'freshness': 'freshness',
+    'robots_txt': 'robots_txt',
+    'crawl_budget': 'crawl_budget',
+}
+
 class AdvertoolsExecutor(TaskExecutor):
     """
     Executor for Advertools-based SEO intelligence tasks.
@@ -101,7 +134,8 @@ class AdvertoolsExecutor(TaskExecutor):
                         save_sitemap_inventory(
                             db, user_id, website_url, effective_url, metrics['inventory']
                         )
-                
+                had_audit_urls = bool(audit_urls)
+
                 if not audit_urls:
                     audit_urls = [website_url]
                 
@@ -158,6 +192,15 @@ class AdvertoolsExecutor(TaskExecutor):
                     "crawl_budget": budget_result,
                     "timestamp": datetime.utcnow().isoformat()
                 }
+                # Phase 4: attach why this run is partial (if at all), so the
+                # persona merge can protect richer stored data and the UI can
+                # show a partial-data warning.
+                result.update(self._degradation_metadata(
+                    sitemap_result=sitemap_result,
+                    had_audit_urls=had_audit_urls,
+                    website_url=website_url,
+                    robots_result=robots_result,
+                ))
                 
                 if result.get('success'):
                     await self._update_persona_augmentation(user_id, website_url, result, db)
@@ -261,10 +304,53 @@ class AdvertoolsExecutor(TaskExecutor):
         freq_days = getattr(task, 'frequency_days', 7) or 7
         return base + timedelta(days=freq_days)
 
+    @staticmethod
+    def _degradation_metadata(
+        sitemap_result: Dict[str, Any],
+        had_audit_urls: bool,
+        website_url: str,
+        robots_result: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Collect why this audit result is partial (empty reasons = clean run).
+
+        Feeds both the returned result and the persisted brand_analysis so the
+        UI can show partial-data warnings instead of a silent downgrade.
+        """
+        reasons: list = []
+        rate_limited = False
+
+        if not sitemap_result.get('success'):
+            reasons.append(f"sitemap analysis failed: {sitemap_result.get('error') or 'unknown error'}")
+            if sitemap_result.get('rate_limited'):
+                rate_limited = True
+        elif sitemap_result.get('degraded'):
+            reasons.append(sitemap_result.get('degraded_reason') or 'sitemap analysis partial (rate-limited)')
+            if sitemap_result.get('rate_limited'):
+                rate_limited = True
+
+        if not had_audit_urls:
+            reasons.append(
+                f"sitemap produced no audit URLs; audited site root only ({website_url})"
+            )
+
+        if robots_result.get('degraded'):
+            reasons.append('robots.txt analysis failed; crawl-budget fallbacks unavailable')
+
+        return {
+            "degraded": bool(reasons),
+            "degraded_reasons": reasons,
+            "rate_limited": rate_limited,
+        }
+
     async def _update_persona_augmentation(self, user_id: str, website_url: str, audit_result: Dict[str, Any], db: Session):
         """
         Updates the user's Brand Persona with discovered themes, site structure,
         link health, and redirect data from the content audit.
+
+        Merge-don't-clobber (Phase 4): a DEGRADED result (e.g. 429 circuit
+        tripped, root-only audit) keeps the richer value per key that an
+        earlier full run stored, instead of shrinking it. Clean results
+        overwrite wholesale and clear the degraded flags.
         """
         try:
             session = db.query(OnboardingSession).filter(OnboardingSession.user_id == user_id).first()
@@ -278,47 +364,48 @@ class AdvertoolsExecutor(TaskExecutor):
                 return
 
             current_brand = analysis.brand_analysis or {}
-            
-            # Core themes
-            current_brand['augmented_themes'] = audit_result.get('themes', [])
-            
-            # Link health
-            current_brand['link_health'] = audit_result.get('link_health', {})
-            
-            # Redirect audit
-            current_brand['redirect_audit'] = audit_result.get('redirect_audit', {})
-            
-            # Image SEO
-            current_brand['image_seo'] = audit_result.get('image_seo', {})
-            
-            # Page status distribution
-            current_brand['page_status'] = audit_result.get('page_status', {})
-            
-            # URL structure analysis
-            current_brand['url_structure'] = audit_result.get('url_structure', {})
-            
-            # Freshness
-            current_brand['freshness'] = audit_result.get('freshness', {})
-            
-            # Robots.txt compliance
-            current_brand['robots_txt'] = audit_result.get('robots_txt', {})
-            
-            # Crawl budget analysis
-            current_brand['crawl_budget'] = audit_result.get('crawl_budget', {})
-            
+            # Work on a COPY and reassign: when the column is NULL the old
+            # pattern mutated a detached dict, so flag_modified flushed the
+            # original (None) value and the whole write silently vanished.
+            current_brand = dict(current_brand)
+            degraded = bool(audit_result.get('degraded'))
+
+            for brand_key, result_key in BRAND_RESULT_KEYS.items():
+                incoming = audit_result.get(result_key)
+                if degraded:
+                    current_brand[brand_key] = _richer(current_brand.get(brand_key), incoming)
+                else:
+                    current_brand[brand_key] = incoming
+
             current_brand['last_advertools_audit'] = datetime.utcnow().isoformat()
-            
+            # Degradation transparency: the LAST run's state, even when we
+            # kept richer per-key values from a previous full run.
+            current_brand['degraded'] = degraded
+            current_brand['degraded_reasons'] = list(audit_result.get('degraded_reasons') or [])
+            current_brand['rate_limited'] = bool(audit_result.get('rate_limited'))
+
+            analysis.brand_analysis = current_brand
+
             from sqlalchemy.orm.attributes import flag_modified
             flag_modified(analysis, "brand_analysis")
-            
+
             if 'avg_word_count' in audit_result:
                 current_strategy = analysis.content_strategy_insights or {}
-                current_strategy['avg_content_length'] = audit_result['avg_word_count']
-                analysis.content_strategy_insights = current_strategy
-                flag_modified(analysis, "content_strategy_insights")
+                # A root-only audit's average says nothing about the site —
+                # keep the stored average when this run is degraded.
+                if not degraded or current_strategy.get('avg_content_length') is None:
+                    current_strategy['avg_content_length'] = audit_result['avg_word_count']
+                    analysis.content_strategy_insights = current_strategy
+                    flag_modified(analysis, "content_strategy_insights")
 
-            self.logger.info(f"Updated persona augmentation for {user_id}")
-            
+            if degraded:
+                self.logger.info(
+                    f"Updated persona augmentation for {user_id} (DEGRADED, kept richer "
+                    f"stored values: {audit_result.get('degraded_reasons')})"
+                )
+            else:
+                self.logger.info(f"Updated persona augmentation for {user_id}")
+
         except Exception as e:
             self.logger.error(f"Failed to update persona augmentation: {e}")
             raise e
@@ -327,6 +414,10 @@ class AdvertoolsExecutor(TaskExecutor):
         """
         Updates the WebsiteAnalysis with site health metrics (velocity, freshness,
         URL structure analysis, freshness score).
+
+        Merge-don't-clobber (Phase 4): a degraded health check (partial
+        sitemap fan-out) keeps the richer stored metric per key and records
+        the degraded flag for the UI.
         """
         try:
             session = db.query(OnboardingSession).filter(OnboardingSession.user_id == user_id).first()
@@ -337,10 +428,11 @@ class AdvertoolsExecutor(TaskExecutor):
             if not analysis:
                 return
 
-            current_seo = analysis.seo_audit or {}
+            current_seo = dict(analysis.seo_audit or {})
             metrics = health_result.get('metrics', {})
-            
-            current_seo['site_health'] = {
+            degraded = bool(health_result.get('degraded'))
+
+            incoming_health = {
                 "total_urls": metrics.get('total_urls'),
                 "publishing_velocity": metrics.get('publishing_velocity'),
                 "stale_content_count": metrics.get('stale_content_count'),
@@ -349,15 +441,35 @@ class AdvertoolsExecutor(TaskExecutor):
                 "publishing_recency": metrics.get('publishing_recency'),
                 "publishing_trend": metrics.get('publishing_trend'),
                 "top_pillars": metrics.get('top_pillars'),
-                "url_structure": metrics.get('url_structure', {})
+                "url_structure": metrics.get('url_structure', {}),
             }
+
+            if degraded:
+                existing_health = current_seo.get('site_health') or {}
+                merged_health = {
+                    key: _richer(existing_health.get(key), value)
+                    for key, value in incoming_health.items()
+                }
+            else:
+                merged_health = incoming_health
+
+            merged_health["degraded"] = degraded
+            merged_health["degraded_reason"] = health_result.get('degraded_reason')
+            current_seo['site_health'] = merged_health
             current_seo['last_advertools_health_check'] = datetime.utcnow().isoformat()
-            
+
             analysis.seo_audit = current_seo
             from sqlalchemy.orm.attributes import flag_modified
             flag_modified(analysis, "seo_audit")
-            self.logger.info(f"Updated site health metrics for {user_id}")
-            
+
+            if degraded:
+                self.logger.info(
+                    f"Updated site health metrics for {user_id} (DEGRADED, kept richer "
+                    f"stored metrics: {health_result.get('degraded_reason')})"
+                )
+            else:
+                self.logger.info(f"Updated site health metrics for {user_id}")
+
         except Exception as e:
             self.logger.error(f"Failed to update site health metrics: {e}")
             raise e

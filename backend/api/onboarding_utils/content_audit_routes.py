@@ -183,6 +183,8 @@ async def run_content_audit(
                 "publishing_trend": metrics.get("publishing_trend"),
             }
 
+        had_audit_urls = bool(audit_urls)
+
         if not audit_urls:
             audit_urls = [website_url]
 
@@ -227,6 +229,14 @@ async def run_content_audit(
             "robots_txt": robots_result,
             "crawl_budget": budget_result,
         }
+        # Phase 4: surface why this run is partial (if at all) so the persona
+        # merge protects richer stored data and the UI can warn the user.
+        result.update(AdvertoolsExecutor._degradation_metadata(
+            sitemap_result=sitemap_result,
+            had_audit_urls=had_audit_urls,
+            website_url=website_url,
+            robots_result=robots_result,
+        ))
 
         # Persist into WebsiteAnalysis.brand_analysis + AdvertoolsTask record
         executor = AdvertoolsExecutor()
@@ -267,6 +277,7 @@ async def run_content_audit(
 
         return {
             "success": result.get("success", False),
+            "degraded": bool(result.get("degraded")),
             "audit": result,
             "error": None if result.get("success") else "Content audit produced no results",
         }
@@ -396,6 +407,8 @@ async def run_site_health(
 
         return {
             "success": True,
+            "degraded": bool(sitemap_result.get("degraded")),
+            "degraded_reason": sitemap_result.get("degraded_reason"),
             "site_health": site_health,
             "error": None,
         }
