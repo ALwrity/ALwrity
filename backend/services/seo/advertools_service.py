@@ -30,10 +30,26 @@ _429_ACTIVE_WINDOW = 20.0      # a 429 inside this window => the origin is throt
 _PACING_MIN = 2.0
 _PACING_MAX = 5.0
 
+# ── Escalating cooldown + 429 circuit breaker (Phase 3, RCA #520) ────
+# During onboarding the origin rate-limited every sub-sitemap; retries plus
+# duplicate pipelines multiplied the load. Two mechanisms:
+#   * cooldown ESCALATES with the number of 429s seen in the escalation
+#     window: 1st -> 20s, 2nd -> 60s, 3rd+ -> 300s (Retry-After still wins
+#     for the immediate retry sleep).
+#   * a circuit breaker stops the sitemap-index FAN-OUT once
+#     _429_CIRCUIT_THRESHOLD 429s occur within _429_CIRCUIT_WINDOW: remaining
+#     sub-sitemaps are not requested (partial result). A fresh top-level
+#     fetch stays allowed as a single probe.
+_429_CIRCUIT_WINDOW = 600.0    # 429s within this window count together
+_429_CIRCUIT_THRESHOLD = 2     # 429s in window => open the fan-out circuit
+_429_ESCALATION_STEPS = (20.0, 60.0, 300.0)
+_THROTTLE_SLEEP_CAP = 60.0     # probe never sleeps longer than this pre-fetch
+
 _DOMAIN_SEMAPHORES: Dict[str, threading.Lock] = {}
 _DOMAIN_LAST_REQUEST: Dict[str, float] = {}
 _DOMAIN_LAST_429: Dict[str, float] = {}
 _DOMAIN_429_LOCK = threading.Lock()
+_429_HISTORY: Dict[str, List[float]] = {}
 
 # Per-URL sitemap DataFrame cache — avoids refetching when multiple
 # background tasks hit the same domain. TTL ensures freshness.
@@ -92,15 +108,46 @@ def _extract_domain(url: str) -> str:
 
 
 def _note_429(domain: str) -> None:
+    """Record a 429 for the domain (escalation history + last-seen marker)."""
+    now = _time.monotonic()
     with _DOMAIN_429_LOCK:
-        _DOMAIN_LAST_429[domain] = _time.monotonic()
+        _DOMAIN_LAST_429[domain] = now
+        hist = [t for t in _429_HISTORY.get(domain, []) if now - t < _429_CIRCUIT_WINDOW]
+        hist.append(now)
+        _429_HISTORY[domain] = hist
+
+
+def _domain_429_count(domain: str) -> int:
+    """Number of 429s for the domain within the circuit window."""
+    now = _time.monotonic()
+    with _DOMAIN_429_LOCK:
+        hist = [t for t in _429_HISTORY.get(domain, []) if now - t < _429_CIRCUIT_WINDOW]
+        _429_HISTORY[domain] = hist
+        return len(hist)
+
+
+def _domain_circuit_open(domain: str) -> bool:
+    """True when the origin is clearly throttling: enough 429s in the window
+    that bulk sub-sitemap fan-out should stop (partial result beats hammering)."""
+    return _domain_429_count(domain) >= _429_CIRCUIT_THRESHOLD
 
 
 def _domain_429_cooldown(domain: str) -> float:
-    """Seconds still remaining in the post-429 pause for this domain (0 if none)."""
+    """Seconds still remaining in the post-429 pause for this domain (0 if none).
+
+    The pause escalates with the number of 429s observed in the circuit
+    window so a persistently throttling origin gets progressively longer
+    breathers instead of a uniform 20s tap on the shoulder.
+    """
+    now = _time.monotonic()
     with _DOMAIN_429_LOCK:
         last = _DOMAIN_LAST_429.get(domain, 0.0)
-    return max(last + _429_ACTIVE_WINDOW - _time.monotonic(), 0.0)
+        hist = [t for t in _429_HISTORY.get(domain, []) if now - t < _429_CIRCUIT_WINDOW]
+        _429_HISTORY[domain] = hist
+    if last == 0.0 or not hist:
+        return 0.0
+    step = _429_ESCALATION_STEPS[min(len(hist) - 1, len(_429_ESCALATION_STEPS) - 1)]
+    return max(last + step - now, 0.0)
 
 
 def _throttle_domain_sync(domain: str) -> None:
@@ -116,6 +163,10 @@ def _throttle_domain_sync(domain: str) -> None:
     try:
         pause = 1.0 - (_time.monotonic() - _DOMAIN_LAST_REQUEST.get(domain, 0.0))
         pause = max(pause, _domain_429_cooldown(domain))
+        # Cap the pre-fetch wait: with escalation the cooldown can reach 300s,
+        # but a probe must never park a worker thread that long (the batch
+        # deadline would expire while sleeping).
+        pause = min(pause, _THROTTLE_SLEEP_CAP)
         if pause > 0:
             _time.sleep(pause)
         _DOMAIN_LAST_REQUEST[domain] = _time.monotonic()
@@ -306,6 +357,15 @@ class AdvertoolsService:
             frames = []
             domain = _extract_domain(sitemap_url)
             for sub_url in df["loc"].dropna().astype(str).tolist():
+                # Circuit breaker: once the origin is clearly throttling
+                # (>= threshold 429s in the window), stop the fan-out and
+                # return the partial result instead of hammering it.
+                if _domain_circuit_open(domain):
+                    logger.warning(
+                        f"429 circuit OPEN for {domain}: stopping sub-sitemap "
+                        f"fan-out after {len(frames)} successful sub-sitemap(s)"
+                    )
+                    break
                 if _time.monotonic() >= _deadline:
                     logger.warning("sitemap_to_df batch deadline reached, returning partial results")
                     break
@@ -363,7 +423,13 @@ class AdvertoolsService:
             )
             
             if df is None or df.empty or 'loc' not in df.columns:
-                return {"success": False, "error": "Sitemap is empty, unparseable, or missing URL column."}
+                result = {"success": False, "error": "Sitemap is empty, unparseable, or missing URL column."}
+                if _domain_429_count(_extract_domain(sitemap_url)) > 0:
+                    # The origin 429'd during this run — surface it so callers
+                    # can show partial-data warnings instead of a silent miss.
+                    result["rate_limited"] = True
+                    result["degraded"] = True
+                return result
 
             if 'lastmod' in df.columns:
                 df['lastmod'] = pd.to_datetime(df['lastmod'], errors='coerce', utc=True)
@@ -430,7 +496,7 @@ class AdvertoolsService:
                 "fetched_at": datetime.utcnow().isoformat(),
             }
 
-            return {
+            result = {
                 "success": True,
                 "metrics": {
                     "total_urls": total_urls,
@@ -447,9 +513,24 @@ class AdvertoolsService:
                 },
                 "timestamp": datetime.utcnow().isoformat()
             }
+            # Phase 3 transparency: when the 429 circuit interrupted the
+            # sub-sitemap fan-out, this analysis is PARTIAL — mark it so
+            # callers/UI can show a degraded-data warning (Phase 4 wires the
+            # persistence of this flag).
+            if _domain_circuit_open(_extract_domain(sitemap_url)):
+                result["degraded"] = True
+                result["degraded_reason"] = (
+                    "Sitemap fan-out stopped early: origin rate-limiting (429 circuit open). "
+                    "Freshness/velocity metrics cover the sub-sitemaps fetched so far."
+                )
+            return result
         except Exception as e:
             self.logger.error(f"Failed to analyze sitemap {sitemap_url}: {str(e)}")
-            return {"success": False, "error": str(e)}
+            failure = {"success": False, "error": str(e)}
+            if _domain_429_count(_extract_domain(sitemap_url)) > 0:
+                failure["rate_limited"] = True
+                failure["degraded"] = True
+            return failure
 
     def _compute_freshness(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Compute content freshness, publishing velocity, and staleness metrics."""
