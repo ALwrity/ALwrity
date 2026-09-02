@@ -15,6 +15,7 @@ Resend integration is stubbed until API is verified.
 """
 
 import logging
+import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, asdict
@@ -33,6 +34,14 @@ from services.tool_certification import get_agent_certification_rollup
 from utils.logger_utils import get_service_logger
 
 logger = get_service_logger(__name__)
+
+# Persistence-race tolerance: ``finish_meeting`` enqueues the digest in a
+# background thread BEFORE the caller persists the plan row, so the first
+# payload build can legitimately find no plan yet. Poll briefly instead of
+# terminally skipping. (A persisted plan with no tasks is still terminal —
+# honest absence needs no email.)
+_DIGEST_PLAN_WAIT_ATTEMPTS = 6
+_DIGEST_PLAN_WAIT_SECONDS = 5
 
 
 # =============================================================================
@@ -532,8 +541,23 @@ def send_digest(
             logger.info(f"User {user_id} has opted out of email digest")
             return True
 
-        # Build payload
-        payload = build_digest_payload(user_id, date, verbose)
+        # Build payload. The plan row is persisted by the CALLER after the
+        # committee returns, while this digest runs in a background thread —
+        # so the plan may not exist yet when we start. Poll briefly for the
+        # plan instead of racing it. (A persisted plan with no tasks is
+        # still terminal: honest absence needs no email.)
+        payload = None
+        for attempt in range(_DIGEST_PLAN_WAIT_ATTEMPTS):
+            payload = build_digest_payload(user_id, date, verbose)
+            if payload is not None:
+                break
+            if attempt < _DIGEST_PLAN_WAIT_ATTEMPTS - 1:
+                logger.info(
+                    f"Plan not persisted yet for user {user_id} on {date} "
+                    f"(attempt {attempt + 1}/{_DIGEST_PLAN_WAIT_ATTEMPTS}); "
+                    f"waiting {_DIGEST_PLAN_WAIT_SECONDS}s"
+                )
+                time.sleep(_DIGEST_PLAN_WAIT_SECONDS)
         if not payload or not payload.tasks:
             if existing:
                 existing.status = "skipped_no_content"
