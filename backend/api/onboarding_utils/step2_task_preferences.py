@@ -7,15 +7,19 @@ No schema migrations required.
 
 from typing import Any, Dict, Optional
 
-# Default preferences — all tasks enabled, staggered delays
+# Default preferences — all tasks enabled, staggered delays.
+# Delays rebalanced (Phase 1b) so heavy crawls don't compete with the
+# user's first dashboard load. sif_indexing and deep_competitor_analysis
+# are the heaviest (website + multi-site crawls) and get the longest
+# grace period.
 DEFAULT_TASK_PREFERENCES: Dict[str, Dict[str, Any]] = {
-    "seo_audit": {"enabled": True, "label": "Full SEO Audit", "delay_mins": 5},
-    "sif_indexing": {"enabled": True, "label": "Semantic Intelligence", "delay_mins": 0},
-    "market_trends": {"enabled": True, "label": "Market Trends", "delay_mins": 10},
-    "deep_competitor_analysis": {"enabled": True, "label": "Deep Competitor Analysis", "delay_mins": 5},
+    "seo_audit": {"enabled": True, "label": "Full SEO Audit", "delay_mins": 10},
+    "sif_indexing": {"enabled": True, "label": "Semantic Intelligence", "delay_mins": 5},
+    "market_trends": {"enabled": True, "label": "Market Trends", "delay_mins": 15},
+    "deep_competitor_analysis": {"enabled": True, "label": "Deep Competitor Analysis", "delay_mins": 15},
     "advertools_content": {"enabled": True, "label": "Content Audit", "delay_mins": 15},
     "advertools_health": {"enabled": True, "label": "Site Health", "delay_mins": 60},
-    "website_analysis_tasks": {"enabled": True, "label": "Website Analysis Monitoring", "delay_mins": 5},
+    "website_analysis_tasks": {"enabled": True, "label": "Website Analysis Monitoring", "delay_mins": 10},
 }
 
 TASK_DESCRIPTIONS: Dict[str, str] = {

@@ -7,13 +7,14 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from starlette.requests import Request
+from sqlalchemy.orm import Session
 from loguru import logger
 import json
 import asyncio
 from datetime import datetime
 
 # Import database
-from services.database import get_session_for_user
+from services.database import get_db_session, get_session_for_user
 
 # Import authentication middleware
 from middleware.auth_middleware import get_current_user, get_current_user_with_query_token
@@ -29,6 +30,14 @@ router = APIRouter(tags=["Strategy Streaming"])
 
 # Shared bounded cache for streaming endpoints
 streaming_cache_service = CachingService()
+
+# Helper function to get database session
+def get_db():
+    db = get_db_session()
+    try:
+        yield db
+    finally:
+        db.close()
 
 async def stream_data(data_generator):
     """Helper function to stream data as Server-Sent Events.
@@ -52,11 +61,11 @@ async def stream_data(data_generator):
 async def stream_enhanced_strategies(
     strategy_id: Optional[int] = Query(None, description="Specific strategy ID"),
     current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """Stream enhanced strategies with real-time updates."""
     
     async def strategy_generator():
-        db = None
         try:
             clerk_user_id = str(current_user.get('id', ''))
             if not clerk_user_id:
@@ -70,11 +79,6 @@ async def stream_enhanced_strategies(
             # Send initial status
             yield {"type": "status", "message": "Starting strategy retrieval...", "timestamp": datetime.utcnow().isoformat()}
             
-            db = get_session_for_user(authenticated_user_id)
-            if not db:
-                yield {"type": "error", "message": "Database unavailable", "timestamp": datetime.utcnow().isoformat()}
-                return
-
             db_service = EnhancedStrategyDBService(db)
             enhanced_service = EnhancedStrategyService(db_service)
             
@@ -102,9 +106,6 @@ async def stream_enhanced_strategies(
         except Exception as e:
             logger.error(f"❌ Error in strategy stream: {str(e)}")
             yield {"type": "error", "message": str(e), "timestamp": datetime.utcnow().isoformat()}
-        finally:
-            if db:
-                db.close()
     
     return StreamingResponse(
         stream_data(strategy_generator()),
@@ -119,11 +120,11 @@ async def stream_enhanced_strategies(
 async def stream_strategic_intelligence(
     request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user_with_query_token),
+    db: Session = Depends(get_db)
 ):
     """Stream strategic intelligence data with real-time updates."""
     
     async def intelligence_generator():
-        db = None
         try:
             clerk_user_id = str(current_user.get('id', ''))
             if not clerk_user_id:
@@ -145,11 +146,6 @@ async def stream_strategic_intelligence(
             # Send initial status
             yield {"type": "status", "message": "Loading strategic intelligence...", "timestamp": datetime.utcnow().isoformat()}
             
-            db = get_session_for_user(authenticated_user_id)
-            if not db:
-                yield {"type": "error", "message": "Database unavailable", "timestamp": datetime.utcnow().isoformat()}
-                return
-
             db_service = EnhancedStrategyDBService(db)
             enhanced_service = EnhancedStrategyService(db_service)
             
@@ -217,9 +213,6 @@ async def stream_strategic_intelligence(
         except Exception as e:
             logger.error(f"❌ Error in strategic intelligence stream: {str(e)}")
             yield {"type": "error", "message": str(e), "timestamp": datetime.utcnow().isoformat()}
-        finally:
-            if db:
-                db.close()
     
     return StreamingResponse(
         stream_data(intelligence_generator()),
@@ -234,6 +227,7 @@ async def stream_strategic_intelligence(
 async def stream_keyword_research(
     request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user_with_query_token),
+    db: Session = Depends(get_db)
 ):
     """Stream keyword research data with real-time updates."""
     
