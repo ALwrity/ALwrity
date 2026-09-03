@@ -554,6 +554,22 @@ class StripeService:
 
         if subscription:
             logger.info(f"Subscription {stripe_sub_id} updated to {status}")
+
+            # Capture previous plan BEFORE mutation so we can detect a real
+            # plan change (upgrade / downgrade) for the notification email.
+            previous_plan_name = ""
+            previous_plan_tier = ""
+            try:
+                prev = subscription.plan
+                if prev is not None:
+                    previous_plan_name = getattr(prev, "name", "") or ""
+                    try:
+                        previous_plan_tier = str(prev.tier.value if hasattr(prev.tier, "value") else prev.tier)
+                    except Exception:
+                        previous_plan_tier = ""
+            except Exception:
+                pass
+
             if status in ["active", "trialing"]:
                 subscription.status = UsageStatus.ACTIVE
                 subscription.is_active = True
@@ -572,7 +588,14 @@ class StripeService:
                 subscription.auto_renew = False
 
             self.db.commit()
-            
+
+            # Best-effort plan-change notification for Stripe self-serve plan
+            # switches (only when the plan actually changed).
+            try:
+                self._send_plan_change_from_webhook(subscription, subscription_obj, previous_plan_name, previous_plan_tier)
+            except Exception as plan_err:
+                logger.warning(f"Plan-change email skipped for user {subscription.user_id}: {plan_err}")
+
             # Clear PricingService cache so next status check returns updated limits
             try:
                 from services.subscription import PricingService
@@ -672,6 +695,73 @@ class StripeService:
             self.db.add(warning)
 
         self.db.commit()
+
+    def _send_plan_change_from_webhook(self, subscription, subscription_obj: Dict[str, Any],
+                                       previous_plan_name: str, previous_plan_tier: str) -> None:
+        """Detect a Stripe self-serve plan change and email the user (best-effort).
+
+        Only emails when the plan truly changed (upgrade or downgrade), resolved
+        from the Stripe subscription's current price. Never raises.
+        """
+        user_id = subscription.user_id
+
+        # Resolve the new plan from the Stripe subscription's current price.
+        try:
+            items = subscription_obj.get("items", {}).get("data", [])
+            price_id = items[0].get("price", {}).get("id") if items else None
+            if not price_id:
+                return
+            new_plan, _ = self._get_plan_for_price_id(price_id)
+        except Exception:
+            return
+
+        new_name = getattr(new_plan, "name", "") or ""
+        try:
+            new_tier = str(new_plan.tier.value if hasattr(new_plan.tier, "value") else new_plan.tier)
+        except Exception:
+            new_tier = ""
+
+        # Same plan as before → no plan-change email.
+        if new_name and new_name == previous_plan_name:
+            return
+
+        # Determine direction.
+        tier_order = {"free": 0, "basic": 1, "pro": 2, "enterprise": 3}
+        prev_order = tier_order.get((previous_plan_tier or "free").lower(), 0)
+        new_order = tier_order.get((new_tier or "").lower(), 0)
+        if new_order > prev_order:
+            change_type = "upgrade"
+        elif new_order < prev_order:
+            change_type = "downgrade"
+        else:
+            change_type = "renewal"
+
+        # Only email on an actual plan change (skip pure renewals).
+        if change_type not in ("upgrade", "downgrade"):
+            return
+
+        try:
+            items = subscription_obj.get("items", {}).get("data", [])
+            interval = ""
+            if items:
+                interval = (items[0].get("price", {}).get("recurring", {}) or {}).get("interval", "")
+            price = getattr(new_plan, "price_yearly", 0) if interval == "year" else getattr(new_plan, "price_monthly", 0)
+            from services.subscription.billing_email import send_billing_email
+            send_billing_email(
+                user_id,
+                db=self.db,
+                kind="plan_change",
+                event_ref=f"stripe-{subscription_obj.get('id', user_id)}",
+                payload_extra={
+                    "previous_plan_name": previous_plan_name or "",
+                    "previous_plan_tier": previous_plan_tier or "",
+                    "renewal_type": change_type,
+                    "price": str(price),
+                },
+            )
+            logger.info(f"Plan-change email ({change_type}) queued for user {user_id}")
+        except Exception as e:
+            logger.warning(f"Failed to send plan-change email for user {user_id}: {e}")
 
     def _update_user_subscription(
         self,

@@ -388,6 +388,29 @@ async def subscribe_to_plan(
         db.add(renewal_history)
         db.commit()
 
+        # Best-effort, non-blocking plan-change email. Only for actual plan
+        # changes (upgrade/downgrade), never plain renewals or new signups.
+        if renewal_type in ("upgrade", "downgrade"):
+            try:
+                from services.subscription.billing_email import send_billing_email
+                first_name = str(current_user.get("first_name") or current_user.get("username") or "")
+                send_billing_email(
+                    user_id,
+                    db=db,
+                    first_name=first_name,
+                    kind="plan_change",
+                    event_ref=f"subscribe-{now.strftime('%Y%m%d%H%M%S')}",
+                    payload_extra={
+                        "previous_plan_name": previous_plan_name or "",
+                        "previous_plan_tier": previous_plan_tier or "",
+                        "renewal_type": renewal_type,
+                        "price": str(plan.price_yearly if billing_cycle == 'yearly' else plan.price_monthly),
+                    },
+                )
+                logger.info(f"Plan-change email ({renewal_type}) sent for user {user_id}")
+            except Exception as email_err:
+                logger.warning(f"Plan-change email skipped for {user_id}: {email_err}")
+
         # Get current usage BEFORE reset for logging
         current_period = datetime.utcnow().strftime("%Y-%m")
         usage_before = db.query(UsageSummary).filter(
