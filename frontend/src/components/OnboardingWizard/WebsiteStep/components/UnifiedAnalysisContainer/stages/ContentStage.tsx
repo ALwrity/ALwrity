@@ -8,6 +8,7 @@ import ContentStrategyInsightsSection from '../../ContentStrategyInsightsSection
 import EnhancedGuidelinesSection from '../../EnhancedGuidelinesSection';
 import StyleAnalysisSection from '../../StyleAnalysisSection';
 import SectionHeader from '../../SectionHeader';
+import KeyInsightsGrid from '../../KeyInsightsGrid';
 import { EmptyState } from './SharedComponents';
 import type { StyleAnalysis } from '../AnalysisResultsDisplay';
 import type { TabKey } from '../types';
@@ -35,6 +36,12 @@ const ContentStage: React.FC<ContentStageProps> = ({
     if (!hasData) return <EmptyState message="No content profile data available." />;
     return (
       <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <KeyInsightsGrid
+          writing_style={analysis.writing_style}
+          content_type={analysis.content_type}
+          filterLabels={['Content Complexity', 'Formality Level', 'Engagement Level', 'Primary Type']}
+          title="Content Characteristics & Format"
+        />
         {analysis.content_characteristics && (
           <ContentCharacteristicsSection
             contentCharacteristics={analysis.content_characteristics}

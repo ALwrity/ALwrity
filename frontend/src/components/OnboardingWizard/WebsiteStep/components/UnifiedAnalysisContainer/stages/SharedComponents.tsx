@@ -3,6 +3,12 @@ import { Box, Typography, Button, Alert, Paper, Chip } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
+import PaletteIcon from '@mui/icons-material/Palette';
+import GroupIcon from '@mui/icons-material/Group';
+import ArticleIcon from '@mui/icons-material/Article';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import ExploreIcon from '@mui/icons-material/Explore';
+import BusinessIcon from '@mui/icons-material/Business';
 import StrategicInsightsSection from '../../StrategicInsightsSection';
 import ContentStrategyInsightsSection from '../../ContentStrategyInsightsSection';
 import StyleAnalysisSection from '../../StyleAnalysisSection';
@@ -65,15 +71,15 @@ interface RecommendedSettingsPanelProps {
 export const RecommendedSettingsPanel: React.FC<RecommendedSettingsPanelProps> = ({ settings }) => {
   if (!settings) return <EmptyState message="No AI generation settings detected." />;
 
-  const chips: { label: string; value: string }[] = [
-    { label: 'Tone', value: settings.writing_tone ?? '' },
-    { label: 'Audience', value: settings.target_audience ?? '' },
-    { label: 'Type', value: settings.content_type ?? '' },
-    { label: 'Creativity', value: settings.creativity_level ?? '' },
-    { label: 'Location', value: settings.geographic_location ?? '' },
-    { label: 'Industry', value: settings.industry_context ?? '' },
-    { label: 'Brand', value: settings.brand_alignment ?? '' },
-  ].filter((c) => c.value);
+  const items = [
+    { label: 'Writing Tone', value: settings.writing_tone, icon: <PaletteIcon sx={{ color: '#3B82F6' }} />, bg: '#EFF6FF' },
+    { label: 'Target Audience', value: settings.target_audience, icon: <GroupIcon sx={{ color: '#10B981' }} />, bg: '#ECFDF5' },
+    { label: 'Content Type', value: settings.content_type, icon: <ArticleIcon sx={{ color: '#F59E0B' }} />, bg: '#FEF3C7' },
+    { label: 'Brand Alignment', value: settings.brand_alignment, icon: <AutoAwesomeIcon sx={{ color: '#6366F1' }} />, bg: '#EEF2FF' },
+    { label: 'Creativity Level', value: settings.creativity_level, icon: <PsychologyIcon sx={{ color: '#8B5CF6' }} />, bg: '#F5F3FF' },
+    { label: 'Industry Context', value: settings.industry_context, icon: <BusinessIcon sx={{ color: '#64748B' }} />, bg: '#F8FAFC' },
+    { label: 'Geographic Location', value: settings.geographic_location, icon: <ExploreIcon sx={{ color: '#EC4899' }} />, bg: '#FDF2F8' },
+  ].filter((item) => item.value);
 
   return (
     <Box sx={{ p: 0, mb: 3 }}>
@@ -81,36 +87,83 @@ export const RecommendedSettingsPanel: React.FC<RecommendedSettingsPanelProps> =
         title="AI Generation Settings"
         icon={<AutoAwesomeIcon sx={{ color: '#6366F1' }} />}
         tooltip="These settings are automatically derived from your website analysis and will be applied when generating content with ALwrity. You can fine-tune other brand parameters under the Refine & Actions tab in Edit Mode."
-        sx={{ mb: 1 }}
+        sx={{ mb: 2 }}
       />
-      <Paper variant="outlined" sx={{ p: 2, bgcolor: '#F8FAFC', border: '1px solid #e0e0e0', borderRadius: 2 }}>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-          {chips.map((c) => (
-            <Chip
-              key={c.label}
-              size="small"
-              label={`${c.label}: ${c.value}`}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr' },
+          gap: 2,
+        }}
+      >
+        {items.map((item) => (
+          <Paper
+            key={item.label}
+            variant="outlined"
+            sx={{
+              p: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              borderRadius: 3,
+              bgcolor: '#FFFFFF',
+              border: '1px solid #E2E8F0',
+              height: '100%',
+              width: '100%',
+              boxSizing: 'border-box',
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                borderColor: '#CBD5E1',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
+                transform: 'translateY(-2px)',
+              },
+            }}
+          >
+            <Box
               sx={{
-                bgcolor: '#FFFFFF !important',
-                border: '1px solid #CBD5E1',
-                borderRadius: '8px',
-                height: 'auto',
-                py: 0.75,
-                px: 0.5,
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                '& .MuiChip-label': {
-                  whiteSpace: 'normal',
-                  lineHeight: 1.4,
-                  display: 'inline-block',
-                  px: 1.5,
+                width: 44,
+                height: 44,
+                borderRadius: '12px',
+                bgcolor: item.bg,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              {item.icon}
+            </Box>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: '#64748B',
+                  fontWeight: 700,
+                  fontSize: '0.65rem',
+                  letterSpacing: '0.05em',
+                  textTransform: 'uppercase',
+                  display: 'block',
+                  mb: 0.5,
+                }}
+              >
+                {item.label}
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
                   fontWeight: 600,
                   color: '#1E293B',
-                },
-              }}
-            />
-          ))}
-        </Box>
-      </Paper>
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {item.value}
+              </Typography>
+            </Box>
+          </Paper>
+        ))}
+      </Box>
     </Box>
   );
 };

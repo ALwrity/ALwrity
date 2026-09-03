@@ -6,6 +6,7 @@ import BrandAnalysisSection from '../../BrandAnalysisSection';
 import StrategicInsightsSection from '../../StrategicInsightsSection';
 import EnhancedGuidelinesSection from '../../EnhancedGuidelinesSection';
 import SectionHeader from '../../SectionHeader';
+import KeyInsightsGrid from '../../KeyInsightsGrid';
 import { EmptyState } from './SharedComponents';
 import type { StyleAnalysis } from '../AnalysisResultsDisplay';
 import type { TabKey } from '../types';
@@ -31,6 +32,11 @@ const BrandStage: React.FC<BrandStageProps> = ({
     if (!analysis.brand_analysis) return <EmptyState message="No brand analysis data available." />;
     return (
       <Box sx={{ p: 2 }}>
+        <KeyInsightsGrid
+          writing_style={analysis.writing_style}
+          filterLabels={['Writing Tone', 'Writing Voice', 'Brand Personality', 'Emotional Appeal']}
+          title="Brand Style Insights"
+        />
         <BrandAnalysisSection
           brandAnalysis={analysis.brand_analysis}
           isEditable={false}

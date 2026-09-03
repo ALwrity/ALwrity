@@ -161,19 +161,75 @@ export const renderGuidelinesCard = (
   color: string = 'primary'
 ) => (
   <Zoom in timeout={600}>
-    <Card sx={{ mb: 2, border: `1px solid ${color}.light` }}>
-      <CardContent>
-        <Box display="flex" alignItems="center" gap={1} mb={2}>
-          <Box sx={{ color: `${color}.main` }}>
+    <Card 
+      elevation={0}
+      sx={{ 
+        mb: 2, 
+        border: '1px solid',
+        borderColor: (theme) => {
+          const mainColor = (theme.palette as any)[color]?.light || theme.palette.divider;
+          return mainColor;
+        },
+        boxShadow: 'none',
+        bgcolor: '#F8FAFC',
+        borderRadius: 3,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        width: '100%',
+        transition: 'all 0.2s ease-in-out',
+        '&:hover': {
+          borderColor: (theme) => (theme.palette as any)[color]?.main || 'primary.main',
+          bgcolor: '#FFFFFF',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.03)',
+        }
+      }}
+    >
+      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 }, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Box display="flex" alignItems="center" gap={1.5} mb={2}>
+          <Box 
+            sx={{ 
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              bgcolor: (theme) => {
+                const mainColor = (theme.palette as any)[color]?.main || theme.palette.primary.main;
+                return `${mainColor}12`;
+              },
+              color: `${color}.main`,
+              border: '1px solid',
+              borderColor: (theme) => {
+                const mainColor = (theme.palette as any)[color]?.light || theme.palette.divider;
+                return mainColor;
+              },
+              flexShrink: 0
+            }}
+          >
             {icon}
           </Box>
-          <Typography variant="h6" fontWeight={600}>
+          <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#1E293B', fontSize: '0.9rem', lineHeight: 1.2 }}>
             {title}
           </Typography>
         </Box>
-        <Box component="ul" sx={{ pl: 2, m: 0 }}>
+        <Box component="ul" sx={{ pl: 2, m: 0, flexGrow: 1 }}>
           {items.map((item, index) => (
-            <Typography component="li" variant="body2" key={index} sx={{ mb: 1, lineHeight: 1.6 }}>
+            <Typography 
+              component="li" 
+              variant="body2" 
+              key={index} 
+              sx={{ 
+                mb: 0.75, 
+                lineHeight: 1.4, 
+                fontSize: '0.8rem', 
+                color: '#475569',
+                '&::marker': {
+                  color: (theme) => (theme.palette as any)[color]?.main || 'primary.main'
+                }
+              }}
+            >
               {item}
             </Typography>
           ))}

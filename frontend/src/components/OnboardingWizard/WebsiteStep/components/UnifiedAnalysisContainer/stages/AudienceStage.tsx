@@ -5,6 +5,7 @@ import GroupIcon from '@mui/icons-material/Group';
 import TargetAudienceAnalysisSection from '../../TargetAudienceAnalysisSection';
 import EnhancedGuidelinesSection from '../../EnhancedGuidelinesSection';
 import SectionHeader from '../../SectionHeader';
+import KeyInsightsGrid from '../../KeyInsightsGrid';
 import { EmptyState } from './SharedComponents';
 import type { StyleAnalysis } from '../AnalysisResultsDisplay';
 import type { TabKey } from '../types';
@@ -30,6 +31,11 @@ const AudienceStage: React.FC<AudienceStageProps> = ({
     if (!analysis.target_audience) return <EmptyState message="No audience data available." />;
     return (
       <Box sx={{ p: 2 }}>
+        <KeyInsightsGrid
+          target_audience={analysis.target_audience}
+          filterLabels={['Target Audience', 'Geographic Focus']}
+          title="Audience Demographics & Focus"
+        />
         <TargetAudienceAnalysisSection
           targetAudience={analysis.target_audience}
           isEditable={false}
