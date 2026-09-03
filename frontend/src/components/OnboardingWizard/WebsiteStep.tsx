@@ -20,7 +20,7 @@ import {
   WebsiteStepHeader,
   ExistingAnalysisDialog,
 } from './WebsiteStep/components';
-import type { StyleAnalysis } from './WebsiteStep/components/AnalysisResultsDisplay';
+import type { StyleAnalysis } from './WebsiteStep/components';
 
 // Import API client for saving
 import { apiClient } from '../../api/client';

@@ -14,7 +14,7 @@ import ContentStrategyInsightsSection from '../../ContentStrategyInsightsSection
 import StyleAnalysisSection from '../../StyleAnalysisSection';
 import CrawlResultSections from '../../CrawlResultSections';
 import SectionHeader from '../../SectionHeader';
-import type { StyleAnalysis } from '../../AnalysisResultsDisplay';
+import type { StyleAnalysis } from '../types';
 
 export const EmptyState: React.FC<{ message: string }> = ({ message }) => (
   <Box

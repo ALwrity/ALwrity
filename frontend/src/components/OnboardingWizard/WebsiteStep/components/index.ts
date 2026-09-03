@@ -3,7 +3,6 @@
  * Exports all components for the WebsiteStep
  */
 
-export { default as AnalysisResultsDisplay } from './AnalysisResultsDisplay';
 export { default as WebsiteAnalysisTabContent } from './WebsiteAnalysisTabContent';
 export { default as ExistingAnalysisDialog } from './ExistingAnalysisDialog';
 export { default as AnalysisProgressDisplay } from './AnalysisProgressDisplay';
@@ -32,4 +31,4 @@ export { default as LinkedInIntegrationTab } from './LinkedInIntegrationTab';
 export { default as WebsiteStepHeader } from './WebsiteStepHeader';
 export type { Competitor } from './CompetitorsGrid';
 export { default as UnifiedAnalysisContainer } from './UnifiedAnalysisContainer/index';
-export type { UnifiedAnalysisContainerProps, DomainKey, TabKey } from './UnifiedAnalysisContainer/types';
+export type { UnifiedAnalysisContainerProps, DomainKey, TabKey, StyleAnalysis } from './UnifiedAnalysisContainer/types';

@@ -17,7 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom';
 
 import UnifiedAnalysisContainer from '../index';
-import type { StyleAnalysis } from '../../AnalysisResultsDisplay';
+import type { StyleAnalysis } from '../types';
 
 // ──────────────────────────────────────────────
 // Mock external deps that hit real APIs
