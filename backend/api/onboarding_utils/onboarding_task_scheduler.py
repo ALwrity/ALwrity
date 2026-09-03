@@ -59,38 +59,22 @@ def _upsert_advertools_task(
     """Insert-or-update an AdvertoolsTask keyed by (user, site, payload type).
 
     ``payload['type']`` lives inside a JSON column (not a queryable column on
-    all backends), so matching is done in Python over the user's rows. This
-    replaces the previous raw ``db.add()`` which appended a NEW task row on
+    all backends), so matching is done via the normalized ``task_type`` column.
+    This replaces the previous raw ``db.add()`` which appended a NEW task row on
     every step-2 save — duplicate rows all became due together and the
     scheduler ran the full pipeline for each one concurrently.
+
+    Delegates to the canonical atomic upsert (``services/seo/
+    advertools_task_upsert.py``) which is ``IntegrityError``-safe and is the
+    single creation path shared with the interactive routes and task
+    restoration, so a DB-level UNIQUE constraint on (user, site, type) is
+    combined with a race-safe code path.
     """
-    from models.advertools_monitoring_models import AdvertoolsTask
+    from services.seo.advertools_task_upsert import upsert_advertools_task
 
-    existing_rows = db.query(AdvertoolsTask).filter(
-        AdvertoolsTask.user_id == user_id,
-        AdvertoolsTask.website_url == website_url,
-    ).all()
-    for row in existing_rows:
-        if (row.payload or {}).get("type") == task_type:
-            for key, value in defaults.items():
-                setattr(row, key, value)
-            row.payload = {"type": task_type, "website_url": website_url, **(defaults.get("payload") or {})}
-            db.add(row)
-            return row
-
-    # Merge the type identity into the payload; defaults must not carry a
-    # second 'payload' kwarg (TypeError: multiple values for keyword argument).
-    task_payload = {"type": task_type, "website_url": website_url}
-    task_payload.update(defaults.get("payload") or {})
-    construct_defaults = {k: v for k, v in defaults.items() if k != "payload"}
-    row = AdvertoolsTask(
-        user_id=user_id,
-        website_url=website_url,
-        payload=task_payload,
-        **construct_defaults,
+    return upsert_advertools_task(
+        db, user_id, website_url, task_type, defaults,
     )
-    db.add(row)
-    return row
 
 
 def _pause_duplicate_advertools_tasks(db: Session, user_id: str, website_url: str) -> int:

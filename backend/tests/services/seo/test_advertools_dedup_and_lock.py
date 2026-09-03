@@ -226,34 +226,64 @@ class TestScheduleStep2Dedup:
 
 
 class TestPauseDuplicates:
-    def test_older_duplicates_paused_newest_kept(self, user_db):
-        from api.onboarding_utils.onboarding_task_scheduler import (
-            _pause_duplicate_advertools_tasks,
-        )
+    def test_db_unique_constraint_rejects_hard_duplicate(self, user_db):
+        """After the unique (user, site, type) constraint, two rows for the
+        same type cannot coexist. A second raw insert must raise IntegrityError
+        instead of silently appending a duplicate that would each run the
+        pipeline. (This replaces the old test where duplicates were allowed in
+        the DB and later paused — the DB now prevents them at the source.)"""
+        from sqlalchemy.exc import IntegrityError
 
         user_id, db = user_db["user_id"], user_db["db"]
-        now = datetime.utcnow()
-        old = _make_advertools_task(
-            db, user_id, status="active", updated_at=now - timedelta(days=1)
+        first = _make_advertools_task(db, user_id, status="active")
+
+        from models.advertools_monitoring_models import AdvertoolsTask
+        dup = AdvertoolsTask(
+            user_id=user_id,
+            website_url=WEBSITE_URL,
+            status="active",
+            payload={"type": "content_audit", "website_url": WEBSITE_URL},
         )
-        new = _make_advertools_task(db, user_id, status="active", updated_at=now)
+        db.add(dup)
+        with pytest.raises(IntegrityError):
+            db.flush()
+        db.rollback()
+
+        # Only the original row survived.
+        rows = _advertools_rows(db, user_id)
+        assert len(rows) == 1
+        assert rows[0].id == first.id
+        # Different type is still allowed (independent pipeline).
         health = _make_advertools_task(db, user_id, task_type="site_health", status="active")
+        assert health.task_type == "site_health"
+        assert len(_advertools_rows(db, user_id)) == 2
 
-        paused = _pause_duplicate_advertools_tasks(db, user_id, WEBSITE_URL)
-        assert paused == 1
-        # Production commits right after (schedule_step2_tasks does); do the
-        # same here so refresh() sees the persisted state.
+    def test_upsert_collapses_to_single_row(self, user_db):
+        """The canonical atomic upsert returns the SAME row on repeated calls
+        for (user, site, type) — no duplicate is ever created, so runtime
+        self-heal is no longer needed as the primary mechanism."""
+        from services.seo.advertools_task_upsert import upsert_advertools_task
+
+        user_id, db = user_db["user_id"], user_db["db"]
+        first = upsert_advertools_task(
+            db, user_id, WEBSITE_URL, "content_audit",
+            defaults={"status": "active", "payload": {"website_url": WEBSITE_URL}},
+        )
+        second = upsert_advertools_task(
+            db, user_id, WEBSITE_URL, "content_audit",
+            defaults={"status": "active", "payload": {"website_url": WEBSITE_URL}},
+        )
         db.commit()
-
-        db.refresh(old)
-        db.refresh(new)
-        db.refresh(health)
-        assert old.status == "paused"
-        assert (old.payload or {}).get("deduped") is True
-        assert new.status == "active"  # newest kept
-        assert health.status == "active"  # different type untouched
-        # Rows are paused, never deleted (execution-log FK history preserved).
-        assert len(_advertools_rows(db, user_id)) == 3
+        assert second.id == first.id
+        # And the on-disk count is exactly one content_audit row.
+        rows = _advertools_rows(db, user_id)
+        by_type = {}
+        for r in rows:
+            by_type.setdefault((r.payload or {}).get("type"), []).append(r)
+        assert len(by_type.get("content_audit", [])) == 1
+        # task_type stays normalized in step.
+        assert first.task_type == "content_audit"
+        assert second.task_type == "content_audit"
 
     def test_no_duplicates_is_noop(self, user_db):
         from api.onboarding_utils.onboarding_task_scheduler import (
@@ -271,31 +301,23 @@ class TestPauseDuplicates:
 
 
 class TestExecutorSelfHealAndSkip:
-    def test_pause_other_active_duplicates(self, user_db):
+    def test_pause_self_heal_is_noop_with_single_row(self, user_db):
+        """With the DB unique constraint there is exactly one row per type, so
+        the self-heal backstop pauses nothing and stays harmless (defensive
+        only — it can no longer be the primary dedup mechanism)."""
         from services.scheduler.executors.advertools_executor import AdvertoolsExecutor
 
         user_id, db = user_db["user_id"], user_db["db"]
         keep = _make_advertools_task(db, user_id, status="active")
-        dup_a = _make_advertools_task(db, user_id, status="active")
-        dup_b = _make_advertools_task(db, user_id, status="active")
         other_type = _make_advertools_task(db, user_id, task_type="site_health", status="active")
+        db.commit()
 
         executor = AdvertoolsExecutor()
         paused = executor._pause_other_active_duplicates(
             db, user_id, WEBSITE_URL, "content_audit", keep_task_id=keep.id
         )
-        assert paused == 2
-        # Production commits after execute_task finishes; mirror that here.
-        db.commit()
-
-        db.refresh(dup_a)
-        db.refresh(dup_b)
-        db.refresh(keep)
-        db.refresh(other_type)
-        assert dup_a.status == "paused" and (dup_a.payload or {}).get("deduped_into") == keep.id
-        assert dup_b.status == "paused"
-        assert keep.status == "active"
-        assert other_type.status == "active"
+        assert paused == 0  # DB guarantees no duplicates to pause
+        other_type.status = "active"  # unchanged
 
     @pytest.mark.asyncio
     async def test_execute_task_skips_when_mutex_held(self, user_db):

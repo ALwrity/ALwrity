@@ -151,29 +151,18 @@ async def run_content_audit(
 
         # Mark our task row running so the status endpoint and the DB-level
         # mutex reflect the interactive run (scheduler rows are marked the
-        # same way by the execution wrapper).
-        from models.advertools_monitoring_models import AdvertoolsTask
+        # same way by the execution wrapper). Uses the canonical upsert so an
+        # interactive run never creates a duplicate row.
+        from services.seo.advertools_task_upsert import upsert_advertools_task
         from datetime import datetime as _dt
-        task_row = None
-        for t in db.query(AdvertoolsTask).filter(
-            AdvertoolsTask.user_id == user_id,
-            AdvertoolsTask.website_url == website_url,
-        ).all():
-            if (t.payload or {}).get("type") == "content_audit":
-                task_row = t
-                break
-        if task_row is None:
-            task_row = AdvertoolsTask(
-                user_id=user_id,
-                website_url=website_url,
-                status="running",
-                started_at=_dt.utcnow(),
-                payload={"type": "content_audit", "website_url": website_url},
-            )
-            db.add(task_row)
-        else:
-            task_row.status = "running"
-            task_row.started_at = _dt.utcnow()
+        task_row = upsert_advertools_task(
+            db, user_id, website_url, "content_audit",
+            defaults={
+                "status": "running",
+                "started_at": _dt.utcnow(),
+                "payload": {"website_url": website_url},
+            },
+        )
         db.commit()
         task_row_id = task_row.id
 
@@ -289,33 +278,19 @@ async def run_content_audit(
         await executor._update_persona_augmentation(user_id, website_url, result, db)
 
         # Update/create the AdvertoolsTask record so status reflects completion
-        from models.advertools_monitoring_models import AdvertoolsTask
+        from services.seo.advertools_task_upsert import upsert_advertools_task
         from datetime import datetime
-
-        existing_tasks = db.query(AdvertoolsTask).filter(
-            AdvertoolsTask.user_id == user_id
-        ).all()
-        task = None
-        for t in existing_tasks:
-            if (t.payload or {}).get("type") == "content_audit":
-                task = t
-                break
-        if task:
-            task.status = "active"
-            task.last_executed = datetime.utcnow()
-            task.last_success = datetime.utcnow()
-            task.consecutive_failures = 0
-            task.failure_reason = None
-        else:
-            task = AdvertoolsTask(
-                user_id=user_id,
-                website_url=website_url,
-                status="active",
-                payload={"type": "content_audit", "website_url": website_url},
-                last_executed=datetime.utcnow(),
-                last_success=datetime.utcnow(),
-            )
-            db.add(task)
+        upsert_advertools_task(
+            db, user_id, website_url, "content_audit",
+            defaults={
+                "status": "active",
+                "payload": {"website_url": website_url},
+                "last_executed": datetime.utcnow(),
+                "last_success": datetime.utcnow(),
+                "consecutive_failures": 0,
+                "failure_reason": None,
+            },
+        )
 
         db.commit()
 
@@ -392,28 +367,16 @@ async def run_site_health(
             }
 
         # Mark our task row running (same convention as the scheduler wrapper).
-        from models.advertools_monitoring_models import AdvertoolsTask
+        from services.seo.advertools_task_upsert import upsert_advertools_task
         from datetime import datetime as _dt
-        task_row = None
-        for t in db.query(AdvertoolsTask).filter(
-            AdvertoolsTask.user_id == user_id,
-            AdvertoolsTask.website_url == website_url,
-        ).all():
-            if (t.payload or {}).get("type") == "site_health":
-                task_row = t
-                break
-        if task_row is None:
-            task_row = AdvertoolsTask(
-                user_id=user_id,
-                website_url=website_url,
-                status="running",
-                started_at=_dt.utcnow(),
-                payload={"type": "site_health", "website_url": website_url},
-            )
-            db.add(task_row)
-        else:
-            task_row.status = "running"
-            task_row.started_at = _dt.utcnow()
+        task_row = upsert_advertools_task(
+            db, user_id, website_url, "site_health",
+            defaults={
+                "status": "running",
+                "started_at": _dt.utcnow(),
+                "payload": {"website_url": website_url},
+            },
+        )
         db.commit()
         task_row_id = task_row.id
 
@@ -461,33 +424,19 @@ async def run_site_health(
         await executor._update_site_health_metrics(user_id, website_url, sitemap_result, db)
 
         # Update/create the AdvertoolsTask record so status reflects completion
-        from models.advertools_monitoring_models import AdvertoolsTask
+        from services.seo.advertools_task_upsert import upsert_advertools_task
         from datetime import datetime
-
-        existing_tasks = db.query(AdvertoolsTask).filter(
-            AdvertoolsTask.user_id == user_id
-        ).all()
-        task = None
-        for t in existing_tasks:
-            if (t.payload or {}).get("type") == "site_health":
-                task = t
-                break
-        if task:
-            task.status = "active"
-            task.last_executed = datetime.utcnow()
-            task.last_success = datetime.utcnow()
-            task.consecutive_failures = 0
-            task.failure_reason = None
-        else:
-            task = AdvertoolsTask(
-                user_id=user_id,
-                website_url=website_url,
-                status="active",
-                payload={"type": "site_health", "website_url": website_url},
-                last_executed=datetime.utcnow(),
-                last_success=datetime.utcnow(),
-            )
-            db.add(task)
+        upsert_advertools_task(
+            db, user_id, website_url, "site_health",
+            defaults={
+                "status": "active",
+                "payload": {"website_url": website_url},
+                "last_executed": datetime.utcnow(),
+                "last_success": datetime.utcnow(),
+                "consecutive_failures": 0,
+                "failure_reason": None,
+            },
+        )
 
         db.commit()
 
