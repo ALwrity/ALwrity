@@ -230,6 +230,103 @@ def build_plan_change_payload(user_id: str, db, first_name: str = "",
     return payload
 
 
+def build_renewal_receipt_payload(user_id: str, db, first_name: str = "",
+                                  price: str = "", period_start: str = "",
+                                  period_end: str = "") -> BillingEmailPayload:
+    """Assemble a renewal-receipt payload.
+
+    ``price`` and ``period_start``/``period_end`` are best supplied by the caller
+    (both hook sites have them in scope); when omitted we derive price from the
+    current plan and periods from the active subscription. Never raises on missing
+    data.
+    """
+    payload = BillingEmailPayload(
+        kind="renewal_receipt",
+        first_name=first_name or "",
+        price=price or "",
+    )
+
+    try:
+        from models.subscription_models import UserSubscription, SubscriptionPlan
+
+        subscription = db.query(UserSubscription).filter(
+            UserSubscription.user_id == user_id
+        ).first()
+
+        if subscription is None:
+            payload.price = _money(payload.price) if payload.price else "$0"
+            return payload
+
+        plan = None
+        if subscription.plan_id:
+            try:
+                plan = db.query(SubscriptionPlan).filter(
+                    SubscriptionPlan.id == subscription.plan_id
+                ).first()
+            except Exception:
+                plan = None
+
+        # Billing cycle + plan name/tier/features
+        cycle = getattr(subscription, "billing_cycle", None)
+        try:
+            payload.billing_cycle = str(cycle.value if hasattr(cycle, "value") else cycle) or ""
+        except Exception:
+            payload.billing_cycle = ""
+
+        if plan is not None:
+            payload.plan_name = getattr(plan, "name", "") or ""
+            try:
+                payload.plan_tier = str(plan.tier.value if hasattr(plan.tier, "value") else plan.tier)
+            except Exception:
+                payload.plan_tier = ""
+            payload.features = _plan_features(plan)[:5]
+            if not payload.price:
+                try:
+                    raw = getattr(plan, "price_yearly" if payload.billing_cycle == "yearly" else "price_monthly", None)
+                    payload.price = _money(raw)
+                except Exception:
+                    payload.price = "$0"
+            else:
+                payload.price = _money(payload.price) if _is_raw_amount(payload.price) else payload.price
+
+        # Periods: caller-provided take precedence, else fall back to subscription.
+        if period_start:
+            payload.period_start = _fmt_dt(_to_ts(period_start))
+        else:
+            payload.period_start = _fmt_dt(getattr(subscription, "current_period_start", None))
+        if period_end:
+            payload.period_end = _fmt_dt(_to_ts(period_end))
+        else:
+            payload.period_end = _fmt_dt(getattr(subscription, "current_period_end", None))
+        if payload.period_end:
+            payload.renewal_date = payload.period_end
+    except Exception as e:
+        logger.warning(f"Failed to build renewal-receipt payload for {user_id}: {e}")
+        if not payload.price:
+            payload.price = "$0"
+
+    return payload
+
+
+def _is_raw_amount(value: str) -> bool:
+    """True if ``value`` looks like a raw numeric amount (e.g. Stripe minor units)
+    rather than an already-formatted display string like ``$79``."""
+    try:
+        float(value)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _to_ts(value: Any):
+    """Normalise seconds-since-epoch or ISO/date string into a form _fmt_dt accepts."""
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str) and value.isdigit():
+        return float(value)
+    return value
+
+
 def _money(value: Any) -> str:
     try:
         f = float(value or 0)
@@ -261,7 +358,9 @@ def render_billing_email(payload: BillingEmailPayload, verbose: bool = True) -> 
         return _render_payment_confirmation(payload)
     if payload.kind == "plan_change":
         return _render_plan_change(payload)
-    # Later phases add: renewal_receipt, payment_failed.
+    if payload.kind == "renewal_receipt":
+        return _render_renewal_receipt(payload)
+    # Later phases add: payment_failed.
     logger.warning(f"render_billing_email: unknown kind {payload.kind!r}; rendering confirmation")
     return _render_payment_confirmation(payload)
 
@@ -622,6 +721,127 @@ def _render_plan_change(payload: BillingEmailPayload) -> str:
 </html>"""
 
 
+def _render_renewal_receipt(payload: BillingEmailPayload) -> str:
+    from services.email_templates import (
+        _FONT, _esc,
+        INK, AMBER, GREEN, SLATE_300, SLATE_400, SLATE_800,
+    )
+
+    first = _esc(payload.first_name) or "there"
+    plan = _esc(payload.plan_name or "your plan")
+    amount = _esc(payload.price) or "$0"
+    period = f"{_esc(payload.period_start)} – {_esc(payload.period_end)}" if payload.period_start or payload.period_end else payload.renewal_date or ""
+    cycle_txt = "yearly" if payload.billing_cycle == "yearly" else "monthly"
+
+    period_row = ""
+    if payload.renewal_date:
+        period_row = (
+            f"<tr><td style='padding:6px 0;font-family:{_FONT};font-size:13px;color:{SLATE_800};'>"
+            f"Next renewal date"
+            f"</td><td style='padding:6px 0;font-family:{_FONT};font-size:13px;font-weight:700;text-align:right;color:{INK};'>"
+            f"{_esc(payload.renewal_date)}</td></tr>"
+        )
+
+    total_row = (
+        f"<tr><td style='padding:10px 0 0 0;border-top:2px solid {SLATE_300};font-family:{_FONT};"
+        f"font-size:14px;font-weight:800;color:{INK};'>Total charged</td>"
+        f"<td style='padding:10px 0 0 0;border-top:2px solid {SLATE_300};font-family:{_FONT};"
+        f"font-size:16px;font-weight:800;text-align:right;color:{INK};'>{amount}</td></tr>"
+    )
+
+    return f"""<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="x-apple-disable-message-reformatting">
+<title>Your {plan} plan has renewed</title>
+<style>
+  body, table, td, a {{ -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }}
+  table, td {{ mso-table-lspace:0pt; mso-table-rspace:0pt; }}
+  body {{ margin:0 !important; padding:0 !important; width:100% !important; background-color:#0f172a; }}
+  @media only screen and (max-width:620px) {{
+    .email-container {{ width:100% !important; padding:14px !important; }}
+    .hide-mobile {{ display:none !important; }}
+  }}
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:#0f172a;font-family:{_FONT};">
+
+<div style="display:none;font-size:1px;color:#0f172a;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+  Your {plan} plan has renewed · {amount}
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:linear-gradient(160deg,#052e16 0%,#15803d 26%,#0d9488 48%,#2563eb 70%,#6d28d9 100%);">
+<tr><td align="center" style="padding:34px 14px;">
+
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="email-container" style="max-width:600px;width:100%;position:relative;">
+
+  <!-- Hero -->
+  <tr>
+    <td style="padding:0 0 16px 0;text-align:center;">
+      <span style="background:rgba(255,255,255,0.18);color:#ffffff;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:0.5px;">RENEWED</span>
+      <div style="font-family:{_FONT};font-size:30px;font-weight:800;color:#ffffff;line-height:1.15;margin-top:10px;">
+        Thanks for staying with us, {first}
+      </div>
+      <div style="font-family:{_FONT};font-size:15px;color:#dcfce7;margin-top:8px;line-height:1.6;">
+        Your {plan} plan ({cycle_txt}) has been renewed.
+      </div>
+    </td>
+  </tr>
+
+  <!-- Receipt card -->
+  <tr>
+    <td style="padding:0 0 16px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border-radius:16px;overflow:hidden;">
+        <tr>
+          <td style="padding:16px 22px;border-bottom:1px solid {SLATE_300};">
+            <div style="font-family:{_FONT};font-size:16px;font-weight:800;color:{INK};">ALwrity — {plan}</div>
+            <div style="font-family:{_FONT};font-size:12px;color:{SLATE_400};margin-top:2px;">Receipt · {cycle_txt} renewal</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:10px 22px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding:6px 0;font-family:{_FONT};font-size:13px;color:{SLATE_800};">Billing period</td>
+                <td style="padding:6px 0;font-family:{_FONT};font-size:13px;font-weight:700;text-align:right;color:{INK};">{period or '—'}</td>
+              </tr>
+              {period_row}
+              {total_row}
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- CTA -->
+  <tr>
+    <td style="padding:0 0 16px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:rgba(255,255,255,0.11);border:1px solid rgba(255,255,255,0.22);border-radius:16px;">
+        <tr>
+          <td style="padding:22px 24px;text-align:center;">
+            <div style="font-family:{_FONT};font-size:16px;font-weight:800;color:#ffffff;">
+              Need to review or change anything?
+            </div>
+            <div style="font-family:{_FONT};font-size:13px;color:#c7d2fe;margin-top:6px;line-height:1.6;">
+              Manage your plan, payment method, and receipts anytime.
+            </div>
+            <a href="{_esc(payload.billing_url)}" style="display:inline-block;background:#ffffff;color:{INK};text-decoration:none;font-family:{_FONT};font-size:14px;font-weight:800;padding:12px 22px;border-radius:999px;margin-top:14px;">Billing settings</a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>"""
+
+
 # ────────────────────────────────────────────────────────────────────────
 # Send
 # ────────────────────────────────────────────────────────────────────────
@@ -691,6 +911,14 @@ def build_from_kind(user_id: str, db, kind: str, first_name: str = "",
             renewal_type=extra.get("renewal_type", ""),
             price=extra.get("price", ""),
         )
+    if kind == "renewal_receipt":
+        extra = extra or {}
+        return build_renewal_receipt_payload(
+            user_id, db, first_name=first_name,
+            price=extra.get("price", ""),
+            period_start=extra.get("period_start", ""),
+            period_end=extra.get("period_end", ""),
+        )
     logger.warning(f"build_from_kind: unknown kind {kind!r}; falling back to confirmation")
     return build_payment_confirmation_payload(user_id, db, first_name=first_name)
 
@@ -709,6 +937,10 @@ def _subject_for(kind: str, payload: BillingEmailPayload) -> str:
         if renewal_type == "downgrade":
             return f"Your ALwrity plan is now {plan}"
         return f"Your ALwrity plan: {plan}"
+    if kind == "renewal_receipt":
+        if first:
+            return f"Your {plan} plan has renewed, {first} — receipt inside"
+        return f"Your {plan} plan has renewed — receipt inside"
     return f"An update about your {plan}"
 
 

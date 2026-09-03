@@ -465,3 +465,84 @@ def test_plan_change_generic_subject():
         first_name="Ada", plan_name="Pro", renewal_type="renewal",
     ))
     assert "Your ALwrity plan: Pro" in subj
+
+
+# --------------------------------------------------------------------------- #
+# Phase 3 — renewal receipt
+# --------------------------------------------------------------------------- #
+
+def test_renewal_receipt_payload_defaults():
+    session = _FakeSession({
+        "usersubscription": [_user_subscription(plan_id=2)],
+        "subscriptionplan": [_plan(name="Pro", tier="pro")],
+    })
+    p = billing.build_renewal_receipt_payload("u1", db=session, first_name="Ada")
+    assert p.kind == "renewal_receipt"
+    assert p.plan_name == "Pro"
+    assert p.first_name == "Ada"
+    assert p.billing_cycle == "monthly"
+    assert p.price == "$79"
+
+
+def test_renewal_receipt_payload_with_explicit_price():
+    session = _FakeSession({
+        "usersubscription": [_user_subscription(plan_id=2)],
+        "subscriptionplan": [_plan(name="Pro", tier="pro")],
+    })
+    p = billing.build_renewal_receipt_payload(
+        "u1", db=session, first_name="Ada",
+        price="99.00", period_start="1704067200", period_end="1706659200",
+    )
+    assert p.kind == "renewal_receipt"
+    assert p.price == "$99"
+    assert p.period_start == "Jan 01, 2024"
+    assert p.period_end == "Jan 31, 2024"
+
+
+def test_renewal_receipt_render():
+    p = billing.BillingEmailPayload(
+        kind="renewal_receipt", first_name="Ada", plan_name="Pro", plan_tier="pro",
+        price="$79", billing_cycle="monthly", period_start="Sep 03, 2026", period_end="Oct 03, 2026",
+        renewal_date="Oct 03, 2026",
+    )
+    html = billing.render_billing_email(p, verbose=True)
+    assert "RENEWED" in html
+    assert "Thanks for staying with us, Ada" in html
+    assert "Pro" in html
+    assert "$79" in html
+    assert "Sep 03, 2026 – Oct 03, 2026" in html or "Sep 03, 2026 – Oct 03" in html
+    assert "Next renewal date" in html
+    assert "Oct 03, 2026" in html
+    assert "Billing settings" in html
+
+
+def test_renewal_receipt_subject_with_first_name():
+    subj = billing._subject_for("renewal_receipt", billing.BillingEmailPayload(
+        first_name="Ada", plan_name="Pro",
+    ))
+    assert "Your Pro plan has renewed, Ada" in subj
+    assert "receipt inside" in subj
+
+
+def test_renewal_receipt_subject_without_first_name():
+    subj = billing._subject_for("renewal_receipt", billing.BillingEmailPayload(
+        plan_name="Basic",
+    ))
+    assert "Your Basic plan has renewed" in subj
+    assert "receipt inside" in subj
+
+
+def test_build_from_kind_routes_renewal_receipt(monkeypatch):
+    monkeypatch.setattr(billing, "_contact_email", lambda uid, db: "a@b.io")
+    monkeypatch.setattr(billing, "_opted_in", lambda uid, db: True)
+    session = _FakeSession({
+        "usersubscription": [_user_subscription(plan_id=2)],
+        "subscriptionplan": [_plan(name="Pro", tier="pro")],
+    })
+    p = billing.build_from_kind(
+        "u1", db=session, kind="renewal_receipt", first_name="Ada",
+        extra={"price": "99", "period_start": "1704067200", "period_end": "1706659200"},
+    )
+    assert p.kind == "renewal_receipt"
+    assert p.plan_name == "Pro"
+    assert p.price == "$99"

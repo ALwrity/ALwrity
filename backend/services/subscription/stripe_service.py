@@ -521,6 +521,13 @@ class StripeService:
                 clear_dashboard_cache(subscription.user_id)
             except Exception as dash_cache_err:
                 logger.warning(f"Failed to clear dashboard cache after payment success for user {subscription.user_id}: {dash_cache_err}")
+            # Best-effort renewal-receipt email for recurring charges. The initial
+            # payment (subscription_create) is covered by the Phase-1
+            # payment-confirmation email, so skip that here to avoid duplicates.
+            try:
+                self._send_renewal_receipt_from_webhook(subscription, invoice)
+            except Exception as receipt_err:
+                logger.warning(f"Renewal-receipt email skipped for user {subscription.user_id}: {receipt_err}")
             self.db.expire_all()
 
     async def _handle_invoice_payment_failed(self, invoice: Dict[str, Any]):
@@ -762,6 +769,50 @@ class StripeService:
             logger.info(f"Plan-change email ({change_type}) queued for user {user_id}")
         except Exception as e:
             logger.warning(f"Failed to send plan-change email for user {user_id}: {e}")
+
+    def _send_renewal_receipt_from_webhook(self, subscription, invoice: Dict[str, Any]) -> None:
+        """Send a renewal-receipt email for a successful recurring charge (best-effort).
+
+        Skips when the invoice isn't a subscription cycle renewal (initial payments
+        and plan-update invoices are covered by the payment-confirmation and
+        plan-change emails respectively). Never raises.
+        """
+        user_id = subscription.user_id
+
+        # Only recurring renewal charges get a receipt here.
+        if invoice.get("billing_reason") and invoice.get("billing_reason") != "subscription_cycle":
+            return
+
+        try:
+            # amount_paid is in minor units (cents).
+            raw_amount = invoice.get("amount_paid", 0) or 0
+            price = str(round(float(raw_amount) / 100.0, 2))
+
+            # Billing period for the charge from the first invoice line.
+            period_start = ""
+            period_end = ""
+            lines = invoice.get("lines", {})
+            line_data = (lines.get("data") or []) if isinstance(lines, dict) else []
+            if line_data:
+                period = (line_data[0].get("period") or {})
+                period_start = str(period.get("start", "") or "")
+                period_end = str(period.get("end", "") or "")
+
+            from services.subscription.billing_email import send_billing_email
+            send_billing_email(
+                user_id,
+                db=self.db,
+                kind="renewal_receipt",
+                event_ref=f"invoice-{invoice.get('id', user_id)}",
+                payload_extra={
+                    "price": price,
+                    "period_start": period_start,
+                    "period_end": period_end,
+                },
+            )
+            logger.info(f"Renewal-receipt email queued for user {user_id}")
+        except Exception as e:
+            logger.warning(f"Failed to send renewal-receipt email for user {user_id}: {e}")
 
     def _update_user_subscription(
         self,
