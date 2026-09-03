@@ -148,6 +148,46 @@ def test_no_context_at_all_returns_fallback():
     assert query == "legacy query"
 
 
+def test_comma_separated_values_become_distinct_terms():
+    """'digital marketing, SaaS, AI tools' must not become one giant
+    comma-laden term - it splits into separate, readable terms."""
+    grounding = {
+        "onboarding_data": {
+            "canonical_profile": {"industry": "digital marketing, SaaS, AI tools"},
+        },
+    }
+    query = build_contextual_query("strategy_architect", grounding, fallback="marketing")
+    assert "digital marketing" in query
+    assert "saas" in query.lower()
+    # the raw comma string must not survive as a single term
+    assert "digital marketing, saas, ai tools" not in query.lower()
+
+
+def test_multi_word_brand_voice_is_capped_not_dumped():
+    """A long descriptive brand voice ('confident tech-forward
+    community-focused') must not dump all of its words into the query."""
+    grounding = {
+        "onboarding_data": {
+            "website_analysis": {"brand_analysis": {"brand_voice": "confident tech-forward community-focused"}},
+            "canonical_profile": {"industry": "SaaS", "content_types": ["blog_post"]},
+        },
+    }
+    query = build_contextual_query("seo_specialist", grounding, fallback="seo audit")
+    # at most 2 words of the brand voice survive the cap
+    assert "community-focused" not in query and "community focused" not in query
+
+
+def test_terms_are_capped_in_length():
+    """No single term should exceed ~60 chars (giant JSON dumps, urls, etc.)."""
+    grounding = {
+        "onboarding_data": {
+            "canonical_profile": {"industry": "x" * 200},
+        },
+    }
+    query = build_contextual_query("strategy_architect", grounding, fallback="marketing")
+    assert all(len(term) <= 80 for term in query.split())
+
+
 def test_sif_base_agent_query_uses_remembered_grounding():
     """The base-agent helpers (_remember_grounding + _sif_query) must compose
     user-specific queries from the committee grounding the agent received."""

@@ -35,6 +35,8 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
+import re
+
 from loguru import logger
 
 # Per-agent intent anchors: appended first so the query stays topical.
@@ -71,26 +73,51 @@ def _clean(value: Any) -> str:
     return text
 
 
-def _tokenize(value: Any) -> List[str]:
+def _split_phrases(text: str, max_words: int = 4) -> List[str]:
+    """Split a value into short phrases for embedding queries.
+
+    Comma/semicolon-separated values ("digital marketing, SaaS, AI tools")
+    become distinct phrases; long prose values (descriptive brand voices)
+    are capped to their first few words so queries stay focused. Single
+    phrases are also capped in character length.
+    """
+    if not text:
+        return []
+    phrases: List[str] = []
+    for chunk in re.split(r"[;,]|\band\b", text, flags=re.IGNORECASE):
+        words = chunk.strip().split()
+        if not words:
+            continue
+        phrase = " ".join(words[:max_words])
+        # Character cap too: a single giant "word" (a URL, a JSON dump, a
+        # 200-char slug) is useless in an embedding query.
+        if len(phrase) > 80:
+            phrase = phrase[:80].rsplit(" ", 1)[0] if " " in phrase[:80] else phrase[:80]
+        phrases.append(phrase)
+    return [p for p in phrases if p]
+
+
+def _tokenize(value: Any, max_words: int = 4) -> List[str]:
     """Turn a scalar/list/dict-ish value into clean query tokens."""
     if value is None:
         return []
     if isinstance(value, (list, tuple, set)):
         tokens: List[str] = []
         for item in value:
-            tokens.extend(_tokenize(item))
+            tokens.extend(_tokenize(item, max_words=max_words))
         return tokens
     if isinstance(value, dict):
         tokens = []
         for key in ("name", "voice", "tone", "industry", "domain", "url", "platform"):
             if value.get(key):
-                tokens.extend(_tokenize(value.get(key)))
+                tokens.extend(_tokenize(value.get(key), max_words=max_words))
         return tokens
     text = _clean(value)
     if not text:
         return []
-    # Underscores/hyphens read better as words for embedding search.
-    return [text.replace("_", " ").replace("-", " ").strip()]
+    text = text.replace("_", " ").replace("-", " ").strip()
+    phrases = _split_phrases(text)
+    return [p for p in phrases if p][:3]
 
 
 def _domain_from_url(url: Any) -> str:
@@ -125,11 +152,12 @@ def _context_terms(grounding: Optional[Dict[str, Any]]) -> Dict[str, List[str]]:
     competitors_raw = onboarding.get("competitor_analysis")
     competitors_raw = competitors_raw if isinstance(competitors_raw, list) else []
 
-    industry = (
+    industry_raw = (
         _clean(canonical.get("industry"))
         or _clean((website.get("target_audience") or {}).get("industry_focus"))
         or _clean((research.get("target_audience") or {}).get("industry_focus"))
     )
+    industry = _tokenize(industry_raw, max_words=3)[:2]
 
     brand_voice = ""
     canonical_voice = canonical.get("brand_voice")
@@ -173,11 +201,11 @@ def _context_terms(grounding: Optional[Dict[str, Any]]) -> Dict[str, List[str]]:
                 competitors.append(candidate)
 
     return {
-        "industry": [industry] if industry else [],
-        "brand_voice": [brand_voice] if brand_voice else [],
+        "industry": industry,
+        "brand_voice": _tokenize(brand_voice, max_words=2)[:1],
         "writing_tone": [writing_tone] if writing_tone else [],
         "content_types": content_types[:3],
-        "audience": [audience] if audience else [],
+        "audience": _tokenize(audience, max_words=3)[:1],
         "platforms": platforms[:3],
         "competitors": competitors[:3],
     }

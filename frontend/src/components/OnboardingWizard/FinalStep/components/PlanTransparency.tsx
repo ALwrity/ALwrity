@@ -51,7 +51,7 @@ function statusIcon(status?: string) {
 
 function outcomeChip(outcome?: string) {
   const s = (outcome || "").toLowerCase();
-  if (s === "success") return <Chip size="small" label="results found" color="success" variant="outlined" />;
+  if (s === "success") return <Chip size="small" label="success" color="success" variant="outlined" />;
   if (s === "miss_healed") return <Chip size="small" label="empty → index self-healed" color="warning" variant="outlined" />;
   if (s === "miss") return <Chip size="small" label="no results" color="warning" variant="outlined" />;
   if (s === "error") return <Chip size="small" label="search failed" color="error" variant="outlined" />;
@@ -146,10 +146,13 @@ export const PlanTransparencyPanel: React.FC<{
                   {statusIcon(check?.status)}
                   <Typography variant="caption" sx={{ fontWeight: 600 }}>
                     {label}
+                    {check?.status ? ` — ${String(check.status)}` : ""}
                   </Typography>
-                  <Typography variant="caption" sx={{ opacity: 0.75 }} noWrap>
-                    {check?.message}
-                  </Typography>
+                  {check?.message ? (
+                    <Typography variant="caption" sx={{ opacity: 0.75 }} noWrap>
+                      {check.message}
+                    </Typography>
+                  ) : null}
                 </Stack>
               ))}
             </Stack>
@@ -209,7 +212,7 @@ export const PlanTransparencyPanel: React.FC<{
                 <Box key={i} sx={{ mt: 0.75 }}>
                   <Typography variant="caption" sx={{ fontWeight: 600 }}>
                     {AGENT_LABELS[ev.agent] || ev.agent}
-                    {typeof ev.confidence === "number" && ` (confidence ${(ev.confidence * 100).toFixed(0)}%)`}
+                    {typeof ev.confidence === "number" && ev.confidence > 0 && ` (confidence ${(ev.confidence * 100).toFixed(0)}%)`}
                   </Typography>
                   {ev.analysis && (
                     <Typography variant="caption" component="div" sx={{ opacity: 0.8 }}>
