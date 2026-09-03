@@ -27,38 +27,72 @@ export const SafeResponsiveContainer: React.FC<SafeResponsiveContainerProps> = (
   ...rest
 }) => {
   const boxRef = React.useRef<HTMLDivElement | null>(null);
-  const [measurable, setMeasurable] = React.useState(false);
+  const [hasSize, setHasSize] = React.useState(false);
 
   React.useEffect(() => {
     const el = boxRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
+    if (!el) return;
+
+    // If we have explicit numeric dimensions, we can render immediately
+    const numericWidth = typeof width === 'number' ? width : 0;
+    const numericHeight = typeof height === 'number' ? height : 0;
+    
+    if (numericWidth > 0 && numericHeight > 0) {
+      setHasSize(true);
+      return;
+    }
+
+    // Otherwise use ResizeObserver to wait for container to get size
+    if (typeof ResizeObserver === 'undefined') return;
+    
     const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      const w = entry?.contentRect?.width ?? 0;
-      const h = entry?.contentRect?.height ?? 0;
-      setMeasurable(w > 0 && h > 0);
+      for (const entry of entries) {
+        const w = entry.contentRect.width;
+        const h = entry.contentRect.height;
+        if (w > 0 && h > 0) {
+          setHasSize(true);
+          observer.disconnect();
+          return;
+        }
+      }
     });
+    
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [width, height]);
+
+  // Determine container style
+  const containerWidth = typeof width === 'number' ? `${width}px` : width;
+  const containerHeight = typeof height === 'number' ? `${height}px` : height;
+
+  // Don't render ResponsiveContainer until we have valid dimensions
+  if (!hasSize) {
+    return (
+      <div
+        ref={boxRef}
+        style={{
+          width: containerWidth,
+          height: containerHeight,
+          minWidth: 1,
+          minHeight: 1,
+        }}
+      />
+    );
+  }
 
   return (
     <div
       ref={boxRef}
       style={{
-        width: typeof width === 'number' ? `${width}px` : width,
-        height: typeof height === 'number' ? `${height}px` : height,
+        width: containerWidth,
+        height: containerHeight,
         minWidth: 1,
         minHeight: 1,
       }}
     >
-      {measurable ? (
-        <ResponsiveContainer width="100%" height="100%" {...rest}>
-          {children}
-        </ResponsiveContainer>
-      ) : (
-        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} />
-      )}
+      <ResponsiveContainer width="100%" height="100%" {...rest}>
+        {children}
+      </ResponsiveContainer>
     </div>
   );
 };

@@ -92,6 +92,36 @@ logger.info("app.py: Early memory checkpoint after env load")
 
 # Import modular utilities (skip OnboardingManager import in feature-only modes)
 from alwrity_utils import HealthChecker, RateLimiter, FrontendServing, RouterManager
+
+
+def _preload_sif_embeddings() -> None:
+    """Pre-load the SIF embedding model in a background thread at startup.
+
+    Removes the 2-4s cold-start cost from every user's first agent search.
+    The model is shared via the per-user txtai singleton, so a single warm-up
+    init benefits all users. Non-blocking: runs in a daemon thread so it
+    never delays the app's startup response.
+    """
+    import threading
+
+    def _warm():
+        try:
+            from services.intelligence.txtai_service import TxtaiIntelligenceService
+
+            # Use a warm-up user_id to trigger the singleton's lazy init.
+            # The per-user model path is the same for all users (the model
+            # weights are shared); the index path is per-user but the
+            # initialization here only loads the model, not the index.
+            svc = TxtaiIntelligenceService(user_id="_preload_warmup")
+            svc._initialize_embeddings(load_existing_index=False)
+            logger.info("[startup] SIF embedding model pre-loaded successfully")
+        except Exception as e:
+            logger.warning(f"[startup] SIF embedding model pre-load failed (non-fatal): {e}")
+
+    thread = threading.Thread(target=_warm, daemon=True, name="sif-embedding-preload")
+    thread.start()
+
+
 if _is_full_mode() or _is_feature_enabled("linkedin"):
     from alwrity_utils import OnboardingManager
 
@@ -541,6 +571,10 @@ router_group_status["assets_serving"] = {
 # Include standalone GIF Maker router (zero ALwrity dependencies)
 from routers.gif_maker import router as gif_maker_router
 app.include_router(gif_maker_router)
+
+# Pre-load the SIF embedding model in a background thread so the first
+# agent search doesn't pay the 2-4s model weight loading cost.
+_preload_sif_embeddings()
 
 # SEO Dashboard endpoints (skip in feature-only modes)
 if _is_full_mode():

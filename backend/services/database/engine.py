@@ -26,11 +26,12 @@ def get_engine_for_user(user_id: str):
         "echo": False,
         "pool_pre_ping": True,
         "pool_recycle": 300,
-        # SQLite is single-writer; a large pool only creates lock contention.
-        # Use a single connection per engine and let SQLite's file locking
-        # serialize writers across threads/processes.
-        "pool_size": int(os.getenv("DB_POOL_SIZE", "1")),
-        "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "0")),
+        # SQLite WAL mode allows concurrent readers with one writer.
+        # pool_size > 1 lets the dashboard's read requests proceed while a
+        # scheduler executor holds a write transaction. Write serialization
+        # is handled by SQLite's WAL journal, not by pool exhaustion.
+        "pool_size": int(os.getenv("DB_POOL_SIZE", "3")),
+        "max_overflow": int(os.getenv("DB_MAX_OVERFLOW", "5")),
         "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),
         "connect_args": {"check_same_thread": False},
     }
