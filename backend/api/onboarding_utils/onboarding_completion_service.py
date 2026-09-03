@@ -170,6 +170,15 @@ class OnboardingCompletionService:
             if not success:
                 raise HTTPException(status_code=500, detail="Failed to mark onboarding as complete")
 
+            # Best-effort, non-blocking onboarding welcome email. Never lets a
+            # send failure block or fail the completion response.
+            try:
+                from services.onboarding_welcome_email import send_welcome_email
+                first_name = str(current_user.get("first_name") or current_user.get("username") or "")
+                send_welcome_email(user_id, first_name=first_name)
+            except Exception as welcome_err:
+                logger.warning(f"Welcome email send skipped for {user_id}: {welcome_err}")
+
             # Completion initializes the user environment and schedules
             # per-platform recurring tasks.
             db = get_session_for_user(user_id)
