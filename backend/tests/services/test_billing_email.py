@@ -1,14 +1,15 @@
-"""Tests for the Phase-1 billing transactional email (payment confirmation).
+"""Tests for the billing transactional email service.
 
-Covers:
-  - render_billing_email (payment confirmation) is data-driven and personalised:
-    first name, plan, price, billing cycle, renewal date, feature highlights, CTA.
-  - graceful degradation on a sparse payload (never raises).
-  - HTML escaping of user-derived content.
-  - payload assembly from a user subscription + plan.
-  - money / date formatting helpers.
-  - send_billing_email: success, event-level idempotency, opt-out skip,
-    no-email fallback, and fail-open behavior (never raises).
+Phase 1 — payment confirmation:
+  - personalised render (first name, plan, price, cycle, renewal date, features).
+  - graceful degradation, HTML escaping, payload assembly, helpers.
+  - send: success, event-level idempotency, opt-out skip, no-email fallback, fail-open.
+
+Phase 2 — plan change (upgrade/downgrade):
+  - upgrade vs downgrade copy + old→new facts.
+  - payload assembly from subscription + plan, with explicit previous-plan/type/price.
+  - renewal-history fallback when previous-plan context is omitted.
+  - build_from_kind routing and plan-change subjects.
 """
 import types
 from datetime import datetime
@@ -323,3 +324,144 @@ def test_opted_in_respects_choice():
     session_false = _FakeSession({"onboardingsession": [_onboarding(opt_in=False)]})
     assert billing._opted_in("u1", db=session_true) is True
     assert billing._opted_in("u1", db=session_false) is False
+
+
+# --------------------------------------------------------------------------- #
+# Phase 2 — plan change (upgrade / downgrade)
+# --------------------------------------------------------------------------- #
+
+def _renewal_history(**overrides):
+    values = {
+        "previous_plan_name": "Basic",
+        "previous_plan_tier": "basic",
+        "renewal_type": "upgrade",
+        "payment_amount": "79.00",
+        "billing_cycle": types.SimpleNamespace(value="monthly"),
+        "plan_date": "2026-09-03",
+        "email_type": "plan_change",
+    }
+    values.update(overrides)
+    return types.SimpleNamespace(**values)
+
+
+def _user_subscription(plan_id=2, billing_cycle="monthly"):
+    return types.SimpleNamespace(
+        user_id="u1",
+        plan_id=plan_id,
+        billing_cycle=types.SimpleNamespace(value=billing_cycle),
+        current_period_start=datetime_obj("2026-09-03"),
+        current_period_end=datetime_obj("2026-10-03"),
+        is_active=True,
+    )
+
+
+def _plan_change_session():
+    return _FakeSession({
+        "usersubscription": [_user_subscription(plan_id=2)],
+        "subscriptionplan": [_plan(name="Pro", tier="pro")],
+        "subscriptionrenewalhistory": [_renewal_history(previous_plan_name="Basic", renewal_type="upgrade")],
+    })
+
+
+def test_plan_change_payload_defaults():
+    # No renewal history or explicit context → graceful empty defaults.
+    session = _FakeSession({
+        "usersubscription": [_user_subscription(plan_id=2)],
+        "subscriptionplan": [_plan(name="Pro", tier="pro")],
+        "subscriptionrenewalhistory": [],
+    })
+    p = billing.build_plan_change_payload("u1", db=session, first_name="Ada")
+    assert p.kind == "plan_change"
+    assert p.plan_name == "Pro"
+    assert p.first_name == "Ada"
+    assert p.previous_plan_name == ""
+    assert p.renewal_type == ""
+
+
+def test_plan_change_payload_uses_explicit_context():
+    session = _plan_change_session()
+    p = billing.build_plan_change_payload(
+        "u1", db=session, first_name="Ada",
+        previous_plan_name="Basic", previous_plan_tier="basic",
+        renewal_type="upgrade", price="79",
+    )
+    assert p.previous_plan_name == "Basic"
+    assert p.previous_plan_tier == "basic"
+    assert p.renewal_type == "upgrade"
+    assert p.price == "79"
+
+
+def test_plan_change_falls_back_to_renewal_history():
+    # No explicit context → pull previous-plan facts from latest renewal history.
+    session = _plan_change_session()
+    p = billing.build_plan_change_payload("u1", db=session, first_name="Ada")
+    assert p.previous_plan_name == "Basic"
+    assert p.renewal_type == "upgrade"
+
+
+def test_build_from_kind_routes_plan_change(monkeypatch):
+    monkeypatch.setattr(billing, "_contact_email", lambda uid, db: "a@b.io")
+    monkeypatch.setattr(billing, "_opted_in", lambda uid, db: True)
+    session = _plan_change_session()
+    p = billing.build_from_kind(
+        "u1", db=session, kind="plan_change", first_name="Ada",
+        extra={"previous_plan_name": "Basic", "previous_plan_tier": "basic", "renewal_type": "upgrade", "price": "79"},
+    )
+    assert p.kind == "plan_change"
+    assert p.previous_plan_name == "Basic"
+    assert p.renewal_type == "upgrade"
+    assert p.plan_name == "Pro"
+
+
+def test_plan_change_upgrade_render():
+    p = billing.BillingEmailPayload(
+        kind="plan_change", first_name="Ada", plan_name="Pro", plan_tier="pro",
+        previous_plan_name="Basic", previous_plan_tier="basic",
+        renewal_type="upgrade", price="$79",
+    )
+    html = billing.render_billing_email(p, verbose=True)
+    assert "UPGRADED" in html
+    assert "Welcome to Pro, Ada" in html
+    assert "Basic" in html
+    assert "$79" in html
+
+
+def test_plan_change_downgrade_render():
+    p = billing.BillingEmailPayload(
+        kind="plan_change", first_name="Ada", plan_name="Basic", plan_tier="basic",
+        previous_plan_name="Pro", previous_plan_tier="pro",
+        renewal_type="downgrade", price="$29",
+    )
+    html = billing.render_billing_email(p, verbose=True)
+    assert "PLAN CHANGED" in html
+    assert "Your plan is now Basic, Ada" in html
+    assert "Pro" in html
+    assert "$29" in html
+
+
+def test_plan_change_generic_render():
+    p = billing.BillingEmailPayload(kind="plan_change", first_name="Ada", plan_name="Pro", renewal_type="renewal")
+    html = billing.render_billing_email(p, verbose=True)
+    assert "PLAN UPDATE" in html
+    assert "Your ALwrity plan: Pro, Ada" in html
+
+
+def test_plan_change_upgrade_subject():
+    subj = billing._subject_for("plan_change", billing.BillingEmailPayload(
+        first_name="Ada", plan_name="Pro", renewal_type="upgrade",
+    ))
+    assert "You're on Pro now, Ada" in subj
+
+
+def test_plan_change_downgrade_subject():
+    subj = billing._subject_for("plan_change", billing.BillingEmailPayload(
+        first_name="Ada", plan_name="Basic", renewal_type="downgrade",
+    ))
+    assert "Your ALwrity plan is now Basic" in subj
+
+
+def test_plan_change_generic_subject():
+    subj = billing._subject_for("plan_change", billing.BillingEmailPayload(
+        first_name="Ada", plan_name="Pro", renewal_type="renewal",
+    ))
+    assert "Your ALwrity plan: Pro" in subj

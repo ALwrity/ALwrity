@@ -52,6 +52,8 @@ class BillingEmailPayload:
 
     # Plan change (Phase 2+)
     previous_plan_name: str = ""
+    previous_plan_tier: str = ""
+    renewal_type: str = ""           # "upgrade" | "downgrade" | "renewal" | "new"
 
     # URLs
     dashboard_url: str = "https://alwrity.com/dashboard"
@@ -144,6 +146,90 @@ def build_payment_confirmation_payload(user_id: str, db, first_name: str = "") -
     return payload
 
 
+def build_plan_change_payload(user_id: str, db, first_name: str = "",
+                              previous_plan_name: str = "", previous_plan_tier: str = "",
+                              renewal_type: str = "", price: str = "") -> BillingEmailPayload:
+    """Assemble a personalised plan-change payload.
+
+    ``previous_plan_*``, ``renewal_type`` and ``price`` are best supplied by the
+    caller (the /subscribe endpoint has them in scope); when omitted we fall back
+    to the most recent ``SubscriptionRenewalHistory`` and the current plan.
+    Never raises on missing data.
+    """
+    payload = BillingEmailPayload(kind="plan_change", first_name=first_name or "")
+    payload.renewal_type = renewal_type or ""
+    payload.previous_plan_name = previous_plan_name or ""
+    payload.previous_plan_tier = previous_plan_tier or ""
+
+    try:
+        from models.subscription_models import UserSubscription, SubscriptionPlan
+
+        subscription = db.query(UserSubscription).filter(
+            UserSubscription.user_id == user_id
+        ).first()
+
+        if subscription is None:
+            payload.price = price or "$0"
+            return payload
+
+        plan = None
+        if subscription.plan_id:
+            try:
+                plan = db.query(SubscriptionPlan).filter(
+                    SubscriptionPlan.id == subscription.plan_id
+                ).first()
+            except Exception:
+                plan = None
+
+        if plan is not None:
+            payload.plan_name = getattr(plan, "name", "") or ""
+            payload.features = _plan_features(plan)[:5]
+            if not price:
+                cycle = getattr(subscription, "billing_cycle", None)
+                cyc = ""
+                try:
+                    cyc = str(cycle.value if hasattr(cycle, "value") else cycle) or ""
+                except Exception:
+                    cyc = ""
+                try:
+                    raw = getattr(plan, "price_yearly" if cyc == "yearly" else "price_monthly", None)
+                    payload.price = _money(raw)
+                except Exception:
+                    payload.price = "$0"
+            else:
+                payload.price = price
+
+        # Cycle + periods from the active subscription
+        cycle = getattr(subscription, "billing_cycle", None)
+        try:
+            payload.billing_cycle = str(cycle.value if hasattr(cycle, "value") else cycle) or ""
+        except Exception:
+            payload.billing_cycle = ""
+        payload.period_start = _fmt_dt(getattr(subscription, "current_period_start", None))
+        payload.period_end = _fmt_dt(getattr(subscription, "current_period_end", None))
+        if payload.period_end:
+            payload.renewal_date = payload.period_end
+
+        # Fall back to the most recent renewal history for previous-plan context
+        if not payload.previous_plan_name and not payload.renewal_type:
+            try:
+                from models.subscription_models import SubscriptionRenewalHistory
+                hist = db.query(SubscriptionRenewalHistory).filter(
+                    SubscriptionRenewalHistory.user_id == user_id
+                ).order_by(SubscriptionRenewalHistory.created_at.desc()).first()
+                if hist is not None:
+                    payload.previous_plan_name = getattr(hist, "previous_plan_name", "") or ""
+                    payload.previous_plan_tier = getattr(hist, "previous_plan_tier", "") or ""
+                    payload.renewal_type = getattr(hist, "renewal_type", "") or ""
+            except Exception:
+                pass
+    except Exception as e:
+        logger.warning(f"Failed to build plan-change payload for {user_id}: {e}")
+        payload.price = price or payload.price
+
+    return payload
+
+
 def _money(value: Any) -> str:
     try:
         f = float(value or 0)
@@ -173,7 +259,9 @@ def render_billing_email(payload: BillingEmailPayload, verbose: bool = True) -> 
     """Render the billing email for the payload's ``kind``."""
     if payload.kind == "payment_confirmation":
         return _render_payment_confirmation(payload)
-    # Later phases add: plan_change, renewal_receipt, payment_failed.
+    if payload.kind == "plan_change":
+        return _render_plan_change(payload)
+    # Later phases add: renewal_receipt, payment_failed.
     logger.warning(f"render_billing_email: unknown kind {payload.kind!r}; rendering confirmation")
     return _render_payment_confirmation(payload)
 
@@ -350,20 +438,206 @@ def _render_payment_confirmation(payload: BillingEmailPayload) -> str:
 </html>"""
 
 
+def _render_plan_change(payload: BillingEmailPayload) -> str:
+    from services.email_templates import (
+        _FONT, _esc, _confetti,
+        INK, ORANGE, AMBER, GREEN, LIME, ROSE, SLATE_300, SLATE_400, SLATE_800,
+    )
+
+    first = _esc(payload.first_name) or "there"
+    new_plan = _esc(payload.plan_name or "your new plan")
+    old_plan = _esc(payload.previous_plan_name) or "your previous plan"
+
+    renewal_type = (payload.renewal_type or "").lower()
+    is_upgrade = renewal_type == "upgrade"
+    is_downgrade = renewal_type == "downgrade"
+
+    if is_upgrade:
+        headline = f"Welcome to {new_plan}, {first}! 🚀"
+        accent = AMBER
+        sub = f"You've moved up from <strong style='color:{SLATE_800}'>{old_plan}</strong> to "
+        sub2 = f"<strong style='color:{INK}'>{new_plan}</strong> — more power, more output, more growth."
+        badge = f"<span style='background:{LIME};color:{INK};padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:0.5px;'>UPGRADED</span>"
+    elif is_downgrade:
+        headline = f"Your plan is now {new_plan}, {first}"
+        accent = ROSE
+        sub = f"You switched from <strong style='color:{SLATE_800}'>{old_plan}</strong> to "
+        sub2 = f"<strong style='color:{INK}'>{new_plan}</strong>. Everything we do will stay within your new limits."
+        badge = f"<span style='background:{ROSE};color:#ffffff;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:0.5px;'>PLAN CHANGED</span>"
+    else:
+        headline = f"Your ALwrity plan: {new_plan}, {first}"
+        accent = AMBER
+        sub = f"Your plan is now "
+        sub2 = f"<strong style='color:{INK}'>{new_plan}</strong>. Here's what that covers."
+        badge = f"<span style='background:rgba(255,255,255,0.18);color:#ffffff;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:0.5px;'>PLAN UPDATE</span>"
+
+    # Compare features: highlight what the new plan adds (net-new over previous).
+    feats = [f for f in payload.features if f]
+    feat_html = ""
+    if feats:
+        rows = ""
+        for f in feats:
+            rows += (
+                f"<tr><td style='width:22px;vertical-align:top;padding:6px 0;font-size:14px;"
+                f"color:{GREEN};'>&#10003;</td>"
+                f"<td style='padding:6px 0;font-family:{_FONT};font-size:13px;color:{SLATE_800};"
+                f"line-height:1.5;'>{_esc(f)}</td></tr>"
+            )
+        feat_html = (
+            f"<table width='100%' cellpadding='0' cellspacing='0' border='0'>"
+            f"<tr><td style='padding:12px 22px;font-family:{_FONT};font-size:12px;font-weight:800;"
+            f"color:{SLATE_400};text-transform:uppercase;letter-spacing:1px;'>Included in {new_plan}</td></tr>"
+            f"{rows}"
+            f"</table>"
+        )
+
+    plan_line = ""
+    if payload.price:
+        plan_line = (
+            f"Plan: <strong style='color:{INK}'>{new_plan}</strong> &nbsp;·&nbsp; "
+            f"{_esc(payload.price)}<span style='font-size:12px;color:{SLATE_400};'> "
+            f"{'billed yearly' if payload.billing_cycle == 'yearly' else 'per month'}</span>"
+        )
+    renew_line = ""
+    if payload.renewal_date:
+        renew_line = (
+            f"Your billing period now runs through "
+            f"<strong style='color:{SLATE_800}'>{_esc(payload.renewal_date)}</strong>."
+        )
+
+    return f"""<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="x-apple-disable-message-reformatting">
+<title>Your ALwrity plan changed to {new_plan}</title>
+<style>
+  body, table, td, a {{ -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }}
+  table, td {{ mso-table-lspace:0pt; mso-table-rspace:0pt; }}
+  body {{ margin:0 !important; padding:0 !important; width:100% !important; background-color:#0f172a; }}
+  @media only screen and (max-width:620px) {{
+    .email-container {{ width:100% !important; padding:14px !important; }}
+    .hide-mobile {{ display:none !important; }}
+  }}
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:#0f172a;font-family:{_FONT};">
+
+<div style="display:none;font-size:1px;color:#0f172a;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+  Your ALwrity plan is now {new_plan}.
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:linear-gradient(160deg,#052e16 0%,#15803d 26%,#0d9488 48%,#2563eb 70%,#6d28d9 100%);">
+<tr><td align="center" style="padding:34px 14px;">
+
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="email-container" style="max-width:600px;width:100%;position:relative;">
+
+  <div class="hide-mobile" style="position:absolute;top:10px;left:0;right:0;height:130px;pointer-events:none;">
+    {_confetti(21, '6px')}{_confetti(13, '40px')}{_confetti(17, '74px')}
+  </div>
+
+  <!-- Hero -->
+  <tr>
+    <td style="padding:0 0 16px 0;text-align:center;">
+      {badge}
+      <div style="font-family:{_FONT};font-size:32px;font-weight:800;color:#ffffff;line-height:1.15;margin-top:10px;">
+        {headline}
+      </div>
+      <div style="font-family:{_FONT};font-size:15px;color:#dcfce7;margin-top:8px;line-height:1.6;">
+        {sub}{sub2}
+      </div>
+    </td>
+  </tr>
+
+  <!-- Plan detail card -->
+  <tr>
+    <td style="padding:0 0 16px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border-radius:16px;overflow:hidden;">
+        <tr>
+          <td style="background:linear-gradient(90deg,#f0fdf4,#eff6ff);padding:18px 22px;">
+            <div style="font-family:{_FONT};font-size:16px;font-weight:800;color:{INK};">Your {new_plan} plan</div>
+            <div style="font-family:{_FONT};font-size:12px;color:{SLATE_400};margin-top:2px;">
+              {('From ' + old_plan) if old_plan and old_plan != 'your previous plan' else 'ALwrity subscription'}
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:10px 22px;">
+            <div style="font-family:{_FONT};font-size:13px;font-weight:700;color:{SLATE_800};padding:4px 0;">{plan_line}</div>
+            {f"<div style='font-family:{_FONT};font-size:12px;color:{SLATE_400};padding:4px 0;'>{renew_line}</div>" if renew_line else ""}
+          </td>
+        </tr>
+        {feat_html}
+      </table>
+    </td>
+  </tr>
+
+  <!-- CTA -->
+  <tr>
+    <td style="padding:0 0 16px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:rgba(255,255,255,0.11);border:1px solid rgba(255,255,255,0.22);border-radius:16px;">
+        <tr>
+          <td style="padding:22px 24px;text-align:center;">
+            <div style="font-family:{_FONT};font-size:16px;font-weight:800;color:#ffffff;">
+              {('Your AI team is ready to push further.' if is_upgrade else 'Keep going — your plan is set.')}
+            </div>
+            <div style="font-family:{_FONT};font-size:13px;color:#c7d2fe;margin-top:6px;line-height:1.6;">
+              Head to your dashboard to see your daily plan and let the agents get to work on your goals.
+            </div>
+            <table cellpadding="0" cellspacing="0" border="0" align="center" style="margin-top:18px;">
+              <tr>
+                <td style="border-radius:999px;background:linear-gradient(90deg,{AMBER},{ORANGE});padding:2px;">
+                  <a href="{_esc(payload.dashboard_url)}" target="_blank" style="display:inline-block;padding:14px 34px;font-family:{_FONT};font-size:15px;font-weight:800;color:{INK};text-decoration:none;border-radius:999px;background:{AMBER};">
+                    Open my dashboard &rarr;
+                  </a>
+                </td>
+              </tr>
+            </table>
+            <div style="font-family:{_FONT};font-size:12px;color:#cbd5e1;margin-top:12px;">
+              Manage your plan and billing anytime:&nbsp;
+              <a href="{_esc(payload.billing_url)}" style="color:#fef08a;text-decoration:underline;">Billing settings</a>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="padding:0 0 8px 0;text-align:center;">
+      <div style="font-family:{_FONT};font-size:12px;color:#94a3b8;line-height:1.7;">
+        You're receiving this because you changed your ALwrity subscription.<br>
+        <a href="https://alwrity.com/settings/email-preferences" style="color:#cbd5e1;text-decoration:underline;">Email preferences</a>
+        &nbsp;·&nbsp;
+        <a href="#" style="color:#cbd5e1;text-decoration:underline;">Unsubscribe</a>
+      </div>
+    </td>
+  </tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>"""
+
+
 # ────────────────────────────────────────────────────────────────────────
 # Send
 # ────────────────────────────────────────────────────────────────────────
 
 def send_billing_email(user_id: str, db=None, first_name: str = "",
                        kind: str = "payment_confirmation",
-                       event_ref: str = "") -> Optional[str]:
+                       event_ref: str = "",
+                       payload_extra: Optional[Dict[str, Any]] = None) -> Optional[str]:
     """Send a billing notification email, best-effort and idempotent.
 
     ``event_ref`` is a natural key (e.g. the Stripe checkout/event id) that, when
     supplied, together with ``kind`` guarantees one email per distinct event even
     across retries on different days (the per-day ``DailyEmailLedger`` can't do
-    this alone). Never raises — returns the Resend message id on success, else
-    ``None``.
+    this alone). ``payload_extra`` carries kind-specific context (e.g. the
+    previous plan for a plan_change email). Never raises — returns the Resend
+    message id on success, else ``None``.
     """
     import services.daily_email_digest as digest_module
     try:
@@ -387,7 +661,8 @@ def send_billing_email(user_id: str, db=None, first_name: str = "",
             if not _reserve_once(db, user_id, kind, event_ref):
                 return None
 
-            payload = build_from_kind(user_id, db, kind, first_name=first_name)
+            payload = build_from_kind(user_id, db, kind, first_name=first_name,
+                                      extra=payload_extra)
             html = render_billing_email(payload)
 
             subject = _subject_for(kind, payload)
@@ -403,9 +678,19 @@ def send_billing_email(user_id: str, db=None, first_name: str = "",
         return None
 
 
-def build_from_kind(user_id: str, db, kind: str, first_name: str = "") -> BillingEmailPayload:
+def build_from_kind(user_id: str, db, kind: str, first_name: str = "",
+                    extra: Optional[Dict[str, Any]] = None) -> BillingEmailPayload:
     if kind == "payment_confirmation":
         return build_payment_confirmation_payload(user_id, db, first_name=first_name)
+    if kind == "plan_change":
+        extra = extra or {}
+        return build_plan_change_payload(
+            user_id, db, first_name=first_name,
+            previous_plan_name=extra.get("previous_plan_name", ""),
+            previous_plan_tier=extra.get("previous_plan_tier", ""),
+            renewal_type=extra.get("renewal_type", ""),
+            price=extra.get("price", ""),
+        )
     logger.warning(f"build_from_kind: unknown kind {kind!r}; falling back to confirmation")
     return build_payment_confirmation_payload(user_id, db, first_name=first_name)
 
@@ -417,6 +702,13 @@ def _subject_for(kind: str, payload: BillingEmailPayload) -> str:
         if first:
             return f"Payment confirmed — welcome to {plan}, {first}! 🎉"
         return f"Payment confirmed — welcome to {plan}! 🎉"
+    if kind == "plan_change":
+        renewal_type = (payload.renewal_type or "").lower()
+        if renewal_type == "upgrade":
+            return f"You're on {plan} now, {first}! 🚀"
+        if renewal_type == "downgrade":
+            return f"Your ALwrity plan is now {plan}"
+        return f"Your ALwrity plan: {plan}"
     return f"An update about your {plan}"
 
 
