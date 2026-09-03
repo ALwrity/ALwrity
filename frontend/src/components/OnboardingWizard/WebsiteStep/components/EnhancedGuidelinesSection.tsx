@@ -69,9 +69,9 @@ const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
         Enhanced Content Guidelines for {domainName}
       </Typography>
       
-      <Grid container spacing={3}>
+      <Grid container spacing={2}>
         {guidelines.tone_recommendations && (
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
             {renderGuidelinesCard(
               'Tone Recommendations',
               guidelines.tone_recommendations,
@@ -81,41 +81,8 @@ const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
           </Grid>
         )}
         
-        {guidelines.structure_guidelines && (
-          <Grid item xs={12} md={6}>
-            {renderGuidelinesCard(
-              'Structure Guidelines',
-              guidelines.structure_guidelines,
-              <AnalyticsIcon />,
-              'secondary'
-            )}
-          </Grid>
-        )}
-        
-        {guidelines.engagement_tips && (
-          <Grid item xs={12} md={6}>
-            {renderGuidelinesCard(
-              'Engagement Tips',
-              guidelines.engagement_tips,
-              <TrendingUpIcon />,
-              'success'
-            )}
-          </Grid>
-        )}
-        
-        {guidelines.vocabulary_suggestions && (
-          <Grid item xs={12} md={6}>
-            {renderGuidelinesCard(
-              'Vocabulary Suggestions',
-              guidelines.vocabulary_suggestions,
-              <LanguageIcon />,
-              'info'
-            )}
-          </Grid>
-        )}
-        
         {guidelines.brand_alignment && (
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
             {renderGuidelinesCard(
               'Brand Alignment',
               guidelines.brand_alignment,
@@ -125,8 +92,30 @@ const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
           </Grid>
         )}
         
+        {guidelines.audience_considerations && (
+          <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
+            {renderGuidelinesCard(
+              'Audience Considerations',
+              guidelines.audience_considerations,
+              <GroupIcon />,
+              'info'
+            )}
+          </Grid>
+        )}
+        
+        {guidelines.structure_guidelines && (
+          <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
+            {renderGuidelinesCard(
+              'Structure Guidelines',
+              guidelines.structure_guidelines,
+              <AnalyticsIcon />,
+              'secondary'
+            )}
+          </Grid>
+        )}
+        
         {guidelines.seo_optimization && (
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
             {renderGuidelinesCard(
               'SEO Optimization',
               guidelines.seo_optimization,
@@ -137,7 +126,7 @@ const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
         )}
         
         {guidelines.conversion_optimization && (
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
             {renderGuidelinesCard(
               'Conversion Optimization',
               guidelines.conversion_optimization,
@@ -147,19 +136,30 @@ const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
           </Grid>
         )}
         
-        {guidelines.audience_considerations && (
-          <Grid item xs={12} md={6}>
+        {guidelines.engagement_tips && (
+          <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
             {renderGuidelinesCard(
-              'Audience Considerations',
-              guidelines.audience_considerations,
-              <GroupIcon />,
+              'Engagement Tips',
+              guidelines.engagement_tips,
+              <TrendingUpIcon />,
+              'success'
+            )}
+          </Grid>
+        )}
+        
+        {guidelines.vocabulary_suggestions && (
+          <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
+            {renderGuidelinesCard(
+              'Vocabulary Suggestions',
+              guidelines.vocabulary_suggestions,
+              <LanguageIcon />,
               'info'
             )}
           </Grid>
         )}
         
         {bestPractices && bestPractices.length > 0 && (
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
             {renderGuidelinesCard(
               'Best Practices',
               bestPractices,
@@ -170,7 +170,7 @@ const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
         )}
         
         {avoidElements && avoidElements.length > 0 && (
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
             {renderGuidelinesCard(
               'What to Avoid',
               avoidElements,

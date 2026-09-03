@@ -277,13 +277,11 @@ describe('AnalysisTopBar', () => {
 // 3. Content Matrix — key intersections
 // ──────────────────────────────────────────────
 describe('Content Matrix — Overview', () => {
-  it('Overview × Insights renders KeyInsightsGrid and AI Generation Settings (RecommendedSettingsPanel)', () => {
+  it('Overview × Insights renders AI Generation Settings (RecommendedSettingsPanel)', () => {
     renderContainer();
+    expect(screen.getByText('AI Generation Settings')).toBeInTheDocument();
     expect(screen.getByText('Writing Tone')).toBeInTheDocument();
     expect(screen.getByText('Professional')).toBeInTheDocument();
-    expect(screen.getByText('AI Generation Settings')).toBeInTheDocument();
-    expect(screen.getByText('Tone: Professional')).toBeInTheDocument();
-    expect(screen.getByText('Audience: Intermediate')).toBeInTheDocument();
     expect(screen.queryByText('Content Strategy Insights')).not.toBeInTheDocument();
   });
 
@@ -370,7 +368,7 @@ describe('Content Matrix — Audience', () => {
 
   it('Audience × Insights renders TargetAudienceAnalysisSection', () => {
     expect(screen.getByText('Expertise Level')).toBeInTheDocument();
-    expect(screen.getByText('Intermediate')).toBeInTheDocument();
+    expect(screen.getAllByText('Intermediate')[0]).toBeInTheDocument();
   });
 
   it('Audience × Refine & Actions renders pain points and motivations', () => {

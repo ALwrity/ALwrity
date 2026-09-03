@@ -47,6 +47,8 @@ interface KeyInsightsGridProps {
   target_audience?: TargetAudience;
   content_type?: ContentType;
   confidence?: number;
+  filterLabels?: string[];
+  title?: string;
 }
 
 interface InsightRow {
@@ -96,8 +98,13 @@ const KeyInsightsGrid: React.FC<KeyInsightsGridProps> = ({
   target_audience,
   content_type,
   confidence,
+  filterLabels,
+  title,
 }) => {
-  const data = rows(writing_style, target_audience, content_type);
+  let data = rows(writing_style, target_audience, content_type);
+  if (filterLabels) {
+    data = data.filter((row) => filterLabels.includes(row.label));
+  }
   if (data.length === 0) return null;
 
   const groupedRows = data.reduce((acc, row) => {
@@ -107,7 +114,23 @@ const KeyInsightsGrid: React.FC<KeyInsightsGridProps> = ({
   }, {} as Record<string, InsightRow[]>);
 
   return (
-    <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e0e0e0', borderRadius: 2, mb: 2.5 }}>
+    <Box sx={{ mb: 3 }}>
+      {title && (
+        <Typography
+          variant="subtitle1"
+          sx={{
+            fontWeight: 700,
+            color: '#1e293b',
+            mb: 1.5,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+          }}
+        >
+          {title}
+        </Typography>
+      )}
+      <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e0e0e0', borderRadius: 2 }}>
       <Table sx={{ minWidth: 650 }}>
         <TableHead>
           <TableRow sx={{ backgroundColor: '#f8fafc' }}>
@@ -209,6 +232,7 @@ const KeyInsightsGrid: React.FC<KeyInsightsGridProps> = ({
         </Box>
       )}
     </TableContainer>
+    </Box>
   );
 };
 

@@ -181,8 +181,9 @@ describe('Parallel Co-existence', () => {
 describe('Real-time Sync', () => {
   it('a writing_style value appears in both containers from the same prop', () => {
     render(<Wrapper initialAnalysis={BASE_ANALYSIS} />);
-    // KeyInsightsGrid in UnifiedAnalysisContainer shows "Writing Tone"
+    // Brandstage in UnifiedAnalysisContainer shows "Writing Tone"
     const unifiedWrapper = screen.getByTestId('unified-container-wrapper');
+    fireEvent.click(within(unifiedWrapper).getByTestId('sidebar-domain-brand'));
     expect(within(unifiedWrapper).getByText('Writing Tone')).toBeInTheDocument();
 
     // AnalysisResultsDisplay also renders KeyInsightsGrid — same data

@@ -1,7 +1,6 @@
 import React from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import KeyInsightsGrid from '../../KeyInsightsGrid';
 import EnhancedGuidelinesSection from '../../EnhancedGuidelinesSection';
 import SectionHeader from '../../SectionHeader';
 import { RecommendedSettingsPanel, StrategicPanel } from './SharedComponents';
@@ -31,12 +30,6 @@ const OverviewStage: React.FC<OverviewStageProps> = ({
             <RecommendedSettingsPanel settings={analysis.recommended_settings} />
           </Box>
         )}
-        <KeyInsightsGrid
-          writing_style={analysis.writing_style}
-          target_audience={analysis.target_audience}
-          content_type={analysis.content_type}
-          confidence={analysis.meta?.confidence}
-        />
       </Box>
     );
   }
