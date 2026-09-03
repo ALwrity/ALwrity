@@ -4,7 +4,7 @@
  * Integrates Priority 2 features from cost transparency review as alerts:
  * - Dynamic Pricing Display alerts (pricing changes, OSS model recommendations)
  * - Cost Estimation Before Operations alerts (high-cost operation warnings)
- * - Historical Cost Trends alerts (spending velocity, projection warnings)
+ * - Cost threshold alerts (real current usage warnings)
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -58,51 +58,22 @@ export const usePriority2Alerts = (
     const generatedAlerts: Priority2Alert[] = [];
     const currentUsage = data.total_usage;
     const limits = data.limits;
-    const projections = data.projections;
 
     if (!currentUsage || !limits) return generatedAlerts;
 
-    // 1. Cost Trend Alerts (Priority 2: Historical Cost Trends)
+    // 1. Cost Alerts (based on actual current spending thresholds, not predictive projections)
     const costLimit = limits.limits?.monthly_cost || 0;
     const currentCost = currentUsage.total_cost || 0;
-    const projectedCost = projections?.projected_monthly_cost || 0;
     const costUsagePercentage = costLimit > 0 ? (currentCost / costLimit) * 100 : 0;
-    const projectedPercentage = costLimit > 0 ? (projectedCost / costLimit) * 100 : 0;
 
-    // High spending velocity alert
-    if (projectedPercentage > 120 && costUsagePercentage < 80) {
-      const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-      const currentDay = new Date().getDate();
-      const avgDailyCost = currentCost / currentDay;
-      const daysUntilExhaustion = costLimit > avgDailyCost 
-        ? Math.ceil((costLimit - currentCost) / avgDailyCost) 
-        : 0;
-
+    // Actual spending threshold alerts
+    if (costUsagePercentage >= 90) {
       generatedAlerts.push({
-        id: 'cost-velocity-high',
-        type: 'cost_trend',
-        severity: 'warning',
-        title: 'High Spending Velocity Detected',
-        message: `Your current spending rate projects to ${projectedCost.toFixed(2)} this month (${projectedPercentage.toFixed(0)}% of limit). At this rate, you'll exhaust your budget in ~${daysUntilExhaustion} days.`,
-        action: {
-          label: 'View Cost Trends',
-          onClick: () => {
-            // Navigate to billing dashboard
-            window.location.href = '/billing';
-          }
-        },
-        dismissible: true
-      });
-    }
-
-    // Cost projection warning
-    if (projectedPercentage >= 95 && costUsagePercentage < 95) {
-      generatedAlerts.push({
-        id: 'cost-projection-critical',
+        id: 'cost-budget-critical',
         type: 'cost_trend',
         severity: 'error',
-        title: 'Critical: Budget Exhaustion Projected',
-        message: `Based on current spending, you're projected to exceed your $${costLimit.toFixed(2)} monthly budget. Current: $${currentCost.toFixed(2)} (${costUsagePercentage.toFixed(0)}%), Projected: $${projectedCost.toFixed(2)} (${projectedPercentage.toFixed(0)}%)`,
+        title: 'Critical: Approaching Monthly Budget Limit',
+        message: `You've used $${currentCost.toFixed(2)} (${costUsagePercentage.toFixed(0)}%) of your $${costLimit.toFixed(2)} monthly budget.`,
         action: {
           label: 'Upgrade Plan',
           onClick: () => {
@@ -110,6 +81,21 @@ export const usePriority2Alerts = (
           }
         },
         dismissible: false
+      });
+    } else if (costUsagePercentage >= 80) {
+      generatedAlerts.push({
+        id: 'cost-budget-warning',
+        type: 'cost_trend',
+        severity: 'warning',
+        title: 'Budget Usage Warning',
+        message: `You've used $${currentCost.toFixed(2)} (${costUsagePercentage.toFixed(0)}%) of your $${costLimit.toFixed(2)} monthly budget.`,
+        action: {
+          label: 'View Billing',
+          onClick: () => {
+            window.location.href = '/billing';
+          }
+        },
+        dismissible: true
       });
     }
 
