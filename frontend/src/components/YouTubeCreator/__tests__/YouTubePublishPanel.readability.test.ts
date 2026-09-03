@@ -21,5 +21,25 @@ describe("YouTubePublishPanel privacy and schedule readability", () => {
     expect(source).toContain("labelSx");
     expect(source).toContain("helperSx");
     expect(source).toContain("selectMenuProps");
+    expect(source).toContain("youtubeScheduleFieldSx");
+  });
+
+  it("merges inputSx with schedule styles so the outlined border is not wiped", () => {
+    const source = readFileSync(PANEL_SOURCE, "utf8");
+    expect(source).toContain("sx={[inputSx, youtubeScheduleFieldSx]}");
+  });
+
+  it("does not disable Privacy when a schedule time is set", () => {
+    const source = readFileSync(PANEL_SOURCE, "utf8");
+    expect(source).not.toContain("disabled={Boolean(scheduleLocal)}");
+  });
+
+  it("logs selected vs effective privacy and skips invalid schedules", () => {
+    const source = readFileSync(PANEL_SOURCE, "utf8");
+    expect(source).toContain("selectedPrivacy");
+    expect(source).toContain("effectivePrivacy");
+    expect(source).toContain("Publish skipped: invalid schedule");
+    expect(source).toContain("hasValidPublishAt");
+    expect(source).toContain("youtubeScheduleIsInvalid");
   });
 });

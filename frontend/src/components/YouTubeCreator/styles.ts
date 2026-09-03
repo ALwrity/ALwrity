@@ -15,6 +15,14 @@ const TEXT_PLACEHOLDER = '#9ca3af'; // Lighter gray for placeholders
 const BACKGROUND = '#ffffff';
 const BACKGROUND_HOVER = '#f9fafb';
 
+export {
+  BACKGROUND,
+  BACKGROUND_HOVER,
+  BORDER_COLOR,
+  BORDER_HOVER,
+  TEXT_PRIMARY,
+};
+
 export const inputSx = {
   '& .MuiOutlinedInput-root': {
     backgroundColor: BACKGROUND,
@@ -156,6 +164,21 @@ export const helperSx = {
   marginTop: '6px',
   lineHeight: 1.5,
   fontWeight: 400,
+};
+
+/** Outlined surface matching Privacy/select: light border that darkens on hover. */
+export const outlinedControlSx = {
+  backgroundColor: BACKGROUND,
+  border: `1.5px solid ${BORDER_COLOR}`,
+  borderRadius: 1.5,
+  transition: 'border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+  '&:hover': {
+    borderColor: BORDER_HOVER,
+  },
+  '&:focus-within': {
+    borderColor: BORDER_FOCUS,
+    boxShadow: `0 0 0 3px rgba(255, 0, 0, 0.1)`,
+  },
 };
 
 export const readableChipSx = {

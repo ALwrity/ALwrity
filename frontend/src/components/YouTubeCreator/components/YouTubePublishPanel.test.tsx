@@ -279,7 +279,44 @@ describe("YouTubePublishPanel title, schedule, and publish", () => {
     );
   });
 
-  it("forces private and a UTC publish_at when a schedule time is set", () => {
+  it("keeps Privacy selectable when scheduling and still sends private until go-live", () => {
+    const publishToYouTube = vi.fn();
+    mockedUseYouTubePublish.mockReturnValue(connectedState({ publishToYouTube }));
+
+    render(
+      <YouTubePublishPanel
+        videoUrl={CREATOR_VIDEO_URL}
+        scenes={baseScenes}
+        videoPlan={basePlan}
+      />,
+    );
+    chooseNotMadeForKids();
+
+    fireEvent.change(screen.getByLabelText(/Schedule/i), {
+      target: { value: "2026-08-20T15:00" },
+    });
+
+    const privacy = screen.getByLabelText("Privacy");
+    expect(privacy).not.toHaveAttribute("aria-disabled", "true");
+    expect(privacy).toHaveTextContent("Unlisted");
+
+    fireEvent.mouseDown(privacy);
+    fireEvent.click(screen.getByRole("option", { name: "Public" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Schedule on YouTube" }));
+
+    expect(publishToYouTube).toHaveBeenCalledTimes(1);
+    expect(publishToYouTube).toHaveBeenCalledWith(
+      CREATOR_VIDEO_URL,
+      "How to rank YouTube videos fast",
+      expect.objectContaining({
+        privacy_status: "private",
+        publish_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/),
+      }),
+    );
+  });
+
+  it("still sends private and UTC publish_at when scheduling without changing Privacy", () => {
     const publishToYouTube = vi.fn();
     mockedUseYouTubePublish.mockReturnValue(connectedState({ publishToYouTube }));
 
@@ -297,7 +334,6 @@ describe("YouTubePublishPanel title, schedule, and publish", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Schedule on YouTube" }));
 
-    expect(publishToYouTube).toHaveBeenCalledTimes(1);
     expect(publishToYouTube).toHaveBeenCalledWith(
       CREATOR_VIDEO_URL,
       "How to rank YouTube videos fast",
@@ -306,5 +342,54 @@ describe("YouTubePublishPanel title, schedule, and publish", () => {
         publish_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/),
       }),
     );
+  });
+
+  it("sends the selected Privacy when publishing now without a schedule", () => {
+    const publishToYouTube = vi.fn();
+    mockedUseYouTubePublish.mockReturnValue(connectedState({ publishToYouTube }));
+
+    render(
+      <YouTubePublishPanel
+        videoUrl={CREATOR_VIDEO_URL}
+        scenes={baseScenes}
+        videoPlan={basePlan}
+      />,
+    );
+    chooseNotMadeForKids();
+
+    fireEvent.mouseDown(screen.getByLabelText("Privacy"));
+    fireEvent.click(screen.getByRole("option", { name: "Public" }));
+    fireEvent.click(screen.getByRole("button", { name: "Publish to YouTube" }));
+
+    expect(publishToYouTube).toHaveBeenCalledWith(
+      CREATOR_VIDEO_URL,
+      "How to rank YouTube videos fast",
+      expect.objectContaining({
+        privacy_status: "public",
+        publish_at: undefined,
+      }),
+    );
+  });
+
+  it("explains that scheduled uploads stay private until go-live", () => {
+    mockedUseYouTubePublish.mockReturnValue(connectedState());
+
+    render(
+      <YouTubePublishPanel
+        videoUrl={CREATOR_VIDEO_URL}
+        scenes={baseScenes}
+        videoPlan={basePlan}
+      />,
+    );
+
+    expect(screen.getByText(/Leave empty to publish now/i)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText(/Schedule/i), {
+      target: { value: "2026-08-20T15:00" },
+    });
+
+    expect(
+      screen.getByText(/YouTube keeps this private until this time/i),
+    ).toBeTruthy();
   });
 });
