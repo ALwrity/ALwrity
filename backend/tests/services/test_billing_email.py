@@ -546,3 +546,71 @@ def test_build_from_kind_routes_renewal_receipt(monkeypatch):
     assert p.kind == "renewal_receipt"
     assert p.plan_name == "Pro"
     assert p.price == "$99"
+
+
+# --------------------------------------------------------------------------- #
+# Phase 4 — payment failure
+# --------------------------------------------------------------------------- #
+
+def test_payment_failed_payload_defaults():
+    session = _FakeSession({
+        "usersubscription": [_user_subscription(plan_id=2)],
+        "subscriptionplan": [_plan(name="Pro", tier="pro")],
+    })
+    p = billing.build_payment_failed_payload("u1", db=session, first_name="Ada")
+    assert p.kind == "payment_failed"
+    assert p.plan_name == "Pro"
+    assert p.first_name == "Ada"
+    assert p.price == "$79"
+
+
+def test_payment_failed_payload_with_explicit_price():
+    session = _FakeSession({
+        "usersubscription": [_user_subscription(plan_id=2)],
+        "subscriptionplan": [_plan(name="Pro", tier="pro")],
+    })
+    p = billing.build_payment_failed_payload(
+        "u1", db=session, first_name="Ada",
+        price="49.50", failure_reason="Your card was declined",
+    )
+    assert p.kind == "payment_failed"
+    assert p.price == "$50"  # rounded
+    assert p.first_name == "Ada"
+
+
+def test_payment_failed_render():
+    p = billing.BillingEmailPayload(
+        kind="payment_failed", first_name="Ada", plan_name="Pro", price="$79",
+    )
+    html = billing.render_billing_email(p, verbose=True)
+    assert "PAYMENT FAILED" in html
+    assert "We couldn't process your payment" in html
+    assert "Hi Ada" in html
+    assert "Pro" in html
+    assert "$79" in html
+    assert "Update payment method" in html
+    assert "settings/billing" in html
+
+
+def test_payment_failed_subject():
+    subj = billing._subject_for("payment_failed", billing.BillingEmailPayload(
+        first_name="Ada", plan_name="Pro",
+    ))
+    assert "Action required" in subj
+    assert "payment failed" in subj
+
+
+def test_build_from_kind_routes_payment_failed(monkeypatch):
+    monkeypatch.setattr(billing, "_contact_email", lambda uid, db: "a@b.io")
+    monkeypatch.setattr(billing, "_opted_in", lambda uid, db: True)
+    session = _FakeSession({
+        "usersubscription": [_user_subscription(plan_id=2)],
+        "subscriptionplan": [_plan(name="Pro", tier="pro")],
+    })
+    p = billing.build_from_kind(
+        "u1", db=session, kind="payment_failed", first_name="Ada",
+        extra={"price": "49.50", "failure_reason": "Insufficient funds"},
+    )
+    assert p.kind == "payment_failed"
+    assert p.plan_name == "Pro"
+    assert p.price == "$50"

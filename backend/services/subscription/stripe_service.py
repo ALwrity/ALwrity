@@ -548,6 +548,12 @@ class StripeService:
             subscription.is_active = False
             self.db.commit()
 
+            # Best-effort payment-failure email.
+            try:
+                self._send_payment_failed_from_webhook(subscription, invoice)
+            except Exception as fail_err:
+                logger.warning(f"Payment-failure email skipped for user {subscription.user_id}: {fail_err}")
+
     async def _handle_subscription_updated(self, subscription_obj: Dict[str, Any]):
         """
         Handle subscription updates (cancellations, changes).
@@ -813,6 +819,35 @@ class StripeService:
             logger.info(f"Renewal-receipt email queued for user {user_id}")
         except Exception as e:
             logger.warning(f"Failed to send renewal-receipt email for user {user_id}: {e}")
+
+    def _send_payment_failed_from_webhook(self, subscription, invoice: Dict[str, Any]) -> None:
+        """Send a payment-failure email for a failed recurring charge (best-effort).
+
+        Never raises.
+        """
+        user_id = subscription.user_id
+
+        try:
+            raw_amount = invoice.get("amount_due", 0) or 0
+            price = str(round(float(raw_amount) / 100.0, 2))
+
+            last_error = invoice.get("last_payment_error") or {}
+            failure_reason = last_error.get("message", "") or ""
+
+            from services.subscription.billing_email import send_billing_email
+            send_billing_email(
+                user_id,
+                db=self.db,
+                kind="payment_failed",
+                event_ref=f"failed-{invoice.get('id', user_id)}",
+                payload_extra={
+                    "price": price,
+                    "failure_reason": failure_reason,
+                },
+            )
+            logger.info(f"Payment-failure email queued for user {user_id}")
+        except Exception as e:
+            logger.warning(f"Failed to send payment-failure email for user {user_id}: {e}")
 
     def _update_user_subscription(
         self,

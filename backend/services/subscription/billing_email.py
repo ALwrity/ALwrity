@@ -308,6 +308,71 @@ def build_renewal_receipt_payload(user_id: str, db, first_name: str = "",
     return payload
 
 
+def build_payment_failed_payload(user_id: str, db, first_name: str = "",
+                                  price: str = "", failure_reason: str = "",
+                                  invoice_url: str = "") -> BillingEmailPayload:
+    """Assemble a payment-failure payload.
+
+    ``price``, ``failure_reason``, and ``invoice_url`` are best supplied by the caller
+    (the Stripe webhook has them in scope); when omitted we derive price from the
+    current plan. Never raises on missing data.
+    """
+    payload = BillingEmailPayload(
+        kind="payment_failed",
+        first_name=first_name or "",
+        price=price or "",
+    )
+
+    try:
+        from models.subscription_models import UserSubscription, SubscriptionPlan
+
+        subscription = db.query(UserSubscription).filter(
+            UserSubscription.user_id == user_id
+        ).first()
+
+        if subscription is None:
+            payload.price = _money(payload.price) if payload.price else "$0"
+            return payload
+
+        plan = None
+        if subscription.plan_id:
+            try:
+                plan = db.query(SubscriptionPlan).filter(
+                    SubscriptionPlan.id == subscription.plan_id
+                ).first()
+            except Exception:
+                plan = None
+
+        # Billing cycle + plan name/tier/features
+        cycle = getattr(subscription, "billing_cycle", None)
+        try:
+            payload.billing_cycle = str(cycle.value if hasattr(cycle, "value") else cycle) or ""
+        except Exception:
+            payload.billing_cycle = ""
+
+        if plan is not None:
+            payload.plan_name = getattr(plan, "name", "") or ""
+            try:
+                payload.plan_tier = str(plan.tier.value if hasattr(plan.tier, "value") else plan.tier)
+            except Exception:
+                payload.plan_tier = ""
+            payload.features = _plan_features(plan)[:5]
+            if not payload.price:
+                try:
+                    raw = getattr(plan, "price_yearly" if payload.billing_cycle == "yearly" else "price_monthly", None)
+                    payload.price = _money(raw)
+                except Exception:
+                    payload.price = "$0"
+            else:
+                payload.price = _money(payload.price) if _is_raw_amount(payload.price) else payload.price
+    except Exception as e:
+        logger.warning(f"Failed to build payment-failed payload for {user_id}: {e}")
+        if not payload.price:
+            payload.price = "$0"
+
+    return payload
+
+
 def _is_raw_amount(value: str) -> bool:
     """True if ``value`` looks like a raw numeric amount (e.g. Stripe minor units)
     rather than an already-formatted display string like ``$79``."""
@@ -360,7 +425,9 @@ def render_billing_email(payload: BillingEmailPayload, verbose: bool = True) -> 
         return _render_plan_change(payload)
     if payload.kind == "renewal_receipt":
         return _render_renewal_receipt(payload)
-    # Later phases add: payment_failed.
+    if payload.kind == "payment_failed":
+        return _render_payment_failed(payload)
+    # Later phases add: .
     logger.warning(f"render_billing_email: unknown kind {payload.kind!r}; rendering confirmation")
     return _render_payment_confirmation(payload)
 
@@ -842,6 +909,120 @@ def _render_renewal_receipt(payload: BillingEmailPayload) -> str:
 </html>"""
 
 
+def _render_payment_failed(payload: BillingEmailPayload) -> str:
+    from services.email_templates import (
+        _FONT, _esc,
+        INK, ROSE, SLATE_300, SLATE_400, SLATE_800,
+    )
+
+    first = _esc(payload.first_name) or "there"
+    plan = _esc(payload.plan_name or "your plan")
+    amount = _esc(payload.price) or "$0"
+
+    return f"""<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="x-apple-disable-message-reformatting">
+<title>Action required: payment failed for your {plan} plan</title>
+<style>
+  body, table, td, a {{ -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }}
+  table, td {{ mso-table-lspace:0pt; mso-table-rspace:0pt; }}
+  body {{ margin:0 !important; padding:0 !important; width:100% !important; background-color:#0f172a; }}
+  @media only screen and (max-width:620px) {{
+    .email-container {{ width:100% !important; padding:14px !important; }}
+    .hide-mobile {{ display:none !important; }}
+  }}
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:#0f172a;font-family:{_FONT};">
+
+<div style="display:none;font-size:1px;color:#0f172a;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+  Payment failed for your {plan} plan
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:linear-gradient(160deg,#7f1d1d 0%,#991b1b 25%,#b45309 60%,#d97706 100%);">
+<tr><td align="center" style="padding:34px 14px;">
+
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="email-container" style="max-width:600px;width:100%;position:relative;">
+
+  <!-- Hero -->
+  <tr>
+    <td style="padding:0 0 16px 0;text-align:center;">
+      <span style="background:{ROSE};color:#ffffff;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:0.5px;">PAYMENT FAILED</span>
+      <div style="font-family:{_FONT};font-size:30px;font-weight:800;color:#ffffff;line-height:1.15;margin-top:10px;">
+        We couldn't process your payment
+      </div>
+      <div style="font-family:{_FONT};font-size:15px;color:#fecaca;margin-top:8px;line-height:1.6;">
+        Hi {first}, your {plan} subscription renewal payment of {amount} didn't go through.
+      </div>
+    </td>
+  </tr>
+
+  <!-- Failure card -->
+  <tr>
+    <td style="padding:0 0 16px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border-radius:16px;overflow:hidden;">
+        <tr>
+          <td style="background:#fef2f2;padding:16px 22px;border-bottom:1px solid {SLATE_300};">
+            <div style="font-family:{_FONT};font-size:16px;font-weight:800;color:{ROSE};">
+              ⚠️ Action required
+            </div>
+            <div style="font-family:{_FONT};font-size:12px;color:{SLATE_400};margin-top:2px;">
+              Your service may be affected if this isn't resolved
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 22px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="padding:6px 0;font-family:{_FONT};font-size:13px;color:{SLATE_800};">Plan</td>
+                <td style="padding:6px 0;font-family:{_FONT};font-size:13px;font-weight:700;text-align:right;color:{INK};">{plan}</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;font-family:{_FONT};font-size:13px;color:{SLATE_800};">Amount</td>
+                <td style="padding:6px 0;font-family:{_FONT};font-size:13px;font-weight:700;text-align:right;color:{ROSE};">{amount}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- CTAs -->
+  <tr>
+    <td style="padding:0 0 16px 0;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:rgba(255,255,255,0.11);border:1px solid rgba(255,255,255,0.22);border-radius:16px;">
+        <tr>
+          <td style="padding:22px 24px;text-align:center;">
+            <div style="font-family:{_FONT};font-size:15px;font-weight:800;color:#ffffff;margin-bottom:14px;">
+              Please update your payment method now
+            </div>
+            <a href="{_esc(payload.billing_url)}" style="display:inline-block;background:#ffffff;color:{INK};text-decoration:none;font-family:{_FONT};font-size:14px;font-weight:800;padding:12px 22px;border-radius:999px;margin-right:8px;">Update payment method</a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <tr>
+    <td style="padding:0 0 8px 0;text-align:center;">
+      <div style="font-family:{_FONT};font-size:12px;color:{SLATE_400};">
+        Questions? Contact us at support@alwrity.com
+      </div>
+    </td>
+  </tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>"""
+
+
 # ────────────────────────────────────────────────────────────────────────
 # Send
 # ────────────────────────────────────────────────────────────────────────
@@ -919,6 +1100,14 @@ def build_from_kind(user_id: str, db, kind: str, first_name: str = "",
             period_start=extra.get("period_start", ""),
             period_end=extra.get("period_end", ""),
         )
+    if kind == "payment_failed":
+        extra = extra or {}
+        return build_payment_failed_payload(
+            user_id, db, first_name=first_name,
+            price=extra.get("price", ""),
+            failure_reason=extra.get("failure_reason", ""),
+            invoice_url=extra.get("invoice_url", ""),
+        )
     logger.warning(f"build_from_kind: unknown kind {kind!r}; falling back to confirmation")
     return build_payment_confirmation_payload(user_id, db, first_name=first_name)
 
@@ -941,6 +1130,8 @@ def _subject_for(kind: str, payload: BillingEmailPayload) -> str:
         if first:
             return f"Your {plan} plan has renewed, {first} — receipt inside"
         return f"Your {plan} plan has renewed — receipt inside"
+    if kind == "payment_failed":
+        return f"Action required: your {plan} payment failed"
     return f"An update about your {plan}"
 
 
