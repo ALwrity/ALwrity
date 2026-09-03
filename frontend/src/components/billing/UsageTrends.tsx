@@ -71,14 +71,11 @@ const UsageTrends: React.FC<UsageTrendsProps> = ({
       : chartData[chartData.length - 1].calls > 0 ? 100 : 0
     : 0;
 
-  // Calculate cost velocity (daily spending rate)
-  const currentDate = new Date();
-  const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-  const currentDay = currentDate.getDate();
+  // Real current period metrics (non-predictive)
   const currentMonthCost = chartData.length > 0 ? chartData[chartData.length - 1].cost : 0;
-  const avgDailyCost = currentDay > 0 ? currentMonthCost / currentDay : 0;
-  const projectedMonthlyCost = avgDailyCost * daysInMonth;
-  const daysRemaining = daysInMonth - currentDay;
+  const currentMonthCalls = chartData.length > 0 ? chartData[chartData.length - 1].calls : 0;
+  const budgetLimit = projections.cost_limit || 0;
+  const actualUsagePercentage = budgetLimit > 0 ? (currentMonthCost / budgetLimit) * 100 : 0;
   
   // Calculate cost velocity trend (comparing recent vs earlier period)
   const recentPeriods = chartData.slice(-3); // Last 3 periods
@@ -142,7 +139,7 @@ const UsageTrends: React.FC<UsageTrendsProps> = ({
         <CardContent sx={{ pb: 1 }}>
           <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold', mb: 2 }}>
             <TrendingUpIcon fontSize="small" />
-            Usage Trends & Projections
+            Usage Trends & Budget Status
           </Typography>
         </CardContent>
 
@@ -343,7 +340,7 @@ const UsageTrends: React.FC<UsageTrendsProps> = ({
             </Box>
           </Box>
 
-          {/* Enhanced Projections */}
+          {/* Current Period Usage & Budget */}
           <Box 
             sx={{ 
               p: 2.5, 
@@ -354,37 +351,31 @@ const UsageTrends: React.FC<UsageTrendsProps> = ({
           >
             <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1, color: '#ffffff' }}>
               <CalendarIcon fontSize="small" />
-              Monthly Projections & Forecast
+              Current Billing Period Status
             </Typography>
             
-            <Grid container spacing={2} sx={{ mb: 2 }}>
+            <Grid container spacing={2}>
               <Grid item xs={6} sm={3}>
-                <MuiTooltip 
-                  title={
-                    <React.Fragment>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5, display: 'block' }}>
-                        Projected Monthly Cost
-                      </Typography>
-                      <Typography variant="body2" sx={{ display: 'block' }}>
-                        Based on current spending rate: {formatCurrency(avgDailyCost)}/day
-                      </Typography>
-                      <Typography variant="caption" sx={{ mt: 1, display: 'block', opacity: 0.8 }}>
-                        {daysRemaining} days remaining in month
-                      </Typography>
-                    </React.Fragment>
-                  }
-                  arrow
-                  placement="top"
-                >
+                <MuiTooltip title="Total spending in the current billing period" arrow placement="top">
                   <Box component="span" sx={{ textAlign: 'center', cursor: 'help' }}>
                     <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 0.5 }}>
-                      Projected Cost
+                      Current Spend
                     </Typography>
                     <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#667eea' }}>
-                      {formatCurrency(Math.max(projectedMonthlyCost, projections.projected_monthly_cost))}
+                      {formatCurrency(currentMonthCost)}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'block', mt: 0.5 }}>
-                      {projectedMonthlyCost > projections.projected_monthly_cost ? '(velocity-based)' : '(trend-based)'}
+                  </Box>
+                </MuiTooltip>
+              </Grid>
+
+              <Grid item xs={6} sm={3}>
+                <MuiTooltip title="Maximum spending allowed for the current billing period" arrow placement="top">
+                  <Box component="span" sx={{ textAlign: 'center', cursor: 'help' }}>
+                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 0.5 }}>
+                      Budget Limit
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#ffffff' }}>
+                      {budgetLimit > 0 ? formatCurrency(budgetLimit) : 'Unlimited'}
                     </Typography>
                   </Box>
                 </MuiTooltip>
@@ -395,10 +386,10 @@ const UsageTrends: React.FC<UsageTrendsProps> = ({
                   title={
                     <React.Fragment>
                       <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5, display: 'block' }}>
-                        Projected Usage Percentage
+                        Actual Usage Percentage
                       </Typography>
                       <Typography variant="body2" sx={{ display: 'block' }}>
-                        Based on projected cost vs monthly limit
+                        Current spending vs monthly budget limit
                       </Typography>
                     </React.Fragment>
                   }
@@ -407,103 +398,35 @@ const UsageTrends: React.FC<UsageTrendsProps> = ({
                 >
                   <Box component="span" sx={{ textAlign: 'center', cursor: 'help' }}>
                     <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 0.5 }}>
-                      Usage %
+                      Current Usage %
                     </Typography>
                     <Typography 
                       variant="h6" 
                       sx={{ 
                         fontWeight: 'bold',
-                        color: projections.projected_usage_percentage > 80 ? '#ef4444' : 
-                               projections.projected_usage_percentage > 60 ? '#f59e0b' : '#22c55e'
+                        color: actualUsagePercentage >= 90 ? '#ef4444' : 
+                               actualUsagePercentage >= 80 ? '#f59e0b' : '#22c55e'
                       }}
                     >
-                      {formatPercentage(projections.projected_usage_percentage)}
+                      {budgetLimit > 0 ? formatPercentage(actualUsagePercentage) : '0%'}
                     </Typography>
                   </Box>
                 </MuiTooltip>
               </Grid>
 
               <Grid item xs={6} sm={3}>
-                <MuiTooltip 
-                  title={
-                    <React.Fragment>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5, display: 'block' }}>
-                        Estimated Days Until Budget Exhaustion
-                      </Typography>
-                      <Typography variant="body2" sx={{ display: 'block' }}>
-                        Based on current daily spending rate
-                      </Typography>
-                    </React.Fragment>
-                  }
-                  arrow
-                  placement="top"
-                >
+                <MuiTooltip title="Total API calls made across all providers this billing period" arrow placement="top">
                   <Box component="span" sx={{ textAlign: 'center', cursor: 'help' }}>
                     <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 0.5 }}>
-                      Days Remaining
-                    </Typography>
-                    <Typography 
-                      variant="h6" 
-                      sx={{ 
-                        fontWeight: 'bold',
-                        color: avgDailyCost > 0 && projections.cost_limit > 0
-                          ? (projections.cost_limit / avgDailyCost <= daysRemaining ? '#ef4444' : '#22c55e')
-                          : '#ffffff'
-                      }}
-                    >
-                      {avgDailyCost > 0 && projections.cost_limit > 0
-                        ? Math.min(Math.ceil((projections.cost_limit - currentMonthCost) / avgDailyCost), daysRemaining)
-                        : daysRemaining
-                      }
-                    </Typography>
-                  </Box>
-                </MuiTooltip>
-              </Grid>
-
-              <Grid item xs={6} sm={3}>
-                <MuiTooltip 
-                  title={
-                    <React.Fragment>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5, display: 'block' }}>
-                        Monthly Budget Limit
-                      </Typography>
-                      <Typography variant="body2" sx={{ display: 'block' }}>
-                        Maximum spending allowed this month
-                      </Typography>
-                    </React.Fragment>
-                  }
-                  arrow
-                  placement="top"
-                >
-                  <Box component="span" sx={{ textAlign: 'center', cursor: 'help' }}>
-                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 0.5 }}>
-                      Budget Limit
+                      Total API Calls
                     </Typography>
                     <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#ffffff' }}>
-                      {formatCurrency(projections.cost_limit)}
+                      {formatNumber(currentMonthCalls)}
                     </Typography>
                   </Box>
                 </MuiTooltip>
               </Grid>
             </Grid>
-
-            {/* Cost Velocity Warning */}
-            {avgDailyCost > 0 && projectedMonthlyCost > projections.cost_limit && (
-              <Box 
-                sx={{ 
-                  mt: 2,
-                  p: 1.5,
-                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                  borderRadius: 1,
-                  border: '1px solid rgba(239, 68, 68, 0.3)'
-                }}
-              >
-                <Typography variant="caption" sx={{ color: '#ef4444', fontWeight: 500 }}>
-                  ⚠️ At current spending rate ({formatCurrency(avgDailyCost)}/day), you'll exceed your monthly budget 
-                  in ~{Math.ceil((projections.cost_limit - currentMonthCost) / avgDailyCost)} days.
-                </Typography>
-              </Box>
-            )}
           </Box>
         </CardContent>
 
