@@ -266,7 +266,7 @@ const TaskCard: React.FC<{ task: any; modal: boolean }> = ({ task, modal }) => {
             <Box>
               <Typography variant="caption" sx={{ fontWeight: 700, opacity: 0.75 }}>
                 Selection score: {Number(meta.selection_score).toFixed(2)}
-                {meta.confidence != null && ` · confidence ${(Number(meta.confidence) * 100).toFixed(0)}%`}
+                {meta.confidence != null && meta.confidence > 0 && ` · confidence ${(Number(meta.confidence) * 100).toFixed(0)}%`}
               </Typography>
               {(meta.selection_reason || []).map((r: string, i: number) => (
                 <Typography key={i} variant="caption" component="div" sx={{ opacity: 0.8 }}>
