@@ -31,14 +31,33 @@ interface MiniSparklineProps {
  *     label="Cost"
  *   />
  */
-export const MiniSparkline: React.FC<MiniSparklineProps> = ({ 
-  data, 
-  color, 
+export const MiniSparkline: React.FC<MiniSparklineProps> = ({
+  data,
+  color,
   height = 60,
   showArea = false,
   formatValue = (v) => v.toLocaleString(),
   label = 'Value'
 }) => {
+  // Guard against zero-size mounts: during AnimatePresence exit animations
+  // (e.g. billing card switching) the parent collapses to width/height -1
+  // and recharts logs warnings. Render the chart only when the container
+  // is actually measurable.
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const [hasSize, setHasSize] = React.useState(false);
+
+  React.useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect?.width ?? 0;
+      const observedHeight = entries[0]?.contentRect?.height ?? 0;
+      setHasSize(width > 0 && observedHeight > 0);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   // Ensure we have data
   if (!data || data.length === 0) {
     return (
@@ -101,46 +120,48 @@ export const MiniSparkline: React.FC<MiniSparklineProps> = ({
   };
 
   return (
-    <Box sx={{ height, width: '100%', mt: 1 }}>
-      <Suspense fallback={<ChartLoadingFallback />}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LazyLineChart 
-            data={chartData} 
-            margin={{ top: 5, right: 5, bottom: 20, left: 5 }}
-          >
-            <XAxis 
-              dataKey="date"
-              tickFormatter={formatDate}
-              stroke="rgba(255,255,255,0.5)"
-              tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
-              height={20}
-            />
-            <YAxis 
-              domain={[minValue - padding, maxValue + padding]}
-              tickFormatter={(value) => {
-                if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-                if (value >= 1) return value.toFixed(0);
-                return value.toFixed(2);
-              }}
-              stroke="rgba(255,255,255,0.5)"
-              tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
-              width={40}
-            />
-            <RechartsTooltip content={<CustomTooltip />} />
-            <Line 
-              type="monotone" 
-              dataKey="value" 
-              stroke={color}
-              strokeWidth={2}
-              dot={{ fill: color, r: 3 }}
-              activeDot={{ r: 5, fill: color }}
-              isAnimationActive={true}
-              animationDuration={1000}
-              animationBegin={0}
-            />
-          </LazyLineChart>
-        </ResponsiveContainer>
-      </Suspense>
+    <Box ref={containerRef} sx={{ height, width: '100%', mt: 1 }}>
+      {hasSize && (
+        <Suspense fallback={<ChartLoadingFallback />}>
+          <ResponsiveContainer width="100%" height={height}>
+            <LazyLineChart
+              data={chartData}
+              margin={{ top: 5, right: 5, bottom: 20, left: 5 }}
+            >
+              <XAxis
+                dataKey="date"
+                tickFormatter={formatDate}
+                stroke="rgba(255,255,255,0.5)"
+                tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
+                height={20}
+              />
+              <YAxis
+                domain={[minValue - padding, maxValue + padding]}
+                tickFormatter={(value) => {
+                  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+                  if (value >= 1) return value.toFixed(0);
+                  return value.toFixed(2);
+                }}
+                stroke="rgba(255,255,255,0.5)"
+                tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
+                width={40}
+              />
+              <RechartsTooltip content={<CustomTooltip />} />
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke={color}
+                strokeWidth={2}
+                dot={{ fill: color, r: 3 }}
+                activeDot={{ r: 5, fill: color }}
+                isAnimationActive={true}
+                animationDuration={1000}
+                animationBegin={0}
+              />
+            </LazyLineChart>
+          </ResponsiveContainer>
+        </Suspense>
+      )}
     </Box>
   );
 };
