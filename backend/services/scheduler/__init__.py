@@ -43,6 +43,7 @@ from .utils.linkedin_post_analytics_sync_task_loader import load_due_linkedin_po
 from .utils.linkedin_growth_reanalysis_task_loader import load_due_linkedin_growth_reanalysis_tasks
 from services.daily_workflow_batch import generate_scheduled_daily_workflows
 from services.linkedin_today_workflow_batch import generate_scheduled_linkedin_workflows
+from services.daily_email_digest import reconcile_missed_digests, send_weekly_summaries
 from services.integrations.linkedin.linkedin_industry_sync_job import (
     schedule_bootstrap_sync_if_missing,
     sync_linkedin_industries_scheduled,
@@ -216,7 +217,42 @@ def get_scheduler() -> TaskScheduler:
             misfire_grace_time=3600,
         )
         schedule_bootstrap_sync_if_missing(_scheduler_instance.scheduler)
-    
+
+        # Daily digest reconciler: recover any pending/failed digest sends.
+        digest_reconcile_hour_utc = int(os.getenv('DIGEST_RECONCILE_HOUR_UTC', '8'))
+        digest_reconcile_minute_utc = int(os.getenv('DIGEST_RECONCILE_MINUTE_UTC', '30'))
+        _scheduler_instance.scheduler.add_job(
+            reconcile_missed_digests,
+            trigger=CronTrigger(
+                hour=digest_reconcile_hour_utc,
+                minute=digest_reconcile_minute_utc,
+                timezone='UTC',
+            ),
+            id='reconcile_missed_digests',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=3600,
+        )
+
+        # Weekly summary: batch-send on Sunday morning (end of the week).
+        weekly_hour_utc = int(os.getenv('WEEKLY_SUMMARY_HOUR_UTC', '9'))
+        weekly_minute_utc = int(os.getenv('WEEKLY_SUMMARY_MINUTE_UTC', '0'))
+        _scheduler_instance.scheduler.add_job(
+            send_weekly_summaries,
+            trigger=CronTrigger(
+                day_of_week='sun',
+                hour=weekly_hour_utc,
+                minute=weekly_minute_utc,
+                timezone='UTC',
+            ),
+            id='send_weekly_summaries',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=3600,
+        )
+
     return _scheduler_instance
 
 
