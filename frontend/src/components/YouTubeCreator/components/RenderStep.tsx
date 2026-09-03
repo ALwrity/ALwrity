@@ -5,7 +5,7 @@
  * Orchestrates scene overview, settings, cost estimation, and render status.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Paper,
   Typography,
@@ -35,6 +35,13 @@ import { YouTubeSceneVideoPromptPanel } from './YouTubeSceneVideoPromptPanel';
 import { YouTubeFinalVideoPanel } from './YouTubeFinalVideoPanel';
 import { useYouTubeRenderQueue } from '../hooks/useYouTubeRenderQueue';
 import { YouTubePublishPanel } from './YouTubePublishPanel';
+import { YouTubePublishMetadataFields } from './YouTubePublishMetadataFields';
+import {
+  buildYouTubePublishMetadata,
+  reconcileYouTubePublishMetadata,
+  resolveYouTubePublishVideoUrl,
+} from './youtubePublishMetadata';
+import { youtubePublishSourceMeta } from '../../../hooks/youtubePublishLog';
 import Snackbar from '@mui/material/Snackbar';
 import MuiAlert, { AlertColor } from '@mui/material/Alert';
 
@@ -89,6 +96,23 @@ export const RenderStep: React.FC<RenderStepProps> = React.memo(({
 
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [previewScene, setPreviewScene] = useState<Scene | null>(null);
+  const derivedPublishMetadata = buildYouTubePublishMetadata(videoPlan, scenes);
+  const previousDerivedPublishMetadataRef = useRef(derivedPublishMetadata);
+  const [publishMetadata, setPublishMetadata] = useState(derivedPublishMetadata);
+
+  useEffect(() => {
+    try {
+      const previousDerived = previousDerivedPublishMetadataRef.current;
+      setPublishMetadata((current) =>
+        reconcileYouTubePublishMetadata(current, previousDerived, derivedPublishMetadata),
+      );
+      previousDerivedPublishMetadataRef.current = derivedPublishMetadata;
+    } catch (error) {
+      console.error("[RenderStep] Publish metadata reconcile failed", {
+        errorName: error instanceof Error ? error.name : "Error",
+      });
+    }
+  }, [derivedPublishMetadata]);
 
   const showSnackbar = (message: string, severity: AlertColor = 'info') => {
     setSnackbar({ open: true, message, severity });
@@ -117,7 +141,26 @@ export const RenderStep: React.FC<RenderStepProps> = React.memo(({
     onInfo: (msg) => showSnackbar(msg, 'info'),
   });
 
-  const resolvedVideoUrl = finalVideoUrl || getVideoUrl();
+  let fallbackVideoUrl: string | null = null;
+  try {
+    fallbackVideoUrl = getVideoUrl();
+  } catch (error) {
+    console.error("[RenderStep] getVideoUrl failed", {
+      errorName: error instanceof Error ? error.name : "Error",
+    });
+  }
+  const { url: resolvedVideoUrl, source: publishVideoSource } = resolveYouTubePublishVideoUrl(
+    finalVideoUrl,
+    fallbackVideoUrl,
+    scenes,
+  );
+
+  useEffect(() => {
+    console.info("[RenderStep] Publish video source resolved", {
+      publishVideoSource,
+      ...youtubePublishSourceMeta(resolvedVideoUrl),
+    });
+  }, [publishVideoSource, resolvedVideoUrl]);
 
   return (
     <motion.div
@@ -437,10 +480,16 @@ export const RenderStep: React.FC<RenderStepProps> = React.memo(({
         />
       )}
 
+      <YouTubePublishMetadataFields
+        metadata={publishMetadata}
+        onMetadataChange={setPublishMetadata}
+      />
+
       <YouTubePublishPanel
         videoUrl={resolvedVideoUrl}
         scenes={scenes}
         videoPlan={videoPlan}
+        metadata={publishMetadata}
       />
     </motion.div>
   );

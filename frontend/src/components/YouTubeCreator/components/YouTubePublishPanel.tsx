@@ -18,11 +18,13 @@ import { Scene, VideoPlan } from '../../../services/youtubeApi';
 import { useYouTubePublish } from '../../../hooks/useYouTubePublish';
 import { toYouTubePublishAtIso } from './youtubePublishSchedule';
 import { youtubePublishSourceMeta } from '../../../hooks/youtubePublishLog';
+import type { YouTubePublishMetadata } from './youtubePublishMetadata';
 
 interface YouTubePublishPanelProps {
   videoUrl: string | null;
   scenes: Scene[];
   videoPlan: VideoPlan | null;
+  metadata?: YouTubePublishMetadata;
 }
 
 function buildVideoTitle(videoPlan: VideoPlan | null, scenes: Scene[]): string {
@@ -52,6 +54,7 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
   videoUrl,
   scenes,
   videoPlan,
+  metadata,
 }) => {
   const youtube = useYouTubePublish();
   const activeChannel = youtube.activeChannel;
@@ -68,20 +71,27 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
         return;
       }
       const publishAt = toYouTubePublishAtIso(scheduleLocal);
+      const title = metadata?.title ?? publishTitle;
+      const description = metadata?.description ?? publishDescription;
+      const tags = metadata ? metadata.tags : ['alwrity', 'youtube', 'ai-video'];
       console.info("[YouTubePublishPanel] Publish clicked", {
         ...youtubePublishSourceMeta(videoUrl),
-        titleLength: publishTitle.length,
-        descriptionLength: publishDescription.length,
+        titleLength: title.length,
+        descriptionLength: description.length,
+        tagCount: tags.length,
+        hasMetadata: Boolean(metadata),
+        hasCategoryId: Boolean(metadata?.category_id),
         hasSchedule: Boolean(publishAt),
         privacy: publishAt ? "private" : privacy,
         connected: youtube.connected,
         hasActiveChannel: Boolean(activeChannel),
       });
-      youtube.publishToYouTube(videoUrl, publishTitle, {
-        description: publishDescription,
-        tags: ['alwrity', 'youtube', 'ai-video'],
+      youtube.publishToYouTube(videoUrl, title, {
+        description,
+        tags,
         privacy_status: publishAt ? 'private' : privacy,
         publish_at: publishAt,
+        ...(metadata ? { category_id: metadata.category_id } : {}),
       });
     } catch (error) {
       console.error("[YouTubePublishPanel] Publish click failed", {
