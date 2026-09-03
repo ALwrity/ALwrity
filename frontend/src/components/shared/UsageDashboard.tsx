@@ -272,9 +272,8 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({
     const monthlyLimit = dashboardData?.limits?.limits?.monthly_cost || 0;
     const usagePercentage = monthlyLimit > 0 ? (totalCost / monthlyLimit) * 100 : 0;
 
-    // Use current_period provider_breakdown for budget bars, total_usage for total display
+    // Use current_period provider_breakdown for budget bars
     const periodBreakdown = currentPeriodUsage?.provider_breakdown || {};
-    const totalBreakdown = usageData.provider_breakdown || {};
     const providerLimits = dashboardData?.limits?.limits || {};
 
     // Aggregate AI text calls (gemini + openai + anthropic + mistral) — from current period
@@ -284,17 +283,14 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({
     // Image calls (stability + wavespeed image) — from current period
     const imageCalls = (periodBreakdown.stability?.calls || 0) + (periodBreakdown.image_edit?.calls || 0);
     const imageCallLimit = providerLimits.stability_calls || 0;
-    const imageTotal = (totalBreakdown.stability?.calls || 0) + (totalBreakdown.image_edit?.calls || 0);
 
     // Audio calls — from current period
     const audioCalls = periodBreakdown.audio?.calls || 0;
     const audioCallLimit = providerLimits.audio_calls || 0;
-    const audioTotal = totalBreakdown.audio?.calls || 0;
 
     // Video calls — from current period
     const videoCalls = periodBreakdown.video?.calls || 0;
     const videoCallLimit = providerLimits.video_calls || 0;
-    const videoTotal = totalBreakdown.video?.calls || 0;
 
     // Research calls (exa + tavily + serper + firecrawl) — from current period
     const researchCalls = (periodBreakdown.exa?.calls || 0) + (periodBreakdown.tavily?.calls || 0) + (periodBreakdown.serper?.calls || 0) + (periodBreakdown.firecrawl?.calls || 0);
@@ -303,18 +299,9 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({
     // WaveSpeed calls (all WaveSpeed API calls) — from current period
     const wavespeedCalls = periodBreakdown.wavespeed?.calls || 0;
     const wavespeedCallLimit = providerLimits.wavespeed_calls || 0;
-    const wavespeedTotal = totalBreakdown.wavespeed?.calls || 0;
 
-    // All-time totals for rows without separate total variables
-    const aiTotal = (totalBreakdown.gemini?.calls || 0) + (totalBreakdown.openai?.calls || 0) + (totalBreakdown.anthropic?.calls || 0) + (totalBreakdown.mistral?.calls || 0) + (totalBreakdown.huggingface?.calls || 0) + (totalBreakdown.wavespeed?.calls || 0);
-    const researchTotal = (totalBreakdown.exa?.calls || 0) + (totalBreakdown.tavily?.calls || 0) + (totalBreakdown.serper?.calls || 0) + (totalBreakdown.firecrawl?.calls || 0);
-
-    const formatLimit = (used: number, limit: number, total?: number) => {
-      const periodStr = limit === 0 ? `${used} / ∞` : `${used} / ${limit}`;
-      if (total !== undefined && total !== used) {
-        return `${periodStr}  •  Total: ${total}`;
-      }
-      return periodStr;
+    const formatLimit = (used: number, limit: number) => {
+      return limit === 0 ? `${used} / ∞` : `${used} / ${limit}`;
     };
 
     const periodControl = (
@@ -503,7 +490,7 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({
                   sx={{ flex: 1, height: 4, borderRadius: 2, bgcolor: '#e5e7eb', '& .MuiLinearProgress-bar': { bgcolor: getUsageColor(aiCalls, aiCallLimit), borderRadius: 2 } }}
                 />
                 <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight: 600, color: getUsageColor(aiCalls, aiCallLimit), minWidth: 55, textAlign: 'right' }}>
-                  {formatLimit(aiCalls, aiCallLimit, aiTotal)}
+                  {formatLimit(aiCalls, aiCallLimit)}
                 </Typography>
               </Box>
             </Box>
@@ -518,7 +505,7 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({
                   sx={{ flex: 1, height: 4, borderRadius: 2, bgcolor: '#e5e7eb', '& .MuiLinearProgress-bar': { bgcolor: getUsageColor(imageCalls, imageCallLimit), borderRadius: 2 } }}
                 />
                 <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight: 600, color: getUsageColor(imageCalls, imageCallLimit), minWidth: 55, textAlign: 'right' }}>
-                  {formatLimit(imageCalls, imageCallLimit, imageTotal)}
+                  {formatLimit(imageCalls, imageCallLimit)}
                 </Typography>
               </Box>
             </Box>
@@ -533,7 +520,7 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({
                   sx={{ flex: 1, height: 4, borderRadius: 2, bgcolor: '#e5e7eb', '& .MuiLinearProgress-bar': { bgcolor: getUsageColor(audioCalls, audioCallLimit), borderRadius: 2 } }}
                 />
                 <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight: 600, color: getUsageColor(audioCalls, audioCallLimit), minWidth: 55, textAlign: 'right' }}>
-                  {formatLimit(audioCalls, audioCallLimit, audioTotal)}
+                  {formatLimit(audioCalls, audioCallLimit)}
                 </Typography>
               </Box>
             </Box>
@@ -548,7 +535,7 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({
                   sx={{ flex: 1, height: 4, borderRadius: 2, bgcolor: '#e5e7eb', '& .MuiLinearProgress-bar': { bgcolor: getUsageColor(videoCalls, videoCallLimit), borderRadius: 2 } }}
                 />
                 <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight: 600, color: getUsageColor(videoCalls, videoCallLimit), minWidth: 55, textAlign: 'right' }}>
-                  {formatLimit(videoCalls, videoCallLimit, videoTotal)}
+                  {formatLimit(videoCalls, videoCallLimit)}
                 </Typography>
               </Box>
             </Box>
@@ -563,22 +550,7 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({
                   sx={{ flex: 1, height: 4, borderRadius: 2, bgcolor: '#e5e7eb', '& .MuiLinearProgress-bar': { bgcolor: getUsageColor(researchCalls, researchCallLimit), borderRadius: 2 } }}
                 />
                 <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight: 600, color: getUsageColor(researchCalls, researchCallLimit), minWidth: 55, textAlign: 'right' }}>
-                  {formatLimit(researchCalls, researchCallLimit, researchTotal)}
-                </Typography>
-              </Box>
-            </Box>
-          )}
-          {wavespeedCallLimit > 0 && (
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 500, color: '#6b7280', minWidth: 60 }}>WaveSpeed</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, ml: 1 }}>
-                <LinearProgress
-                  variant="determinate"
-                  value={wavespeedCallLimit > 0 ? Math.min((wavespeedCalls / wavespeedCallLimit) * 100, 100) : 0}
-                  sx={{ flex: 1, height: 4, borderRadius: 2, bgcolor: '#e5e7eb', '& .MuiLinearProgress-bar': { bgcolor: getUsageColor(wavespeedCalls, wavespeedCallLimit), borderRadius: 2 } }}
-                />
-                <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight: 600, color: getUsageColor(wavespeedCalls, wavespeedCallLimit), minWidth: 55, textAlign: 'right' }}>
-                  {formatLimit(wavespeedCalls, wavespeedCallLimit, wavespeedTotal)}
+                  {formatLimit(researchCalls, researchCallLimit)}
                 </Typography>
               </Box>
             </Box>
