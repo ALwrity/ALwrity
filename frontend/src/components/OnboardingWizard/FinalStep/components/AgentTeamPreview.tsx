@@ -7,6 +7,8 @@ import {
   LinearProgress,
   Chip,
   Stack,
+  Collapse,
+  Tooltip,
   Alert,
   Dialog,
   DialogTitle,
@@ -17,6 +19,8 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ReplayIcon from "@mui/icons-material/Replay";
@@ -27,6 +31,7 @@ import {
   type TodayPlanPreview,
 } from "../../../../api/onboarding";
 import { onboardingCache } from "../../../../services/onboardingCache";
+import { PlanTransparencyPanel } from "./PlanTransparency";
 
 const AGENT_LABELS: Record<string, string> = {
   content_strategist: "Content Strategist",
@@ -119,21 +124,6 @@ const AgentGroupCard: React.FC<{
         ? { borderColor: "rgba(251,191,36,0.6)", color: "#fcd34d" }
         : { borderColor: "rgba(74,222,128,0.6)", color: "#86efac" };
 
-  const taskCardSx = modal
-    ? {
-        p: 1.5,
-        borderRadius: 2,
-        border: "1px solid",
-        borderColor: "divider",
-        bgcolor: "background.default",
-      }
-    : {
-        p: 1.5,
-        borderRadius: 2,
-        border: "1px solid rgba(255, 255, 255, 0.15)",
-        bgcolor: "rgba(255, 255, 255, 0.06)",
-      };
-
   return (
     <Box>
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1, flexWrap: "wrap" }}>
@@ -191,36 +181,127 @@ const AgentGroupCard: React.FC<{
       )}
       <Stack spacing={1}>
         {(tasks || []).map((t: any, i: number) => (
-          <Box key={i} sx={taskCardSx}>
-            <Stack direction="row" spacing={1} sx={{ mb: 0.5 }}>
-              {t.priority && (
-                <Chip
-                  size="small"
-                  label={t.priority}
-                  sx={modal ? { color: t.priority === "high" ? "error" : t.priority === "medium" ? "warning" : "default" } : { bgcolor: "rgba(255, 255, 255, 0.12)", color: "#e5e7eb" }}
-                  color={modal ? (t.priority === "high" ? "error" : t.priority === "medium" ? "warning" : "default") : "default"}
-                />
-              )}
-              {t.pillarId && (
-                <Chip
-                  size="small"
-                  label={t.pillarId}
-                  variant="outlined"
-                  sx={modal ? {} : { borderColor: "rgba(255, 255, 255, 0.3)", color: "#e5e7eb" }}
-                />
-              )}
-            </Stack>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {t.title}
-            </Typography>
-            {t.description && (
-              <Typography variant="body2" sx={modal ? { color: "text.secondary" } : { opacity: 0.85 }}>
-                {t.description}
-              </Typography>
-            )}
-          </Box>
+          <TaskCard key={i} task={t} modal={!!modal} />
         ))}
       </Stack>
+    </Box>
+  );
+};
+
+const SYNTHESIS_LABELS: Record<string, { label: string; color: "success" | "warning" | "error" | "default" }> = {
+  llm: { label: "AI-generated", color: "success" },
+  data_derived: { label: "Data-derived", color: "success" },
+  template_fallback: { label: "Generic template", color: "warning" },
+};
+
+const TaskCard: React.FC<{ task: any; modal: boolean }> = ({ task, modal }) => {
+  const [open, setOpen] = React.useState(false);
+  const meta = task.metadata || {};
+  const reasoning = meta.reasoning || task.description;
+  const synthesis = SYNTHESIS_LABELS[meta.synthesis_mode] || null;
+  const hasDetail = Boolean(
+    (meta.reasoning && meta.reasoning !== task.description) ||
+      meta.selection_score != null ||
+      (meta.selection_reason || []).length ||
+      meta.confidence != null ||
+      task.kpi ||
+      task.riskLevel ||
+      task.measurement ||
+      task.evidence,
+  );
+
+  return (
+    <Box sx={modal ? { p: 1.5, borderRadius: 2, border: "1px solid", borderColor: "divider", bgcolor: "background.default" } : { p: 1.5, borderRadius: 2, border: "1px solid rgba(255,255,255,0.15)", bgcolor: "rgba(255,255,255,0.06)" }}>
+      <Stack direction="row" spacing={1} sx={{ mb: 0.5 }} alignItems="center">
+        {task.priority && (
+          <Chip
+            size="small"
+            label={task.priority}
+            sx={modal ? { color: task.priority === "high" ? "error" : task.priority === "medium" ? "warning" : "default" } : { bgcolor: "rgba(255,255,255,0.12)", color: "#e5e7eb" }}
+            color={modal ? (task.priority === "high" ? "error" : task.priority === "medium" ? "warning" : "default") : "default"}
+          />
+        )}
+        {task.pillarId && (
+          <Chip
+            size="small"
+            label={task.pillarId}
+            variant="outlined"
+            sx={modal ? {} : { borderColor: "rgba(255,255,255,0.3)", color: "#e5e7eb" }}
+          />
+        )}
+        {synthesis && (
+          <Tooltip title={`How this task was produced: ${meta.synthesis_mode}`}>
+            <Chip size="small" label={synthesis.label} color={synthesis.color} variant="outlined" />
+          </Tooltip>
+        )}
+        {hasDetail && (
+          <Box sx={{ ml: "auto" }}>
+            <IconButton size="small" onClick={() => setOpen((o) => !o)} aria-label="task details">
+              {open ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </IconButton>
+          </Box>
+        )}
+      </Stack>
+      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+        {task.title}
+      </Typography>
+      {task.description && (
+        <Typography variant="body2" sx={modal ? { color: "text.secondary" } : { opacity: 0.85 }}>
+          {task.description}
+        </Typography>
+      )}
+      <Collapse in={open}>
+        <Stack spacing={0.75} sx={{ mt: 1 }}>
+          {reasoning && (
+            <Box>
+              <Typography variant="caption" sx={{ fontWeight: 700, opacity: 0.75 }}>
+                Why this task
+              </Typography>
+              <Typography variant="caption" component="div" sx={{ opacity: 0.85 }}>
+                {reasoning}
+              </Typography>
+            </Box>
+          )}
+          {meta.selection_score != null && (
+            <Box>
+              <Typography variant="caption" sx={{ fontWeight: 700, opacity: 0.75 }}>
+                Selection score: {Number(meta.selection_score).toFixed(2)}
+                {meta.confidence != null && ` · confidence ${(Number(meta.confidence) * 100).toFixed(0)}%`}
+              </Typography>
+              {(meta.selection_reason || []).map((r: string, i: number) => (
+                <Typography key={i} variant="caption" component="div" sx={{ opacity: 0.8 }}>
+                  • {r}
+                </Typography>
+              ))}
+            </Box>
+          )}
+          {(task.kpi || task.effort || task.riskLevel || task.measurement) && (
+            <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap", gap: 0.5 }}>
+              {task.kpi && <Chip size="small" label={`KPI: ${task.kpi}`} variant="outlined" />}
+              {task.effort && <Chip size="small" label={`Effort: ${task.effort}`} variant="outlined" />}
+              {task.riskLevel && <Chip size="small" label={`Risk: ${task.riskLevel}`} variant="outlined" />}
+              {task.measurement && <Chip size="small" label={`Measure: ${task.measurement}`} variant="outlined" />}
+            </Stack>
+          )}
+          {(task.evidence || []).length > 0 && (
+            <Box>
+              <Typography variant="caption" sx={{ fontWeight: 700, opacity: 0.75 }}>
+                Citations
+              </Typography>
+              <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap", gap: 0.5 }}>
+                {(task.evidence || []).map((ev: any, i: number) => (
+                  <Chip
+                    key={i}
+                    size="small"
+                    label={typeof ev === "string" ? ev : ev?.id || JSON.stringify(ev).slice(0, 40)}
+                    variant="outlined"
+                  />
+                ))}
+              </Stack>
+            </Box>
+          )}
+        </Stack>
+      </Collapse>
     </Box>
   );
 };
@@ -348,6 +429,14 @@ export const AgentTeamPreview: React.FC = () => {
             declined_agents: result.declined_agents ?? preview.declined_agents,
             template_fallback_count: result.template_fallback_count ?? preview.template_fallback_count,
             backfill_errors: result.backfill_errors ?? preview.backfill_errors,
+            // Transparency fields refresh with the retry response
+            limitations: result.limitations ?? preview.limitations,
+            meeting_preflight: result.meeting_preflight ?? preview.meeting_preflight,
+            agent_evidence: result.agent_evidence ?? preview.agent_evidence,
+            proposal_review_summary: result.proposal_review_summary ?? preview.proposal_review_summary,
+            guardian_health: result.guardian_health ?? preview.guardian_health,
+            quality_status: result.quality_status ?? preview.quality_status,
+            contextuality_validation: result.contextuality_validation ?? preview.contextuality_validation,
           }
         : null;
       setPreview(nextPreview);
@@ -450,6 +539,7 @@ export const AgentTeamPreview: React.FC = () => {
 
       {preview && !resultModalOpen && (
         <>
+          <PlanTransparencyPanel data={preview} variant="inline" />
           {preview.fallback_used && (
             <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>
               Agents are still warming up — showing a fallback plan.
@@ -558,6 +648,7 @@ export const AgentTeamPreview: React.FC = () => {
             </Alert>
           ) : preview ? (
             <Stack spacing={2}>
+              <PlanTransparencyPanel data={preview} variant="modal" />
               {preview.fallback_used && (
                 <Alert severity="info" sx={{ borderRadius: 2 }}>
                   Agents are still warming up — showing a fallback plan.
