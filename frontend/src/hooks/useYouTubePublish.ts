@@ -196,6 +196,7 @@ export function useYouTubePublish() {
       privacy_status?: string;
       category_id?: string;
       made_for_kids?: boolean;
+      age_restricted?: boolean;
       publish_at?: string;
     }
   ) => {
@@ -214,6 +215,8 @@ export function useYouTubePublish() {
         tagCount: options?.tags?.length || 0,
         privacy: options?.privacy_status || "unlisted",
         hasSchedule: Boolean(options?.publish_at),
+        madeForKids: options?.made_for_kids ?? false,
+        ageRestricted: Boolean(options?.age_restricted),
         ...sourceMeta,
       });
       setPublishState({
@@ -233,7 +236,8 @@ export function useYouTubePublish() {
         tags: options?.tags || [],
         privacy_status: options?.privacy_status || 'unlisted',
         category_id: options?.category_id || '22',
-        made_for_kids: options?.made_for_kids || false,
+        made_for_kids: options?.made_for_kids ?? false,
+        ...(options?.age_restricted ? { age_restricted: true } : {}),
         publish_at: options?.publish_at,
       });
 

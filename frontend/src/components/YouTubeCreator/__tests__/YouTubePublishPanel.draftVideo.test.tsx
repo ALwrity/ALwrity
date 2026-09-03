@@ -73,6 +73,12 @@ type DraftPublishProps = React.ComponentProps<typeof YouTubePublishPanel> & {
   helperText?: string | null;
 };
 
+function chooseNotMadeForKids() {
+  fireEvent.click(
+    screen.getByRole("radio", { name: /no, it's not ['"]?made for kids['"]?/i }),
+  );
+}
+
 function renderPanel(props: Partial<DraftPublishProps> = {}) {
   const Panel = YouTubePublishPanel as unknown as React.FC<DraftPublishProps>;
   return render(
@@ -136,6 +142,7 @@ describe("YouTubePublishPanel this-draft source copy", () => {
       videoUrl: SCENE_1,
       publishLine: "Publishing: scene 1 clip",
     });
+    chooseNotMadeForKids();
 
     fireEvent.click(screen.getByRole("button", { name: "Publish to YouTube" }));
     expect(publishToYouTube).toHaveBeenCalledTimes(1);
