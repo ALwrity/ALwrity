@@ -78,6 +78,12 @@ const basePlan = {
   duration_type: "medium",
 };
 
+function chooseNotMadeForKids() {
+  fireEvent.click(
+    screen.getByRole("radio", { name: /no, it's not ['"]?made for kids['"]?/i }),
+  );
+}
+
 describe("YouTubePublishPanel connect and disconnect", () => {
   beforeEach(() => {
     mockedUseYouTubePublish.mockReset();
@@ -191,6 +197,7 @@ describe("YouTubePublishPanel title, schedule, and publish", () => {
         videoPlan={basePlan}
       />,
     );
+    chooseNotMadeForKids();
     fireEvent.click(screen.getByRole("button", { name: "Publish to YouTube" }));
 
     expect(publishToYouTube).toHaveBeenCalledTimes(1);
@@ -202,6 +209,7 @@ describe("YouTubePublishPanel title, schedule, and publish", () => {
         tags: ["alwrity", "youtube", "ai-video"],
         privacy_status: "unlisted",
         publish_at: undefined,
+        made_for_kids: false,
       },
     );
   });
@@ -217,6 +225,7 @@ describe("YouTubePublishPanel title, schedule, and publish", () => {
         videoPlan={{ ...basePlan, selected_title: "Rank Videos in 7 Days" }}
       />,
     );
+    chooseNotMadeForKids();
     fireEvent.click(screen.getByRole("button", { name: "Publish to YouTube" }));
 
     expect(publishToYouTube).toHaveBeenCalledWith(
@@ -237,6 +246,7 @@ describe("YouTubePublishPanel title, schedule, and publish", () => {
         videoPlan={null}
       />,
     );
+    chooseNotMadeForKids();
     fireEvent.click(screen.getByRole("button", { name: "Publish to YouTube" }));
 
     expect(publishToYouTube).toHaveBeenCalledWith(
@@ -259,6 +269,7 @@ describe("YouTubePublishPanel title, schedule, and publish", () => {
         videoPlan={basePlan}
       />,
     );
+    chooseNotMadeForKids();
     fireEvent.click(screen.getByRole("button", { name: "Publish to YouTube" }));
 
     const options = publishToYouTube.mock.calls[0][2] as { publish_at?: string };
@@ -279,6 +290,7 @@ describe("YouTubePublishPanel title, schedule, and publish", () => {
         videoPlan={basePlan}
       />,
     );
+    chooseNotMadeForKids();
 
     fireEvent.change(screen.getByLabelText(/Schedule/i), {
       target: { value: "2026-08-20T15:00" },

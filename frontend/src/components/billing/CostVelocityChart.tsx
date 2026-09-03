@@ -10,8 +10,7 @@ import {
 import { motion } from 'framer-motion';
 import { 
   TrendingUp,
-  TrendingDown,
-  AlertTriangle
+  TrendingDown
 } from 'lucide-react';
 import { 
   LazyLineChart,
@@ -30,74 +29,62 @@ import { SafeResponsiveContainer } from '../shared/SafeResponsiveContainer';
 import { UsageTrends as UsageTrendsType, CostProjections } from '../../types/billing';
 
 // Utils
-import { formatCurrency } from '../../services/billingService';
+import { formatCurrency, formatNumber } from '../../services/billingService';
 
 interface CostVelocityChartProps {
   trends: UsageTrendsType;
-  projections: CostProjections;
+  projections?: CostProjections;
   monthlyLimit: number;
 }
 
 /**
- * CostVelocityChart - Shows daily spending rate (cost velocity) over time
- * with projected monthly cost and budget limit annotations
+ * CostVelocityChart - Shows spending trends across billing periods
+ * with budget limit annotation and moving average
  */
 const CostVelocityChart: React.FC<CostVelocityChartProps> = ({ 
   trends, 
-  projections,
   monthlyLimit
 }) => {
-  // Calculate daily spending rate for each period
-  const velocityData = useMemo(() => {
+  // Transform monthly period data
+  const periodData = useMemo(() => {
     if (!trends.periods || trends.periods.length === 0) {
       return [];
     }
 
-    const data = [];
-    const currentDate = new Date();
-    const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-
-    for (let i = 0; i < trends.periods.length; i++) {
-      const period = trends.periods[i];
-      const cost = trends.total_cost[i] || 0;
-      
-      // Parse period (assuming format like "2025-01" or day number)
-      // For monthly periods, calculate daily average
-      const dayNumber = i + 1; // Approximate day in month
-      const dailyRate = dayNumber > 0 ? cost / dayNumber : 0;
-      const projectedMonthly = dailyRate * daysInMonth;
-
-      data.push({
+    return trends.periods.map((period, index) => {
+      const cost = trends.total_cost[index] || 0;
+      const calls = trends.total_calls[index] || 0;
+      return {
         period,
-        day: dayNumber,
-        dailyRate,
-        projectedMonthly,
-        actualCost: cost
-      });
-    }
-
-    return data;
+        cost,
+        calls
+      };
+    });
   }, [trends]);
 
-  // Calculate 7-day moving average
+  // Calculate 3-period moving average
   const movingAverageData = useMemo(() => {
-    if (velocityData.length === 0) return [];
+    if (periodData.length === 0) return [];
     
-    const windowSize = Math.min(7, velocityData.length);
-    return velocityData.map((point, index) => {
+    const windowSize = Math.min(3, periodData.length);
+    return periodData.map((point, index) => {
       const start = Math.max(0, index - windowSize + 1);
-      const window = velocityData.slice(start, index + 1);
-      const avg = window.reduce((sum, p) => sum + p.dailyRate, 0) / window.length;
-      return { ...point, movingAvg: avg };
+      const window = periodData.slice(start, index + 1);
+      const avg = window.reduce((sum, p) => sum + p.cost, 0) / window.length;
+      return { ...point, movingAvg: Number(avg.toFixed(2)) };
     });
-  }, [velocityData]);
+  }, [periodData]);
 
-  // Current velocity metrics
-  const currentVelocity = velocityData.length > 0 
-    ? velocityData[velocityData.length - 1].dailyRate 
+  // Current period spending metrics
+  const currentPeriodCost = periodData.length > 0 
+    ? periodData[periodData.length - 1].cost 
     : 0;
-  const projectedCost = projections.projected_monthly_cost || 0;
-  const isOverBudget = projectedCost > monthlyLimit;
+  const previousPeriodCost = periodData.length > 1
+    ? periodData[periodData.length - 2].cost
+    : 0;
+  const costChange = previousPeriodCost > 0
+    ? ((currentPeriodCost - previousPeriodCost) / previousPeriodCost) * 100
+    : 0;
 
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -114,16 +101,18 @@ const CostVelocityChart: React.FC<CostVelocityChartProps> = ({
           }}
         >
           <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
-            Day {data.day}
+            Period: {data.period}
           </Typography>
           <Typography variant="body2">
-            Daily Rate: {formatCurrency(data.dailyRate)}
+            Spend: {formatCurrency(data.cost)}
           </Typography>
+          {data.movingAvg !== undefined && (
+            <Typography variant="body2">
+              Avg: {formatCurrency(data.movingAvg)}
+            </Typography>
+          )}
           <Typography variant="body2">
-            7-Day Avg: {formatCurrency(data.movingAvg || 0)}
-          </Typography>
-          <Typography variant="body2">
-            Projected Monthly: {formatCurrency(data.projectedMonthly)}
+            API Calls: {formatNumber(data.calls || 0)}
           </Typography>
         </Box>
       );
@@ -131,7 +120,7 @@ const CostVelocityChart: React.FC<CostVelocityChartProps> = ({
     return null;
   };
 
-  if (velocityData.length === 0) {
+  if (periodData.length === 0) {
     return null;
   }
 
@@ -153,21 +142,13 @@ const CostVelocityChart: React.FC<CostVelocityChartProps> = ({
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#ffffff' }}>
-              Cost Velocity Trend
+              Monthly Spending Trends
             </Typography>
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-              {isOverBudget && (
-                <Chip
-                  icon={<AlertTriangle size={14} />}
-                  label="Over Budget"
-                  color="error"
-                  size="small"
-                />
-              )}
               <Chip
-                icon={currentVelocity > (monthlyLimit / 30) ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                label={`${formatCurrency(currentVelocity)}/day`}
-                color={isOverBudget ? 'error' : 'default'}
+                icon={costChange >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                label={`${costChange >= 0 ? '+' : ''}${costChange.toFixed(1)}% vs prev month`}
+                color={costChange > 20 ? 'warning' : 'default'}
                 size="small"
               />
             </Box>
@@ -175,12 +156,13 @@ const CostVelocityChart: React.FC<CostVelocityChartProps> = ({
 
           <Box sx={{ mb: 2 }}>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 0.5 }}>
-              Projected Monthly Cost: <strong style={{ color: isOverBudget ? '#ef4444' : '#4ade80' }}>
-                {formatCurrency(projectedCost)}
+              Current Period Spend: <strong style={{ color: monthlyLimit > 0 && currentPeriodCost > monthlyLimit ? '#ef4444' : '#4ade80' }}>
+                {formatCurrency(currentPeriodCost)}
               </strong>
+              {monthlyLimit > 0 && ` of ${formatCurrency(monthlyLimit)} budget`}
             </Typography>
             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-              Based on current daily spending rate
+              Historical spending across billing periods
             </Typography>
           </Box>
 
@@ -189,7 +171,7 @@ const CostVelocityChart: React.FC<CostVelocityChartProps> = ({
               <LazyLineChart data={movingAverageData} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                 <XAxis 
-                  dataKey="day" 
+                  dataKey="period" 
                   stroke="rgba(255,255,255,0.7)"
                   tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 12 }}
                 />
@@ -200,19 +182,19 @@ const CostVelocityChart: React.FC<CostVelocityChartProps> = ({
                 />
                 <RechartsTooltip content={<CustomTooltip />} />
                 
-                {/* Daily Rate Line */}
+                {/* Monthly Spend Line */}
                 <Line 
                   type="monotone" 
-                  dataKey="dailyRate" 
+                  dataKey="cost" 
                   stroke="#3b82f6"
                   strokeWidth={2}
                   dot={{ fill: '#3b82f6', r: 4 }}
-                  name="Daily Rate"
+                  name="Monthly Spend"
                   animationDuration={1000}
                   animationBegin={0}
                 />
                 
-                {/* 7-Day Moving Average */}
+                {/* 3-Period Moving Average */}
                 <Line 
                   type="monotone" 
                   dataKey="movingAvg" 
@@ -220,18 +202,20 @@ const CostVelocityChart: React.FC<CostVelocityChartProps> = ({
                   strokeWidth={2}
                   strokeDasharray="5 5"
                   dot={false}
-                  name="7-Day Avg"
+                  name="3-Period Avg"
                   animationDuration={1000}
                   animationBegin={200}
                 />
                 
                 {/* Budget Limit Reference Line */}
-                <ReferenceLine 
-                  y={monthlyLimit / 30} 
-                  stroke="#ef4444" 
-                  strokeDasharray="3 3"
-                  label={{ value: "Budget Limit", position: "right", fill: "#ef4444" }}
-                />
+                {monthlyLimit > 0 && (
+                  <ReferenceLine 
+                    y={monthlyLimit} 
+                    stroke="#ef4444" 
+                    strokeDasharray="3 3"
+                    label={{ value: "Budget Limit", position: "right", fill: "#ef4444" }}
+                  />
+                )}
               </LazyLineChart>
             </SafeResponsiveContainer>
           </Suspense>

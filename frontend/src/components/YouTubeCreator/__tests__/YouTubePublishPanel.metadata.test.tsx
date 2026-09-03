@@ -81,6 +81,12 @@ type PublishPanelMetadataProps = React.ComponentProps<typeof YouTubePublishPanel
   metadata?: YouTubePublishMetadata;
 };
 
+function chooseNotMadeForKids() {
+  fireEvent.click(
+    screen.getByRole("radio", { name: /no, it's not ['"]?made for kids['"]?/i }),
+  );
+}
+
 function renderPublishPanel(metadata: YouTubePublishMetadata) {
   const Panel = YouTubePublishPanel as unknown as React.FC<PublishPanelMetadataProps>;
   return render(
@@ -102,6 +108,7 @@ describe("YouTubePublishPanel edited metadata", () => {
     const publishToYouTube = vi.fn();
     mockedUseYouTubePublish.mockReturnValue(connectedHook(publishToYouTube));
     renderPublishPanel(editedMetadata);
+    chooseNotMadeForKids();
     fireEvent.click(screen.getByRole("button", { name: "Publish to YouTube" }));
 
     expect(publishToYouTube).toHaveBeenCalledTimes(1);
@@ -111,6 +118,7 @@ describe("YouTubePublishPanel edited metadata", () => {
       category_id: "27",
       privacy_status: "unlisted",
       publish_at: undefined,
+      made_for_kids: false,
     });
   });
 
@@ -118,6 +126,7 @@ describe("YouTubePublishPanel edited metadata", () => {
     const publishToYouTube = vi.fn();
     mockedUseYouTubePublish.mockReturnValue(connectedHook(publishToYouTube));
     renderPublishPanel(editedMetadata);
+    chooseNotMadeForKids();
 
     fireEvent.change(screen.getByLabelText(/Schedule/i), {
       target: { value: "2026-08-20T15:00" },
