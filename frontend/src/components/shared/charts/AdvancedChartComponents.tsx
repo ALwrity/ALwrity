@@ -1,4 +1,5 @@
 import React from 'react';
+import { SafeResponsiveContainer } from '../SafeResponsiveContainer';
 import {
   Line,
   BarChart,
@@ -59,7 +60,7 @@ const PerformanceTrendChart: React.FC<PerformanceTrendChartProps> = ({
       <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
         {title}
       </Typography>
-      <ResponsiveContainer width="100%" height="85%">
+      <SafeResponsiveContainer width="100%" height="85%">
         <ComposedChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
           <XAxis 
@@ -113,7 +114,7 @@ const PerformanceTrendChart: React.FC<PerformanceTrendChartProps> = ({
             name="Conversion Rate (%)"
           />
         </ComposedChart>
-      </ResponsiveContainer>
+      </SafeResponsiveContainer>
     </Paper>
   );
 };
@@ -141,7 +142,7 @@ const QualityMetricsRadar: React.FC<QualityMetricsRadarProps> = ({
       <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
         {title}
       </Typography>
-      <ResponsiveContainer width="100%" height="85%">
+      <SafeResponsiveContainer width="100%" height="85%">
         <RadarChart data={data}>
           <PolarGrid stroke={theme.palette.divider} />
           <PolarAngleAxis 
@@ -177,7 +178,7 @@ const QualityMetricsRadar: React.FC<QualityMetricsRadarProps> = ({
             }}
           />
         </RadarChart>
-      </ResponsiveContainer>
+      </SafeResponsiveContainer>
     </Paper>
   );
 };
@@ -215,7 +216,7 @@ const PerformanceMetricsBar: React.FC<PerformanceMetricsBarProps> = ({
       <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
         {title}
       </Typography>
-      <ResponsiveContainer width="100%" height="85%">
+      <SafeResponsiveContainer width="100%" height="85%">
         <BarChart data={data} layout="horizontal">
           <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
           <XAxis 
@@ -257,7 +258,7 @@ const PerformanceMetricsBar: React.FC<PerformanceMetricsBarProps> = ({
             radius={[0, 4, 4, 0]}
           />
         </BarChart>
-      </ResponsiveContainer>
+      </SafeResponsiveContainer>
     </Paper>
   );
 };
@@ -294,7 +295,7 @@ const ContentDistributionPie: React.FC<ContentDistributionPieProps> = ({
       <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
         {title}
       </Typography>
-      <ResponsiveContainer width="100%" height="85%">
+      <SafeResponsiveContainer width="100%" height="85%">
         <PieChart>
           <Pie
             data={data}
@@ -321,7 +322,7 @@ const ContentDistributionPie: React.FC<ContentDistributionPieProps> = ({
             }}
           />
         </PieChart>
-      </ResponsiveContainer>
+      </SafeResponsiveContainer>
     </Paper>
   );
 };

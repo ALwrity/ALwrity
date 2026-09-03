@@ -1,4 +1,5 @@
 import React from 'react';
+import { SafeResponsiveContainer } from '../shared/SafeResponsiveContainer';
 import { PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer } from 'recharts';
 import {
   ContentOpportunity,
@@ -542,7 +543,7 @@ const SummarySidebar: React.FC<{ summary: BrainstormSummary }> = ({ summary }) =
               <HelpIcon text={METRIC_HELP['Rank Distribution']} />
             </div>
             <div style={{ width: '120px', height: '120px', margin: '0 auto' }}>
-              <ResponsiveContainer width={120} height={120}>
+              <SafeResponsiveContainer width={120} height={120}>
                 <PieChart>
                   <Pie data={pieData} cx="50%" cy="50%" innerRadius={30} outerRadius={50} dataKey="value" paddingAngle={2} stroke="none">
                     {pieData.map((entry, idx) => (
@@ -561,7 +562,7 @@ const SummarySidebar: React.FC<{ summary: BrainstormSummary }> = ({ summary }) =
                     }}
                   />
                 </PieChart>
-              </ResponsiveContainer>
+              </SafeResponsiveContainer>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11px', marginTop: '6px' }}>
               {pieData.map((d, idx) => (

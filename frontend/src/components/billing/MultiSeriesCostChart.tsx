@@ -25,6 +25,7 @@ import {
   Legend,
   ChartLoadingFallback
 } from '../../utils/lazyRecharts';
+import { SafeResponsiveContainer } from '../shared/SafeResponsiveContainer';
 
 // Types
 import { UsageTrends as UsageTrendsType } from '../../types/billing';
@@ -147,7 +148,7 @@ const MultiSeriesCostChart: React.FC<MultiSeriesCostChartProps> = ({
           </Box>
 
           <Suspense fallback={<ChartLoadingFallback />}>
-            <ResponsiveContainer width="100%" height={350}>
+            <SafeResponsiveContainer width="100%" height={350}>
               <LazyComposedChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
                 <defs>
                   <linearGradient id="colorTotalCost" x1="0" y1="0" x2="0" y2="1">
@@ -199,7 +200,7 @@ const MultiSeriesCostChart: React.FC<MultiSeriesCostChartProps> = ({
                   />
                 )}
               </LazyComposedChart>
-            </ResponsiveContainer>
+            </SafeResponsiveContainer>
           </Suspense>
         </CardContent>
       </Card>

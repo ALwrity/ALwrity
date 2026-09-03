@@ -25,6 +25,7 @@ import {
   Area,
   ChartLoadingFallback
 } from '../../utils/lazyRecharts';
+import { SafeResponsiveContainer } from '../shared/SafeResponsiveContainer';
 
 // Types
 import { UsageTrends as UsageTrendsType, CostProjections } from '../../types/billing';
@@ -311,7 +312,7 @@ const UsageTrends: React.FC<UsageTrendsProps> = ({
               API Calls Trend
             </Typography>
             <Box sx={{ height: 150 }}>
-              <ResponsiveContainer width="100%" height="100%">
+              <SafeResponsiveContainer width="100%" height="100%">
                 <Suspense fallback={<ChartLoadingFallback />}>
                   <LazyLineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
@@ -338,7 +339,7 @@ const UsageTrends: React.FC<UsageTrendsProps> = ({
                   />
                 </LazyLineChart>
                 </Suspense>
-              </ResponsiveContainer>
+              </SafeResponsiveContainer>
             </Box>
           </Box>
 

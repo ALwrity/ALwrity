@@ -35,6 +35,7 @@ import {
   Legend,
   ChartLoadingFallback
 } from '../../utils/lazyRecharts';
+import { SafeResponsiveContainer } from '../shared/SafeResponsiveContainer';
 
 // Types
 import { UsageLog } from '../../types/billing';
@@ -395,7 +396,7 @@ const AdvancedCostAnalytics: React.FC<AdvancedCostAnalyticsProps> = ({
               </Typography>
               
               <Box sx={{ height: 300, mb: 3 }}>
-                <ResponsiveContainer width="100%" height="100%">
+                <SafeResponsiveContainer width="100%" height="100%">
                   <Suspense fallback={<ChartLoadingFallback />}>
                     <LazyBarChart data={timeOfDayData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
@@ -423,7 +424,7 @@ const AdvancedCostAnalytics: React.FC<AdvancedCostAnalyticsProps> = ({
                       <Bar dataKey="cost" fill="#667eea" radius={[4, 4, 0, 0]} />
                     </LazyBarChart>
                   </Suspense>
-                </ResponsiveContainer>
+                </SafeResponsiveContainer>
               </Box>
 
               {/* Peak Hours Summary */}
@@ -458,7 +459,7 @@ const AdvancedCostAnalytics: React.FC<AdvancedCostAnalyticsProps> = ({
               </Typography>
               
               <Box sx={{ height: 300, mb: 3 }}>
-                <ResponsiveContainer width="100%" height="100%">
+                <SafeResponsiveContainer width="100%" height="100%">
                   <Suspense fallback={<ChartLoadingFallback />}>
                     <LazyPieChart>
                       <Pie
@@ -487,7 +488,7 @@ const AdvancedCostAnalytics: React.FC<AdvancedCostAnalyticsProps> = ({
                       />
                     </LazyPieChart>
                   </Suspense>
-                </ResponsiveContainer>
+                </SafeResponsiveContainer>
               </Box>
 
               {/* Top Actions Table */}

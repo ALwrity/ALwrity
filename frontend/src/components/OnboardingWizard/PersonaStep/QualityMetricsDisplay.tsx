@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { SafeResponsiveContainer } from '../../shared/SafeResponsiveContainer';
 import {
   Box,
   Typography,
@@ -428,7 +429,7 @@ export const QualityMetricsDisplay: React.FC<QualityMetricsDisplayProps> = ({ me
             flexShrink: 0,
           }}
         >
-          <ResponsiveContainer width="100%" height={200}>
+          <SafeResponsiveContainer width="100%" height={200}>
             <RadialBarChart
               innerRadius="75%"
               outerRadius="100%"
@@ -442,7 +443,7 @@ export const QualityMetricsDisplay: React.FC<QualityMetricsDisplayProps> = ({ me
                 cornerRadius={20}
               />
             </RadialBarChart>
-          </ResponsiveContainer>
+          </SafeResponsiveContainer>
           <Box
             sx={{
               position: 'absolute',
@@ -561,7 +562,7 @@ export const QualityMetricsDisplay: React.FC<QualityMetricsDisplayProps> = ({ me
 
         {/* Bar chart */}
         <Box sx={{ height: 160, width: '100%' }}>
-          <ResponsiveContainer width="100%" height={160}>
+          <SafeResponsiveContainer width="100%" height={160}>
             <BarChart
               data={barChartData}
               layout="vertical"
@@ -595,7 +596,7 @@ export const QualityMetricsDisplay: React.FC<QualityMetricsDisplayProps> = ({ me
                 />
               </Bar>
             </BarChart>
-          </ResponsiveContainer>
+          </SafeResponsiveContainer>
         </Box>
 
         <Divider sx={{ my: 2 }} />

@@ -10,6 +10,7 @@ import {
   Line,
   ChartLoadingFallback,
 } from '../../utils/lazyRecharts';
+import { SafeResponsiveContainer } from './SafeResponsiveContainer';
 
 interface ChartItem {
   query: string;
@@ -32,7 +33,7 @@ const CtrPositionChart: React.FC<CtrPositionChartProps> = ({ data }) => {
       </Typography>
       <Box sx={{ height: 180, bgcolor: '#020617', borderRadius: 2, p: 1.5, border: '1px solid rgba(148, 163, 184, 0.4)' }}>
         <Suspense fallback={<ChartLoadingFallback />}>
-          <ResponsiveContainer width="100%" height="100%">
+          <SafeResponsiveContainer width="100%" height="100%">
             <LazyLineChart
               data={data}
               margin={{ top: 8, right: 12, bottom: 8, left: -10 }}
@@ -75,7 +76,7 @@ const CtrPositionChart: React.FC<CtrPositionChartProps> = ({ data }) => {
                 activeDot={{ r: 5 }}
               />
             </LazyLineChart>
-          </ResponsiveContainer>
+          </SafeResponsiveContainer>
         </Suspense>
       </Box>
     </Grid>

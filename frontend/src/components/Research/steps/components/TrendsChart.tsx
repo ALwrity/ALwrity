@@ -6,6 +6,7 @@
  */
 
 import React, { useMemo } from 'react';
+import { SafeResponsiveContainer } from '../../../shared/SafeResponsiveContainer';
 import {
   LineChart,
   Line,
@@ -124,7 +125,7 @@ export const TrendsChart: React.FC<TrendsChartProps> = ({
 
   return (
     <Box sx={{ width: '100%', height }}>
-      <ResponsiveContainer width="100%" height="100%">
+      <SafeResponsiveContainer width="100%" height="100%">
         <LineChart
           data={chartData}
           margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
@@ -195,7 +196,7 @@ export const TrendsChart: React.FC<TrendsChartProps> = ({
             />
           ))}
         </LineChart>
-      </ResponsiveContainer>
+      </SafeResponsiveContainer>
       <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
         Values are normalized (0-100) where 100 is peak popularity
         {data.timeframe && ` • Timeframe: ${data.timeframe}`}

@@ -24,6 +24,7 @@ import {
   ReferenceLine,
   ChartLoadingFallback
 } from '../../utils/lazyRecharts';
+import { SafeResponsiveContainer } from '../shared/SafeResponsiveContainer';
 
 // Types
 import { UsageTrends as UsageTrendsType, CostProjections } from '../../types/billing';
@@ -184,7 +185,7 @@ const CostVelocityChart: React.FC<CostVelocityChartProps> = ({
           </Box>
 
           <Suspense fallback={<ChartLoadingFallback />}>
-            <ResponsiveContainer width="100%" height={300}>
+            <SafeResponsiveContainer width="100%" height={300}>
               <LazyLineChart data={movingAverageData} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                 <XAxis 
@@ -232,7 +233,7 @@ const CostVelocityChart: React.FC<CostVelocityChartProps> = ({
                   label={{ value: "Budget Limit", position: "right", fill: "#ef4444" }}
                 />
               </LazyLineChart>
-            </ResponsiveContainer>
+            </SafeResponsiveContainer>
           </Suspense>
         </CardContent>
       </Card>

@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import { Box, Typography } from '@mui/material';
 import { LazyPieChart, Pie, Cell, ResponsiveContainer, ChartLoadingFallback } from '../../utils/lazyRecharts';
+import { SafeResponsiveContainer } from './SafeResponsiveContainer';
 import { motion } from 'framer-motion';
 
 interface UsageLimitRingProps {
@@ -56,7 +57,7 @@ export const UsageLimitRing: React.FC<UsageLimitRingProps> = ({
   return (
     <Box sx={{ position: 'relative', width: size, height: size }}>
       <Suspense fallback={<ChartLoadingFallback />}>
-        <ResponsiveContainer width="100%" height="100%">
+        <SafeResponsiveContainer width="100%" height="100%">
           <LazyPieChart>
             <Pie
               data={data}
@@ -77,7 +78,7 @@ export const UsageLimitRing: React.FC<UsageLimitRingProps> = ({
               />
             </Pie>
           </LazyPieChart>
-        </ResponsiveContainer>
+        </SafeResponsiveContainer>
       </Suspense>
       <Box sx={{
         position: 'absolute',

@@ -1,4 +1,5 @@
 import React from 'react';
+import { SafeResponsiveContainer } from '../../shared/SafeResponsiveContainer';
 import {
   Box,
   Card,
@@ -90,7 +91,7 @@ const MonitoringCharts: React.FC<MonitoringChartsProps> = ({
               subheader="Real-time request and error patterns"
             />
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
+              <SafeResponsiveContainer width="100%" height={250}>
                 <LineChart data={timeSeriesData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="time" />
@@ -111,7 +112,7 @@ const MonitoringCharts: React.FC<MonitoringChartsProps> = ({
                     dot={{ fill: '#ff0000', strokeWidth: 2, r: 4 }}
                   />
                 </LineChart>
-              </ResponsiveContainer>
+              </SafeResponsiveContainer>
             </CardContent>
           </Card>
         </motion.div>
@@ -131,7 +132,7 @@ const MonitoringCharts: React.FC<MonitoringChartsProps> = ({
               subheader="Average response time trends"
             />
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
+              <SafeResponsiveContainer width="100%" height={250}>
                 <AreaChart data={timeSeriesData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="time" />
@@ -145,7 +146,7 @@ const MonitoringCharts: React.FC<MonitoringChartsProps> = ({
                     fillOpacity={0.6}
                   />
                 </AreaChart>
-              </ResponsiveContainer>
+              </SafeResponsiveContainer>
             </CardContent>
           </Card>
         </motion.div>
@@ -165,7 +166,7 @@ const MonitoringCharts: React.FC<MonitoringChartsProps> = ({
               subheader="Request volume and error distribution"
             />
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+              <SafeResponsiveContainer width="100%" height={300}>
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
@@ -174,7 +175,7 @@ const MonitoringCharts: React.FC<MonitoringChartsProps> = ({
                   <Bar dataKey="requests" fill="#8884d8" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="errors" fill="#ff0000" radius={[4, 4, 0, 0]} />
                 </BarChart>
-              </ResponsiveContainer>
+              </SafeResponsiveContainer>
             </CardContent>
           </Card>
         </motion.div>
@@ -194,7 +195,7 @@ const MonitoringCharts: React.FC<MonitoringChartsProps> = ({
               subheader="Hit vs Miss distribution"
             />
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+              <SafeResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
                     data={cacheData}
@@ -212,7 +213,7 @@ const MonitoringCharts: React.FC<MonitoringChartsProps> = ({
                   </Pie>
                   <Tooltip />
                 </PieChart>
-              </ResponsiveContainer>
+              </SafeResponsiveContainer>
               <Box sx={{ textAlign: 'center', mt: 2 }}>
                 <Typography variant="h6" color="primary">
                   {cachePerformance.hit_rate.toFixed(1)}%
@@ -247,7 +248,7 @@ const MonitoringCharts: React.FC<MonitoringChartsProps> = ({
               }
             />
             <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
+              <SafeResponsiveContainer width="100%" height={400}>
                 <RadarChart data={radarData}>
                   <PolarGrid />
                   <PolarAngleAxis dataKey="metric" />
@@ -261,7 +262,7 @@ const MonitoringCharts: React.FC<MonitoringChartsProps> = ({
                   />
                   <Tooltip />
                 </RadarChart>
-              </ResponsiveContainer>
+              </SafeResponsiveContainer>
             </CardContent>
           </Card>
         </motion.div>
