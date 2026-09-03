@@ -6,6 +6,8 @@ import sys
 import types
 from pathlib import Path
 
+import re
+
 import pytest
 
 
@@ -15,6 +17,12 @@ def _install_environment_defaults() -> None:
     os.environ.setdefault(
         "STRIPE_PLAN_PRICE_MAPPING_TEST",
         '{"free":{"monthly":"price_test_free"},"basic":{"monthly":"price_test_basic"},"pro":{"monthly":"price_test_pro"}}',
+    )
+    # The app imports analytics services that construct OAuth providers at
+    # import time; without a key the import itself raises. Test-only key.
+    os.environ.setdefault(
+        "OAUTH_TOKEN_ENCRYPTION_KEY",
+        "1KLwO81o21nJVGkxTIihuog680QmlyCx0FB4y-_76PA=",
     )
 
 
@@ -34,6 +42,14 @@ if str(BACKEND_ROOT) not in sys.path:
 TARGET_PATHS = {
     "/api/seo-dashboard/cache-stats",
     "/api/seo-dashboard/sif-health",
+    # Endpoints the frontend calls that were never registered (404 fix):
+    "/api/seo-dashboard/guardian-audit",
+    "/api/seo-dashboard/keyword-gaps",
+    "/api/seo-dashboard/content-gap-radar",
+    "/api/seo-dashboard/content-gap-radar/generate-content",
+    "/api/seo-dashboard/pages",
+    "/api/seo-dashboard/summary",
+    "/api/seo-dashboard/metrics/{url}",
 }
 
 ENTRYPOINT_MODULES = ("backend.app",)
@@ -47,7 +63,10 @@ def test_seo_dashboard_routes_registered(module_name: str) -> None:
     module = importlib.import_module(module_name)
     fastapi_app = module.app
 
-    registered_paths = {route.path for route in fastapi_app.routes}
+    # Normalize Starlette converter suffixes (e.g. "/x/{url:path}" -> "/x/{url}")
+    registered_paths = {
+        re.sub(r":path\}", "}", route.path) for route in fastapi_app.routes
+    }
 
     missing_paths = TARGET_PATHS - registered_paths
     assert not missing_paths, (
