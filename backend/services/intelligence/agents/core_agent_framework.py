@@ -344,8 +344,9 @@ class BaseALwrityAgent(ABC):
         if results:
             return results
 
-        # Miss: heal the index once (day-guarded) and retry the search.
-        heal_summary: Optional[Dict[str, Any]] = None
+        # Miss: fire the self-heal as a background task so the agent's
+        # response is NOT blocked by indexing. The next run benefits from
+        # the bootstrapped index (honest absence for this run).
         try:
             from services.intelligence.sif_integration import SIFIntegrationService
 
@@ -356,39 +357,17 @@ class BaseALwrityAgent(ABC):
                 except Exception:
                     sif = None
             if sif is not None:
-                heal = await _maybe_self_heal_index_impl(
-                    sif, trigger=trigger, min_index_items=min_index_items
-                )
-                heal_summary = heal
-                if heal.get("healed") and intelligence is not None:
-                    # Record the heal on the agent so the committee can
-                    # surface it in the plan's limitations (transparency:
-                    # the evidence base was repaired from local context).
-                    try:
-                        self.last_sif_heal = heal
-                    except Exception:
-                        pass
-                    logger.info(
-                        f"[{type(self).__name__}] SIF index healed "
-                        f"(+{heal.get('bootstrap_indexed')} docs); retrying search"
+                asyncio.get_event_loop().create_task(
+                    _maybe_self_heal_index_impl(
+                        sif, trigger=trigger, min_index_items=min_index_items
                     )
-                    try:
-                        results = list(await intelligence.search(query, limit=limit) or [])
-                    except Exception as retry_exc:
-                        logger.debug(f"[{type(self).__name__}] SIF retry after heal failed: {retry_exc}")
-                # Update the provenance entry with the heal outcome and the
-                # post-heal result count (miss_healed vs still-miss).
-                self._record_sif_query_provenance(
-                    query,
-                    limit=limit,
-                    trigger=trigger,
-                    result_count=len(results),
-                    outcome="miss_healed" if (heal_summary or {}).get("healed") else "miss",
-                    heal=heal_summary,
-                    update_last=True,
+                )
+                logger.info(
+                    f"[{type(self).__name__}] SIF index miss: self-heal fired "
+                    f"in background; this run proceeds with honest absence"
                 )
         except Exception as exc:
-            logger.debug(f"[{type(self).__name__}] Self-heal attempt failed: {exc}")
+            logger.debug(f"[{type(self).__name__}] Self-heal dispatch failed: {exc}")
         return results
 
     def _record_sif_query_provenance(

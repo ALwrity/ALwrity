@@ -14,6 +14,7 @@ Contract:
 - Never raises: heal failures degrade to a reported status.
 """
 from pathlib import Path
+import asyncio
 import shutil
 
 import pytest
@@ -246,7 +247,9 @@ async def test_sif_search_returns_results_without_heal(workspace_clean):
 
 
 @pytest.mark.asyncio
-async def test_sif_search_heals_on_miss_and_retries(workspace_clean, monkeypatch):
+async def test_sif_search_heals_on_miss_in_background(workspace_clean, monkeypatch):
+    """On a miss, the self-heal fires as a fire-and-forget background task.
+    The search returns honest absence; the heal runs for the NEXT run."""
     backend_root, user_id, store = workspace_clean
     agent = _make_hook_agent(user_id)
 
@@ -255,7 +258,7 @@ async def test_sif_search_heals_on_miss_and_retries(workspace_clean, monkeypatch
     class _Intel:
         async def search(self, query, limit=5):
             search_state["count"] += 1
-            return [] if search_state["count"] == 1 else [{"id": "healed-doc", "score": 0.8}]
+            return []
 
     agent.intelligence = _Intel()
 
@@ -267,14 +270,8 @@ async def test_sif_search_heals_on_miss_and_retries(workspace_clean, monkeypatch
     monkeypatch.setattr(caf, "_maybe_self_heal_index_impl", _fake_heal, raising=False)
 
     results = await agent.sif_search("anything", limit=5)
-    assert search_state["count"] == 2, "search must be retried after heal"
-    assert results and results[0]["id"] == "healed-doc"
-    # G2: the heal summary must be recorded on the agent so the committee
-    # can surface it in the plan's limitations.
-    heal_summary = getattr(agent, "last_sif_heal", None)
-    assert isinstance(heal_summary, dict), f"heal summary not recorded: {heal_summary}"
-    assert heal_summary.get("healed") is True
-    assert heal_summary.get("bootstrap_indexed") == 2
+    assert results == []
+    assert search_state["count"] == 1, "search runs exactly once (no retry)"
 
 
 @pytest.mark.asyncio
@@ -329,18 +326,15 @@ async def test_sif_search_records_query_provenance(workspace_clean, monkeypatch)
 
 
 @pytest.mark.asyncio
-async def test_sif_search_provenance_records_miss_and_heal(workspace_clean, monkeypatch):
-    """A miss that triggers a heal records outcome='miss_healed' with the
-    heal bootstrap count in the provenance entry."""
+async def test_sif_search_provenance_records_miss(workspace_clean, monkeypatch):
+    """A miss records outcome='miss' (the heal is fire-and-forget, so the
+    provenance captures the honest miss without waiting for the heal)."""
     backend_root, user_id, store = workspace_clean
     agent = _make_hook_agent(user_id)
 
-    search_state = {"count": 0}
-
     class _Intel:
         async def search(self, query, limit=5):
-            search_state["count"] += 1
-            return [] if search_state["count"] == 1 else [{"id": "healed", "score": 0.7}]
+            return []
 
     agent.intelligence = _Intel()
 
@@ -352,11 +346,10 @@ async def test_sif_search_provenance_records_miss_and_heal(workspace_clean, monk
     monkeypatch.setattr(caf, "_maybe_self_heal_index_impl", _fake_heal, raising=False)
 
     results = await agent.sif_search("thin query", limit=5, trigger="proposal")
-    assert results and results[0]["id"] == "healed"
+    assert results == []
 
     queries = agent.last_sif_queries
-    assert queries[-1]["outcome"] == "miss_healed"
-    assert queries[-1]["heal"] == {"healed": True, "bootstrap_indexed": 4}
+    assert queries[-1]["outcome"] == "miss"
 
 
 @pytest.mark.asyncio
@@ -395,3 +388,47 @@ async def test_sif_search_never_raises_on_total_failure(workspace_clean, monkeyp
 
     results = await agent.sif_search("anything", limit=5)
     assert results == []
+
+
+# ============================================================
+# Phase 3a: non-blocking self-heal
+# ============================================================
+
+@pytest.mark.asyncio
+async def test_sif_search_does_not_block_on_self_heal(workspace_clean, monkeypatch):
+    """Phase 3a: when sif_search triggers a self-heal, it must NOT wait for
+    the heal to complete. The agent proceeds with honest absence and the
+    heal runs in the background for the NEXT run."""
+    import time
+
+    backend_root, user_id, store = workspace_clean
+    agent = _make_hook_agent(user_id)
+
+    heal_started = asyncio.Event()
+
+    class _Intel:
+        async def search(self, query, limit=5):
+            return []
+
+    agent.intelligence = _Intel()
+
+    async def _slow_heal(sif_service, **kwargs):
+        heal_started.set()
+        await asyncio.sleep(30)  # would block for 30s if awaited
+        return {"healed": True, "bootstrap_indexed": 5}
+
+    import services.intelligence.agents.core_agent_framework as caf
+    monkeypatch.setattr(caf, "_maybe_self_heal_index_impl", _slow_heal, raising=False)
+
+    start = time.monotonic()
+    results = await agent.sif_search("anything", limit=5)
+    # yield to the event loop so the background heal task can start
+    await asyncio.sleep(0)
+    elapsed = time.monotonic() - start
+
+    assert results == [], "no results available (honest absence)"
+    assert elapsed < 1.0, (
+        f"sif_search took {elapsed:.1f}s — it must not block on the heal"
+    )
+    assert heal_started.is_set(), "self-heal must have been triggered"
+
