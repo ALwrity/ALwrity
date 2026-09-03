@@ -18,8 +18,9 @@ class _FakeRow:
 class _FakeQuery:
     """Chainable query stub: .first() pops from a provided sequence."""
 
-    def __init__(self, first_results):
+    def __init__(self, first_results, scalar_result=0):
         self._first_results = list(first_results)
+        self._scalar_result = scalar_result
 
     def filter(self, *args, **kwargs):
         return self
@@ -35,10 +36,13 @@ class _FakeQuery:
     def count(self):
         return 0
 
+    def scalar(self):
+        return self._scalar_result
+
 
 class _FakeSession:
-    def __init__(self, first_results):
-        self._query = _FakeQuery(first_results)
+    def __init__(self, first_results, scalar_result=0):
+        self._query = _FakeQuery(first_results, scalar_result)
         self.added = []
         self.committed = 0
 

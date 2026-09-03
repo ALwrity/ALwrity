@@ -15,6 +15,7 @@ Resend integration is stubbed until API is verified.
 """
 
 import logging
+import os
 import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -23,7 +24,7 @@ from dataclasses import dataclass, asdict
 from sqlalchemy import and_
 from sqlalchemy.sql import func
 
-from models.daily_workflow_models import DailyWorkflowPlan, DailyWorkflowTask
+from models.daily_workflow_models import DailyWorkflowPlan, DailyWorkflowTask, TaskHistory
 from models.daily_email_ledger import DailyEmailLedger
 from models.agent_activity_models import AgentAlert
 from models.onboarding import OnboardingSession
@@ -31,6 +32,11 @@ from models.onboarding import OnboardingSession
 # from models.task_memory_models import TaskProposalMemory
 from services.database import get_session_for_user
 from services.tool_certification import get_agent_certification_rollup
+from services.email_templates import (
+    render_standard_digest,
+    render_reengagement,
+    render_weekly_digest,
+)
 from utils.logger_utils import get_service_logger
 
 logger = get_service_logger(__name__)
@@ -96,6 +102,42 @@ class DigestPayload:
     task_memory_signals: List[TaskMemorySignal]
     certification_summary: Dict[str, CertificationInfo]
     confidence_estimates: List[str]  # list of "agent: is_estimate" notes
+    timezone: str
+
+
+@dataclass
+class PillarThroughput:
+    """Weekly completion per content pillar."""
+    pillar_id: str
+    proposed: int
+    completed: int
+    skipped: int
+    completion_rate: float
+
+
+@dataclass
+class AgentThroughput:
+    """Weekly acceptance per source agent."""
+    agent: str
+    proposed: int
+    completed: int
+    acceptance_rate: float
+
+
+@dataclass
+class WeeklySummaryPayload:
+    """Aggregated weekly digest payload (design doc Sec 11)."""
+    user_id: str
+    week_label: str
+    end_date: str
+    total_tasks: int
+    completed: int
+    skipped: int
+    completion_percentage: float
+    pillars: List[PillarThroughput]
+    agents: List[AgentThroughput]
+    strongest_pillar: Optional[str]
+    weakest_pillar: Optional[str]
     timezone: str
 
 
@@ -303,124 +345,175 @@ def build_digest_payload(user_id: str, date: str, verbose: bool = True) -> Optio
 
 
 # =============================================================================
+# Weekly summary payload builder
+# =============================================================================
+
+def build_weekly_payload(user_id: str, end_date: Optional[str] = None) -> Optional[WeeklySummaryPayload]:
+    """Aggregate the last 7 days of tasks into a weekly summary (design Sec 11).
+
+    ``end_date`` defaults to today (YYYY-MM-DD); the window is the 7 days ending
+    on it. Returns None when the user has no task rows in the window.
+    """
+    if not end_date:
+        end_date = datetime.utcnow().strftime("%Y-%m-%d")
+
+    session = get_session_for_user(user_id)
+    try:
+        start_dt = datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=6)
+        start_date = start_dt.strftime("%Y-%m-%d")
+
+        plan_rows = (
+            session.query(DailyWorkflowPlan)
+            .filter(
+                DailyWorkflowPlan.user_id == user_id,
+                DailyWorkflowPlan.date >= start_date,
+                DailyWorkflowPlan.date <= end_date,
+            )
+            .all()
+        )
+        plan_ids = [p.id for p in plan_rows]
+        if not plan_ids:
+            return None
+
+        tasks = (
+            session.query(DailyWorkflowTask)
+            .filter(
+                DailyWorkflowTask.plan_id.in_(plan_ids),
+                DailyWorkflowTask.user_id == user_id,
+            )
+            .all()
+        )
+        if not tasks:
+            return None
+
+        completed = 0
+        skipped = 0
+        total = len(tasks)
+        pillar_stats: Dict[str, List[int]] = {}  # pillar -> [proposed, completed]
+        agent_stats: Dict[str, List[int]] = {}   # agent -> [proposed, completed]
+
+        for task in tasks:
+            meta = task.metadata_json or {}
+            agent = meta.get("source_agent", "unknown")
+            agent_stats.setdefault(agent, [0, 0])[0] += 1
+            pillar_stats.setdefault(task.pillar_id, [0, 0])[0] += 1
+
+            if task.status == "completed":
+                completed += 1
+                agent_stats[agent][1] += 1
+                pillar_stats[task.pillar_id][1] += 1
+            elif task.status in ("dismissed", "rejected", "skipped"):
+                skipped += 1
+
+        pillars = sorted(
+            (
+                PillarThroughput(
+                    pillar_id=p,
+                    proposed=s[0],
+                    completed=s[1],
+                    skipped=s[0] - s[1],
+                    completion_rate=(s[1] / s[0] * 100) if s[0] else 0.0,
+                )
+                for p, s in pillar_stats.items()
+            ),
+            key=lambda x: x.pillar_id or "",
+        )
+        agents = sorted(
+            (
+                AgentThroughput(
+                    agent=a,
+                    proposed=s[0],
+                    completed=s[1],
+                    acceptance_rate=(s[1] / s[0] * 100) if s[0] else 0.0,
+                )
+                for a, s in agent_stats.items()
+            ),
+            key=lambda x: (x.acceptance_rate, x.agent or ""),
+            reverse=True,
+        )
+
+        strongest = max(pillars, key=lambda x: x.completion_rate).pillar_id if pillars else None
+        weakest = min(pillars, key=lambda x: x.completion_rate).pillar_id if pillars else None
+
+        onboarding = (
+            session.query(OnboardingSession)
+            .filter(OnboardingSession.user_id == user_id)
+            .first()
+        )
+        tz = onboarding.timezone if onboarding and onboarding.timezone else "UTC"
+
+        return WeeklySummaryPayload(
+            user_id=user_id,
+            week_label=f"7 days ending {end_date}",
+            end_date=end_date,
+            total_tasks=total,
+            completed=completed,
+            skipped=skipped,
+            completion_percentage=round(completed / total * 100, 1),
+            pillars=pillars,
+            agents=agents,
+            strongest_pillar=strongest,
+            weakest_pillar=weakest,
+            timezone=tz,
+        )
+
+    except Exception as e:
+        logger.error(f"Error building weekly payload for user {user_id}: {e}")
+        return None
+    finally:
+        session.close()
+
+
+# =============================================================================
+# Re-engagement idle detection
+# =============================================================================
+
+def _should_reengage(session, user_id: str, idle_days: Optional[int] = None) -> bool:
+    """Return True when the user has zero completed tasks in the idle window.
+
+    Implements the design doc's re-engagement hook (Sec 10): when the user has
+    had no task completion for ``idle_days`` (default 3, configurable via the
+    ``REENGAGEMENT_IDLE_DAYS`` env var), the digest flips to the bold
+    re-engagement variant and a themed subject.
+    """
+    if idle_days is None:
+        idle_days = int(os.environ.get("REENGAGEMENT_IDLE_DAYS", "3"))
+    if idle_days <= 0:
+        return False
+
+    cutoff = datetime.utcnow() - timedelta(days=idle_days)
+    try:
+        completed_count = (
+            session.query(func.count(TaskHistory.id))
+            .filter(
+                TaskHistory.user_id == user_id,
+                TaskHistory.status == "completed",
+                TaskHistory.last_completed_at >= cutoff,
+            )
+            .scalar()
+            or 0
+        )
+        return completed_count == 0
+    except Exception as e:
+        # Fail-open to the standard digest on any query failure; never block a send.
+        logger.warning(f"Re-engagement check failed for {user_id}: {e}")
+        return False
+
+
+# =============================================================================
 # Email Renderer
 # =============================================================================
 
-def render_email(payload: DigestPayload, verbose: bool = True) -> str:
-    """Render the email HTML. Stub for now - returns simple HTML."""
+def render_email(payload: DigestPayload, verbose: bool = True, reengage: bool = False) -> str:
+    """Render the email HTML.
 
-    # Build task list HTML
-    tasks_html = ""
-    for task in payload.tasks:
-        status_color = "#22c55e" if task.status == "completed" else "#f59e0b"
-        synthesis_marker = ""
-        if task.synthesis_mode and task.synthesis_mode != "unknown":
-            mode_color = "#22c55e" if task.synthesis_mode == "llm" else "#3b82f6" if task.synthesis_mode == "data_derived" else "#f59e0b"
-            synthesis_marker = f"<span style='background: {mode_color}; color: white; padding: 1px 6px; border-radius: 3px; font-size: 10px; margin-left: 6px;'>{task.synthesis_mode}</span>"
-        
-        source_info = f"by {task.source_agent}" if task.source_agent and task.source_agent != "unknown" else ""
-        
-        action_link = ""
-        if task.action_url:
-            action_link = f"<a href='{task.action_url}' style='color: #2563eb; text-decoration: none; font-size: 12px; margin-left: 8px;'>Open in ALwrity →</a>"
-        
-        tasks_html += f"""
-        <div style="padding: 12px; margin: 8px 0; background: #f8fafc; border-radius: 8px; border-left: 4px solid {status_color};">
-            <div style="font-weight: 600; color: #1e293b;">{task.title}{synthesis_marker}</div>
-            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">
-                <span style="background: #e2e8f0; padding: 2px 8px; border-radius: 4px;">{task.pillar_id}</span>
-                <span style="margin-left: 8px;">{task.priority} priority</span>
-                <span style="margin-left: 8px;">{task.estimated_time} min</span>
-                {f'<span style="margin-left: 8px;">{source_info}</span>' if source_info else ''}
-                {action_link}
-            </div>
-        </div>
-        """
-
-    # Build alerts HTML if any
-    alerts_html = ""
-    if payload.alerts:
-        alerts_html = "<h3 style='margin-top: 24px; color: #1e293b;'>Alerts</h3>"
-        for alert in payload.alerts:
-            severity_color = "#ef4444" if alert["severity"] == "high" else "#f59e0b"
-            alerts_html += f"""
-            <div style="padding: 10px; margin: 6px 0; background: #fef2f2; border-radius: 6px; border-left: 3px solid {severity_color};">
-                <div style="font-weight: 600; color: #991b1b;">{alert['title']}</div>
-                <div style="font-size: 13px; color: #7f1d1d;">{alert['message']}</div>
-            </div>
-            """
-
-    # Build task memory signals HTML
-    memory_signals_html = ""
-    if payload.task_memory_signals:
-        memory_signals_html = "<h3 style='margin-top: 24px; color: #1e293b;'>Task History</h3>"
-        for signal in payload.task_memory_signals:
-            memory_signals_html += f"""
-            <div style="padding: 10px; margin: 6px 0; background: #eff6ff; border-radius: 6px; border-left: 3px solid #3b82f6;">
-                <div style="font-weight: 600; color: #1e40af;">{signal.title}</div>
-                <div style="font-size: 13px; color: #1e3a8a;">{signal.signal_text}</div>
-            </div>
-            """
-
-    # Build certification transparency HTML
-    cert_html = ""
-    if payload.certification_summary and verbose:
-        cert_html = "<h3 style='margin-top: 24px; color: #1e293b;'>Agent Certification Status</h3>"
-        for agent, cert in payload.certification_summary.items():
-            state_color = {"certified": "#22c55e", "certified_with_provider_dependency": "#3b82f6", "degraded": "#f59e0b", "not certified": "#64748b"}.get(cert.state, "#64748b")
-            cert_html += f"""
-            <div style="padding: 10px; margin: 6px 0; background: #f8fafc; border-radius: 6px;">
-                <div style="font-weight: 600; color: #1e293b;">{agent}</div>
-                <div style="font-size: 13px; color: {state_color};">State: {cert.state} • {cert.tools_blocked}/{cert.tools_total} tools blocked</div>
-            </div>
-            """
-
-    # Build synthesis mode breakdown
-    mode_items = ", ".join([f"{k}: {v}" for k, v in payload.synthesis_mode_breakdown.items()])
-
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <title>Your Daily ALwrity Plan</title>
-    </head>
-    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f1f5f9;">
-        <div style="background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <h1 style="color: #1e293b; margin-bottom: 8px;">📋 Your Daily ALwrity Plan</h1>
-            <p style="color: #64748b; margin-top: 0;">{payload.date} • Generated by AI Agent Team</p>
-
-            <div style="background: #f0f9ff; padding: 16px; border-radius: 8px; margin: 16px 0;">
-                <div style="font-size: 24px; font-weight: 700; color: #0369a1;">{payload.completed_count}/{len(payload.tasks)} tasks completed</div>
-                <div style="color: #0369a1;">{payload.completion_percentage}% completion • ~{payload.total_estimated_time} min to finish</div>
-            </div>
-
-            <p style="color: #64748b; font-size: 13px;">
-                Generation mode: {payload.generation_mode} • {mode_items}
-            </p>
-
-            <h3 style="margin-top: 24px; color: #1e293b;">Today's Tasks</h3>
-            {tasks_html}
-
-            {memory_signals_html}
-            {alerts_html}
-            {cert_html}
-
-            <div style="margin-top: 24px; text-align: center;">
-                <a href="https://alwrity.com/dashboard" style="display: inline-block; background: #4f46e5; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-                    Complete your daily plan on ALwrity →
-                </a>
-            </div>
-        </div>
-
-        <p style="text-align: center; color: #94a3b8; font-size: 12px; margin-top: 16px;">
-            You're receiving this because you opted in to daily AI agent team summaries.<br>
-            <a href="https://alwrity.com/settings/email-preferences" style="color: #64748b;">Manage email preferences</a>
-        </p>
-    </body>
-    </html>
+    Dispatches to the data-driven production templates in ``email_templates``:
+    the two-column standard digest by default, or the bold re-engagement
+    variant when ``reengage`` is True.
     """
-    return html
+    if reengage:
+        return render_reengagement(payload, verbose)
+    return render_standard_digest(payload, verbose)
 
 
 # =============================================================================
@@ -574,9 +667,18 @@ def send_digest(
             logger.info(f"No sendable content for user {user_id} on {date}")
             return True
 
+        # Re-engagement trigger (design doc Sec 10): zero completed tasks in the
+        # idle window flips the subject and leads with the bold variant.
+        reengage = _should_reengage(session, user_id)
+        if reengage:
+            pending = [t for t in payload.tasks if t.status != "completed"]
+            subject = f"You have {len(pending)} pending tasks — here's the quickest one"
+            logger.info(f"Re-engagement digest selected for user {user_id} on {date}")
+        else:
+            subject = f"Your Daily ALwrity Plan — {payload.completed_count}/{len(payload.tasks)} tasks done"
+
         # Render email
-        html = render_email(payload, verbose)
-        subject = f"Your Daily ALwrity Plan — {payload.completed_count}/{len(payload.tasks)} tasks done"
+        html = render_email(payload, verbose, reengage=reengage)
 
         # Send via Resend (stubbed)
         message_id = _send_via_resend(contact_email, subject, html)
@@ -676,15 +778,17 @@ def enqueue_digest(user_id: str, date: str, contact_email: str) -> None:
 def reconcile_missed_digests(lookback_days: int = 3) -> int:
     """
     Reconciler to find and send missed digests.
-    Returns count of digests sent.
-    """
-    from datetime import datetime, timedelta
 
+    Pulls pending/failed ledger rows within the lookback window, resolves each
+    user's contact email + opt-in from onboarding, and re-sends inline using
+    the real render + Resend path so the ledger status stays the source of truth.
+
+    Returns count of digests actually sent (status == "sent").
+    """
     cutoff_date = (datetime.utcnow() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
 
-    session = get_session_for_user("system")  # Use system session to query all
+    session = get_session_for_user("system")  # System session to query all users
     try:
-        # Find pending/failed ledgers older than cutoff
         missed = (
             session.query(DailyEmailLedger)
             .filter(
@@ -694,25 +798,206 @@ def reconcile_missed_digests(lookback_days: int = 3) -> int:
             .all()
         )
 
-        sent_count = 0
+        sent = 0
         for ledger in missed:
-            # Get user's contact email (placeholder - would query onboarding)
-            # For now, skip if no email
-            logger.info(f"Reconciling missed digest for user {ledger.user_id} on {ledger.plan_date}")
+            onboarding = (
+                session.query(OnboardingSession)
+                .filter(OnboardingSession.user_id == ledger.user_id)
+                .first()
+            )
+            contact_email = onboarding.contact_email if onboarding and onboarding.contact_email else None
+            opted_in = bool(onboarding and onboarding.email_digest_opt_in)
 
-            # TODO: get actual contact email from user data
-            # For now, just update status to avoid infinite retry loop
-            # In production, would call send_digest with actual email
-            if ledger.status == "pending":
-                ledger.status = "skipped_no_content"  # Placeholder
+            if not opted_in:
+                ledger.status = "skipped_opted_out"
+                ledger.updated_at = func.now()
+                logger.info(f"Reconciler: user {ledger.user_id} opted out; skipping digest")
+                continue
+
+            if not contact_email:
+                ledger.status = "failed"
                 ledger.error_message = "Reconciler: no contact email found"
-                sent_count += 1
+                ledger.updated_at = func.now()
+                logger.info(f"Reconciler: no contact email for user {ledger.user_id}")
+                continue
+
+            # Build payload via the same builder the live path uses (with the
+            # persistence-race tolerance). It opens its own session.
+            payload = build_digest_payload(ledger.user_id, ledger.plan_date, verbose=True)
+            if not payload or not payload.tasks:
+                ledger.status = "skipped_no_content"
+                ledger.error_message = "Reconciler: no sendable content"
+                ledger.updated_at = func.now()
+                logger.info(f"Reconciler: no content for user {ledger.user_id} on {ledger.plan_date}")
+                continue
+
+            # Re-engagement subject flip (same logic as send_digest).
+            reengage = _should_reengage(session, ledger.user_id)
+            pending = [t for t in payload.tasks if t.status != "completed"]
+            if reengage:
+                subject = f"You have {len(pending)} pending tasks — here's the quickest one"
+            else:
+                subject = f"Your Daily ALwrity Plan — {payload.completed_count}/{len(payload.tasks)} tasks done"
+
+            html = render_email(payload, verbose=True, reengage=reengage)
+            message_id = _send_via_resend(contact_email, subject, html)
+
+            if message_id:
+                ledger.status = "sent"
+                ledger.sent_at = func.now()
+                ledger.resend_message_id = message_id
+                ledger.updated_at = func.now()
+                sent += 1
+                logger.info(f"Reconciler sent digest to {contact_email} (msg_id: {message_id})")
+            else:
+                ledger.status = "failed"
+                ledger.error_message = "Reconciler: Resend returned no message_id"
+                ledger.updated_at = func.now()
+                logger.warning(f"Reconciler: send failed for user {ledger.user_id}")
 
         session.commit()
-        return sent_count
+        logger.info(f"Reconciler sent {sent} missed digest(s)")
+        return sent
 
     except Exception as e:
         logger.error(f"Error running reconciler: {e}")
         return 0
+    finally:
+        try:
+            session.close()
+        except Exception:
+            pass
+
+
+# =============================================================================
+# Weekly summary send
+# =============================================================================
+
+def send_weekly_digest(user_id: str, contact_email: str, end_date: Optional[str] = None) -> bool:
+    """Send a single user's weekly summary (design doc Sec 11).
+
+    Records on the ``weekly`` ledger row so it does not count against the daily
+    limit and stays idempotent per week. Returns True if sent (or terminally
+    skipped), False on Rerror.
+    """
+    session = get_session_for_user(user_id)
+    try:
+        if not end_date:
+            end_date = datetime.utcnow().strftime("%Y-%m-%d")
+        email_type = "weekly"
+
+        existing = (
+            session.query(DailyEmailLedger)
+            .filter(
+                and_(
+                    DailyEmailLedger.user_id == user_id,
+                    DailyEmailLedger.plan_date == end_date,
+                    DailyEmailLedger.email_type == email_type,
+                )
+            )
+            .first()
+        )
+        if existing and existing.status == "sent":
+            return True
+
+        onboarding = (
+            session.query(OnboardingSession)
+            .filter(OnboardingSession.user_id == user_id)
+            .first()
+        )
+        if not (onboarding and onboarding.email_digest_opt_in):
+            if not existing:
+                session.add(DailyEmailLedger(
+                    user_id=user_id, plan_date=end_date, email_type=email_type,
+                    status="skipped_opted_out",
+                ))
+                session.commit()
+            return True
+
+        payload = build_weekly_payload(user_id, end_date)
+        if not payload or payload.total_tasks == 0:
+            if not existing:
+                session.add(DailyEmailLedger(
+                    user_id=user_id, plan_date=end_date, email_type=email_type,
+                    status="skipped_no_content",
+                ))
+                session.commit()
+            return True
+
+        html = render_weekly_digest(payload, verbose=True)
+        subject = f"Your Weekly ALwrity Summary — {payload.completed}/{payload.total_tasks} tasks done"
+        message_id = _send_via_resend(contact_email, subject, html)
+
+        if message_id:
+            if existing:
+                existing.status = "sent"
+                existing.sent_at = func.now()
+                existing.resend_message_id = message_id
+                existing.updated_at = func.now()
+            else:
+                session.add(DailyEmailLedger(
+                    user_id=user_id, plan_date=end_date, email_type=email_type,
+                    status="sent", sent_at=func.now(), resend_message_id=message_id,
+                ))
+            session.commit()
+            logger.info(f"Weekly digest sent to {contact_email} (msg_id: {message_id})")
+            return True
+
+        if not existing:
+            session.add(DailyEmailLedger(
+                user_id=user_id, plan_date=end_date, email_type=email_type,
+                status="failed", error_message="Resend API returned no message_id",
+            ))
+            session.commit()
+        return False
+
+    except Exception as e:
+        logger.error(f"Error sending weekly digest to {user_id}: {e}")
+        return False
+    finally:
+        session.close()
+
+
+def _iter_opted_in_users(session):
+    """Yield (user_id, contact_email) for every opted-in onboarding session."""
+    rows = session.query(OnboardingSession).filter(
+        OnboardingSession.email_digest_opt_in.is_(True)
+    ).all()
+    for row in rows:
+        if row.contact_email:
+            yield row.user_id, row.contact_email
+
+
+def send_weekly_summaries(end_date: Optional[str] = None) -> int:
+    """Batch-send weekly summaries to all opted-in users (cron entry point)."""
+    if not end_date:
+        end_date = datetime.utcnow().strftime("%Y-%m-%d")
+
+    session = get_session_for_user("system")
+    sent = 0
+    try:
+        for user_id, contact_email in _iter_opted_in_users(session):
+            try:
+                if send_weekly_digest(user_id, contact_email, end_date):
+                    # Count only actual sends; a skip also returns True.
+                    row = (
+                        session.query(DailyEmailLedger)
+                        .filter(
+                            and_(
+                                DailyEmailLedger.user_id == user_id,
+                                DailyEmailLedger.plan_date == end_date,
+                                DailyEmailLedger.email_type == "weekly",
+                            )
+                        )
+                        .first()
+                    )
+                    if row and row.status == "sent":
+                        sent += 1
+            except Exception as e:
+                logger.error(f"Weekly digest error for {user_id}: {e}")
+        return sent
+    except Exception as e:
+        logger.error(f"Error running weekly summary batch: {e}")
+        return sent
     finally:
         session.close()
