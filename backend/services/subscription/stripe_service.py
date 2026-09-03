@@ -459,10 +459,24 @@ class StripeService:
                 except Exception as cache_err:
                     logger.warning(f"Failed to clear cache after checkout for user {user_id}: {cache_err}")
                 
-                # Expire all SQLAlchemy objects to force fresh reads
+# Expire all SQLAlchemy objects to force fresh reads
                 self.db.expire_all()
                 logger.info(f"Expired all SQLAlchemy objects for user {user_id} after checkout")
-                
+
+                # Best-effort, non-blocking payment-confirmation email. A send
+                # failure must never break the checkout/webhook flow.
+                try:
+                    from services.subscription.billing_email import send_billing_email
+                    send_billing_email(
+                        user_id,
+                        db=self.db,
+                        kind="payment_confirmation",
+                        event_ref=str(session.get("id") or ""),
+                    )
+                    logger.info(f"Payment-confirmation email sent for user {user_id}")
+                except Exception as email_err:
+                    logger.warning(f"Payment-confirmation email skipped for {user_id}: {email_err}")
+
             except Exception as e:
                 logger.error(f"Error processing checkout subscription: {e}")
 
