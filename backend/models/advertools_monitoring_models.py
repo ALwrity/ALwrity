@@ -3,8 +3,8 @@ Advertools Monitoring Models
 Database models for tracking Advertools-based SEO intelligence tasks.
 """
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, JSON, Index, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, JSON, Index, ForeignKey, UniqueConstraint
+from sqlalchemy.orm import relationship, validates
 from datetime import datetime
 
 # Import the same Base from enhanced_strategy_models
@@ -45,23 +45,43 @@ class AdvertoolsTask(Base):
     
     # Task Type & Data
     payload = Column(JSON, nullable=True) # {"type": "content_audit", "website_url": "..."}
-    
+    # Denormalized copy of ``payload['type']`` so it can be queried, indexed,
+    # and constrained at the DB level (the JSON column cannot be).
+    task_type = Column(String(50), nullable=False, default='content_audit')
+
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     # Execution Logs Relationship
     execution_logs = relationship(
         "AdvertoolsExecutionLog",
         back_populates="task",
         cascade="all, delete-orphan"
     )
-    
+
     __table_args__ = (
         Index('idx_advertools_tasks_user_site', 'user_id', 'website_url'),
         Index('idx_advertools_tasks_next_execution', 'next_execution'),
         Index('idx_advertools_tasks_status', 'status'),
+        UniqueConstraint(
+            'user_id', 'website_url', 'task_type',
+            name='uq_advertools_tasks_user_site_type',
+        ),
     )
+
+    @validates('payload')
+    def _derive_task_type(self, key, payload):
+        """Auto-sync ``task_type`` from ``payload['type']``.
+
+        Every construction site passes ``payload`` (never ``task_type``), so
+        deriving here keeps the normalized column consistent without touching
+        the 10+ ``AdvertoolsTask(...)`` call sites. Also guarded on reads so a
+        payload mutation on an unsaved instance stays in sync before flush.
+        """
+        if isinstance(payload, dict) and payload.get("type"):
+            self.task_type = str(payload.get("type"))
+        return payload
     
     def __repr__(self):
         return f"<AdvertoolsTask(id={self.id}, user_id={self.user_id}, url={self.website_url}, status={self.status})>"
