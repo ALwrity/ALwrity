@@ -242,6 +242,11 @@ if _is_full_mode():
         get_semantic_cache_stats,
         get_sif_indexing_health,
         get_onboarding_task_health,
+        get_guardian_audit,
+        get_keyword_gaps,
+        get_content_gap_radar,
+        generate_content_from_gap,
+        GenerateContentRequest,
     )
 else:
     get_seo_dashboard_data = None
@@ -643,6 +648,71 @@ if _is_full_mode():
         Used by the Semantic Indexing Status widget on the dashboard.
         """
         return await get_sif_indexing_health(current_user)
+
+    # --- Routes the frontend calls that were never registered (404 fix) ---
+
+    @app.get("/api/seo-dashboard/guardian-audit")
+    async def guardian_audit_endpoint(current_user: dict = Depends(get_current_user)):
+        """Latest Content Guardian audit, enriched with the committee's
+        guardian health from the most recent today-workflow plan."""
+        audit = await get_guardian_audit(current_user)
+        try:
+            from services.database import get_session_for_user
+            from models.daily_workflow_models import DailyWorkflowPlan
+
+            user_id = str(current_user.get("id"))
+            session = get_session_for_user(user_id)
+            if session:
+                try:
+                    plan = (
+                        session.query(DailyWorkflowPlan)
+                        .filter(DailyWorkflowPlan.user_id == user_id)
+                        .order_by(DailyWorkflowPlan.created_at.desc())
+                        .first()
+                    )
+                    plan_json = plan.plan_json if plan and isinstance(plan.plan_json, dict) else {}
+                    guardian_review = plan_json.get("guardian_review") or {}
+                    summary = guardian_review.get("summary") or {}
+                    if summary.get("health_score") is not None:
+                        audit["committee_health_score"] = summary["health_score"]
+                        audit["guardian_review"] = guardian_review
+                finally:
+                    session.close()
+        except Exception:
+            pass
+        return audit
+
+    @app.get("/api/seo-dashboard/keyword-gaps")
+    async def keyword_gaps_endpoint(current_user: dict = Depends(get_current_user)):
+        """Get keyword gaps between the user's site and competitors."""
+        return await get_keyword_gaps(current_user)
+
+    @app.get("/api/seo-dashboard/content-gap-radar")
+    async def content_gap_radar_endpoint(current_user: dict = Depends(get_current_user)):
+        """Get content gap radar analysis for the user."""
+        return await get_content_gap_radar(current_user)
+
+    @app.post("/api/seo-dashboard/content-gap-radar/generate-content")
+    async def generate_content_from_gap_endpoint(
+        request: GenerateContentRequest, current_user: dict = Depends(get_current_user)
+    ):
+        """Generate a content brief from a detected content gap."""
+        return await generate_content_from_gap(request, current_user)
+
+    @app.get("/api/seo-dashboard/pages")
+    async def analyzed_pages_endpoint(current_user: dict = Depends(get_current_user)):
+        """Get the analyzed pages list for the user's site."""
+        return await get_analyzed_pages(current_user)
+
+    @app.get("/api/seo-dashboard/summary")
+    async def seo_analysis_summary_short(url: str):
+        """Quick summary of SEO analysis for a URL (short-path alias)."""
+        return await get_analysis_summary(url)
+
+    @app.get("/api/seo-dashboard/metrics/{url:path}")
+    async def seo_metrics_by_url(url: str):
+        """Detailed SEO metrics for a URL (path-parameter alias)."""
+        return await get_seo_metrics_detailed(url)
 
     # Comprehensive SEO Analysis endpoints
     @app.post("/api/seo-dashboard/analyze-comprehensive")
