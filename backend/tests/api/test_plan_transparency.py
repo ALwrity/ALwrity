@@ -223,3 +223,71 @@ async def test_retry_exposes_transparency_fields(monkeypatch, dbctx):
     assert data["meeting_preflight"]["checks"]["onboarding"]["status"] == "available"
     assert data["proposal_review_summary"]["counts"]["accepted"] == 12
     assert data["guardian_health"] == 88
+
+
+@pytest.mark.asyncio
+async def test_generate_indexes_tasks_for_preview_sourced_plan(monkeypatch, dbctx):
+    """Finding #2: the onboarding save path (POST /generate) FINDS the
+    preview-created plan (created=False), so its tasks were never indexed
+    into SIF. The save transition must index them."""
+    import asyncio
+
+    import api.today_workflow as tw
+    from api.today_workflow import generate_workflow
+
+    plan = _make_transparent_plan(dbctx.session)
+    plan.source = "preview"
+    dbctx.session.commit()
+
+    indexed = []
+
+    async def _fake_index(user_id, date, tasks, label):
+        indexed.append({"user_id": user_id, "date": date, "tasks": tasks, "label": label})
+
+    monkeypatch.setattr(tw, "_index_tasks_to_sif", _fake_index)
+
+    await generate_workflow(
+        date="2026-01-01",
+        workflow_type="main",
+        current_user={"id": "u1"},
+        db=dbctx.session,
+    )
+
+    # let the scheduled background task run
+    await asyncio.sleep(0)
+
+    assert indexed, "preview-sourced plan tasks must be indexed into SIF on save"
+    assert indexed[0]["date"] == "2026-01-01"
+    assert any(t.get("title") == "Build Out Content Pillar: AI Storytelling" for t in indexed[0]["tasks"])
+
+
+@pytest.mark.asyncio
+async def test_generate_does_not_reindex_manual_plans(monkeypatch, dbctx):
+    """A manual plan that was already indexed (created=False, source=manual)
+    must NOT be re-indexed on every /generate call."""
+    import asyncio
+
+    import api.today_workflow as tw
+    from api.today_workflow import generate_workflow
+
+    plan = _make_transparent_plan(dbctx.session)
+    plan.source = "manual"
+    dbctx.session.commit()
+
+    indexed = []
+
+    async def _fake_index(user_id, date, tasks, label):
+        indexed.append({"user_id": user_id, "date": date, "tasks": tasks, "label": label})
+
+    monkeypatch.setattr(tw, "_index_tasks_to_sif", _fake_index)
+
+    await generate_workflow(
+        date="2026-01-01",
+        workflow_type="main",
+        current_user={"id": "u1"},
+        db=dbctx.session,
+    )
+
+    await asyncio.sleep(0)
+
+    assert indexed == [], "already-indexed manual plans must not be re-indexed"

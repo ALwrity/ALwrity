@@ -721,7 +721,11 @@ async def generate_workflow(
 
     tasks = await run_in_threadpool(_fetch_tasks)
 
-    if created:
+    # Index the plan's tasks into SIF when the plan is newly created OR when
+    # this is the onboarding save transition (the preview-sourced plan is
+    # FOUND by /generate, not created - without this its tasks would never
+    # reach the SIF index). Already-indexed manual plans are skipped.
+    if created or plan.source == "preview":
         response_tasks = _build_workflow_payload(user_id, plan, tasks)["workflow"]["tasks"]
         asyncio.create_task(_index_tasks_to_sif(user_id, plan.date, response_tasks, label="today"))
         from datetime import date as date_type, timedelta
