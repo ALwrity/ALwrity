@@ -569,16 +569,25 @@ class ContentStrategyAgent(BaseALwrityAgent):
             if isinstance(target, dict):
                 industry = str(target.get("industry_focus") or target.get("industry") or "")
 
-            # Content pillars from multiple sources
+            # Content pillars from multiple sources. Some onboarding
+            # payloads store content_pillars as a DICT (form data like
+            # {"0": {"topic": ...}}) — indexing a dict with 0 raises
+            # KeyError: 0, so normalize to a list first.
             style_analysis = website_analysis.get("style_analysis") or {}
             strategy_insights = style_analysis.get("content_strategy_insights") or {}
             sitemap_analysis = style_analysis.get("sitemap_analysis") or {}
-            content_pillars = (
+            raw_pillars = (
                 strategy_insights.get("content_pillars")
                 or sitemap_analysis.get("content_pillars")
                 or research_prefs.get("content_pillars")
                 or []
             )
+            if isinstance(raw_pillars, dict):
+                raw_pillars = [
+                    value if isinstance(value, dict) else {"topic": str(value)}
+                    for value in raw_pillars.values()
+                ] or [{"topic": str(key)} for key in raw_pillars]
+            content_pillars = raw_pillars if isinstance(raw_pillars, list) else []
 
             # Competitor domains from competitor_analysis
             competitor_analysis = onboarding.get("competitor_analysis") or []
@@ -593,9 +602,19 @@ class ContentStrategyAgent(BaseALwrityAgent):
 
         # Task 1: Create content for a key pillar (generate)
         if content_pillars:
-            pillar_topic = content_pillars[0] if isinstance(content_pillars[0], str) else (
-                content_pillars[0].get("topic") or content_pillars[0].get("name") or "your audience"
-            )
+            first_pillar = content_pillars[0]
+            if isinstance(first_pillar, str):
+                pillar_topic = first_pillar
+            elif isinstance(first_pillar, dict):
+                pillar_topic = (
+                    first_pillar.get("topic")
+                    or first_pillar.get("name")
+                    or first_pillar.get("title")
+                    or "your audience"
+                )
+            else:
+                pillar_topic = str(first_pillar)
+            pillar_topic = str(pillar_topic).strip() or "your audience"
             default_proposals.append(TaskProposal(
                 title=f"Create content for '{pillar_topic}'",
                 description=f"Write a blog post or social content around your {pillar_topic} content pillar.",
