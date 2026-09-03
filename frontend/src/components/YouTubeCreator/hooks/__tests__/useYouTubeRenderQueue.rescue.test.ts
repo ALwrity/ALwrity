@@ -47,7 +47,7 @@ describe("useYouTubeRenderQueue library rescue", () => {
     vi.mocked(youtubeApi.listVideos).mockReset();
   });
 
-  it("restores the latest combined video into finalVideoUrl on mount", async () => {
+  it("does not restore account combined into finalVideoUrl on mount", async () => {
     vi.mocked(youtubeApi.listVideos).mockResolvedValue({
       success: true,
       message: "ok",
@@ -78,10 +78,10 @@ describe("useYouTubeRenderQueue library rescue", () => {
     const { result } = renderQueue([scene(1), scene(2)]);
 
     await waitFor(() => {
-      expect(result.current.finalVideoUrl).toBe(
-        "/api/youtube/videos/combined_latest.mp4",
-      );
+      expect(youtubeApi.listVideos).toHaveBeenCalled();
     });
+    expect(result.current.finalVideoUrl).toBeNull();
+    expect(result.current.combinedFromThisSession).toBe(false);
   });
 
   it("still restores scene clip URLs and does not treat combined as a scene", async () => {
@@ -115,7 +115,8 @@ describe("useYouTubeRenderQueue library rescue", () => {
     const updated = onScenesUpdate.mock.calls[0][0] as Scene[];
     expect(updated[0].videoUrl).toBe("/api/youtube/videos/scene_1.mp4");
     expect(updated[1].videoUrl).toBeUndefined();
-    expect(result.current.finalVideoUrl).toBe("/api/youtube/videos/combined.mp4");
+    expect(result.current.finalVideoUrl).toBeNull();
+    expect(result.current.combinedFromThisSession).toBe(false);
   });
 
   it("leaves finalVideoUrl null when the library only has scene clips", async () => {

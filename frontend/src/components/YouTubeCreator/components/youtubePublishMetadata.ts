@@ -51,6 +51,38 @@ export function parseYouTubePublishTags(raw: string): string[] {
   }
 }
 
+export function parseYouTubePublishMetadata(raw: unknown): YouTubePublishMetadata | null {
+  try {
+    if (!raw || typeof raw !== "object") {
+      return null;
+    }
+    const value = raw as Record<string, unknown>;
+    if (typeof value.title !== "string" || typeof value.description !== "string") {
+      return null;
+    }
+    if (typeof value.category_id !== "string" || !value.category_id.trim()) {
+      return null;
+    }
+    if (!Array.isArray(value.tags)) {
+      return null;
+    }
+    const tags = normalizeKeywordList(
+      value.tags.filter((tag): tag is string => typeof tag === "string"),
+    );
+    return {
+      title: value.title.slice(0, TITLE_MAX),
+      description: value.description,
+      tags,
+      category_id: value.category_id.trim(),
+    };
+  } catch (error) {
+    console.error("[youtubePublishMetadata] Failed to parse persisted metadata", {
+      errorName: error instanceof Error ? error.name : "Error",
+    });
+    return null;
+  }
+}
+
 function sameYouTubePublishTags(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((tag, index) => tag === right[index]);
 }

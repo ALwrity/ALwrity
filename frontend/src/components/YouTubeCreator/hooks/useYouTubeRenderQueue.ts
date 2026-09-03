@@ -7,10 +7,7 @@ import {
   TaskStatus,
   VideoPlan,
 } from '../../../services/youtubeApi';
-import {
-  mapYouTubeSceneVideosByNumber,
-  pickYouTubeCombinedVideoUrl,
-} from './youtubeRenderVideoRescue';
+import { mapYouTubeSceneVideosByNumber } from './youtubeRenderVideoRescue';
 
 type SceneStatus = 'idle' | 'running' | 'completed' | 'failed';
 
@@ -35,6 +32,7 @@ interface UseYouTubeRenderQueueParams {
 interface UseYouTubeRenderQueueResult {
   sceneStatuses: Record<number, SceneVideoState>;
   finalVideoUrl: string | null;
+  combinedFromThisSession: boolean;
   combining: boolean;
   combiningProgress: number;
   combiningMessage: string;
@@ -55,6 +53,7 @@ export function useYouTubeRenderQueue({
 }: UseYouTubeRenderQueueParams): UseYouTubeRenderQueueResult {
   const [sceneStatuses, setSceneStatuses] = useState<Record<number, SceneVideoState>>({});
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
+  const [combinedFromThisSession, setCombinedFromThisSession] = useState(false);
   const [combining, setCombining] = useState(false);
   const [combiningProgress, setCombiningProgress] = useState(0);
   const [combiningMessage, setCombiningMessage] = useState('Combining videos...');
@@ -212,26 +211,14 @@ export function useYouTubeRenderQueue({
     youtubeApi
       .listVideos()
       .then((result) => {
-        if (!result.videos || result.videos.length === 0) return;
-
-        try {
-          const combinedUrl = pickYouTubeCombinedVideoUrl(result.videos);
-          if (combinedUrl) {
-            setFinalVideoUrl((prev) => prev ?? combinedUrl);
-            console.info("[YouTubeRenderQueue] Restored combined video from library", {
-              ...youtubePublishSourceMeta(combinedUrl),
-              videoCount: result.videos.length,
-            });
-          } else {
-            console.info("[YouTubeRenderQueue] Library rescue: no combined video", {
-              videoCount: result.videos.length,
-            });
-          }
-        } catch (error) {
-          console.error("[YouTubeRenderQueue] Combined video rescue failed", {
-            errorName: error instanceof Error ? error.name : "Error",
-          });
+        if (!result.videos || result.videos.length === 0) {
+          console.info("[YouTubeRenderQueue] No library videos; skipped combined restore");
+          return;
         }
+
+        console.info("[YouTubeRenderQueue] Skipped account combined restore", {
+          videoCount: result.videos.length,
+        });
 
         try {
           const videoMap = mapYouTubeSceneVideosByNumber(result.videos);
@@ -420,6 +407,10 @@ export function useYouTubeRenderQueue({
               throw new Error('Final video URL not found in result. Please contact support.');
             }
             setFinalVideoUrl(url);
+            setCombinedFromThisSession(true);
+            console.info("[YouTubeRenderQueue] Combined this-session video", {
+              ...youtubePublishSourceMeta(url),
+            });
             setCombining(false);
             setCombiningProgress(100);
             setCombiningMessage('Combined successfully');
@@ -461,6 +452,7 @@ export function useYouTubeRenderQueue({
   return {
     sceneStatuses,
     finalVideoUrl,
+    combinedFromThisSession,
     combining,
     combiningProgress,
     combiningMessage,

@@ -86,6 +86,7 @@ function queueReturn(finalVideoUrl: string | null) {
   return {
     sceneStatuses: {},
     finalVideoUrl,
+    combinedFromThisSession: false,
     combining: false,
     combiningProgress: 0,
     combiningMessage: "",

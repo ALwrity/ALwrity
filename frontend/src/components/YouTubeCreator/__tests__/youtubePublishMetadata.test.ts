@@ -5,6 +5,7 @@
 import type { Scene, VideoPlan } from "../../../services/youtubeApi";
 import {
   buildYouTubePublishMetadata,
+  parseYouTubePublishMetadata,
   parseYouTubePublishTags,
   reconcileYouTubePublishMetadata,
   resolveYouTubePublishVideoUrl,
@@ -164,6 +165,28 @@ describe("parseYouTubePublishTags", () => {
   it("returns [] for blank input", () => {
     expect(parseYouTubePublishTags("")).toEqual([]);
     expect(parseYouTubePublishTags("   ,  ")).toEqual([]);
+  });
+});
+
+describe("parseYouTubePublishMetadata", () => {
+  const valid: YouTubePublishMetadata = {
+    title: "Edited title",
+    description: "Edited description",
+    tags: ["seo", "ranking"],
+    category_id: "27",
+  };
+
+  it("returns persisted title, description, tags, and category", () => {
+    expect(parseYouTubePublishMetadata(valid)).toEqual(valid);
+  });
+
+  it("returns null for missing, invalid, or incomplete values instead of inventing metadata", () => {
+    expect(parseYouTubePublishMetadata(null)).toBeNull();
+    expect(parseYouTubePublishMetadata(undefined)).toBeNull();
+    expect(parseYouTubePublishMetadata("Edited title")).toBeNull();
+    expect(parseYouTubePublishMetadata({ ...valid, title: 1 })).toBeNull();
+    expect(parseYouTubePublishMetadata({ ...valid, tags: "seo" })).toBeNull();
+    expect(parseYouTubePublishMetadata({ ...valid, category_id: "" })).toBeNull();
   });
 });
 

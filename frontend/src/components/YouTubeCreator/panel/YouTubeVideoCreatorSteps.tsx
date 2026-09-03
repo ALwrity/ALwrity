@@ -84,6 +84,7 @@ export interface YouTubeVideoCreatorStepsProps {
   handleResetRender: () => void;
   handleRetryFailedScenes: (failed: any[]) => void;
   getVideoUrl: () => string | null;
+  publishMetadata: YouTubeCreatorState["publishMetadata"];
 }
 
 export const YouTubeVideoCreatorSteps: React.FC<YouTubeVideoCreatorStepsProps> = (props) => {
@@ -221,6 +222,8 @@ export const YouTubeVideoCreatorSteps: React.FC<YouTubeVideoCreatorStepsProps> =
         onRetryFailedScenes={props.handleRetryFailedScenes}
         onScenesUpdate={(updated) => props.updateState({ scenes: updated })}
         getVideoUrl={props.getVideoUrl}
+        persistedPublishMetadata={props.publishMetadata}
+        onPublishMetadataChange={(metadata) => props.updateState({ publishMetadata: metadata })}
       />
     );
   }

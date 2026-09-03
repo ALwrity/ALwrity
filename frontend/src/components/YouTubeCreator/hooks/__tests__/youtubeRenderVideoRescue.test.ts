@@ -148,15 +148,16 @@ describe("mapYouTubeSceneVideosByNumber", () => {
 });
 
 describe("useYouTubeRenderQueue combined rescue contract", () => {
-  it("restores combined video via pickYouTubeCombinedVideoUrl on listVideos", () => {
+  it("rescues scene clips from listVideos and does not restore account combined", () => {
     const dir = dirname(fileURLToPath(import.meta.url));
     const source = readFileSync(
       join(dir, "..", "useYouTubeRenderQueue.ts"),
       "utf8",
     );
-    expect(source).toContain("pickYouTubeCombinedVideoUrl");
+    expect(source).not.toContain("pickYouTubeCombinedVideoUrl");
     expect(source).toContain("mapYouTubeSceneVideosByNumber");
     expect(source).toContain("listVideos");
     expect(source).toContain("setFinalVideoUrl");
+    expect(source).toContain("combinedFromThisSession");
   });
 });

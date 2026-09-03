@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { VideoPlan, VideoPlanGeneration, VideoPlanResearchSource, Scene, SceneBuildGeneration } from '../services/youtubeApi';
 import { Resolution, DurationType, VideoType, YouTubeContentLanguage } from '../components/YouTubeCreator/constants';
+import { parseYouTubePublishMetadata, type YouTubePublishMetadata } from '../components/YouTubeCreator/components/youtubePublishMetadata';
 
 export type YouTubeScriptPhase = 'idle' | 'pitch' | 'expanding' | 'ready';
 
@@ -61,6 +62,9 @@ export interface YouTubeCreatorState {
   renderProgress: number;
   resolution: Resolution;
   combineScenes: boolean;
+
+  /** Edited YouTube publish title/description/tags/category for this draft. */
+  publishMetadata: YouTubePublishMetadata | null;
   
   // UI state
   activeStep: number;
@@ -98,6 +102,7 @@ const DEFAULT_STATE: YouTubeCreatorState = {
   renderProgress: 0,
   resolution: '480p',
   combineScenes: true,
+  publishMetadata: null,
   activeStep: 0,
 };
 
@@ -118,6 +123,7 @@ export function getYouTubeCreatorStateSnapshot(): YouTubeCreatorState {
           typeof parsed.enableResearch === "boolean" ? parsed.enableResearch : true,
         pitchHistory: Array.isArray(parsed.pitchHistory) ? parsed.pitchHistory : [],
         scriptPhase: parsed.scriptPhase || 'idle',
+        publishMetadata: parseYouTubePublishMetadata(parsed.publishMetadata),
       };
     }
   } catch (error) {
@@ -177,6 +183,7 @@ export const useYouTubeCreatorState = () => {
             typeof parsed.enableResearch === "boolean" ? parsed.enableResearch : true,
           pitchHistory: Array.isArray(parsed.pitchHistory) ? parsed.pitchHistory : [],
           scriptPhase: parsed.scriptPhase || 'idle',
+          publishMetadata: parseYouTubePublishMetadata(parsed.publishMetadata),
           // Ensure dates are preserved
           createdAt: parsed.createdAt || new Date().toISOString(),
           updatedAt: parsed.updatedAt || new Date().toISOString(),
@@ -188,6 +195,7 @@ export const useYouTubeCreatorState = () => {
           scriptPhase: restoredState.scriptPhase,
           scenesCount: restoredState.scenes.length,
           activeStep: restoredState.activeStep,
+          hasPublishMetadata: Boolean(restoredState.publishMetadata),
         });
         
         return restoredState;
