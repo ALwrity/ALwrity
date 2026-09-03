@@ -16,14 +16,14 @@ import {
 } from '@mui/material';
 import { Scene, VideoPlan } from '../../../services/youtubeApi';
 import { useYouTubePublish } from '../../../hooks/useYouTubePublish';
-import { toYouTubePublishAtIso } from './youtubePublishSchedule';
+import { toYouTubePublishAtIso, youtubeScheduleFieldSx, youtubeScheduleIsInvalid } from './youtubePublishSchedule';
 import { youtubePublishSourceMeta } from '../../../hooks/youtubePublishLog';
 import type { YouTubePublishMetadata } from './youtubePublishMetadata';
 import {
   YouTubePublishAudienceFields,
   type YouTubeMadeForKidsChoice,
 } from './YouTubePublishAudienceFields';
-import { helperSx, inputSx, labelSx, selectMenuProps, selectSx } from '../styles';
+import { helperSx, inputSx, labelSx, selectMenuProps, selectSx, TEXT_PRIMARY, BACKGROUND } from '../styles';
 
 interface YouTubePublishPanelProps {
   videoUrl: string | null;
@@ -86,10 +86,15 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
         return;
       }
       const publishAt = toYouTubePublishAtIso(scheduleLocal);
+      if (youtubeScheduleIsInvalid(scheduleLocal)) {
+        console.warn("[YouTubePublishPanel] Publish skipped: invalid schedule");
+        return;
+      }
       const title = metadata?.title ?? publishTitle;
       const description = metadata?.description ?? publishDescription;
       const tags = metadata ? metadata.tags : ['alwrity', 'youtube', 'ai-video'];
       const restrictTo18 = madeForKids === false && ageRestricted;
+      const effectivePrivacy = publishAt ? 'private' : privacy;
       console.info("[YouTubePublishPanel] Publish clicked", {
         ...youtubePublishSourceMeta(videoUrl),
         titleLength: title.length,
@@ -100,7 +105,8 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
         hasPublishLine: Boolean(publishLine),
         hasHelperText: Boolean(helperText),
         hasSchedule: Boolean(publishAt),
-        privacy: publishAt ? "private" : privacy,
+        selectedPrivacy: privacy,
+        effectivePrivacy,
         madeForKids,
         ageRestricted: restrictTo18,
         connected: youtube.connected,
@@ -109,7 +115,7 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
       youtube.publishToYouTube(videoUrl, title, {
         description,
         tags,
-        privacy_status: publishAt ? 'private' : privacy,
+        privacy_status: effectivePrivacy,
         publish_at: publishAt,
         made_for_kids: madeForKids,
         ...(restrictTo18 ? { age_restricted: true } : {}),
@@ -187,7 +193,7 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
         ) : null}
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-          <FormControl size="small" sx={{ minWidth: 160 }}>
+          <FormControl size="small" sx={{ minWidth: 200, flex: '0 0 auto' }}>
             <InputLabel id="yt-privacy-label" sx={labelSx}>
               Privacy
             </InputLabel>
@@ -195,7 +201,6 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
               labelId="yt-privacy-label"
               label="Privacy"
               value={privacy}
-              disabled={Boolean(scheduleLocal)}
               onChange={(e) => {
                 try {
                   const nextPrivacy = e.target.value as typeof privacy;
@@ -207,7 +212,16 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
                   });
                 }
               }}
-              sx={selectSx}
+              sx={{
+                ...selectSx,
+                '& .MuiSelect-select': {
+                  color: TEXT_PRIMARY,
+                  WebkitTextFillColor: TEXT_PRIMARY,
+                  backgroundColor: BACKGROUND,
+                  padding: '8.5px 14px',
+                  fontSize: '0.9375rem',
+                },
+              }}
               MenuProps={selectMenuProps}
             >
               <MenuItem value="unlisted">Unlisted</MenuItem>
@@ -226,7 +240,8 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
               try {
                 const nextSchedule = e.target.value;
                 console.info("[YouTubePublishPanel] Schedule updated", {
-                  hasSchedule: Boolean(nextSchedule),
+                  hasSchedule: Boolean(nextSchedule.trim()),
+                  hasValidPublishAt: Boolean(toYouTubePublishAtIso(nextSchedule)),
                 });
                 setScheduleLocal(nextSchedule);
               } catch (error) {
@@ -237,16 +252,10 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
             }}
             helperText={
               scheduleLocal
-                ? 'Will upload as private until this time (UTC converted).'
+                ? 'YouTube keeps this private until this time (UTC converted), then publishes it.'
                 : 'Leave empty to publish now'
             }
-            sx={{
-              minWidth: 240,
-              ...inputSx,
-              '& .MuiOutlinedInput-input': {
-                color: '#111827',
-              },
-            }}
+            sx={[inputSx, youtubeScheduleFieldSx]}
           />
         </Stack>
 
@@ -292,7 +301,7 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
         >
           {youtube.publishState.publishing
             ? youtube.publishState.progress || 'Publishing...'
-            : scheduleLocal
+            : toYouTubePublishAtIso(scheduleLocal)
               ? 'Schedule on YouTube'
               : 'Publish to YouTube'}
         </Button>

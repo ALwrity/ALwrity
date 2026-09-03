@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { YouTubePublishAudienceFields } from "../components/YouTubePublishAudienceFields";
+import { outlinedControlSx } from "../styles";
 
 const FIELDS_SOURCE = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -67,6 +68,33 @@ describe("YouTubePublishAudienceFields disabled readability", () => {
     expect(
       screen.getByRole("radio", { name: /Yes, restrict my video to viewers over 18/i }),
     ).toBeDisabled();
+  });
+
+  it("wraps Audience in an outlined surface with Privacy-matching hover border", () => {
+    const source = readFileSync(FIELDS_SOURCE, "utf8");
+    expect(source).toContain("outlinedControlSx");
+    expect(source).toContain('id="yt-audience-label"');
+    expect(source).toContain('aria-labelledby="yt-audience-label"');
+    expect(outlinedControlSx).toMatchObject({
+      backgroundColor: "#ffffff",
+      border: "1.5px solid #d1d5db",
+    });
+    expect(outlinedControlSx["&:hover"]).toMatchObject({
+      borderColor: "#9ca3af",
+    });
+  });
+
+  it("exposes Audience as a named fieldset for assistive tech", () => {
+    render(
+      <YouTubePublishAudienceFields
+        madeForKids={false}
+        ageRestricted={false}
+        onMadeForKidsChange={vi.fn()}
+        onAgeRestrictedChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("group", { name: "Audience" })).toBeTruthy();
   });
 
   it("left-aligns Age restriction (advanced) under the Made for Kids radios", () => {

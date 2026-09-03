@@ -18,7 +18,7 @@ import {
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { YT_RED, YT_TEXT } from "../constants";
-import { helperSx, labelSx } from "../styles";
+import { BACKGROUND, BACKGROUND_HOVER, helperSx, labelSx, outlinedControlSx } from "../styles";
 
 export type YouTubeMadeForKidsChoice = boolean | null;
 
@@ -50,14 +50,24 @@ const radioLabelSx = {
   color: YT_TEXT,
   ml: 0,
   alignItems: "flex-start",
+  borderRadius: 1,
+  px: 1,
+  py: 0.25,
+  mx: -0.5,
   "& .MuiFormControlLabel-label": {
     color: YT_TEXT,
     fontSize: "0.9375rem",
     fontWeight: 400,
     lineHeight: 1.5,
   },
+  "&:hover": {
+    backgroundColor: BACKGROUND_HOVER,
+  },
   "&.Mui-disabled": {
     opacity: 1,
+  },
+  "&.Mui-disabled:hover": {
+    backgroundColor: "transparent",
   },
   "&.Mui-disabled .MuiFormControlLabel-label": {
     color: DISABLED_LABEL,
@@ -98,6 +108,9 @@ export const YouTubePublishAudienceFields: React.FC<YouTubePublishAudienceFields
   const handleAgeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       if (!ageRestrictionEnabled) {
+        console.info("[YouTubePublishAudienceFields] Age restriction ignored", {
+          ageRestrictionEnabled: false,
+        });
         return;
       }
       const nextRestricted = event.target.value === "yes";
@@ -113,11 +126,33 @@ export const YouTubePublishAudienceFields: React.FC<YouTubePublishAudienceFields
   };
 
   return (
-    <Stack spacing={2}>
-      <FormControl component="fieldset" sx={{ m: 0 }}>
-        <Typography component="legend" sx={{ ...labelSx, mb: 0.5 }}>
-          Audience
-        </Typography>
+    <Stack
+      spacing={2}
+      sx={{
+        ...outlinedControlSx,
+        position: "relative",
+        px: 2,
+        pt: 2.5,
+        pb: 1.5,
+      }}
+    >
+      <Typography
+        id="yt-audience-label"
+        component="span"
+        sx={{
+          ...labelSx,
+          position: "absolute",
+          top: -9,
+          left: 12,
+          mb: 0,
+          px: 0.5,
+          backgroundColor: BACKGROUND,
+          lineHeight: 1.2,
+        }}
+      >
+        Audience
+      </Typography>
+      <FormControl component="fieldset" sx={{ m: 0 }} aria-labelledby="yt-audience-label">
         <Typography variant="body2" sx={{ ...helperSx, mt: 0, mb: 1 }}>
           YouTube requires this for every upload. Made for kids videos cannot be age-restricted.
         </Typography>
