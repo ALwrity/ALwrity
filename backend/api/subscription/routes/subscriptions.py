@@ -411,6 +411,29 @@ async def subscribe_to_plan(
             except Exception as email_err:
                 logger.warning(f"Plan-change email skipped for {user_id}: {email_err}")
 
+        # Best-effort, non-blocking renewal-receipt email for same-plan renewals.
+        if renewal_type == "renewal":
+            try:
+                from services.subscription.billing_email import send_billing_email
+                first_name = str(current_user.get("first_name") or current_user.get("username") or "")
+                period_start_ts = str(int(now.timestamp()))
+                period_end_ts = str(int(subscription.current_period_end.timestamp())) if subscription.current_period_end else ""
+                send_billing_email(
+                    user_id,
+                    db=db,
+                    first_name=first_name,
+                    kind="renewal_receipt",
+                    event_ref=f"subscribe-renewal-{now.strftime('%Y%m%d%H%M%S')}",
+                    payload_extra={
+                        "price": str(plan.price_yearly if billing_cycle == 'yearly' else plan.price_monthly),
+                        "period_start": period_start_ts,
+                        "period_end": period_end_ts,
+                    },
+                )
+                logger.info(f"Renewal-receipt email sent for user {user_id}")
+            except Exception as email_err:
+                logger.warning(f"Renewal-receipt email skipped for {user_id}: {email_err}")
+
         # Get current usage BEFORE reset for logging
         current_period = datetime.utcnow().strftime("%Y-%m")
         usage_before = db.query(UsageSummary).filter(
