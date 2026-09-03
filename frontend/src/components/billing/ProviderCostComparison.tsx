@@ -16,6 +16,7 @@ import {
   Cell,
   ChartLoadingFallback
 } from '../../utils/lazyRecharts';
+import { SafeResponsiveContainer } from '../shared/SafeResponsiveContainer';
 
 // Types
 import { ProviderBreakdown } from '../../types/billing';
@@ -115,7 +116,7 @@ const ProviderCostComparison: React.FC<ProviderCostComparisonProps> = ({
         </Typography>
         
         <Suspense fallback={<ChartLoadingFallback />}>
-          <ResponsiveContainer width="100%" height={200}>
+          <SafeResponsiveContainer width="100%" height={200}>
             <LazyBarChart 
               data={chartData} 
               layout="vertical"
@@ -161,7 +162,7 @@ const ProviderCostComparison: React.FC<ProviderCostComparisonProps> = ({
                 ))}
               </Bar>
             </LazyBarChart>
-          </ResponsiveContainer>
+          </SafeResponsiveContainer>
         </Suspense>
       </Box>
     </motion.div>

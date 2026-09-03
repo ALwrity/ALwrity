@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { SafeResponsiveContainer } from '../shared/SafeResponsiveContainer';
 import { useAuth } from '@clerk/clerk-react';
 import { useBacklinkOutreachStore } from '../../stores/backlinkOutreachStore';
 import {
@@ -1160,7 +1161,7 @@ const BacklinkOutreachDashboard: React.FC = () => {
                   <div style={{ marginBottom: '24px' }}>
                     <SectionHeader title="Send Volume Trend" subtitle={`Daily outreach email send volume over the last ${analyticsDays} days.`} />
                     <div style={{ padding: '16px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <ResponsiveContainer width="100%" height={250}>
+                      <SafeResponsiveContainer width="100%" height={250}>
                         <LineChart data={volumeData}>
                           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                           <XAxis dataKey="date" tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.4)' }} />
@@ -1168,7 +1169,7 @@ const BacklinkOutreachDashboard: React.FC = () => {
                           <RechartsTooltip contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }} />
                           <Line type="monotone" dataKey="count" stroke="#667eea" strokeWidth={2} dot={{ r: 3, fill: '#667eea' }} />
                         </LineChart>
-                      </ResponsiveContainer>
+                      </SafeResponsiveContainer>
                     </div>
                   </div>
                 )}
@@ -1178,7 +1179,7 @@ const BacklinkOutreachDashboard: React.FC = () => {
                   <div style={{ marginBottom: '24px' }}>
                     <SectionHeader title="Lead Conversion Funnel" subtitle="Breakdown of leads by status stage. Shows where leads are in the outreach pipeline." />
                     <div style={{ padding: '16px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <ResponsiveContainer width="100%" height={250}>
+                      <SafeResponsiveContainer width="100%" height={250}>
                         <BarChart data={funnelData}>
                           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                           <XAxis dataKey="status" tick={{ fontSize: 12, fill: 'rgba(255,255,255,0.4)' }} />
@@ -1186,7 +1187,7 @@ const BacklinkOutreachDashboard: React.FC = () => {
                           <RechartsTooltip contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }} />
                           <Bar dataKey="count" fill="#667eea" radius={[4, 4, 0, 0]} />
                         </BarChart>
-                      </ResponsiveContainer>
+                      </SafeResponsiveContainer>
                     </div>
                   </div>
                 )}

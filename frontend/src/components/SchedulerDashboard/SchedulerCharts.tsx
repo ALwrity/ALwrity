@@ -4,6 +4,7 @@
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
+import { SafeResponsiveContainer } from '../shared/SafeResponsiveContainer';
 import {
   LineChart,
   Line,
@@ -293,7 +294,7 @@ const SchedulerCharts: React.FC<SchedulerChartsProps> = ({ events: propEvents })
               </TerminalTypography>
               <MaximizeIcon sx={{ fontSize: 16, color: terminalColors.primary }} />
             </Box>
-            <ResponsiveContainer width="100%" height={150}>
+            <SafeResponsiveContainer width="100%" height={150}>
               <LineChart data={chartData.slice(-7)}>
                 <CartesianGrid strokeDasharray="3 3" stroke={terminalColors.border} />
                 <XAxis 
@@ -323,7 +324,7 @@ const SchedulerCharts: React.FC<SchedulerChartsProps> = ({ events: propEvents })
                   dot={false}
                 />
               </LineChart>
-            </ResponsiveContainer>
+            </SafeResponsiveContainer>
           </TerminalPaper>
         </Box>
 
@@ -346,7 +347,7 @@ const SchedulerCharts: React.FC<SchedulerChartsProps> = ({ events: propEvents })
               </TerminalTypography>
               <MaximizeIcon sx={{ fontSize: 16, color: terminalColors.primary }} />
             </Box>
-            <ResponsiveContainer width="100%" height={150}>
+            <SafeResponsiveContainer width="100%" height={150}>
               <BarChart data={chartData.slice(-7)}>
                 <CartesianGrid strokeDasharray="3 3" stroke={terminalColors.border} />
                 <XAxis 
@@ -372,7 +373,7 @@ const SchedulerCharts: React.FC<SchedulerChartsProps> = ({ events: propEvents })
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>
-            </ResponsiveContainer>
+            </SafeResponsiveContainer>
           </TerminalPaper>
         </Box>
 
@@ -395,7 +396,7 @@ const SchedulerCharts: React.FC<SchedulerChartsProps> = ({ events: propEvents })
               </TerminalTypography>
               <MaximizeIcon sx={{ fontSize: 16, color: terminalColors.primary }} />
             </Box>
-            <ResponsiveContainer width="100%" height={150}>
+            <SafeResponsiveContainer width="100%" height={150}>
               <BarChart data={chartData.slice(-7)}>
                 <CartesianGrid strokeDasharray="3 3" stroke={terminalColors.border} />
                 <XAxis 
@@ -416,7 +417,7 @@ const SchedulerCharts: React.FC<SchedulerChartsProps> = ({ events: propEvents })
                   radius={[4, 4, 0, 0]}
                 />
               </BarChart>
-            </ResponsiveContainer>
+            </SafeResponsiveContainer>
           </TerminalPaper>
         </Box>
       </Box>
@@ -427,7 +428,7 @@ const SchedulerCharts: React.FC<SchedulerChartsProps> = ({ events: propEvents })
         onClose={handleModalClose}
         title="Task Execution Trends (Last 30 Days)"
       >
-        <ResponsiveContainer width="100%" height={400}>
+        <SafeResponsiveContainer width="100%" height={400}>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke={terminalColors.border} />
             <XAxis 
@@ -468,7 +469,7 @@ const SchedulerCharts: React.FC<SchedulerChartsProps> = ({ events: propEvents })
               dot={{ fill: terminalColors.error, r: 4 }}
             />
           </LineChart>
-        </ResponsiveContainer>
+        </SafeResponsiveContainer>
       </ChartModal>
 
       <ChartModal
@@ -476,7 +477,7 @@ const SchedulerCharts: React.FC<SchedulerChartsProps> = ({ events: propEvents })
         onClose={handleModalClose}
         title="Job Status Distribution (Last 30 Days)"
       >
-        <ResponsiveContainer width="100%" height={400}>
+        <SafeResponsiveContainer width="100%" height={400}>
           <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke={terminalColors.border} />
             <XAxis 
@@ -508,7 +509,7 @@ const SchedulerCharts: React.FC<SchedulerChartsProps> = ({ events: propEvents })
               name="Failed"
             />
           </BarChart>
-        </ResponsiveContainer>
+        </SafeResponsiveContainer>
       </ChartModal>
 
       <ChartModal
@@ -516,7 +517,7 @@ const SchedulerCharts: React.FC<SchedulerChartsProps> = ({ events: propEvents })
         onClose={handleModalClose}
         title="Check Cycles Over Time (Last 30 Days)"
       >
-        <ResponsiveContainer width="100%" height={400}>
+        <SafeResponsiveContainer width="100%" height={400}>
           <BarChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke={terminalColors.border} />
             <XAxis 
@@ -535,7 +536,7 @@ const SchedulerCharts: React.FC<SchedulerChartsProps> = ({ events: propEvents })
               name="Check Cycles"
             />
           </BarChart>
-        </ResponsiveContainer>
+        </SafeResponsiveContainer>
       </ChartModal>
 
       {/* Summary Stats - Compact */}

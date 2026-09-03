@@ -10,6 +10,7 @@ import {
   Bar,
   ChartLoadingFallback,
 } from '../../utils/lazyRecharts';
+import { SafeResponsiveContainer } from './SafeResponsiveContainer';
 import { formatNumber } from './PlatformAnalytics.utils';
 
 interface ChartItem {
@@ -35,7 +36,7 @@ const TopPagesBarChart: React.FC<TopPagesBarChartProps> = ({ data }) => {
       </Typography>
       <Box sx={{ height: 180, bgcolor: '#020617', borderRadius: 2, p: 1.5, border: '1px solid rgba(148, 163, 184, 0.4)' }}>
         <Suspense fallback={<ChartLoadingFallback />}>
-          <ResponsiveContainer width="100%" height="100%">
+          <SafeResponsiveContainer width="100%" height="100%">
             <LazyBarChart
               data={data}
               layout="vertical"
@@ -69,7 +70,7 @@ const TopPagesBarChart: React.FC<TopPagesBarChartProps> = ({ data }) => {
               />
               <Bar dataKey="clicks" fill="#38bdf8" radius={[0, 6, 6, 0]} />
             </LazyBarChart>
-          </ResponsiveContainer>
+          </SafeResponsiveContainer>
         </Suspense>
       </Box>
     </Grid>

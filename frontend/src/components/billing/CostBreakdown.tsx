@@ -1,4 +1,5 @@
 import React from 'react';
+import { SafeResponsiveContainer } from '../shared/SafeResponsiveContainer';
 import {
   Card,
   CardContent,
@@ -113,7 +114,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
         <CardContent sx={{ pt: 0 }}>
           {/* Pie Chart */}
           <Box sx={{ height: 300, mb: 3 }}>
-            <ResponsiveContainer width="100%" height="100%">
+            <SafeResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={chartData}
@@ -136,7 +137,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
               </PieChart>
-            </ResponsiveContainer>
+            </SafeResponsiveContainer>
           </Box>
 
           {/* Provider Details */}

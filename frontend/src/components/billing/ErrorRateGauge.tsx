@@ -15,6 +15,7 @@ import {
   ResponsiveContainer,
   ChartLoadingFallback
 } from '../../utils/lazyRecharts';
+import { SafeResponsiveContainer } from '../shared/SafeResponsiveContainer';
 import { SystemHealth } from '../../types/monitoring';
 
 interface ErrorRateGaugeProps {
@@ -98,7 +99,7 @@ const ErrorRateGauge: React.FC<ErrorRateGaugeProps> = ({
 
           <Box sx={{ position: 'relative', height: 200, mb: 2 }}>
             <Suspense fallback={<ChartLoadingFallback />}>
-              <ResponsiveContainer width="100%" height="100%">
+              <SafeResponsiveContainer width="100%" height="100%">
                 <LazyPieChart>
                   <Pie
                     data={gaugeData}
@@ -119,7 +120,7 @@ const ErrorRateGauge: React.FC<ErrorRateGaugeProps> = ({
                     />
                   </Pie>
                 </LazyPieChart>
-              </ResponsiveContainer>
+              </SafeResponsiveContainer>
             </Suspense>
             
             {/* Center value display */}
