@@ -104,6 +104,10 @@ function ageRestrictYesRadio() {
   });
 }
 
+function expandAgeRestriction() {
+  fireEvent.click(screen.getByRole("button", { name: /age restriction \(advanced\)/i }));
+}
+
 describe("YouTubePublishPanel audience (Made for Kids + age restriction)", () => {
   beforeEach(() => {
     mockedUseYouTubePublish.mockReset();
@@ -115,7 +119,11 @@ describe("YouTubePublishPanel audience (Made for Kids + age restriction)", () =>
 
     expect(kidsYesRadio()).toBeTruthy();
     expect(kidsNoRadio()).toBeTruthy();
-    expect(screen.getByText(/age restriction \(advanced\)/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /age restriction \(advanced\)/i })).toBeTruthy();
+    expect(
+      screen.queryByRole("radio", { name: /yes, restrict my video to viewers over 18/i }),
+    ).toBeNull();
+    expandAgeRestriction();
     expect(ageRestrictYesRadio()).toBeTruthy();
   });
 
@@ -175,6 +183,7 @@ describe("YouTubePublishPanel audience (Made for Kids + age restriction)", () =>
     renderPublishPanel();
 
     fireEvent.click(kidsYesRadio());
+    expandAgeRestriction();
     expect(ageRestrictYesRadio()).toBeDisabled();
   });
 
@@ -183,6 +192,7 @@ describe("YouTubePublishPanel audience (Made for Kids + age restriction)", () =>
     renderPublishPanel();
 
     fireEvent.click(kidsNoRadio());
+    expandAgeRestriction();
     expect(ageRestrictYesRadio()).toBeEnabled();
   });
 
@@ -192,6 +202,7 @@ describe("YouTubePublishPanel audience (Made for Kids + age restriction)", () =>
     renderPublishPanel();
 
     fireEvent.click(kidsNoRadio());
+    expandAgeRestriction();
     fireEvent.click(ageRestrictYesRadio());
     fireEvent.click(screen.getByRole("button", { name: "Publish to YouTube" }));
 
@@ -211,6 +222,7 @@ describe("YouTubePublishPanel audience (Made for Kids + age restriction)", () =>
     renderPublishPanel();
 
     fireEvent.click(kidsNoRadio());
+    expandAgeRestriction();
     fireEvent.click(ageRestrictYesRadio());
     fireEvent.click(kidsYesRadio());
     expect(ageRestrictYesRadio()).toBeDisabled();

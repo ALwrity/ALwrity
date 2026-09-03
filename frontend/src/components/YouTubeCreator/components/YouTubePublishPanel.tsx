@@ -23,7 +23,7 @@ import {
   YouTubePublishAudienceFields,
   type YouTubeMadeForKidsChoice,
 } from './YouTubePublishAudienceFields';
-import { helperSx } from '../styles';
+import { helperSx, inputSx, labelSx, selectMenuProps, selectSx } from '../styles';
 
 interface YouTubePublishPanelProps {
   videoUrl: string | null;
@@ -188,13 +188,27 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
           <FormControl size="small" sx={{ minWidth: 160 }}>
-            <InputLabel id="yt-privacy-label">Privacy</InputLabel>
+            <InputLabel id="yt-privacy-label" sx={labelSx}>
+              Privacy
+            </InputLabel>
             <Select
               labelId="yt-privacy-label"
               label="Privacy"
               value={privacy}
               disabled={Boolean(scheduleLocal)}
-              onChange={(e) => setPrivacy(e.target.value as typeof privacy)}
+              onChange={(e) => {
+                try {
+                  const nextPrivacy = e.target.value as typeof privacy;
+                  console.info("[YouTubePublishPanel] Privacy updated", { privacy: nextPrivacy });
+                  setPrivacy(nextPrivacy);
+                } catch (error) {
+                  console.error("[YouTubePublishPanel] Privacy update failed", {
+                    errorName: error instanceof Error ? error.name : "Error",
+                  });
+                }
+              }}
+              sx={selectSx}
+              MenuProps={selectMenuProps}
             >
               <MenuItem value="unlisted">Unlisted</MenuItem>
               <MenuItem value="private">Private</MenuItem>
@@ -205,15 +219,34 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
             size="small"
             type="datetime-local"
             label="Schedule (optional)"
-            InputLabelProps={{ shrink: true }}
+            InputLabelProps={{ shrink: true, sx: labelSx }}
+            FormHelperTextProps={{ sx: helperSx }}
             value={scheduleLocal}
-            onChange={(e) => setScheduleLocal(e.target.value)}
+            onChange={(e) => {
+              try {
+                const nextSchedule = e.target.value;
+                console.info("[YouTubePublishPanel] Schedule updated", {
+                  hasSchedule: Boolean(nextSchedule),
+                });
+                setScheduleLocal(nextSchedule);
+              } catch (error) {
+                console.error("[YouTubePublishPanel] Schedule update failed", {
+                  errorName: error instanceof Error ? error.name : "Error",
+                });
+              }
+            }}
             helperText={
               scheduleLocal
                 ? 'Will upload as private until this time (UTC converted).'
                 : 'Leave empty to publish now'
             }
-            sx={{ minWidth: 240 }}
+            sx={{
+              minWidth: 240,
+              ...inputSx,
+              '& .MuiOutlinedInput-input': {
+                color: '#111827',
+              },
+            }}
           />
         </Stack>
 
@@ -221,12 +254,26 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
           madeForKids={madeForKids}
           ageRestricted={ageRestricted}
           onMadeForKidsChange={(nextKids) => {
-            setMadeForKids(nextKids);
-            if (nextKids) {
-              setAgeRestricted(false);
+            try {
+              setMadeForKids(nextKids);
+              if (nextKids) {
+                setAgeRestricted(false);
+              }
+            } catch (error) {
+              console.error("[YouTubePublishPanel] Made for Kids update failed", {
+                errorName: error instanceof Error ? error.name : "Error",
+              });
             }
           }}
-          onAgeRestrictedChange={setAgeRestricted}
+          onAgeRestrictedChange={(nextRestricted) => {
+            try {
+              setAgeRestricted(nextRestricted);
+            } catch (error) {
+              console.error("[YouTubePublishPanel] Age restriction update failed", {
+                errorName: error instanceof Error ? error.name : "Error",
+              });
+            }
+          }}
         />
 
         <Button

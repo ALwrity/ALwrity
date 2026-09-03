@@ -1,9 +1,14 @@
 /**
  * YouTube audience controls on Connect & Publish: Made for Kids and
  * Age restriction (advanced). Uses Creator labelSx/helperSx and YouTube red.
+ * Disabled 18+ labels keep gray color: the global MUI theme is dark, so
+ * default disabled text/radios vanish on the white Creator surface.
  */
-import React from "react";
+import React, { useState } from "react";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   FormControl,
   FormControlLabel,
   Radio,
@@ -11,6 +16,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { YT_RED, YT_TEXT } from "../constants";
 import { helperSx, labelSx } from "../styles";
 
@@ -23,10 +29,19 @@ interface YouTubePublishAudienceFieldsProps {
   onAgeRestrictedChange: (ageRestricted: boolean) => void;
 }
 
+const DISABLED_LABEL = "#6b7280";
+const DISABLED_RADIO = "#9ca3af";
+
 const radioSx = {
   color: YT_TEXT,
   py: 0.25,
   "&.Mui-checked": {
+    color: YT_RED,
+  },
+  "&.Mui-disabled": {
+    color: DISABLED_RADIO,
+  },
+  "&.Mui-disabled.Mui-checked": {
     color: YT_RED,
   },
 };
@@ -40,6 +55,13 @@ const radioLabelSx = {
     fontSize: "0.9375rem",
     fontWeight: 400,
     lineHeight: 1.5,
+  },
+  "&.Mui-disabled": {
+    opacity: 1,
+  },
+  "&.Mui-disabled .MuiFormControlLabel-label": {
+    color: DISABLED_LABEL,
+    opacity: 1,
   },
 };
 
@@ -57,6 +79,7 @@ export const YouTubePublishAudienceFields: React.FC<YouTubePublishAudienceFields
 }) => {
   const kidsValue = madeForKids === null ? "" : madeForKids ? "yes" : "no";
   const ageRestrictionEnabled = youtubeAgeRestrictionEnabled(madeForKids);
+  const [ageRestrictionOpen, setAgeRestrictionOpen] = useState(false);
 
   const handleKidsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -118,38 +141,85 @@ export const YouTubePublishAudienceFields: React.FC<YouTubePublishAudienceFields
         </RadioGroup>
       </FormControl>
 
-      <FormControl component="fieldset" sx={{ m: 0 }} disabled={!ageRestrictionEnabled}>
-        <Typography component="legend" sx={{ ...labelSx, mb: 0.5 }}>
-          Age restriction (advanced)
-        </Typography>
-        <Typography variant="body2" sx={{ ...helperSx, mt: 0, mb: 1 }}>
-          Restrict this video to viewers over 18. Available only when the video is not made for kids.
-        </Typography>
-        <RadioGroup
-          name="youtube-age-restricted"
-          value={ageRestricted ? "yes" : "no"}
-          onChange={handleAgeChange}
+      <Accordion
+        disableGutters
+        elevation={0}
+        expanded={ageRestrictionOpen}
+        onChange={(_, expanded) => {
+          try {
+            console.info("[YouTubePublishAudienceFields] Age restriction toggle", {
+              expanded,
+            });
+            setAgeRestrictionOpen(expanded);
+          } catch (error) {
+            console.error("[YouTubePublishAudienceFields] Age restriction toggle failed", {
+              errorName: error instanceof Error ? error.name : "Error",
+            });
+          }
+        }}
+        sx={{
+          backgroundColor: "transparent",
+          boxShadow: "none",
+          alignSelf: "flex-start",
+          width: "100%",
+          "&:before": { display: "none" },
+        }}
+      >
+        <AccordionSummary
+          expandIcon={<ExpandMoreIcon sx={{ color: YT_TEXT }} />}
+          sx={{
+            minHeight: 40,
+            px: 0,
+            width: "fit-content",
+            maxWidth: "100%",
+            justifyContent: "flex-start",
+            gap: 1,
+            "& .MuiAccordionSummary-content": {
+              m: 0,
+              flexGrow: 0,
+            },
+            "& .MuiAccordionSummary-expandIconWrapper": {
+              order: -1,
+              color: YT_TEXT,
+              mr: 1,
+            },
+          }}
         >
-          <FormControlLabel
-            value="yes"
-            control={
-              <Radio size="small" sx={radioSx} disabled={!ageRestrictionEnabled} />
-            }
-            label="Yes, restrict my video to viewers over 18"
-            sx={radioLabelSx}
-            disabled={!ageRestrictionEnabled}
-          />
-          <FormControlLabel
-            value="no"
-            control={
-              <Radio size="small" sx={radioSx} disabled={!ageRestrictionEnabled} />
-            }
-            label="No, don't restrict my video to viewers over 18"
-            sx={radioLabelSx}
-            disabled={!ageRestrictionEnabled}
-          />
-        </RadioGroup>
-      </FormControl>
+          <Typography sx={{ ...labelSx, mb: 0 }}>Age restriction (advanced)</Typography>
+        </AccordionSummary>
+        <AccordionDetails sx={{ px: 0, pt: 0.5, pb: 0 }}>
+          <FormControl component="fieldset" sx={{ m: 0 }} disabled={!ageRestrictionEnabled}>
+            <Typography variant="body2" sx={{ ...helperSx, mt: 0, mb: 1 }}>
+              Restrict this video to viewers over 18. Available only when the video is not made for
+              kids.
+            </Typography>
+            <RadioGroup
+              name="youtube-age-restricted"
+              value={ageRestricted ? "yes" : "no"}
+              onChange={handleAgeChange}
+            >
+              <FormControlLabel
+                value="yes"
+                control={
+                  <Radio size="small" sx={radioSx} disabled={!ageRestrictionEnabled} />
+                }
+                label="Yes, restrict my video to viewers over 18"
+                sx={radioLabelSx}
+                disabled={!ageRestrictionEnabled}
+              />
+              <FormControlLabel
+                value="no"
+                control={
+                  <Radio size="small" sx={radioSx} disabled={!ageRestrictionEnabled} />
+                }
+                label="No, don't restrict my video to viewers over 18"
+                sx={radioLabelSx}
+                disabled={!ageRestrictionEnabled}
+              />
+            </RadioGroup>
+          </FormControl>
+        </AccordionDetails>
+      </Accordion>
     </Stack>
   );
 };

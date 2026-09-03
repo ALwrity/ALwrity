@@ -14,6 +14,9 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+from pydantic import ValidationError
+
 _BACKEND_ROOT = Path(__file__).resolve().parents[3]
 if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
@@ -140,3 +143,45 @@ class TestYouTubePublishServiceAudience:
         assert status["selfDeclaredMadeForKids"] is False
         assert "contentRating" not in status
         assert status.get("contentRating", {}).get("ytRating") != "ytAgeRestricted"
+
+
+class TestYouTubePublishRequestAudience:
+    def test_request_rejects_made_for_kids_and_age_restricted_together(self):
+        from api.youtube.publish_router import PublishRequest
+
+        with pytest.raises(ValidationError) as exc:
+            PublishRequest(
+                token_id=TOKEN_ID,
+                video_source="/api/youtube/videos/final.mp4",
+                title="Creator video title",
+                made_for_kids=True,
+                age_restricted=True,
+            )
+
+        message = str(exc.value).lower()
+        assert "kids" in message
+        assert "age" in message
+
+    def test_request_allows_age_restricted_when_not_for_kids(self):
+        from api.youtube.publish_router import PublishRequest
+
+        req = PublishRequest(
+            token_id=TOKEN_ID,
+            video_source="/api/youtube/videos/final.mp4",
+            title="Creator video title",
+            made_for_kids=False,
+            age_restricted=True,
+        )
+        assert req.made_for_kids is False
+        assert req.age_restricted is True
+
+    def test_legacy_request_defaults_not_for_kids_and_not_age_restricted(self):
+        from api.youtube.publish_router import PublishRequest
+
+        req = PublishRequest(
+            token_id=TOKEN_ID,
+            video_source="/api/youtube/videos/final.mp4",
+            title="Creator video title",
+        )
+        assert req.made_for_kids is False
+        assert req.age_restricted is False
