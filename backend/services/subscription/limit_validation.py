@@ -520,13 +520,17 @@ class LimitValidator:
             total_video_calls = usage.video_calls or 0
             total_image_edit_calls = getattr(usage, 'image_edit_calls', 0) or 0
             total_audio_calls = getattr(usage, 'audio_calls', 0) or 0
+            total_wavespeed_calls = usage.wavespeed_calls or 0
+            other_provider_calls = {}
             
             # Log current usage summary
             logger.info(f"[Pre-flight Check] 📊 Current Usage Summary:")
             logger.info(f"   ├─ Total LLM Calls: {total_llm_calls}")
             logger.info(f"   ├─ Gemini Tokens: {usage.gemini_tokens or 0}, Mistral/HF Tokens: {usage.mistral_tokens or 0}")
             logger.info(f"   ├─ Image Calls: {total_images}")
-            logger.info(f"   └─ Video Calls: {total_video_calls}")
+            logger.info(f"   ├─ Video Calls: {total_video_calls}")
+            logger.info(f"   ├─ Audio Calls: {total_audio_calls}")
+            logger.info(f"   └─ WaveSpeed Calls: {total_wavespeed_calls}")
             
             # Validate each operation
             for op_idx, operation in enumerate(operations):
@@ -784,13 +788,36 @@ class LimitValidator:
                     
                     total_image_edit_calls = projected_image_edit_calls
                 
-                # Check other provider-specific limits
+                # Check audio generation limits
+                elif provider == APIProvider.AUDIO:
+                    audio_limit = limits.get('audio_calls', 0) or 0
+                    projected_audio_calls = total_audio_calls + 1
+                    
+                    # Enforce limit based on tier (Free: 0=disabled, others: 0=unlimited)
+                    if _should_enforce_limit(audio_limit, tier) and projected_audio_calls > audio_limit:
+                        error_info = {
+                            'current_calls': total_audio_calls,
+                            'limit': audio_limit,
+                            'provider': 'audio',
+                            'operation_type': operation_type,
+                            'operation_index': op_idx
+                        }
+                        return False, f"Audio generation limit would be exceeded. Would use {projected_audio_calls} of {audio_limit} audio calls this billing period.", {
+                            'error_type': 'audio_limit',
+                            'usage_info': error_info
+                        }
+                    
+                    total_audio_calls = projected_audio_calls
+                
+                # Check other provider-specific limits (research providers: exa, tavily, serper, metaphor, firecrawl)
                 else:
                     provider_calls_key = f"{provider_name}_calls"
-                    current_provider_calls = getattr(usage, provider_calls_key, 0) or 0
+                    if provider_calls_key not in other_provider_calls:
+                        other_provider_calls[provider_calls_key] = getattr(usage, provider_calls_key, 0) or 0
+                    current_provider_calls = other_provider_calls[provider_calls_key]
                     call_limit = limits.get(provider_calls_key, 0) or 0
                     
-                    if call_limit > 0:
+                    if _should_enforce_limit(call_limit, tier):
                         projected_calls = current_provider_calls + 1
                         if projected_calls > call_limit:
                             error_info = {
@@ -804,16 +831,16 @@ class LimitValidator:
                                 'error_type': 'call_limit',
                                 'usage_info': error_info
                             }
+                        other_provider_calls[provider_calls_key] = projected_calls
                 
                 # Check WaveSpeed combined limit if actual_provider is WaveSpeed
                 if actual_provider_name == 'wavespeed':
                     wavespeed_limit = limits.get('wavespeed_calls', 0) or 0
                     if _should_enforce_limit(wavespeed_limit, tier):
-                        wavespeed_usage = usage.wavespeed_calls or 0
-                        projected_wavespeed = wavespeed_usage + 1
+                        projected_wavespeed = total_wavespeed_calls + 1
                         if projected_wavespeed > wavespeed_limit:
                             error_info = {
-                                'current_calls': wavespeed_usage,
+                                'current_calls': total_wavespeed_calls,
                                 'limit': wavespeed_limit,
                                 'provider': 'wavespeed',
                                 'operation_type': operation_type,
@@ -823,6 +850,7 @@ class LimitValidator:
                                 'error_type': 'wavespeed_limit',
                                 'usage_info': error_info
                             }
+                        total_wavespeed_calls = projected_wavespeed
             
             # All checks passed
             logger.info(f"[Pre-flight Check] ✅ All {len(operations)} operation(s) validated successfully")
