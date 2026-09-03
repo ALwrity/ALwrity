@@ -795,6 +795,7 @@ export const youtubeApi = {
     privacy_status?: string;
     category_id?: string;
     made_for_kids?: boolean;
+    age_restricted?: boolean;
     publish_at?: string;
   }): Promise<{ success: boolean; task_id?: string; error?: string; message: string }> {
     const response = await apiClient.post(`${API_BASE}/publish`, params);

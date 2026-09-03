@@ -36,6 +36,10 @@ class PublishRequest(BaseModel):
     privacy_status: str = Field("unlisted", pattern="^(public|private|unlisted)$", description="Privacy status")
     category_id: str = Field("22", description="YouTube category ID (default: People & Blogs)")
     made_for_kids: bool = Field(False, description="Whether content is made for children")
+    age_restricted: bool = Field(
+        False,
+        description="Restrict the video to viewers over 18 (incompatible with made_for_kids)",
+    )
     publish_at: Optional[str] = Field(
         None,
         description="Optional ISO-8601 UTC schedule time (forces private until live)",
@@ -73,13 +77,16 @@ def start_publish(
         source_meta = youtube_publish_source_meta(request.video_source)
         logger.info(
             "[youtube_publish] Start request user_id={} token_id={} title_length={} "
-            "tag_count={} privacy={} has_publish_at={} source_kind={} source_length={}",
+            "tag_count={} privacy={} has_publish_at={} made_for_kids={} age_restricted={} "
+            "source_kind={} source_length={}",
             user_id,
             request.token_id,
             len(request.title),
             len(request.tags),
             request.privacy_status,
             bool(request.publish_at),
+            request.made_for_kids,
+            request.age_restricted,
             source_meta["source_kind"],
             source_meta["source_length"],
         )
@@ -118,6 +125,7 @@ def start_publish(
             privacy_status=request.privacy_status,
             category_id=request.category_id,
             made_for_kids=request.made_for_kids,
+            age_restricted=request.age_restricted,
             publish_at=request.publish_at,
             publish_service=publish_service,
         )
@@ -235,13 +243,17 @@ def _execute_publish_task(
     made_for_kids: bool,
     publish_service: YouTubePublishService,
     publish_at: Optional[str] = None,
+    age_restricted: bool = False,
 ):
     """Background task to execute video publish."""
     logger.info(
-        "[youtube_publish] Background task start task_id={} user_id={} token_id={} source_kind={}",
+        "[youtube_publish] Background task start task_id={} user_id={} token_id={} "
+        "made_for_kids={} age_restricted={} source_kind={}",
         task_id,
         user_id,
         token_id,
+        made_for_kids,
+        age_restricted,
         youtube_publish_source_meta(video_source)["source_kind"],
     )
 
@@ -260,6 +272,7 @@ def _execute_publish_task(
             privacy_status=privacy_status,
             category_id=category_id,
             made_for_kids=made_for_kids,
+            age_restricted=age_restricted,
             publish_at=publish_at,
         )
 

@@ -19,6 +19,10 @@ import { useYouTubePublish } from '../../../hooks/useYouTubePublish';
 import { toYouTubePublishAtIso } from './youtubePublishSchedule';
 import { youtubePublishSourceMeta } from '../../../hooks/youtubePublishLog';
 import type { YouTubePublishMetadata } from './youtubePublishMetadata';
+import {
+  YouTubePublishAudienceFields,
+  type YouTubeMadeForKidsChoice,
+} from './YouTubePublishAudienceFields';
 import { helperSx } from '../styles';
 
 interface YouTubePublishPanelProps {
@@ -65,6 +69,8 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
   const activeChannel = youtube.activeChannel;
   const [privacy, setPrivacy] = useState<'public' | 'private' | 'unlisted'>('unlisted');
   const [scheduleLocal, setScheduleLocal] = useState('');
+  const [madeForKids, setMadeForKids] = useState<YouTubeMadeForKidsChoice>(null);
+  const [ageRestricted, setAgeRestricted] = useState(false);
 
   const publishTitle = useMemo(() => buildVideoTitle(videoPlan, scenes), [videoPlan, scenes]);
   const publishDescription = useMemo(() => buildVideoDescription(videoPlan), [videoPlan]);
@@ -75,10 +81,15 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
         console.warn("[YouTubePublishPanel] Publish skipped: no video URL");
         return;
       }
+      if (madeForKids === null) {
+        console.warn("[YouTubePublishPanel] Publish skipped: Made for Kids not chosen");
+        return;
+      }
       const publishAt = toYouTubePublishAtIso(scheduleLocal);
       const title = metadata?.title ?? publishTitle;
       const description = metadata?.description ?? publishDescription;
       const tags = metadata ? metadata.tags : ['alwrity', 'youtube', 'ai-video'];
+      const restrictTo18 = madeForKids === false && ageRestricted;
       console.info("[YouTubePublishPanel] Publish clicked", {
         ...youtubePublishSourceMeta(videoUrl),
         titleLength: title.length,
@@ -90,6 +101,8 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
         hasHelperText: Boolean(helperText),
         hasSchedule: Boolean(publishAt),
         privacy: publishAt ? "private" : privacy,
+        madeForKids,
+        ageRestricted: restrictTo18,
         connected: youtube.connected,
         hasActiveChannel: Boolean(activeChannel),
       });
@@ -98,6 +111,8 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
         tags,
         privacy_status: publishAt ? 'private' : privacy,
         publish_at: publishAt,
+        made_for_kids: madeForKids,
+        ...(restrictTo18 ? { age_restricted: true } : {}),
         ...(metadata ? { category_id: metadata.category_id } : {}),
       });
     } catch (error) {
@@ -202,11 +217,29 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
           />
         </Stack>
 
+        <YouTubePublishAudienceFields
+          madeForKids={madeForKids}
+          ageRestricted={ageRestricted}
+          onMadeForKidsChange={(nextKids) => {
+            setMadeForKids(nextKids);
+            if (nextKids) {
+              setAgeRestricted(false);
+            }
+          }}
+          onAgeRestrictedChange={setAgeRestricted}
+        />
+
         <Button
           variant="contained"
           color="error"
           onClick={handlePublish}
-          disabled={!youtube.connected || !activeChannel || !videoUrl || youtube.publishState.publishing}
+          disabled={
+            !youtube.connected ||
+            !activeChannel ||
+            !videoUrl ||
+            youtube.publishState.publishing ||
+            madeForKids === null
+          }
           startIcon={youtube.publishState.publishing ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
           sx={{ width: 'fit-content', fontWeight: 700 }}
         >

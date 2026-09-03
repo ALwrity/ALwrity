@@ -52,6 +52,7 @@ class YouTubePublishService:
         made_for_kids: bool = False,
         language: str = "en",
         publish_at: Optional[str] = None,
+        age_restricted: bool = False,
     ) -> Dict[str, Any]:
         """
         Upload a video to YouTube.
@@ -59,21 +60,34 @@ class YouTubePublishService:
         Args:
             publish_at: Optional ISO-8601 UTC datetime (e.g. 2026-08-20T15:00:00Z).
                 When set, privacy_status is forced to private until YouTube goes live.
+            age_restricted: When True, sets status.contentRating.ytRating to ytAgeRestricted.
+                Incompatible with made_for_kids.
         """
         temp_path = None
         is_temp = False
         try:
             logger.info(
                 "[youtube_publish] Entry user_id={} token_id={} title_length={} tag_count={} "
-                "privacy={} has_publish_at={} source_kind={}",
+                "privacy={} has_publish_at={} made_for_kids={} age_restricted={} source_kind={}",
                 user_id,
                 token_id,
                 len(title),
                 len(tags or []),
                 privacy_status,
                 bool(publish_at),
+                made_for_kids,
+                age_restricted,
                 youtube_publish_source_meta(video_source)["source_kind"],
             )
+            if made_for_kids and age_restricted:
+                logger.warning(
+                    "[youtube_publish] Audience conflict user_id={} made_for_kids=True age_restricted=True",
+                    user_id,
+                )
+                return {
+                    "success": False,
+                    "error": "This video cannot be both made for kids and age-restricted.",
+                }
             # Validate title length
             if len(title) > 100:
                 title = title[:97] + "..."
@@ -133,12 +147,14 @@ class YouTubePublishService:
 
             logger.info(
                 "[youtube_publish] Upload start user_id={} token_id={} size_mb={} privacy={} "
-                "has_publish_at={} title_length={} source_kind={}",
+                "has_publish_at={} made_for_kids={} age_restricted={} title_length={} source_kind={}",
                 user_id,
                 token_id,
                 round(file_size / 1024 / 1024, 1),
                 effective_privacy,
                 bool(publish_at),
+                made_for_kids,
+                age_restricted,
                 len(title),
                 source_meta["source_kind"],
             )
@@ -151,6 +167,8 @@ class YouTubePublishService:
                 "privacyStatus": effective_privacy,
                 "selfDeclaredMadeForKids": made_for_kids,
             }
+            if age_restricted:
+                status_body["contentRating"] = {"ytRating": "ytAgeRestricted"}
             if publish_at:
                 status_body["publishAt"] = publish_at
                 status_body["privacyStatus"] = "private"
