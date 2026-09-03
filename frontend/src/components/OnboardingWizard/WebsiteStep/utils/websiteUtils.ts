@@ -304,15 +304,18 @@ export const fetchLastAnalysis = async (): Promise<{
     const res = await apiClient.get('/api/onboarding/style-detection/session-analyses');
     const data = res.data;
     if (data.success && Array.isArray(data.analyses) && data.analyses.length > 0) {
-      // Pick the most recent analysis (assuming sorted by date desc, else sort here)
-      const last = data.analyses[0];
-      if (last && last.website_url) {
-        return {
-          success: true,
-          website: last.website_url,
-          analysis: buildAnalysisDisplayModel(last),
-          domainName: extractDomainName(last.website_url)
-        };
+      // Pick the most recent completed analysis to prevent loading failed/empty ones
+      const completedAnalyses = data.analyses.filter((a: any) => a.status === 'completed');
+      if (completedAnalyses.length > 0) {
+        const last = completedAnalyses[0];
+        if (last && last.website_url) {
+          return {
+            success: true,
+            website: last.website_url,
+            analysis: buildAnalysisDisplayModel(last),
+            domainName: extractDomainName(last.website_url)
+          };
+        }
       }
     }
     return {

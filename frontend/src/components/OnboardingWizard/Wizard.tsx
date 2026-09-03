@@ -97,6 +97,16 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     }
   }, [data, stepData?.email, user]);
 
+  // Auto-clear success message after 4 seconds
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => {
+        setSuccessMessage(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
+
   const handleEmailChange = useCallback((newEmail: string) => {
     setEmail(newEmail);
     setStepData((prev: any) => ({

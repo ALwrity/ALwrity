@@ -252,10 +252,11 @@ class WebsiteAnalysisService:
         try:
             analysis = self.db.query(WebsiteAnalysis).filter_by(
                 session_id=session_id,
-                website_url=website_url
-            ).first()
+                website_url=website_url,
+                status='completed'
+            ).order_by(WebsiteAnalysis.created_at.desc()).first()
             
-            if analysis and analysis.status == 'completed':
+            if analysis:
                 return {
                     'exists': True,
                     'analysis_date': analysis.analysis_date.isoformat() if analysis.analysis_date else None,
