@@ -15,7 +15,7 @@ import MapIcon from '@mui/icons-material/Map';
 import BusinessIcon from '@mui/icons-material/Business';
 import type { DomainKey, DomainConfig, TabKey } from './types';
 import { TAB_CORRESPONDING_DOMAINS } from './types';
-import type { StyleAnalysis } from '../AnalysisResultsDisplay';
+import type { StyleAnalysis } from './types';
 
 interface AnalysisSidebarProps {
   activeDomain: DomainKey;

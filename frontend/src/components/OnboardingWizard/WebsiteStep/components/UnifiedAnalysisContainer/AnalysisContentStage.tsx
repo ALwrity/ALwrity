@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import type { DomainKey, TabKey } from './types';
-import type { StyleAnalysis } from '../AnalysisResultsDisplay';
+import type { StyleAnalysis } from './types';
 
 import OverviewStage from './stages/OverviewStage';
 import BrandStage from './stages/BrandStage';

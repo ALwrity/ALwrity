@@ -10,10 +10,8 @@ import {
   Chip,
 } from '@mui/material';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
-import ViewAgendaIcon from '@mui/icons-material/ViewAgenda';
-
 // Extracted components
-import AnalysisResultsDisplay, { StyleAnalysis } from './AnalysisResultsDisplay';
+import { StyleAnalysis } from './UnifiedAnalysisContainer/types';
 import UnifiedAnalysisContainer from './UnifiedAnalysisContainer/index';
 import WebsiteIntegrationsSection from './WebsiteIntegrationsSection';
 import { BackgroundSetupCard } from '../BackgroundSetupCard';
@@ -151,51 +149,15 @@ const WebsiteAnalysisTabContent: React.FC<WebsiteAnalysisTabContentProps> = ({
         </Alert>
       )}
 
-      {/* Website Analysis Results — both containers always visible in parallel */}
+      {/* Website Analysis Results */}
       {analysis && (
         <>
-          {/* ── NEW: Brand Intelligence Dashboard ─────────────────────────── */}
+          {/* ── Brand Intelligence Dashboard ─────────────────────────── */}
           <Box
             data-testid="unified-container-wrapper"
             sx={{ animation: 'fadeIn 0.5s ease-in', mb: 3 }}
           >
             <UnifiedAnalysisContainer
-              analysis={analysis}
-              crawlResult={crawlResult}
-              domainName={domainName}
-              useAnalysisForGenAI={useAnalysisForGenAI}
-              onUseAnalysisChange={setUseAnalysisForGenAI}
-              onAnalysisUpdate={handleAnalysisUpdate}
-              warning={analysisWarning || undefined}
-              onSave={() => saveAnalysis(analysis)}
-            />
-          </Box>
-
-          {/* ── Divider between the two containers ───────────────────────── */}
-          <Box sx={{ my: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Divider sx={{ flex: 1 }} />
-            <Chip
-              icon={<ViewAgendaIcon fontSize="small" />}
-              label="Master Analysis Container Card (Classic View)"
-              size="small"
-              variant="outlined"
-              sx={{
-                fontWeight: 600,
-                fontSize: '0.7rem',
-                color: '#64748B',
-                borderColor: '#CBD5E1',
-                bgcolor: '#F8FAFC',
-              }}
-            />
-            <Divider sx={{ flex: 1 }} />
-          </Box>
-
-          {/* ── LEGACY: Master Analysis Container Card — DO NOT MODIFY ──── */}
-          <Box
-            data-testid="legacy-container-wrapper"
-            sx={{ animation: 'fadeIn 0.8s ease-in', mb: 3 }}
-          >
-            <AnalysisResultsDisplay
               analysis={analysis}
               crawlResult={crawlResult}
               domainName={domainName}

@@ -29,7 +29,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 import { seoDashboardAPI, SavedWebsiteAnalysis } from '../../api/seoDashboard';
-import AnalysisResultsDisplay from '../OnboardingWizard/WebsiteStep/components/AnalysisResultsDisplay';
+import UnifiedAnalysisContainer from '../OnboardingWizard/WebsiteStep/components/UnifiedAnalysisContainer/index';
 import { SiteHealthSummaryCard } from '../OnboardingWizard/WebsiteStep/SiteHealthSummaryCard';
 import { ContentAuditSummaryCard } from '../OnboardingWizard/WebsiteStep/ContentAuditSummaryCard';
 import { buildAnalysisDisplayModel, extractDomainName } from '../OnboardingWizard/WebsiteStep/utils/websiteUtils';
@@ -183,7 +183,7 @@ const WebsiteAnalysisModal: React.FC<WebsiteAnalysisModalProps> = ({ open, onClo
 
         {!loading && mapped && row && (
           <>
-            <AnalysisResultsDisplay
+            <UnifiedAnalysisContainer
               analysis={mapped}
               domainName={domainName}
               crawlResult={row.crawl_result}

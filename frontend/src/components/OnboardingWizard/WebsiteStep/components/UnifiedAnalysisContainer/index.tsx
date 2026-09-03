@@ -32,7 +32,7 @@ const UnifiedAnalysisContainer: React.FC<UnifiedAnalysisContainerProps> = ({
   defaultTab = 'insights',
 }) => {
   // Ensure starting activeDomain is valid for the starting activeTab
-  const initialTab = defaultTab === 'refine' || defaultTab === 'actions' ? 'refine_actions' : defaultTab;
+  const initialTab = (defaultTab as string) === 'refine' || (defaultTab as string) === 'actions' ? 'refine_actions' : defaultTab;
   const initialDomain = TAB_CORRESPONDING_DOMAINS[initialTab].includes(defaultDomain)
     ? defaultDomain
     : TAB_CORRESPONDING_DOMAINS[initialTab][0];

@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import SitemapAnalysisSection from '../../SitemapAnalysisSection';
 import { EmptyState } from './SharedComponents';
-import type { StyleAnalysis } from '../AnalysisResultsDisplay';
+import type { StyleAnalysis } from '../types';
 import type { TabKey } from '../types';
 
 interface SitemapStageProps {

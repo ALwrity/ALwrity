@@ -8,7 +8,7 @@ import EnhancedGuidelinesSection from '../../EnhancedGuidelinesSection';
 import SectionHeader from '../../SectionHeader';
 import KeyInsightsGrid from '../../KeyInsightsGrid';
 import { EmptyState } from './SharedComponents';
-import type { StyleAnalysis } from '../AnalysisResultsDisplay';
+import type { StyleAnalysis } from '../types';
 import type { TabKey } from '../types';
 
 interface BrandStageProps {
