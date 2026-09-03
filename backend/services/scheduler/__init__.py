@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from apscheduler.triggers.cron import CronTrigger
 
 from .core.scheduler import TaskScheduler
+from .core.resource_classes import ResourceClass, get_resource_class
 from .core.executor_interface import TaskExecutor, TaskExecutionResult
 from .core.exception_handler import (
     SchedulerExceptionHandler, SchedulerException, SchedulerErrorType, SchedulerErrorSeverity,
@@ -72,7 +73,8 @@ def get_scheduler() -> TaskScheduler:
         _scheduler_instance.register_executor(
             'monitoring_task',
             monitoring_executor,
-            load_due_monitoring_tasks
+            load_due_monitoring_tasks,
+            resource_class=get_resource_class('monitoring_task'),
         )
         
         # Register OAuth token monitoring executor
@@ -80,7 +82,8 @@ def get_scheduler() -> TaskScheduler:
         _scheduler_instance.register_executor(
             'oauth_token_monitoring',
             oauth_token_executor,
-            load_due_oauth_token_monitoring_tasks
+            load_due_oauth_token_monitoring_tasks,
+            resource_class=get_resource_class('oauth_token_monitoring'),
         )
         
         # Register website analysis executor
@@ -88,21 +91,24 @@ def get_scheduler() -> TaskScheduler:
         _scheduler_instance.register_executor(
             'website_analysis',
             website_analysis_executor,
-            load_due_website_analysis_tasks
+            load_due_website_analysis_tasks,
+            resource_class=get_resource_class('website_analysis'),
         )
 
         onboarding_full_site_executor = OnboardingFullWebsiteAnalysisExecutor()
         _scheduler_instance.register_executor(
             'onboarding_full_website_analysis',
             onboarding_full_site_executor,
-            load_due_onboarding_full_website_analysis_tasks
+            load_due_onboarding_full_website_analysis_tasks,
+            resource_class=get_resource_class('onboarding_full_website_analysis'),
         )
 
         deep_competitor_analysis_executor = DeepCompetitorAnalysisExecutor()
         _scheduler_instance.register_executor(
             'deep_competitor_analysis',
             deep_competitor_analysis_executor,
-            load_due_deep_competitor_analysis_tasks
+            load_due_deep_competitor_analysis_tasks,
+            resource_class=get_resource_class('deep_competitor_analysis'),
         )
         
         # Register deep website crawl executor
@@ -110,7 +116,8 @@ def get_scheduler() -> TaskScheduler:
         _scheduler_instance.register_executor(
             'deep_website_crawl',
             deep_website_crawl_executor,
-            load_due_deep_website_crawl_tasks
+            load_due_deep_website_crawl_tasks,
+            resource_class=get_resource_class('deep_website_crawl'),
         )
         
         # Register platform insights executors
@@ -122,7 +129,8 @@ def get_scheduler() -> TaskScheduler:
         _scheduler_instance.register_executor(
             'gsc_insights',
             gsc_insights_executor,
-            load_due_gsc_insights_tasks
+            load_due_gsc_insights_tasks,
+            resource_class=get_resource_class('gsc_insights'),
         )
         
         # Bing insights executor
@@ -133,7 +141,8 @@ def get_scheduler() -> TaskScheduler:
         _scheduler_instance.register_executor(
             'bing_insights',
             bing_insights_executor,
-            load_due_bing_insights_tasks
+            load_due_bing_insights_tasks,
+            resource_class=get_resource_class('bing_insights'),
         )
 
         # Register Advertools executor
@@ -141,7 +150,8 @@ def get_scheduler() -> TaskScheduler:
         _scheduler_instance.register_executor(
             'advertools_intelligence',
             advertools_executor,
-            load_due_advertools_tasks
+            load_due_advertools_tasks,
+            resource_class=get_resource_class('advertools_intelligence'),
         )
 
         # Register SIF indexing executor
@@ -149,7 +159,8 @@ def get_scheduler() -> TaskScheduler:
         _scheduler_instance.register_executor(
             'sif_indexing',
             sif_indexing_executor,
-            load_due_sif_indexing_tasks
+            load_due_sif_indexing_tasks,
+            resource_class=get_resource_class('sif_indexing'),
         )
 
         # Register market trends executor
@@ -157,24 +168,28 @@ def get_scheduler() -> TaskScheduler:
         _scheduler_instance.register_executor(
             'market_trends',
             market_trends_executor,
-            load_due_market_trends_tasks
+            load_due_market_trends_tasks,
+            resource_class=get_resource_class('market_trends'),
         )
 
         # Register LinkedIn background task executors
         _scheduler_instance.register_executor(
             'linkedin_profile_sync',
             LinkedInProfileSyncExecutor(),
-            load_due_linkedin_profile_sync_tasks
+            load_due_linkedin_profile_sync_tasks,
+            resource_class=get_resource_class('linkedin_profile_sync'),
         )
         _scheduler_instance.register_executor(
             'linkedin_post_analytics_sync',
             LinkedInPostAnalyticsSyncExecutor(),
-            load_due_linkedin_post_analytics_sync_tasks
+            load_due_linkedin_post_analytics_sync_tasks,
+            resource_class=get_resource_class('linkedin_post_analytics_sync'),
         )
         _scheduler_instance.register_executor(
             'linkedin_growth_reanalysis',
             LinkedInGrowthReanalysisExecutor(),
-            load_due_linkedin_growth_reanalysis_tasks
+            load_due_linkedin_growth_reanalysis_tasks,
+            resource_class=get_resource_class('linkedin_growth_reanalysis'),
         )
 
         today_workflow_hour_utc = int(os.getenv('TODAY_WORKFLOW_SCHEDULE_HOUR_UTC', '2'))

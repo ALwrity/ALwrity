@@ -28,6 +28,7 @@ from utils.logger_utils import get_service_logger
 from ..utils.user_job_store import get_user_job_store_name
 from models.scheduler_models import SchedulerEventLog
 from .interval_manager import determine_optimal_interval
+from .resource_classes import ResourceClass, CLASS_LIMITS, CLASS_TIMEOUTS
 from .job_restoration import restore_persona_jobs
 from .oauth_task_restoration import restore_oauth_monitoring_tasks
 from .website_analysis_task_restoration import restore_website_analysis_tasks
@@ -79,6 +80,10 @@ class TaskScheduler:
         self.max_concurrent_executions = max_concurrent_executions
         self.enable_retries = enable_retries
         self.max_retries = max_retries
+
+        # Per-resource-class tracking
+        self._executor_classes: dict = {}   # task_type -> ResourceClass
+        self._task_classes: dict = {}      # lease_key -> ResourceClass
         
         # Initialize APScheduler
         self.scheduler = AsyncIOScheduler(
@@ -160,18 +165,42 @@ class TaskScheduler:
         self,
         task_type: str,
         executor: TaskExecutor,
-        task_loader: Callable[[Session], List[Any]]
+        task_loader: Callable[[Session], List[Any]],
+        resource_class=None,
     ):
         """
         Register a task executor for a specific task type.
-        
+
         Args:
             task_type: Unique identifier for task type (e.g., 'monitoring_task')
             executor: TaskExecutor instance that handles execution
             task_loader: Function that loads due tasks from database
+            resource_class: ResourceClass enum controlling concurrency limit
+                and timeout. Defaults to MEDIUM when not specified.
         """
+        if resource_class is None:
+            from services.scheduler.core.resource_classes import get_resource_class
+            resource_class = get_resource_class(task_type)
         self.registry.register(task_type, executor, task_loader)
-        logger.debug(f"Registered executor for task type: {task_type}")
+        self._executor_classes[task_type] = resource_class
+        logger.debug(
+            f"Registered executor for task type: {task_type} "
+            f"(resource_class={resource_class.value})"
+        )
+
+    def _can_dispatch(self, task_type: str, resource_class) -> bool:
+        """Check if a task of this resource class can be dispatched without
+        exceeding its per-class concurrency limit."""
+        active = self._active_count_for_class(resource_class)
+        limit = CLASS_LIMITS.get(resource_class, self.max_concurrent_executions)
+        return active < limit
+
+    def _active_count_for_class(self, resource_class) -> int:
+        """Count active executions belonging to a specific resource class."""
+        return sum(
+            1 for lease_key in self.active_executions
+            if self._task_classes.get(lease_key) == resource_class
+        )
     
     def _configure_apscheduler_logging(self):
         """Configure APScheduler to use unified logging system."""
@@ -629,6 +658,27 @@ class TaskScheduler:
         """
         pass
 
+    async def _cancel_after_timeout(self, lease_key: str, task: asyncio.Task, timeout: float):
+        """Cancel a scheduler execution task after its resource-class timeout.
+
+        Prevents stuck executors (e.g. a hung crawl) from holding a
+        resource-class concurrency slot indefinitely.
+        """
+        try:
+            await asyncio.wait_for(asyncio.shield(task), timeout=timeout)
+        except asyncio.TimeoutError:
+            task.cancel()
+            logger.warning(
+                f"Scheduler task {lease_key} cancelled after {timeout}s timeout"
+            )
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            pass
+        finally:
+            self.active_executions.pop(lease_key, None)
+            self._task_classes.pop(lease_key, None)
+
     async def _process_task_type(
         self,
         task_type: str,
@@ -669,8 +719,18 @@ class TaskScheduler:
                 if len(self.active_executions) >= max_concurrent:
                     break
 
+                # Per-resource-class concurrency check
+                resource_class = self._executor_classes.get(
+                    task_type, ResourceClass.MEDIUM
+                )
+                if not self._can_dispatch(task_type, resource_class):
+                    break
+
                 if not self._acquire_task_lease(lease_key):
                     continue
+
+                # Track the resource class for this execution
+                self._task_classes[lease_key] = resource_class
 
                 execution_task = asyncio.create_task(
                     execute_task_async(
@@ -683,6 +743,11 @@ class TaskScheduler:
                     )
                 )
                 self.active_executions[lease_key] = execution_task
+
+                # Per-class timeout: cancel stuck executors so they don't
+                # hold a resource-class slot indefinitely.
+                timeout = CLASS_TIMEOUTS.get(resource_class, 600.0)
+                asyncio.create_task(self._cancel_after_timeout(lease_key, execution_task, timeout))
 
             cycle_summary.setdefault("tasks_found_by_type", {})
             cycle_summary.setdefault("tasks_executed_by_type", {})
