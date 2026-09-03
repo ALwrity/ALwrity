@@ -40,9 +40,26 @@ class StrategyArchitectAgent(SIFBaseAgent):
             or research.get("content_pillars")
             or []
         )
+        if isinstance(pillars, dict):
+            # Dict-shaped payloads (form data like {"0": {...}}): the
+            # values carry the pillar entries; string values are names.
+            pillars = [
+                value.get("topic") or value.get("name") or value.get("title") or str(value)
+                if isinstance(value, dict) else str(value)
+                for value in pillars.values()
+            ]
         if not isinstance(pillars, list):
             pillars = [pillars]
-        return [str(p).strip() for p in pillars if str(p).strip()][:6]
+        cleaned: List[str] = []
+        for p in pillars:
+            name = (
+                p.get("topic") or p.get("name") or p.get("title") or str(p)
+                if isinstance(p, dict) else str(p)
+            )
+            name = str(name).strip()
+            if name and name not in cleaned:
+                cleaned.append(name)
+        return cleaned[:6]
 
     async def discover_pillars(self) -> List[Dict[str, Any]]:
         """Identify content pillars through semantic clustering."""
@@ -147,19 +164,11 @@ class StrategyArchitectAgent(SIFBaseAgent):
         except Exception as e:
             logger.warning(f"[{self.__class__.__name__}] Error checking pillars for proposals: {e}")
 
-        # 2. Strategy Review (Generic fallback)
-        default_proposals.append(TaskProposal(
-            title="Review Strategic Goals",
-            description="Ensure your content output aligns with your quarterly business goals.",
-            pillar_id="plan",
-            priority="low",
-            estimated_time=10,
-            source_agent="StrategyArchitectAgent",
-            reasoning="Routine strategy maintenance.",
-            action_type="navigate",
-            action_url="/content-planning-dashboard"
-        ))
-        
+        # NOTE: the old unconditional "Review Strategic Goals" filler was
+        # removed per the honest-absence policy — when SIF clustering and
+        # onboarding context provide nothing, this agent declines or returns
+        # empty instead of shipping identical-for-everyone advice.
+
         return await self._synthesize_task_proposals(
             context,
             default_proposals,

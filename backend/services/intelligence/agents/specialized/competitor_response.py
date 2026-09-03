@@ -160,18 +160,10 @@ class CompetitorResponseAgent(BaseALwrityAgent):
                 action_type="navigate",
                 action_url="/seo-dashboard"
             ))
-        else:
-            default_proposals.append(TaskProposal(
-                title="Research Competitor Topics",
-                description="Search for competitor content in your niche to identify coverage gaps.",
-                pillar_id="analyze",
-                priority="medium",
-                estimated_time=30,
-                source_agent="CompetitorResponseAgent",
-                reasoning="Understanding competitor positioning improves content strategy.",
-                action_type="navigate",
-                action_url="/seo-dashboard"
-            ))
+        # NOTE: the old else-branch "Research Competitor Topics" filler was
+        # removed per the honest-absence policy — with no SIF competitor
+        # evidence this agent declines or returns empty instead of shipping
+        # identical-for-everyone advice.
 
         return await self._synthesize_task_proposals(
             context,

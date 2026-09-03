@@ -301,6 +301,81 @@ async def test_sif_search_does_not_record_heal_when_not_healed(workspace_clean, 
 
 
 @pytest.mark.asyncio
+async def test_sif_search_records_query_provenance(workspace_clean, monkeypatch):
+    """Phase 1 transparency: each sif_search records the composed query,
+    limit, result count and outcome on the agent (last_sif_queries) so the
+    plan can show what was searched and what came back."""
+    backend_root, user_id, store = workspace_clean
+    agent = _make_hook_agent(user_id)
+
+    class _Intel:
+        async def search(self, query, limit=5):
+            return [{"id": "doc-1", "score": 0.9}]
+
+    agent.intelligence = _Intel()
+
+    results = await agent.sif_search("brand voice content pillars", limit=7, trigger="test")
+    assert results and results[0]["id"] == "doc-1"
+
+    queries = getattr(agent, "last_sif_queries", None)
+    assert isinstance(queries, list) and queries, "query provenance not recorded"
+    entry = queries[-1]
+    assert entry["query"] == "brand voice content pillars"
+    assert entry["limit"] == 7
+    assert entry["result_count"] == 1
+    assert entry["outcome"] == "success"
+    assert entry["trigger"] == "test"
+    assert "timestamp" in entry
+
+
+@pytest.mark.asyncio
+async def test_sif_search_provenance_records_miss_and_heal(workspace_clean, monkeypatch):
+    """A miss that triggers a heal records outcome='miss_healed' with the
+    heal bootstrap count in the provenance entry."""
+    backend_root, user_id, store = workspace_clean
+    agent = _make_hook_agent(user_id)
+
+    search_state = {"count": 0}
+
+    class _Intel:
+        async def search(self, query, limit=5):
+            search_state["count"] += 1
+            return [] if search_state["count"] == 1 else [{"id": "healed", "score": 0.7}]
+
+    agent.intelligence = _Intel()
+
+    async def _fake_heal(sif_service, **kwargs):
+        return {"healed": True, "bootstrap_indexed": 4}
+
+    import services.intelligence.agents.core_agent_framework as caf
+
+    monkeypatch.setattr(caf, "_maybe_self_heal_index_impl", _fake_heal, raising=False)
+
+    results = await agent.sif_search("thin query", limit=5, trigger="proposal")
+    assert results and results[0]["id"] == "healed"
+
+    queries = agent.last_sif_queries
+    assert queries[-1]["outcome"] == "miss_healed"
+    assert queries[-1]["heal"] == {"healed": True, "bootstrap_indexed": 4}
+
+
+@pytest.mark.asyncio
+async def test_sif_search_provenance_failure_outcome(workspace_clean):
+    backend_root, user_id, store = workspace_clean
+    agent = _make_hook_agent(user_id)
+
+    class _Boom:
+        async def search(self, query, limit=5):
+            raise RuntimeError("down")
+
+    agent.intelligence = _Boom()
+
+    results = await agent.sif_search("q", limit=5)
+    assert results == []
+    assert agent.last_sif_queries[-1]["outcome"] == "error"
+
+
+@pytest.mark.asyncio
 async def test_sif_search_never_raises_on_total_failure(workspace_clean, monkeypatch):
     backend_root, user_id, store = workspace_clean
     agent = _make_hook_agent(user_id)

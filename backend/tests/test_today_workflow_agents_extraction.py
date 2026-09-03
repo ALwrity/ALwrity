@@ -434,6 +434,44 @@ async def test_committee_writes_shared_note_and_activity_log(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_committee_attaches_sif_query_provenance_to_evidence(monkeypatch):
+    """Phase 1 transparency: an agent's recorded SIF queries flow into its
+    agent_evidence entry so the plan can show what was searched."""
+    from services import today_workflow_service as svc
+    from services.today_workflow_agents import generate_agent_enhanced_plan
+
+    class _SearchingAgent:
+        last_sif_queries = [
+            {"query": "brand voice content", "limit": 5, "result_count": 3,
+             "outcome": "success", "trigger": "proposal", "timestamp": "2026-09-02T00:00:00"},
+        ]
+
+        async def propose_daily_tasks(self, grounding):
+            return []
+
+    async def _get_orchestrator(user_id):
+        return SimpleNamespace(agents={
+            "content": _SearchingAgent(),
+            "strategy": None,
+            "seo": None,
+            "social": None,
+            "competitor": None,
+            "content_gap_radar": None,
+        })
+
+    monkeypatch.setattr(svc.orchestration_service, "get_or_create_orchestrator", _get_orchestrator)
+
+    result = await generate_agent_enhanced_plan(
+        db=None, user_id="u1", date="2026-01-01", grounding={"onboarding_data": {}}
+    )
+
+    evidence = {ev.get("agent"): ev for ev in result.get("agent_evidence", [])}
+    content_ev = evidence.get("content_strategist")
+    assert content_ev, f"content evidence missing: {list(evidence)}"
+    assert content_ev.get("sif_queries") == _SearchingAgent.last_sif_queries
+
+
+@pytest.mark.asyncio
 async def test_agent_error_is_classified_as_error(monkeypatch):
     """A generic agent exception is recorded as an error state."""
     from services import today_workflow_service as svc

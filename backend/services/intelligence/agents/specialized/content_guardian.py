@@ -47,7 +47,10 @@ class ContentGuardianAgent(SIFBaseAgent):
 
     async def propose_daily_tasks(self, context: Dict[str, Any]) -> List[TaskProposal]:
         self._remember_grounding(context)
-        default_proposals = [TaskProposal(title="Audit Old Content", description="Review top performing posts from >6 months ago for updates.", pillar_id="analyze", priority="low", estimated_time=30, source_agent="ContentGuardianAgent", reasoning="Maintains content relevance and authority.", action_type="navigate", action_url="/content-planning-dashboard")]
+        # NOTE: the old unconditional "Audit Old Content" filler was removed
+        # per the honest-absence policy — the guardian now declines or
+        # returns empty when it has nothing evidence-based to propose.
+        default_proposals = []
 
         return await self._synthesize_task_proposals(
             context,

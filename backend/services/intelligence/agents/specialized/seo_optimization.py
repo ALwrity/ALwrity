@@ -198,18 +198,10 @@ class SEOOptimizationAgent(BaseALwrityAgent):
                 action_type="navigate",
                 action_url="/seo-dashboard"
             ))
-        else:
-            default_proposals.append(TaskProposal(
-                title="Run SEO Audit",
-                description="Perform a comprehensive SEO audit to identify optimization opportunities.",
-                pillar_id="analyze",
-                priority="medium",
-                estimated_time=15,
-                source_agent="SEOOptimizationAgent",
-                reasoning="Regular audits prevent SEO degradation.",
-                action_type="navigate",
-                action_url="/seo-dashboard"
-            ))
+        # NOTE: the old else-branch "Run SEO Audit" filler was removed per the
+        # honest-absence policy — with no SIF issue evidence this agent
+        # declines or returns empty instead of shipping identical-for-everyone
+        # advice.
 
         return await self._synthesize_task_proposals(
             context,

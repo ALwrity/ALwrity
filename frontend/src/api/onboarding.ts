@@ -167,7 +167,67 @@ export async function getCompetitorAnalysis() {
   return res.data;
 }
 
-export interface TodayPlanPreview {
+export interface SifQueryProvenance {
+  query: string;
+  limit?: number;
+  trigger?: string;
+  result_count?: number;
+  outcome?: "success" | "miss" | "miss_healed" | "error";
+  error?: string | null;
+  heal?: { healed?: boolean; bootstrap_indexed?: number; website_sync_new?: number } | null;
+  timestamp?: string;
+}
+
+export interface AgentEvidenceEntry {
+  agent: string;
+  evidence?: any[];
+  analysis?: string;
+  proposed_tasks?: any[];
+  confidence?: number;
+  expected_impact?: string[];
+  effort?: string[];
+  kpi?: string[];
+  required_action_parameters?: any[];
+  error?: string | null;
+  declined?: boolean;
+  message?: string | null;
+  sif_queries?: SifQueryProvenance[];
+}
+
+export interface ProposalReviewSummary {
+  counts: {
+    accepted: number;
+    rejected: number;
+    merged: number;
+    deferred: number;
+    quarantined: number;
+  };
+  flagged: Array<{
+    title?: string | null;
+    agent?: string | null;
+    status?: string | null;
+    reasons?: string[];
+  }>;
+}
+
+export interface MeetingPreflight {
+  checks?: Record<string, { status?: string; message?: string; [key: string]: any }>;
+  limitations?: string[];
+  blocking?: boolean;
+  [key: string]: any;
+}
+
+export interface PlanTransparency {
+  limitations: string[];
+  meeting_preflight: MeetingPreflight;
+  agent_evidence: AgentEvidenceEntry[];
+  proposal_review_summary: ProposalReviewSummary;
+  guardian_health: number | null;
+  quality_status: string | null;
+  contextuality_validation: Record<string, any>;
+}
+
+export interface TodayPlanPreview extends PlanTransparency {
   date: string;
   tasks: any[];
   committee_agent_count: number;
@@ -194,7 +254,7 @@ export interface TodayPlanPreview {
   declined_agents?: Array<{ agent: string; state: string; detail?: string | null }>;
 }
 
-export interface RetryAgentResult {
+export interface RetryAgentResult extends PlanTransparency {
   success: boolean;
   agent?: string;
   proposals_by_agent?: Record<string, any[]>;

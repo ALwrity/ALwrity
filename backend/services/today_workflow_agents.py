@@ -413,6 +413,14 @@ async def generate_agent_enhanced_plan(
                 logger.warning(f"Agent proposal failed: {res}")
                 continue
             agent_evidence.append(build_agent_evidence(agent_key, res))
+            # Phase 1 transparency: attach the agent's SIF query provenance
+            # (composed queries, result counts, outcomes) to its evidence so
+            # the plan can show what was searched and what came back.
+            sif_queries = getattr(_agent, "last_sif_queries", None)
+            if isinstance(sif_queries, list) and sif_queries:
+                agent_evidence[-1]["sif_queries"] = [
+                    dict(q) for q in sif_queries if isinstance(q, dict)
+                ]
             if isinstance(res, list):
                 raw_proposals.extend(res)
                 raw_agent_keys.extend([agent_key] * len(res))
