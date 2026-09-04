@@ -19,7 +19,7 @@ import os
 import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 
 from sqlalchemy import and_
 from sqlalchemy.sql import func
@@ -103,6 +103,9 @@ class DigestPayload:
     certification_summary: Dict[str, CertificationInfo]
     confidence_estimates: List[str]  # list of "agent: is_estimate" notes
     timezone: str
+    # Phase 3b: transparency - what the end user should know about grounding
+    limitations: List[str] = field(default_factory=list)
+    sif_query_summary: Dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -320,7 +323,19 @@ def build_digest_payload(user_id: str, date: str, verbose: bool = True) -> Optio
             (completed_count / len(tasks) * 100) if tasks else 0.0
         )
 
-        return DigestPayload(
+        # Phase 3b: extract transparency data from the plan's evidence
+        plan_json = plan.plan_json if isinstance(plan.plan_json, dict) else {}
+        limitations = [str(l) for l in (plan_json.get("limitations") or []) if l]
+        sif_qs = {"total": 0, "success": 0, "miss": 0, "miss_healed": 0, "error": 0}
+        for ev in (plan_json.get("agent_evidence") or []):
+            for q in (ev.get("sif_queries") or []):
+                if isinstance(q, dict):
+                    sif_qs["total"] += 1
+                    outcome = q.get("outcome", "unknown")
+                    if outcome in sif_qs:
+                        sif_qs[outcome] += 1
+
+        result = DigestPayload(
             date=date,
             generation_mode=plan.generation_mode or "unknown",
             synthesis_mode_breakdown=synthesis_mode_breakdown,
@@ -336,6 +351,10 @@ def build_digest_payload(user_id: str, date: str, verbose: bool = True) -> Optio
             confidence_estimates=[],  # Could wire from market_signal metadata if available
             timezone=user_timezone,
         )
+
+        result.limitations = limitations
+        result.sif_query_summary = sif_qs
+        return result
 
     except Exception as e:
         logger.error(f"Error building digest payload for user {user_id}: {e}")
@@ -513,7 +532,34 @@ def render_email(payload: DigestPayload, verbose: bool = True, reengage: bool = 
     """
     if reengage:
         return render_reengagement(payload, verbose)
-    return render_standard_digest(payload, verbose)
+    html = render_standard_digest(payload, verbose)
+
+    # Phase 3b: transparency footer - show the plan's grounding quality
+    transparency_parts = []
+    if getattr(payload, "limitations", None):
+        lim_items = "".join(f"<li style='margin:4px 0'>{l}</li>" for l in payload.limitations)
+        transparency_parts.append(
+            f"<div style='margin:8px 0'><strong>Limitations this run:</strong>"
+            f"<ul style='margin:4px 0;padding-left:20px'>{lim_items}</ul></div>"
+        )
+    sif_qs = getattr(payload, "sif_query_summary", None)
+    if sif_qs and sif_qs.get("total", 0) > 0:
+        transparency_parts.append(
+            f"<div style='margin:8px 0'><strong>SIF searches:</strong> "
+            f"{sif_qs['total']} queries ({sif_qs.get('success', 0)} found, "
+            f"{sif_qs.get('miss', 0)} empty)</div>"
+        )
+    if transparency_parts:
+        footer = (
+            "<div style='border-top:1px solid #e0e0e0;margin-top:16px;padding-top:12px;"
+            "font-size:0.85em;color:#666'>"
+            "<strong>Plan transparency</strong><br/>"
+            + "".join(transparency_parts)
+            + "</div>"
+        )
+        html = html + footer
+
+    return html
 
 
 # =============================================================================
