@@ -10,6 +10,9 @@ from googleapiclient.discovery import build
 from loguru import logger
 
 from services.llm_providers.main_text_generation import llm_text_gen
+from services.youtube.youtube_comment_video_titles import (
+    attach_youtube_comment_video_titles,
+)
 from services.youtube.youtube_comments_insert_errors import (
     YOUTUBE_COMMENTS_INSERT_QUOTA_COST,
     user_safe_youtube_comment_insert_error,
@@ -147,10 +150,18 @@ class YouTubeCommentsService:
                     }
                 )
 
+            attach_youtube_comment_video_titles(youtube, comments, user_id=user_id)
+            unique_video_ids = {
+                (row.get("video_id") or "").strip()
+                for row in comments
+                if (row.get("video_id") or "").strip()
+            }
             logger.info(
-                "[youtube_comments] Inbox complete user_id={} comment_count={} quota_cost={}",
+                "[youtube_comments] Inbox complete user_id={} comment_count={} "
+                "unique_video_id_count={} quota_cost={}",
                 user_id,
                 len(comments),
+                len(unique_video_ids),
                 YOUTUBE_COMMENT_THREADS_LIST_QUOTA_COST,
             )
             return {

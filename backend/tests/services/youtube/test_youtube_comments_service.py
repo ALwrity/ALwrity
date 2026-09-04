@@ -1,7 +1,7 @@
 """YouTube Comment Reply Assistant service — existing inbox, draft, and HITL send.
 
 Documents current list_inbox / draft_reply / send_reply behavior.
-Does not cover video-title grouping (not implemented yet).
+Video titles come from videos.list after commentThreads.list.
 Hub wedge chrome and Podcast Maker are out of scope.
 """
 
@@ -65,6 +65,7 @@ def _youtube_inbox(threads: list[dict] | None = None) -> MagicMock:
     youtube.commentThreads.return_value.list.return_value.execute.return_value = {
         "items": threads if threads is not None else [_thread()]
     }
+    youtube.videos.return_value.list.return_value.execute.return_value = {"items": []}
     return youtube
 
 
@@ -124,6 +125,7 @@ class TestYouTubeCommentsServiceInbox:
         assert comment["author"] == "Sam"
         assert comment["text"] == "Loved the intro"
         assert comment["thread_id"] == "thread-1"
+        assert comment["video_title"] == "vid-1"
         list_kwargs = youtube.commentThreads.return_value.list.call_args.kwargs
         assert list_kwargs["allThreadsRelatedToChannelId"] == "UC123"
         assert list_kwargs["maxResults"] == 20
@@ -140,6 +142,88 @@ class TestYouTubeCommentsServiceInbox:
             _service(_connected_oauth()).list_inbox(USER_ID, max_results=99)
 
         assert youtube.commentThreads.return_value.list.call_args.kwargs["maxResults"] == 99
+        youtube.videos.return_value.list.assert_not_called()
+
+    def test_inbox_attaches_video_title_from_videos_list(self):
+        youtube = _youtube_inbox(
+            [
+                _thread(
+                    comment_id="c-1",
+                    video_id="vid-1",
+                    author="Sam",
+                    text="Loved the intro",
+                )
+            ]
+        )
+        youtube.videos.return_value.list.return_value.execute.return_value = {
+            "items": [{"id": "vid-1", "snippet": {"title": "Rank Videos in 7 Days"}}]
+        }
+
+        with patch(
+            "services.youtube.youtube_comments_service.build",
+            return_value=youtube,
+        ):
+            result = _service(_connected_oauth()).list_inbox(USER_ID)
+
+        assert result["success"] is True
+        assert result["comments"][0]["video_title"] == "Rank Videos in 7 Days"
+        video_kwargs = youtube.videos.return_value.list.call_args.kwargs
+        assert video_kwargs["part"] == "snippet"
+        assert "vid-1" in video_kwargs["id"]
+
+    def test_inbox_videos_list_uses_unique_video_ids(self):
+        youtube = _youtube_inbox(
+            [
+                _thread(comment_id="c-1", video_id="vid-1", author="Sam", text="A"),
+                _thread(
+                    thread_id="thread-2",
+                    comment_id="c-2",
+                    video_id="vid-1",
+                    author="Pat",
+                    text="B",
+                ),
+                _thread(
+                    thread_id="thread-3",
+                    comment_id="c-3",
+                    video_id="vid-2",
+                    author="Lee",
+                    text="C",
+                ),
+            ]
+        )
+
+        with patch(
+            "services.youtube.youtube_comments_service.build",
+            return_value=youtube,
+        ):
+            result = _service(_connected_oauth()).list_inbox(USER_ID)
+
+        assert result["success"] is True
+        assert youtube.videos.return_value.list.call_count == 1
+        ids = set(youtube.videos.return_value.list.call_args.kwargs["id"].split(","))
+        assert ids == {"vid-1", "vid-2"}
+        assert youtube.videos.return_value.list.call_args.kwargs["part"] == "snippet"
+
+    def test_inbox_videos_list_failure_still_returns_comments(self):
+        youtube = _youtube_inbox(
+            [
+                _thread(comment_id="c-1", video_id="abcdefghijk", author="Sam", text="Hi")
+            ]
+        )
+        youtube.videos.return_value.list.return_value.execute.side_effect = RuntimeError(
+            "secret-title-lookup"
+        )
+
+        with patch(
+            "services.youtube.youtube_comments_service.build",
+            return_value=youtube,
+        ):
+            result = _service(_connected_oauth()).list_inbox(USER_ID)
+
+        assert result["success"] is True
+        assert result["comments"][0]["text"] == "Hi"
+        assert result["comments"][0]["video_title"] == "abcdefgh"
+        assert "secret-title-lookup" not in (result.get("message") or "")
 
     def test_inbox_failure_returns_error_not_fake_comments(self):
         oauth = _connected_oauth()

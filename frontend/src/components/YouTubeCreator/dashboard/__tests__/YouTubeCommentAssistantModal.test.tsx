@@ -1,6 +1,5 @@
 /**
- * Existing Comment Reply Assistant modal: inbox list, draft, HITL send.
- * Does not cover video-title grouping (not implemented yet).
+ * Existing Comment Reply Assistant modal: inbox list, video heading, draft, HITL send.
  * Hub chrome and Podcast Maker are out of scope.
  */
 import React from "react";
@@ -21,7 +20,8 @@ const mockedStudioApi = vi.mocked(youtubeStudioApi);
 
 const inboxComment = {
   comment_id: "c-1",
-  video_id: "vid-1",
+  video_id: "abcdefghijk",
+  video_title: "Rank Videos in 7 Days",
   author: "Sam",
   text: "Loved the intro",
 };
@@ -57,8 +57,52 @@ describe("YouTube Comment Reply Assistant modal", () => {
     await waitFor(() => {
       expect(screen.getByText("Sam")).toBeTruthy();
     });
+    expect(screen.getByText("Sam")).toHaveClass("yt-comment-author");
     expect(screen.getByText("Loved the intro")).toBeTruthy();
+    expect(screen.getByText("Rank Videos in 7 Days")).toBeTruthy();
+    expect(screen.queryByText("abcdefghijk")).toBeNull();
     expect(mockedStudioApi.getCommentInbox).toHaveBeenCalledWith({ max_results: 20 });
+  });
+
+  it("shows a short video id heading when title lookup fell back", async () => {
+    mockedStudioApi.getCommentInbox.mockResolvedValueOnce({
+      success: true,
+      comments: [
+        {
+          comment_id: "c-2",
+          video_id: "abcdefghijk",
+          video_title: "abcdefgh",
+          author: "Sam",
+          text: "Loved the intro",
+        },
+      ],
+    });
+    renderAssistant();
+
+    await waitFor(() => {
+      expect(screen.getByText("abcdefgh")).toBeTruthy();
+    });
+    expect(screen.queryByText("abcdefghijk")).toBeNull();
+    expect(screen.queryByText(/untitled/i)).toBeNull();
+  });
+
+  it("shows Video unavailable when the comment has no video id", async () => {
+    mockedStudioApi.getCommentInbox.mockResolvedValueOnce({
+      success: true,
+      comments: [
+        {
+          comment_id: "c-3",
+          author: "Sam",
+          text: "Loved the intro",
+        },
+      ],
+    });
+    renderAssistant();
+
+    await waitFor(() => {
+      expect(screen.getByText("Video unavailable")).toBeTruthy();
+    });
+    expect(screen.queryByText(/untitled/i)).toBeNull();
   });
 
   it("shows empty copy when inbox has no comments", async () => {
@@ -118,6 +162,7 @@ describe("YouTube Comment Reply Assistant modal", () => {
     expect(mockedStudioApi.draftCommentReply).toHaveBeenCalledWith({
       comment_text: "Loved the intro",
       channel_niche: "seo",
+      video_title: "Rank Videos in 7 Days",
     });
   });
 
