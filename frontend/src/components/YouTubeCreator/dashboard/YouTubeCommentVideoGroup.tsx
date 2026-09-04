@@ -1,22 +1,26 @@
 import React from "react";
 import { youtubeCommentCountLabel } from "./youtubeCommentVideoGroups";
+import { isYouTubeIframeVideoId } from "./youtubeCommentEmbedVideoId";
+import { YouTubeCommentIframePlayer } from "./YouTubeCommentIframePlayer";
 
 export const YouTubeCommentVideoGroup: React.FC<{
   heading: string;
   commentCount: number;
   expanded: boolean;
   onToggle: () => void;
+  videoId?: string | null;
   children: React.ReactNode;
-}> = ({ heading, commentCount, expanded, onToggle, children }) => {
+}> = ({ heading, commentCount, expanded, onToggle, videoId, children }) => {
   const countLabel = youtubeCommentCountLabel(commentCount);
+  const embedId = (videoId || "").trim();
   return (
     <section className="yt-comment-video-group">
       <button
         type="button"
         className="yt-comment-video-group-header"
         aria-expanded={expanded}
-        aria-label={`Your video ${heading}, ${countLabel}`}
         onClick={onToggle}
+        aria-label={`Your video ${heading}, ${countLabel}`}
       >
         <div className="yt-comment-video-group-header-row">
           <span className="yt-comment-video-group-kicker">Your video</span>
@@ -29,7 +33,14 @@ export const YouTubeCommentVideoGroup: React.FC<{
         </div>
         <div className="yt-comment-video-heading">{heading}</div>
       </button>
-      {expanded ? <div className="yt-comment-video-group-body">{children}</div> : null}
+      {expanded ? (
+        <div className="yt-comment-video-group-body">
+          {isYouTubeIframeVideoId(embedId) ? (
+            <YouTubeCommentIframePlayer videoId={embedId} />
+          ) : null}
+          {children}
+        </div>
+      ) : null}
     </section>
   );
 };
