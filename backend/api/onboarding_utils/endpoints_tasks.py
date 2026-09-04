@@ -123,6 +123,7 @@ async def get_tasks_status(current_user: dict) -> Dict[str, Any]:
 
             return base
 
+        # Calculate onboarding completion status
         tasks = {
             "full_site_seo_audit": _task_status(OnboardingFullWebsiteAnalysisTask, "Full-Site SEO Audit"),
             "deep_competitor_analysis": _task_status(DeepCompetitorAnalysisTask, "Deep Competitor Analysis"),
@@ -137,12 +138,21 @@ async def get_tasks_status(current_user: dict) -> Dict[str, Any]:
         failed_count = sum(1 for t in tasks.values() if t.get("status") == "failed")
         all_done = completed_count + failed_count >= total
 
+        # Determine if onboarding completion should be tracked
+        # We'll track completion when ALL critical tasks are done
+        critical_task_types = ["full_site_seo_audit", "deep_competitor_analysis", "sif_indexing"]
+        critical_tasks_completed = sum(1 for task_name in critical_task_types if tasks.get(task_name, {}).get("status") == "completed")
+        onboarding_complete = critical_tasks_completed == len(critical_task_types)
+
         return {
             "tasks": tasks,
             "total": total,
             "completed_count": completed_count,
             "failed_count": failed_count,
-            "all_done": all_done,
+            "all_done": all_done,           # Legacy: any/all tasks done
+            "has_completed_onboarding": onboarding_complete,  # NEW: critical tasks complete
+            "has_active_strategy": False, # NEW: determined by frontend checks
+            "onboarding_data_available": True,  # NEW: data exists for strategy generation
         }
     finally:
         db.close()
