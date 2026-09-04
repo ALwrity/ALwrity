@@ -7,6 +7,7 @@ import {
   CircularProgress,
   FormControl,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Paper,
   Select,
@@ -14,7 +15,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { Scene, VideoPlan } from '../../../services/youtubeApi';
+import { Scene, VideoPlan, youtubeApi } from '../../../services/youtubeApi';
 import { useYouTubePublish } from '../../../hooks/useYouTubePublish';
 import { toYouTubePublishAtIso, youtubeScheduleFieldSx, youtubeScheduleIsInvalid } from './youtubePublishSchedule';
 import { youtubePublishSourceMeta } from '../../../hooks/youtubePublishLog';
@@ -23,6 +24,8 @@ import {
   YouTubePublishAudienceFields,
   type YouTubeMadeForKidsChoice,
 } from './YouTubePublishAudienceFields';
+import { YouTubePublishThumbnailUpload } from './YouTubePublishThumbnailUpload';
+import { youtubePublishDurationType, youtubePublishThumbnailAppliedMessage } from './youtubePublishThumbnail';
 import { helperSx, inputSx, labelSx, selectMenuProps, selectSx, TEXT_PRIMARY, BACKGROUND } from '../styles';
 
 interface YouTubePublishPanelProps {
@@ -71,6 +74,10 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
   const [scheduleLocal, setScheduleLocal] = useState('');
   const [madeForKids, setMadeForKids] = useState<YouTubeMadeForKidsChoice>(null);
   const [ageRestricted, setAgeRestricted] = useState(false);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailError, setThumbnailError] = useState<string | null>(null);
+  const [thumbnailBusy, setThumbnailBusy] = useState(false);
+  const durationType = youtubePublishDurationType(videoPlan?.duration_type);
 
   const publishTitle = useMemo(() => buildVideoTitle(videoPlan, scenes), [videoPlan, scenes]);
   const publishDescription = useMemo(() => buildVideoDescription(videoPlan), [videoPlan]);
@@ -95,6 +102,15 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
       const tags = metadata ? metadata.tags : ['alwrity', 'youtube', 'ai-video'];
       const restrictTo18 = madeForKids === false && ageRestricted;
       const effectivePrivacy = publishAt ? 'private' : privacy;
+      const publishOptions = {
+        description,
+        tags,
+        privacy_status: effectivePrivacy,
+        publish_at: publishAt,
+        made_for_kids: madeForKids,
+        ...(restrictTo18 ? { age_restricted: true } : {}),
+        ...(metadata ? { category_id: metadata.category_id } : {}),
+      };
       console.info("[YouTubePublishPanel] Publish clicked", {
         ...youtubePublishSourceMeta(videoUrl),
         titleLength: title.length,
@@ -109,18 +125,41 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
         effectivePrivacy,
         madeForKids,
         ageRestricted: restrictTo18,
+        hasThumbnail: Boolean(thumbnailFile),
+        durationType,
         connected: youtube.connected,
         hasActiveChannel: Boolean(activeChannel),
       });
-      youtube.publishToYouTube(videoUrl, title, {
-        description,
-        tags,
-        privacy_status: effectivePrivacy,
-        publish_at: publishAt,
-        made_for_kids: madeForKids,
-        ...(restrictTo18 ? { age_restricted: true } : {}),
-        ...(metadata ? { category_id: metadata.category_id } : {}),
-      });
+      if (thumbnailFile) {
+        void (async () => {
+          try {
+            setThumbnailBusy(true);
+            setThumbnailError(null);
+            const uploaded = await youtubeApi.uploadPublishThumbnail(
+              thumbnailFile,
+              durationType,
+            );
+            youtube.publishToYouTube(videoUrl, title, {
+              ...publishOptions,
+              thumbnail_path: uploaded.thumbnail_path,
+              duration_type: durationType,
+            });
+          } catch (uploadError) {
+            console.error("[YouTubePublishPanel] Cover picture upload failed", {
+              errorName: uploadError instanceof Error ? uploadError.name : "Error",
+            });
+            setThumbnailError(
+              uploadError instanceof Error
+                ? uploadError.message
+                : "We could not save that picture. Try again or publish without it.",
+            );
+          } finally {
+            setThumbnailBusy(false);
+          }
+        })();
+        return;
+      }
+      youtube.publishToYouTube(videoUrl, title, publishOptions);
     } catch (error) {
       console.error("[YouTubePublishPanel] Publish click failed", {
         errorName: error instanceof Error ? error.name : "Error",
@@ -259,6 +298,17 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
           />
         </Stack>
 
+        <YouTubePublishThumbnailUpload
+          durationType={durationType}
+          disabled={youtube.publishState.publishing || thumbnailBusy}
+          file={thumbnailFile}
+          error={thumbnailError}
+          onFileChange={(nextFile, nextError) => {
+            setThumbnailFile(nextFile);
+            setThumbnailError(nextError);
+          }}
+        />
+
         <YouTubePublishAudienceFields
           madeForKids={madeForKids}
           ageRestricted={ageRestricted}
@@ -294,17 +344,36 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
             !activeChannel ||
             !videoUrl ||
             youtube.publishState.publishing ||
+            thumbnailBusy ||
             madeForKids === null
           }
-          startIcon={youtube.publishState.publishing ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : undefined}
+          startIcon={
+            youtube.publishState.publishing || thumbnailBusy
+              ? <CircularProgress size={16} sx={{ color: '#fff' }} />
+              : undefined
+          }
           sx={{ width: 'fit-content', fontWeight: 700 }}
         >
-          {youtube.publishState.publishing
-            ? youtube.publishState.progress || 'Publishing...'
-            : toYouTubePublishAtIso(scheduleLocal)
-              ? 'Schedule on YouTube'
-              : 'Publish to YouTube'}
+          {thumbnailBusy
+            ? 'Saving cover picture...'
+            : youtube.publishState.publishing
+              ? 'Publishing…'
+              : toYouTubePublishAtIso(scheduleLocal)
+                ? 'Schedule on YouTube'
+                : 'Publish to YouTube'}
         </Button>
+
+        {(youtube.publishState.publishing || thumbnailBusy) && (
+          <Stack spacing={1} sx={{ width: '100%' }}>
+            <LinearProgress color="error" aria-label="Publish progress" />
+            <Typography variant="body2" sx={helperSx}>
+              {thumbnailBusy
+                ? 'Saving your cover picture…'
+                : youtube.publishState.progress ||
+                  'Publishing to YouTube… This can take a minute.'}
+            </Typography>
+          </Stack>
+        )}
 
         {youtube.publishState.videoUrl && (
           <Alert severity="success">
@@ -312,8 +381,23 @@ export const YouTubePublishPanel: React.FC<YouTubePublishPanelProps> = ({
             <a href={youtube.publishState.videoUrl} target="_blank" rel="noopener noreferrer">
               Open on YouTube
             </a>
+            {youtube.publishState.thumbnailApplied === true ? (
+              <>
+                <br />
+                {youtubePublishThumbnailAppliedMessage(durationType)}
+              </>
+            ) : null}
           </Alert>
         )}
+
+        {youtube.publishState.thumbnailError ? (
+          <Alert severity="warning">{youtube.publishState.thumbnailError}</Alert>
+        ) : youtube.publishState.thumbnailApplied === false ? (
+          <Alert severity="warning">
+            Your video published, but the cover picture could not be applied. Open YouTube Studio
+            and add it from the video details page.
+          </Alert>
+        ) : null}
 
         {youtube.publishState.error && (
           <Alert severity="error">

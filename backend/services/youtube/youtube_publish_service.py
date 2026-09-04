@@ -9,7 +9,7 @@ Supports resumable upload for large files.
 import os
 import tempfile
 import time
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Callable
 from pathlib import Path
 
 import httpx
@@ -25,6 +25,8 @@ from services.youtube.youtube_publish_log import (
 )
 from services.youtube.video_storage import find_youtube_video_file
 from services.database import get_session_for_user
+from services.youtube.youtube_publish_thumbnail import resolve_youtube_thumbnail_file
+from services.youtube.youtube_publish_thumbnail_set import apply_youtube_publish_thumbnail
 
 _CREATOR_VIDEO_API_PREFIX = "/api/youtube/videos/"
 
@@ -53,6 +55,9 @@ class YouTubePublishService:
         language: str = "en",
         publish_at: Optional[str] = None,
         age_restricted: bool = False,
+        thumbnail_path: Optional[str] = None,
+        duration_type: str = "medium",
+        on_progress: Optional[Callable[[str], None]] = None,
     ) -> Dict[str, Any]:
         """
         Upload a video to YouTube.
@@ -62,13 +67,17 @@ class YouTubePublishService:
                 When set, privacy_status is forced to private until YouTube goes live.
             age_restricted: When True, sets status.contentRating.ytRating to ytAgeRestricted.
                 Incompatible with made_for_kids.
+            thumbnail_path: Optional local JPEG/PNG already saved for thumbnails.set.
+                Missing file fails before insert. set failure still returns success.
+            duration_type: Creator plan length (shorts | medium | long). Logged only here.
         """
         temp_path = None
         is_temp = False
         try:
             logger.info(
                 "[youtube_publish] Entry user_id={} token_id={} title_length={} tag_count={} "
-                "privacy={} has_publish_at={} made_for_kids={} age_restricted={} source_kind={}",
+                "privacy={} has_publish_at={} made_for_kids={} age_restricted={} "
+                "has_thumbnail={} duration_type={} source_kind={}",
                 user_id,
                 token_id,
                 len(title),
@@ -77,6 +86,8 @@ class YouTubePublishService:
                 bool(publish_at),
                 made_for_kids,
                 age_restricted,
+                bool(thumbnail_path and str(thumbnail_path).strip()),
+                duration_type,
                 youtube_publish_source_meta(video_source)["source_kind"],
             )
             if made_for_kids and age_restricted:
@@ -139,6 +150,23 @@ class YouTubePublishService:
                     source_meta["source_kind"],
                 )
                 return {"success": False, "error": "Video file is empty."}
+
+            thumbnail_file = None
+            if thumbnail_path and str(thumbnail_path).strip():
+                thumbnail_file = resolve_youtube_thumbnail_file(thumbnail_path)
+                if thumbnail_file is None:
+                    logger.warning(
+                        "[youtube_publish] Thumbnail missing user_id={} duration_type={}",
+                        user_id,
+                        duration_type,
+                    )
+                    return {
+                        "success": False,
+                        "error": (
+                            "The thumbnail was not found. "
+                            "Choose a JPEG or PNG and try again."
+                        ),
+                    }
 
             effective_privacy = privacy_status
             if publish_at:
@@ -242,11 +270,38 @@ class YouTubePublishService:
             video_url = f"https://youtu.be/{video_id}" if video_id else ""
 
             logger.info(
-                "[youtube_publish] Upload complete user_id={} has_video_id={} privacy={}",
+                "[youtube_publish] Upload complete user_id={} has_video_id={} privacy={} "
+                "has_thumbnail={}",
                 user_id,
                 bool(video_id),
                 effective_privacy,
+                bool(thumbnail_file),
             )
+
+            thumbnail_error = None
+            thumbnail_applied = False
+            if thumbnail_file and video_id:
+                thumb_result = apply_youtube_publish_thumbnail(
+                    youtube,
+                    video_id=video_id,
+                    thumbnail_path=thumbnail_file,
+                    duration_type=duration_type,
+                    on_progress=on_progress,
+                )
+                thumbnail_applied = bool(thumb_result.get("applied"))
+                thumbnail_error = thumb_result.get("error")
+                if thumbnail_applied:
+                    logger.info(
+                        "[youtube_publish] Thumbnail set user_id={} duration_type={}",
+                        user_id,
+                        duration_type,
+                    )
+                else:
+                    logger.warning(
+                        "[youtube_publish] Thumbnail set failed user_id={} duration_type={}",
+                        user_id,
+                        duration_type,
+                    )
 
             return {
                 "success": True,
@@ -255,6 +310,8 @@ class YouTubePublishService:
                 "title": title,
                 "privacy_status": effective_privacy,
                 "publish_at": publish_at,
+                "thumbnail_applied": thumbnail_applied,
+                "thumbnail_error": thumbnail_error,
             }
 
         except Exception as e:

@@ -797,9 +797,43 @@ export const youtubeApi = {
     made_for_kids?: boolean;
     age_restricted?: boolean;
     publish_at?: string;
+    thumbnail_path?: string;
+    duration_type?: "shorts" | "medium" | "long";
   }): Promise<{ success: boolean; task_id?: string; error?: string; message: string }> {
     const response = await apiClient.post(`${API_BASE}/publish`, params);
     return response.data;
+  },
+
+  async uploadPublishThumbnail(
+    file: File,
+    durationType: "shorts" | "medium" | "long",
+  ): Promise<{ success: boolean; thumbnail_path: string }> {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("duration_type", durationType);
+      const response = await apiClient.post(`${API_BASE}/publish/thumbnail`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const data = response.data as {
+        success?: boolean;
+        thumbnail_path?: string;
+        error?: string;
+      };
+      if (!data?.success || !data.thumbnail_path) {
+        throw new Error(data?.error || "We could not save that picture. Try again.");
+      }
+      return { success: true, thumbnail_path: data.thumbnail_path };
+    } catch (error: any) {
+      const detail = error.response?.data?.detail;
+      const message =
+        (typeof detail === "string" && detail) ||
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        "We could not save that picture. Try a JPEG or PNG under 2 MB.";
+      throw new Error(message);
+    }
   },
 
   async getPublishStatus(taskId: string): Promise<{
@@ -808,6 +842,8 @@ export const youtubeApi = {
     video_id?: string;
     video_url?: string;
     error?: string;
+    thumbnail_error?: string;
+    thumbnail_applied?: boolean;
     message: string;
   }> {
     const response = await apiClient.get(`${API_BASE}/publish/${taskId}`);

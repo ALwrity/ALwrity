@@ -5,7 +5,7 @@ Uses stored OAuth credentials for authentication.
 """
 
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field, model_validator
 from loguru import logger
 
@@ -17,6 +17,7 @@ from services.youtube.youtube_publish_log import (
     youtube_publish_error_log_fields,
     youtube_publish_source_meta,
 )
+from services.youtube.youtube_publish_thumbnail import process_youtube_publish_thumbnail_upload
 from .oauth_router import get_oauth_service
 from .task_manager import task_manager
 
@@ -44,6 +45,15 @@ class PublishRequest(BaseModel):
         None,
         description="Optional ISO-8601 UTC schedule time (forces private until live)",
     )
+    thumbnail_path: Optional[str] = Field(
+        None,
+        description="Local JPEG/PNG path from POST /publish/thumbnail (optional)",
+    )
+    duration_type: str = Field(
+        "medium",
+        pattern="^(shorts|medium|long)$",
+        description="Creator plan length; picks our 16:9 or 9:16 cover rule",
+    )
 
     @model_validator(mode="after")
     def reject_made_for_kids_with_age_restriction(self):
@@ -59,7 +69,15 @@ class PublishResponse(BaseModel):
     video_id: Optional[str] = None
     video_url: Optional[str] = None
     error: Optional[str] = None
+    thumbnail_error: Optional[str] = None
+    thumbnail_applied: Optional[bool] = None
     message: str = ""
+
+
+class ThumbnailUploadResponse(BaseModel):
+    success: bool
+    thumbnail_path: Optional[str] = None
+    error: Optional[str] = None
 
 
 def get_publish_service(
@@ -85,7 +103,7 @@ def start_publish(
         logger.info(
             "[youtube_publish] Start request user_id={} token_id={} title_length={} "
             "tag_count={} privacy={} has_publish_at={} made_for_kids={} age_restricted={} "
-            "source_kind={} source_length={}",
+            "has_thumbnail={} duration_type={} source_kind={} source_length={}",
             user_id,
             request.token_id,
             len(request.title),
@@ -94,6 +112,8 @@ def start_publish(
             bool(request.publish_at),
             request.made_for_kids,
             request.age_restricted,
+            bool(request.thumbnail_path),
+            request.duration_type,
             source_meta["source_kind"],
             source_meta["source_length"],
         )
@@ -134,6 +154,8 @@ def start_publish(
             made_for_kids=request.made_for_kids,
             age_restricted=request.age_restricted,
             publish_at=request.publish_at,
+            thumbnail_path=request.thumbnail_path,
+            duration_type=request.duration_type,
             publish_service=publish_service,
         )
 
@@ -153,6 +175,54 @@ def start_publish(
             fields["http_status"],
         )
         raise HTTPException(status_code=500, detail="Failed to start publish. Please try again.")
+
+
+@router.post("/thumbnail", response_model=ThumbnailUploadResponse)
+async def upload_publish_thumbnail(
+    file: UploadFile = File(...),
+    duration_type: str = Form("medium"),
+    user: dict = Depends(get_current_user),
+):
+    """Save a cover picture for the next publish. Browser cannot send a server path."""
+    try:
+        user_id = user.get("id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        image_bytes = await file.read()
+        logger.info(
+            "[youtube_publish] Thumbnail upload user_id={} size_bytes={} duration_type={}",
+            user_id,
+            len(image_bytes or b""),
+            duration_type,
+        )
+        thumbnail_path = process_youtube_publish_thumbnail_upload(
+            image_bytes=image_bytes,
+            content_type=file.content_type,
+            filename=file.filename or "",
+            duration_type=duration_type,
+            user_id=str(user_id),
+        )
+        return ThumbnailUploadResponse(success=True, thumbnail_path=thumbnail_path)
+    except HTTPException:
+        raise
+    except ValueError as validation_error:
+        logger.warning(
+            "[youtube_publish] Thumbnail upload rejected user_id={} error_type=ValueError",
+            user.get("id") if user else None,
+        )
+        raise HTTPException(status_code=400, detail=str(validation_error))
+    except Exception as e:
+        fields = youtube_publish_error_log_fields(e)
+        logger.error(
+            "[youtube_publish] Thumbnail upload failed error_type={} http_status={}",
+            fields["error_type"],
+            fields["http_status"],
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="We could not save that picture. Try a JPEG or PNG under 2 MB.",
+        )
 
 
 @router.get("/{task_id}", response_model=PublishResponse)
@@ -208,6 +278,8 @@ def get_publish_status(
                 task_id=task_id,
                 video_id=result.get("video_id"),
                 video_url=result.get("video_url"),
+                thumbnail_error=result.get("thumbnail_error") or None,
+                thumbnail_applied=result.get("thumbnail_applied"),
                 message=task_status.get("message", "Published successfully"),
             )
         elif status == "failed":
@@ -251,16 +323,20 @@ def _execute_publish_task(
     publish_service: YouTubePublishService,
     publish_at: Optional[str] = None,
     age_restricted: bool = False,
+    thumbnail_path: Optional[str] = None,
+    duration_type: str = "medium",
 ):
     """Background task to execute video publish."""
     logger.info(
         "[youtube_publish] Background task start task_id={} user_id={} token_id={} "
-        "made_for_kids={} age_restricted={} source_kind={}",
+        "made_for_kids={} age_restricted={} has_thumbnail={} duration_type={} source_kind={}",
         task_id,
         user_id,
         token_id,
         made_for_kids,
         age_restricted,
+        bool(thumbnail_path),
+        duration_type,
         youtube_publish_source_meta(video_source)["source_kind"],
     )
 
@@ -268,6 +344,27 @@ def _execute_publish_task(
         task_manager.update_task_status(
             task_id, "processing", progress=10.0, message="Preparing video for upload..."
         )
+        task_manager.update_task_status(
+            task_id, "processing", progress=40.0, message="Uploading video to YouTube..."
+        )
+
+        def on_progress(message: str) -> None:
+            try:
+                lower = message.lower()
+                progress = None
+                if "waiting" in lower:
+                    progress = 70.0
+                elif "cover" in lower:
+                    progress = 85.0
+                task_manager.update_task_status(
+                    task_id, "processing", progress=progress, message=message
+                )
+            except Exception as progress_error:
+                logger.warning(
+                    "[youtube_publish] Progress update failed task_id={} error_type={}",
+                    task_id,
+                    type(progress_error).__name__,
+                )
 
         result = publish_service.publish_video(
             user_id=user_id,
@@ -281,6 +378,9 @@ def _execute_publish_task(
             made_for_kids=made_for_kids,
             age_restricted=age_restricted,
             publish_at=publish_at,
+            thumbnail_path=thumbnail_path,
+            duration_type=duration_type,
+            on_progress=on_progress,
         )
 
         if result.get("success"):
