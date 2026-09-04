@@ -14,6 +14,35 @@ from models.advertools_monitoring_models import AdvertoolsTask
 from .task_status import derive_ui_status
 
 
+def _has_active_strategy(db, user_id: str) -> bool:
+    """Return True when the user has a strategy whose activation status is 'active'.
+
+    Checked against ``StrategyActivationStatus`` (monitoring_models), which is
+    the single source of truth for strategy activation. Defensive: any failure
+    (missing table, DB hiccup, non-numeric user id) degrades to False so the
+    tasks-status endpoint never breaks because of this extra check.
+    """
+    try:
+        from models.monitoring_models import StrategyActivationStatus
+        uid = int(user_id)
+    except (ImportError, ValueError, TypeError):
+        return False
+
+    try:
+        row = (
+            db.query(StrategyActivationStatus)
+            .filter(
+                StrategyActivationStatus.user_id == uid,
+                StrategyActivationStatus.status == "active",
+            )
+            .first()
+        )
+        return row is not None
+    except Exception as e:
+        logger.warning(f"[tasks_status] active-strategy check failed for user {user_id}: {e}")
+        return False
+
+
 async def get_tasks_status(current_user: dict) -> Dict[str, Any]:
     user_id = str(current_user.get("id"))
     db = get_session_for_user(user_id)
@@ -123,6 +152,7 @@ async def get_tasks_status(current_user: dict) -> Dict[str, Any]:
 
             return base
 
+        # Calculate onboarding completion status
         tasks = {
             "full_site_seo_audit": _task_status(OnboardingFullWebsiteAnalysisTask, "Full-Site SEO Audit"),
             "deep_competitor_analysis": _task_status(DeepCompetitorAnalysisTask, "Deep Competitor Analysis"),
@@ -137,12 +167,21 @@ async def get_tasks_status(current_user: dict) -> Dict[str, Any]:
         failed_count = sum(1 for t in tasks.values() if t.get("status") == "failed")
         all_done = completed_count + failed_count >= total
 
+        # Determine if onboarding completion should be tracked
+        # We'll track completion when ALL critical tasks are done
+        critical_task_types = ["full_site_seo_audit", "deep_competitor_analysis", "sif_indexing"]
+        critical_tasks_completed = sum(1 for task_name in critical_task_types if tasks.get(task_name, {}).get("status") == "completed")
+        onboarding_complete = critical_tasks_completed == len(critical_task_types)
+
         return {
             "tasks": tasks,
             "total": total,
             "completed_count": completed_count,
             "failed_count": failed_count,
-            "all_done": all_done,
+            "all_done": all_done,           # Legacy: any/all tasks done
+            "has_completed_onboarding": onboarding_complete,  # NEW: critical tasks complete
+            "has_active_strategy": _has_active_strategy(db, user_id),  # NEW: real activation query
+            "onboarding_data_available": True,  # NEW: data exists for strategy generation
         }
     finally:
         db.close()

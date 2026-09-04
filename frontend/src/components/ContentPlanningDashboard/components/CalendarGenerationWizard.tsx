@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -13,6 +14,7 @@ import {
 import DataUsageIcon from '@mui/icons-material/DataUsage';
 import CalendarIcon from '@mui/icons-material/CalendarToday';
 import CampaignIcon from '@mui/icons-material/Campaign';
+import { useCalendarAutoStart } from '../../../hooks/useCalendarAutoStart';
 
 // Import modular step components
 import {
@@ -92,6 +94,27 @@ const CalendarGenerationWizard: React.FC<CalendarGenerationWizardProps> = ({
     console.log('🎯 CalendarGenerationWizard: calendarConfig:', calendarConfig);
     onGenerateCalendar(calendarConfig);
   }, [onGenerateCalendar, calendarConfig]);
+
+  // Phase 4: Auto-start generation when arriving from strategy activation.
+  // Fires exactly once; user can opt out via autoGenerate:false in nav state.
+  const location = useLocation();
+  const { shouldAutoStart, consumeAutoStart, hasConsumed } = useCalendarAutoStart({
+    fromStrategyActivation,
+    locationState: location.state,
+    strategyContext,
+    onAutoStart: handleGenerateCalendar,
+    isGenerating,
+  });
+
+  useEffect(() => {
+    if (shouldAutoStart && !isGenerating && !hasConsumed) {
+      console.log('⚡ CalendarGenerationWizard: auto-starting generation from strategy activation');
+      // Jump to the final (Generate) step so the UI reflects generation state.
+      actions.setActiveStep(steps.length - 1);
+      consumeAutoStart();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldAutoStart, isGenerating, hasConsumed, consumeAutoStart]);
 
   // REMOVED: Show loading state if generating - Let modal handle progress display
   // The modal should open immediately and show progress inside
