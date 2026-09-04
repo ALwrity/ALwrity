@@ -29,21 +29,16 @@ export const SafeResponsiveContainer: React.FC<SafeResponsiveContainerProps> = (
   const boxRef = React.useRef<HTMLDivElement | null>(null);
   const [hasSize, setHasSize] = React.useState(false);
 
+  // Check for explicit numeric dimensions first
+  const numericWidth = typeof width === 'number' ? width : 0;
+  const numericHeight = typeof height === 'number' ? height : 0;
+  const hasNumericSize = numericWidth > 0 && numericHeight > 0;
+
   React.useEffect(() => {
-    const el = boxRef.current;
-    if (!el) return;
-
-    // If we have explicit numeric dimensions, we can render immediately
-    const numericWidth = typeof width === 'number' ? width : 0;
-    const numericHeight = typeof height === 'number' ? height : 0;
+    if (hasNumericSize) return; // Skip ResizeObserver if we have numeric dimensions
     
-    if (numericWidth > 0 && numericHeight > 0) {
-      setHasSize(true);
-      return;
-    }
-
-    // Otherwise use ResizeObserver to wait for container to get size
-    if (typeof ResizeObserver === 'undefined') return;
+    const el = boxRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
     
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -59,14 +54,12 @@ export const SafeResponsiveContainer: React.FC<SafeResponsiveContainerProps> = (
     
     observer.observe(el);
     return () => observer.disconnect();
-  }, [width, height]);
+  }, [hasNumericSize]);
 
-  // Determine container style
-  const containerWidth = typeof width === 'number' ? `${width}px` : width;
-  const containerHeight = typeof height === 'number' ? `${height}px` : height;
-
-  // Don't render ResponsiveContainer until we have valid dimensions
-  if (!hasSize) {
+  // Don't render anything until we have valid dimensions
+  if (!hasNumericSize && !hasSize) {
+    const containerWidth = typeof width === 'number' ? `${width}px` : width;
+    const containerHeight = typeof height === 'number' ? `${height}px` : height;
     return (
       <div
         ref={boxRef}
@@ -80,17 +73,25 @@ export const SafeResponsiveContainer: React.FC<SafeResponsiveContainerProps> = (
     );
   }
 
+  // Use numeric dimensions if available, otherwise use 100%
+  const containerStyle: React.CSSProperties = hasNumericSize 
+    ? { width: numericWidth, height: numericHeight }
+    : { width: '100%', height: '100%' };
+
   return (
     <div
       ref={boxRef}
       style={{
-        width: containerWidth,
-        height: containerHeight,
+        ...containerStyle,
         minWidth: 1,
         minHeight: 1,
       }}
     >
-      <ResponsiveContainer width="100%" height="100%" {...rest}>
+      <ResponsiveContainer 
+        width={hasNumericSize ? '100%' : '100%'} 
+        height={hasNumericSize ? '100%' : '100%'} 
+        {...rest}
+      >
         {children}
       </ResponsiveContainer>
     </div>
