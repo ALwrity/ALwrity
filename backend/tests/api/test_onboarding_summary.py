@@ -1,208 +1,235 @@
 """
-Tests for onboarding summary endpoint and onboarding completion detection.
+Tests for the onboarding tasks-status endpoint (Phase 1: completion detection).
+
+These tests exercise the REAL ``get_tasks_status`` logic through a faked DB
+session — no mocking of the function under test — so the completion flags
+(``all_done``, ``has_completed_onboarding``, ``has_active_strategy``) are
+verified against actual behaviour.
 """
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
-import pytest
+from datetime import datetime, timezone
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from api.onboarding_utils.endpoints_tasks import get_tasks_status
+from models.website_analysis_monitoring_models import (
+    OnboardingFullWebsiteAnalysisTask,
+    DeepCompetitorAnalysisTask,
+    DeepWebsiteCrawlTask,
+    SIFIndexingTask,
+    MarketTrendsTask,
+    SIFIndexingExecutionLog,
+)
+from models.monitoring_models import StrategyActivationStatus
+from models.advertools_monitoring_models import AdvertoolsTask
+
+TASK_MODELS = {
+    OnboardingFullWebsiteAnalysisTask: "full_site_seo_audit",
+    DeepCompetitorAnalysisTask: "deep_competitor_analysis",
+    SIFIndexingTask: "sif_indexing",
+    MarketTrendsTask: "market_trends",
+    AdvertoolsTask: "advertools",
+    DeepWebsiteCrawlTask: "deep_website_crawl",
+}
+
+CRITICAL = ("full_site_seo_audit", "deep_competitor_analysis", "sif_indexing")
 
 
-class TestOnboardingSummary:
-    """Tests for /api/onboarding/tasks/status endpoint and onboarding completion."""
+def _task(status: str):
+    """Build a task row shaped like the monitoring models expect."""
+    done = status == "completed"
+    return SimpleNamespace(
+        id=1,
+        status=status,
+        last_executed=datetime.now(timezone.utc) if status != "pending" else None,
+        last_success=datetime.now(timezone.utc) if done else None,
+        next_execution=None,
+        failure_reason="boom" if status == "failed" else None,
+        payload={},  # SIF branch reads this
+    )
 
-    async def test_onboarding_summary_status_not_completed(self):
-        """Test when onboarding tasks are not completed."""
-        mock_user = {"id": "test-user-123"}
-        
-        with patch('backend.api.onboarding_utils.endpoints_tasks.get_session_for_user') as mock_get_session:
-            mock_db = Mock()
-            mock_get_session.return_value = mock_db
-            
-            # Mock task with "pending" status
-            mock_task = Mock()
-            mock_task.user_id = "test-user-123"
-            mock_task.last_executed = None
-            mock_task.last_success = None
-            mock_task.next_execution = None
-            mock_task.status = "pending"
-            mock_task.failure_reason = None
-            
-            mock_session = Mock()
-            mock_session.query.return_value.filter.return_value.first.return_value = mock_task
-            mock_session.close = Mock()
-            mock_get_session.return_value = mock_session
-            
-            # Mock the entire get_tasks_status function to return test data
-            with patch('backend.api.onboarding_utils.endpoints_tasks.get_tasks_status', AsyncMock()) as mock_get_tasks:
-                mock_get_tasks.return_value = {
-                    "tasks": {
-                        "full_site_seo_audit": {
-                            "status": "pending",
-                            "started_at": None,
-                            "progress_pct": 0,
-                            "details": None,
-                        }
-                    },
-                    "total": 1,
-                    "completed_count": 0,
-                    "failed_count": 0,
-                    "all_done": False,
-                }
-                
-                from backend.api.onboarding_utils.endpoints_tasks import get_tasks_status
-                result = await get_tasks_status(mock_user)
-            
-            assert result["all_done"] == False
-            assert result["completed_count"] == 0
-            assert result["failed_count"] == 0
-            assert "full_site_seo_audit" in result["tasks"]
-            assert result["tasks"]["full_site_seo_audit"]["status"] == "pending"
 
-    async def test_onboarding_summary_status_all_completed(self):
-        """Test when all onboarding tasks are completed."""
-        mock_user = {"id": "test-user-456"}
-        
-        with patch('backend.api.onboarding_utils.endpoints_tasks.get_session_for_user') as mock_get_session:
-            mock_db = Mock()
-            mock_get_session.return_value = mock_db
-            
-            # Mock completed task
-            mock_task = Mock()
-            mock_task.user_id = "test-user-456"
-            mock_task.last_executed = None
-            mock_task.last_success = None
-            mock_task.next_execution = None
-            mock_task.status = "completed"
-            mock_task.failure_reason = None
-            
-            mock_session = Mock()
-            mock_session.query.return_value.filter.return_value.first.return_value = mock_task
-            mock_session.close = Mock()
-            mock_get_session.return_value = mock_session
-            
-            with patch('backend.api.onboarding_utils.endpoints_tasks.get_tasks_status', AsyncMock()) as mock_get_tasks:
-                mock_get_tasks.return_value = {
-                    "tasks": {
-                        "full_site_seo_audit": {
-                            "status": "completed",
-                            "started_at": None,
-                            "progress_pct": 100,
-                            "details": None,
-                        }
-                    },
-                    "total": 1,
-                    "completed_count": 1,
-                    "failed_count": 0,
-                    "all_done": True,
-                }
-                
-                from backend.api.onboarding_utils.endpoints_tasks import get_tasks_status
-                result = await get_tasks_status(mock_user)
-            
-            assert result["all_done"] == True
-            assert result["completed_count"] == 1
-            assert result["failed_count"] == 0
-            assert result["tasks"]["full_site_seo_audit"]["status"] == "completed"
+def _fake_db(task_status: str = "pending", activation_row=None):
+    """Session fake whose query chain returns per-model configured rows.
 
-    async def test_onboarding_summary_status_all_failed(self):
-        """Test when all onboarding tasks have failed."""
-        mock_user = {"id": "test-user-789"}
-        
-        with patch('backend.api.onboarding_utils.endpoints_tasks.get_session_for_user') as mock_get_session:
-            mock_db = Mock()
-            mock_get_session.return_value = mock_db
-            
-            # Mock failed task
-            mock_task = Mock()
-            mock_task.user_id = "test-user-789"
-            mock_task.last_executed = None
-            mock_task.last_success = None
-            mock_task.next_execution = None
-            mock_task.status = "failed"
-            mock_task.failure_reason = "Database connection failed"
-            
-            mock_session = Mock()
-            mock_session.query.return_value.filter.return_value.first.return_value = mock_task
-            mock_session.close = Mock()
-            mock_get_session.return_value = mock_session
-            
-            with patch('backend.api.onboarding_utils.endpoints_tasks.get_tasks_status', AsyncMock()) as mock_get_tasks:
-                mock_get_tasks.return_value = {
-                    "tasks": {
-                        "full_site_seo_audit": {
-                            "status": "failed",
-                            "started_at": None,
-                            "progress_pct": 0,
-                            "details": None,
-                        }
-                    },
-                    "total": 1,
-                    "completed_count": 0,
-                    "failed_count": 1,
-                    "all_done": True,
-                }
-                
-                from backend.api.onboarding_utils.endpoints_tasks import get_tasks_status
-                result = await get_tasks_status(mock_user)
-            
-            assert result["all_done"] == True
-            assert result["completed_count"] == 0
-            assert result["failed_count"] == 1
-            assert result["tasks"]["full_site_seo_audit"]["status"] == "failed"
+    Simulates basic WHERE semantics: a ``column == value`` filter clause is
+    checked against the row (when the row has that attribute), and a row that
+    does not satisfy the filter is treated as not found — mirroring what the
+    real database would return.
+    """
 
-    async def test_onboarding_summary_error_handling(self):
-        """Test error handling when database connection fails."""
-        mock_user = {"id": "test-user-error"}
-        
-        with patch('backend.api.onboarding_utils.endpoints_tasks.get_session_for_user') as mock_get_session:
-            mock_get_session.return_value = None
-            
-            with patch('backend.api.onboarding_utils.endpoints_tasks.get_tasks_status', AsyncMock()) as mock_get_tasks:
-                mock_get_tasks.return_value = {"error": "Database connection failed"}
-                
-                from backend.api.onboarding_utils.endpoints_tasks import get_tasks_status
-                result = await get_tasks_status(mock_user)
-            
-            assert "error" in result
-            assert result["error"] == "Database connection failed"
+    def _matches(row, filter_args):
+        for f in filter_args:
+            right = getattr(f, "right", None)
+            val = getattr(right, "value", None)
+            col = getattr(getattr(f, "left", None), "key", None)
+            if col and val is not None and hasattr(row, col):
+                if getattr(row, col) != val:
+                    return False
+        return True
 
-    async def test_onboarding_summary_consistency(self):
-        """Test that all_done calculation is consistent."""
-        mock_user = {"id": "test-user-consistency"}
-        
-        with patch('backend.api.onboarding_utils.endpoints_tasks.get_session_for_user') as mock_get_session:
-            mock_db = Mock()
-            mock_get_session.return_value = mock_db
-            
-            mock_session = Mock()
-            mock_session.query.return_value.filter.return_value.first.return_value = None
-            mock_session.close = Mock()
-            mock_get_session.return_value = mock_session
-            
-            with patch('backend.api.onboarding_utils.endpoints_tasks.get_tasks_status', AsyncMock()) as mock_get_tasks:
-                mock_get_tasks.return_value = {
-                    "tasks": {},
-                    "total": 0,
-                    "completed_count": 0,
-                    "failed_count": 0,
-                    "all_done": False,
-                }
-                
-                from backend.api.onboarding_utils.endpoints_tasks import get_tasks_status
-                result = await get_tasks_status(mock_user)
-                
-                # Should be False because no tasks
-                assert result["all_done"] == False
-                assert result["completed_count"] == 0
-                assert result["failed_count"] == 0
+    def _query(model):
+        chain = SimpleNamespace()
+        if model in TASK_MODELS:
+            row = _task(task_status)
+        elif model is SIFIndexingExecutionLog:
+            row = None  # no execution log
+        elif model is StrategyActivationStatus:
+            row = activation_row
+        else:
+            row = None
 
-    # Pytest wrapper to run async tests
-    def run_async_test(test_method):
-        async def wrapper(*args, **kwargs):
-            return await test_method(*args, **kwargs)
-        return wrapper
+        def _filter(*fargs, **fkwargs):
+            visible = row if (row is None or _matches(row, fargs)) else None
+            return SimpleNamespace(
+                order_by=lambda *a, **k: SimpleNamespace(first=lambda: visible),
+                first=lambda: visible,
+            )
 
-    test_onboarding_summary_status_not_completed = pytest.mark.asyncio(run_async_test(test_onboarding_summary_status_not_completed))
-    test_onboarding_summary_status_all_completed = pytest.mark.asyncio(run_async_test(test_onboarding_summary_status_all_completed))
-    test_onboarding_summary_status_all_failed = pytest.mark.asyncio(run_async_test(test_onboarding_summary_status_all_failed))
-    test_onboarding_summary_error_handling = pytest.mark.asyncio(run_async_test(test_onboarding_summary_error_handling))
-    test_onboarding_summary_consistency = pytest.mark.asyncio(run_async_test(test_onboarding_summary_consistency))
+        chain.filter = _filter
+        chain.first = lambda: row
+        return chain
+
+    db = SimpleNamespace(query=_query, close=lambda: None)
+    return db
+
+
+def _run(user_id="123", db=None):
+    with patch(
+        "api.onboarding_utils.endpoints_tasks.get_session_for_user",
+        return_value=db,
+    ):
+        return asyncio.run(get_tasks_status({"id": user_id}))
+
+
+# ============================================================
+# Endpoint contract
+# ============================================================
+
+def test_no_db_session_returns_error():
+    result = _run(db=None)
+    assert result == {"error": "Database connection failed"}
+
+
+def test_no_tasks_all_pending_not_complete():
+    """A brand-new user: all 6 tasks pending, nothing complete."""
+    result = _run(db=_fake_db())
+
+    assert result["total"] == 6
+    assert result["completed_count"] == 0
+    assert result["failed_count"] == 0
+    assert result["all_done"] is False
+    assert result["has_completed_onboarding"] is False
+    assert result["has_active_strategy"] is False
+    assert result["onboarding_data_available"] is True
+    for key in TASK_MODELS.values():
+        assert result["tasks"][key]["status"] == "pending"
+
+
+# ============================================================
+# has_completed_onboarding: critical tasks vs all_done
+# ============================================================
+
+def test_critical_tasks_done_but_recurring_pending():
+    """The 3 critical tasks completed but recurring ones pending:
+    onboarding counts as complete (strategy data available) while
+    all_done stays False (background polling continues)."""
+    db = _fake_db()
+    real_query = db.query
+
+    critical_models = [
+        OnboardingFullWebsiteAnalysisTask,
+        DeepCompetitorAnalysisTask,
+        SIFIndexingTask,
+    ]
+
+    def _query(model):
+        if model in critical_models:
+            return _chain_for(_task("completed"))
+        return real_query(model)
+
+    db.query = _query
+    result = _run(db=db)
+
+    assert result["has_completed_onboarding"] is True
+    assert result["all_done"] is False
+    assert result["completed_count"] == 3
+
+
+def test_all_tasks_completed_flags_all_true():
+    db = _fake_db(task_status="completed")
+    result = _run(db=db)
+
+    assert result["completed_count"] == 6
+    assert result["all_done"] is True
+    assert result["has_completed_onboarding"] is True
+
+
+def test_failed_task_counts_toward_all_done():
+    """A failed task is terminal: all_done True, failed_count 1, and the
+    critical-task check still sees completed only for non-failed."""
+    db = _fake_db(task_status="completed")
+    real_query = db.query
+
+    def _query(model):
+        if model is DeepCompetitorAnalysisTask:
+            return _chain_for(_task("failed"))
+        return real_query(model)
+
+    db.query = _query
+    result = _run(db=db)
+
+    assert result["failed_count"] == 1
+    assert result["all_done"] is True
+    # competitor analysis is critical and failed → not completed → flags False
+    assert result["has_completed_onboarding"] is False
+
+
+def _chain_for(row):
+    return SimpleNamespace(
+        filter=lambda *a, **k: SimpleNamespace(
+            order_by=lambda *a, **k: SimpleNamespace(first=lambda: row)
+        ),
+        first=lambda: row,
+    )
+
+
+# ============================================================
+# has_active_strategy: real StrategyActivationStatus query
+# ============================================================
+
+def test_active_strategy_detected():
+    db = _fake_db(task_status="completed", activation_row=SimpleNamespace(status="active"))
+    result = _run(db=db)
+    assert result["has_active_strategy"] is True
+
+
+def test_inactive_or_paused_strategy_not_detected():
+    db = _fake_db(task_status="completed", activation_row=SimpleNamespace(status="inactive"))
+    result = _run(db=db)
+    assert result["has_active_strategy"] is False
+
+
+def test_activation_check_failure_degrades_to_false():
+    """DB hiccup on the activation query must not break the endpoint."""
+
+    def _boom(model):
+        if model is StrategyActivationStatus:
+            raise RuntimeError("db down")
+        return _chain_for(_task("completed") if model in TASK_MODELS else None)
+
+    db = SimpleNamespace(query=_boom, close=lambda: None)
+    result = _run(db=db)
+
+    assert result["has_active_strategy"] is False
+    assert result["all_done"] is True  # rest of the payload still intact
+
+
+def test_non_numeric_user_id_degrades_to_false():
+    """StrategyActivationStatus.user_id is an Integer; a non-numeric id
+    must degrade to False, not crash."""
+    db = _fake_db(task_status="completed", activation_row=SimpleNamespace(status="active"))
+    result = _run(user_id="clerk_nonnumeric", db=db)
+    assert result["has_active_strategy"] is False
+    # Task tables (String user_id) still resolve fine
+    assert result["completed_count"] == 6

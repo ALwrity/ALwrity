@@ -89,7 +89,6 @@ import AskAlwrityIcon from '../../assets/images/AskAlwrity-min.ico';
 import { SubscriptionGuard } from '../SubscriptionGuard';
 import { apiClient } from '../../api/client';
 import { useOnboardingTasksStatus } from '../../hooks/useOnboardingTasksStatus';
-import { useOnboardingCompletion } from '../../utils/useOnboardingCompletion';
 
 // Shared components
 import DashboardHeader from '../shared/DashboardHeader';
@@ -244,10 +243,13 @@ const MainDashboard: React.FC = () => {
   // Onboarding background tasks status (shared React Query poller)
   const { data: onboardingTasks, isError: onboardingTasksError } = useOnboardingTasksStatus();
   const [showOnboardingStatus, setShowOnboardingStatus] = React.useState(true);
-  
-  // Onboarding completion CTA state - show when onboarding complete and no active strategy
-  const { hasCompletedOnboarding, hasActiveStrategy, loading: onboardingCompletionLoading } = useOnboardingCompletion();
-  const [showStrategyCTA, setShowStrategyCTA] = React.useState(true);
+
+  // Onboarding completion CTA - derived from the SAME poller (single fetch,
+  // no duplicate polling). Flags come from the backend status payload.
+  const hasCompletedOnboarding = onboardingTasks?.has_completed_onboarding ?? false;
+  const hasActiveStrategy = onboardingTasks?.has_active_strategy ?? false;
+  const [ctaDismissed, setCtaDismissed] = React.useState(false);
+  const showStrategyCTA = hasCompletedOnboarding && !hasActiveStrategy && !ctaDismissed;
 
   // State to track if we need to start a newly generated workflow
   const [shouldStartWorkflow, setShouldStartWorkflow] = React.useState(false);
@@ -526,14 +528,16 @@ const MainDashboard: React.FC = () => {
             )}
 
             {/* Onboarding completion CTA - show when onboarding is complete and no strategy exists */}
-            {showStrategyCTA && !onboardingCompletionLoading && (
+            {showStrategyCTA && (
               <OnboardingCompletionCTA
                 hasCompletedOnboarding={hasCompletedOnboarding}
                 hasActiveStrategy={hasActiveStrategy}
                 onCreateStrategy={() => {
-                  navigate('/content-planning', { state: { activeTab: 4 } });
+                  // fromOnboarding lets the strategy builder prefill from
+                  // onboarding data (see utils/strategyPrefill.ts).
+                  navigate('/content-planning', { state: { activeTab: 4, fromOnboarding: true } });
                 }}
-                onDismiss={() => setShowStrategyCTA(false)}
+                onDismiss={() => setCtaDismissed(true)}
               />
             )}
 

@@ -14,6 +14,35 @@ from models.advertools_monitoring_models import AdvertoolsTask
 from .task_status import derive_ui_status
 
 
+def _has_active_strategy(db, user_id: str) -> bool:
+    """Return True when the user has a strategy whose activation status is 'active'.
+
+    Checked against ``StrategyActivationStatus`` (monitoring_models), which is
+    the single source of truth for strategy activation. Defensive: any failure
+    (missing table, DB hiccup, non-numeric user id) degrades to False so the
+    tasks-status endpoint never breaks because of this extra check.
+    """
+    try:
+        from models.monitoring_models import StrategyActivationStatus
+        uid = int(user_id)
+    except (ImportError, ValueError, TypeError):
+        return False
+
+    try:
+        row = (
+            db.query(StrategyActivationStatus)
+            .filter(
+                StrategyActivationStatus.user_id == uid,
+                StrategyActivationStatus.status == "active",
+            )
+            .first()
+        )
+        return row is not None
+    except Exception as e:
+        logger.warning(f"[tasks_status] active-strategy check failed for user {user_id}: {e}")
+        return False
+
+
 async def get_tasks_status(current_user: dict) -> Dict[str, Any]:
     user_id = str(current_user.get("id"))
     db = get_session_for_user(user_id)
@@ -151,7 +180,7 @@ async def get_tasks_status(current_user: dict) -> Dict[str, Any]:
             "failed_count": failed_count,
             "all_done": all_done,           # Legacy: any/all tasks done
             "has_completed_onboarding": onboarding_complete,  # NEW: critical tasks complete
-            "has_active_strategy": False, # NEW: determined by frontend checks
+            "has_active_strategy": _has_active_strategy(db, user_id),  # NEW: real activation query
             "onboarding_data_available": True,  # NEW: data exists for strategy generation
         }
     finally:
