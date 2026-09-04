@@ -31,8 +31,7 @@ const AIInsightsPanel: React.FC = () => {
     aiRecommendations, 
     loading, 
     error,
-    loadAIInsights,
-    loadAIRecommendations
+    loadAIInsights
   } = useContentPlanningStore();
   
   const [expandedInsights, setExpandedInsights] = useState<Set<string>>(new Set());
@@ -46,11 +45,8 @@ const AIInsightsPanel: React.FC = () => {
     try {
       setDataLoading(true);
       
-      // Load AI insights and recommendations
-      await Promise.all([
-        loadAIInsights(),
-        loadAIRecommendations()
-      ]);
+      // Load AI insights (also fetches recommendations from same endpoint)
+      await loadAIInsights();
     } catch (error) {
       console.error('Error loading AI data:', error);
     } finally {
@@ -73,10 +69,7 @@ const AIInsightsPanel: React.FC = () => {
       ]);
       
       // Reload data from store
-      await Promise.all([
-        loadAIInsights(),
-        loadAIRecommendations()
-      ]);
+      await loadAIInsights();
     } catch (error) {
       console.error('Error force refreshing AI data:', error);
     } finally {

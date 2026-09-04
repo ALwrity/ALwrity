@@ -7,6 +7,8 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from loguru import logger
 from sqlalchemy.orm import Session
+import asyncio
+import random
 import time
 
 # Import database service
@@ -410,23 +412,32 @@ class CalendarGenerationService:
             return False
     
     def _cleanup_old_sessions(self, user_id: str) -> None:
-        """Clean up old sessions for a user."""
+        """Clean up old sessions across ALL users.
+
+        Phase 2 fix: previously only cleaned sessions for the requesting
+        user, so sessions from other users accumulated forever.
+        """
         try:
             current_time = datetime.now()
             sessions_to_remove = []
             
             # Collect sessions to remove first, then remove them
             for session_id, session_data in self.orchestrator_sessions.items():
-                if session_data.get("user_id") == user_id:
-                    start_time = session_data.get("start_time")
-                    if start_time:
-                        # Remove sessions older than 1 hour
-                        if (current_time - start_time).total_seconds() > 3600:  # 1 hour
-                            sessions_to_remove.append(session_id)
-                        # Also remove completed/error sessions older than 10 minutes
-                        elif session_data.get("status") in ["completed", "error", "cancelled"]:
-                            if (current_time - start_time).total_seconds() > 600:  # 10 minutes
-                                sessions_to_remove.append(session_id)
+                start_time = session_data.get("start_time")
+                if not start_time:
+                    continue
+
+                age_seconds = (current_time - start_time).total_seconds()
+
+                # Remove sessions older than 1 hour regardless of user
+                if age_seconds > 3600:
+                    sessions_to_remove.append(session_id)
+                    continue
+
+                # Also remove completed/error/cancelled sessions older than 10 minutes
+                if session_data.get("status") in ("completed", "error", "cancelled"):
+                    if age_seconds > 600:  # 10 minutes
+                        sessions_to_remove.append(session_id)
             
             # Remove the sessions
             for session_id in sessions_to_remove:
