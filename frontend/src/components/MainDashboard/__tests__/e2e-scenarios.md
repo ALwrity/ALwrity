@@ -77,6 +77,34 @@ AND the Strategy tab should be active (tab index 4)
 3. Verify URL is `/content-planning`
 4. Verify Strategy tab is selected
 
+### Scenario 6: Strategy activation auto-starts calendar generation (Phase 4)
+```gherkin
+GIVEN the user has activated a content strategy
+WHEN the app navigates to the Content Planning dashboard (Create tab)
+THEN the Calendar Generation Wizard should auto-start the 12-step generation
+AND the generation progress modal should appear
+AND generation should fire exactly once (no double-fire on re-render)
+```
+
+**Implementation Steps:**
+1. Activate a strategy (mock `handleStrategyActivationSuccess`)
+2. Verify navigation state contains `fromStrategyActivation: true`, `autoGenerate: true`, `strategyId`
+3. Verify CalendarGenerationWizard auto-triggers generation once
+4. Re-render the wizard and verify no second generation fires
+
+### Scenario 7: Calendar auto-start opt-out
+```gherkin
+GIVEN the user activated a strategy with autoGenerate: false in preferences
+WHEN the Calendar Generation Wizard loads
+THEN generation should NOT auto-start
+AND the user should land on the wizard's first step to configure manually
+```
+
+**Implementation Steps:**
+1. Activate strategy with `userPreferences.autoGenerateCalendar: false`
+2. Verify wizard stays on step 0
+3. Verify no generation API call is made
+
 ## Test Data Requirements
 
 - User account with completed onboarding

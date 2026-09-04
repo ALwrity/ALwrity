@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { buildStrategyActivationNavigationState } from '../utils/calendarAutoStart';
 
 export interface StrategyContext {
   strategyId: string;
@@ -77,8 +78,14 @@ class NavigationOrchestrator {
     // Navigate to calendar wizard with context
     const navigate = this.getNavigateFunction();
     if (navigate) {
+      // Phase 4: use the shared helper so the nav state shape matches what
+      // useCalendarAutoStart consumes (strategyId + autoGenerate opt-out).
+      const calendarNavState = buildStrategyActivationNavigationState(strategyId, {
+        autoGenerate: strategyContext.userPreferences?.autoGenerateCalendar !== false,
+      });
       navigate('/content-planning', { 
         state: { 
+          ...calendarNavState,
           activeTab: 4, // Create tab (where Calendar Wizard is located)
           strategyContext,
           fromStrategyActivation: true
