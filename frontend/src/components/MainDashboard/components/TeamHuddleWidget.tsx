@@ -14,10 +14,14 @@ import {
   AccordionSummary,
   AccordionDetails,
   Stack,
+  Button,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import { useNavigate } from 'react-router-dom';
 import { useAgentHuddleFeed } from '../../../hooks/useAgentHuddleFeed';
+import { buildHuddleTimeline } from '../../../utils/huddleTimeline';
 
 type EventPayload = {
   phase?: string | null;
@@ -32,24 +36,14 @@ type EventPayload = {
   metadata?: Record<string, unknown>;
 };
 
+const TEAM_ACTIVITY_ROUTE = '/team-activity';
+
 const TeamHuddleWidget: React.FC = () => {
+  const navigate = useNavigate();
   const { runs, events, connectionMode } = useAgentHuddleFeed({ detailTier: 'detailed' });
 
-  // Group events by run_id for the UI
-  const timeline = useMemo(() => {
-    // Only take top 5 runs
-    const topRuns = runs.slice(0, 5);
-    return topRuns.map(run => {
-      // Find events for this run
-      const runEvents = events
-        .filter(e => e.run_id === run.id)
-        .map(e => ({
-          ...e,
-          payload: (e.payload || {}) as EventPayload
-        }));
-      return { run, events: runEvents };
-    });
-  }, [runs, events]);
+  // Group events by run_id and attach a run outcome line for the UI.
+  const timeline = useMemo(() => buildHuddleTimeline(runs, events), [runs, events]);
 
   const loading = connectionMode === 'connecting' && runs.length === 0;
 
@@ -65,6 +59,14 @@ const TeamHuddleWidget: React.FC = () => {
             sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700 }} 
           />
         </Box>
+        <Button
+          size="small"
+          variant="text"
+          onClick={() => navigate(TEAM_ACTIVITY_ROUTE)}
+          startIcon={<OpenInNewIcon />}
+        >
+          View all
+        </Button>
       </Box>
 
       {loading && (
@@ -79,7 +81,7 @@ const TeamHuddleWidget: React.FC = () => {
 
       {!loading && timeline.length > 0 && (
         <List disablePadding>
-          {timeline.map(({ run, events }, index) => (
+          {timeline.map(({ run, events, outcome }, index) => (
             <React.Fragment key={run.id}>
               {index > 0 && <Divider sx={{ my: 1 }} />}
               <ListItem disableGutters sx={{ display: 'block' }}>
@@ -91,8 +93,20 @@ const TeamHuddleWidget: React.FC = () => {
                   </Typography>
                 </Stack>
 
+                {outcome.title && (
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      mb: 0.75,
+                      color: outcome.kind === 'failed' ? 'error.main' : (outcome.kind === 'completed' ? 'success.dark' : 'text.secondary'),
+                    }}
+                  >
+                    {outcome.title}
+                  </Typography>
+                )}
+
                 {events.map((event) => {
-                  const payload = event.payload || {};
+                  const payload = (event.payload || {}) as EventPayload;
                   return (
                     <Accordion key={event.id} disableGutters elevation={0} sx={{ border: '1px solid #e5e7eb', mb: 1 }}>
                       <AccordionSummary expandIcon={<ExpandMoreIcon />}>

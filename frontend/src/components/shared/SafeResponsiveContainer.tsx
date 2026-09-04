@@ -8,15 +8,18 @@ interface SafeResponsiveContainerProps extends Omit<ResponsiveContainerProps, 'c
 }
 
 /**
- * SafeResponsiveContainer - drop-in wrapper around recharts' ResponsiveContainer
- * that only mounts the chart once its container is actually measurable.
+ * SafeResponsiveContainer - drop-in wrapper around recharts' ResponsiveContainer.
  *
- * Why: charts rendered inside AnimatePresence transitions (e.g. billing
- * dashboard card switches) have a parent that collapses to width/height -1
- * during exit animations, and recharts logs
- * "The width(-1) and height(-1) of chart should be greater than 0" on every
- * frame. This wrapper hides the chart until the wrapper box has a real size,
- * then mounts ResponsiveContainer with 100%/100% against the sized box.
+ * RCA of the recharts warning "The width(-1) and height(-1) of chart should be
+ * greater than 0": recharts 3.x seeds its measured-size state from the
+ * `initialDimension` prop, which defaults to { width: -1, height: -1 }. Every
+ * ResponsiveContainer therefore warns once on its first render, before its own
+ * ResizeObserver reports the real box size. The warning is pure noise for
+ * charts that mount/unmount frequently (e.g. AnimatePresence view switches).
+ *
+ * Fix: measure our own box first and only mount ResponsiveContainer once the
+ * box is measurable, passing the real measured size as `initialDimension` so
+ * recharts' first render already has positive dimensions.
  *
  * Props are forwarded 1:1 to ResponsiveContainer.
  */
@@ -27,72 +30,59 @@ export const SafeResponsiveContainer: React.FC<SafeResponsiveContainerProps> = (
   ...rest
 }) => {
   const boxRef = React.useRef<HTMLDivElement | null>(null);
-  const [hasSize, setHasSize] = React.useState(false);
+  const [size, setSize] = React.useState<{ w: number; h: number } | null>(null);
 
   React.useEffect(() => {
     const el = boxRef.current;
-    if (!el) return;
-
-    // If we have explicit numeric dimensions, we can render immediately
-    const numericWidth = typeof width === 'number' ? width : 0;
-    const numericHeight = typeof height === 'number' ? height : 0;
-    
-    if (numericWidth > 0 && numericHeight > 0) {
-      setHasSize(true);
-      return;
-    }
-
-    // Otherwise use ResizeObserver to wait for container to get size
-    if (typeof ResizeObserver === 'undefined') return;
-    
+    if (!el || typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const w = entry.contentRect.width;
-        const h = entry.contentRect.height;
+      const entry = entries[0];
+      const w = Math.round(entry?.contentRect?.width ?? 0);
+      const h = Math.round(entry?.contentRect?.height ?? 0);
+      setSize((prev) => {
         if (w > 0 && h > 0) {
-          setHasSize(true);
-          observer.disconnect();
-          return;
+          return prev && prev.w === w && prev.h === h ? prev : { w, h };
         }
-      }
+        // Collapsed (e.g. parent exit animation): keep last known size.
+        return prev;
+      });
     });
-    
     observer.observe(el);
     return () => observer.disconnect();
-  }, [width, height]);
+  }, []);
 
-  // Determine container style
-  const containerWidth = typeof width === 'number' ? `${width}px` : width;
-  const containerHeight = typeof height === 'number' ? `${height}px` : height;
+  // Explicit numeric width AND height: no measurement needed.
+  const numericWidth = typeof width === 'number' ? width : 0;
+  const numericHeight = typeof height === 'number' ? height : 0;
+  const hasFullNumericSize = numericWidth > 0 && numericHeight > 0;
 
-  // Don't render ResponsiveContainer until we have valid dimensions
-  if (!hasSize) {
-    return (
-      <div
-        ref={boxRef}
-        style={{
-          width: containerWidth,
-          height: containerHeight,
-          minWidth: 1,
-          minHeight: 1,
-        }}
-      />
-    );
-  }
+  // Recharts requires positive initialDimension or it warns on first render.
+  const initialDimension = hasFullNumericSize
+    ? { width: numericWidth, height: numericHeight }
+    : size
+      ? { width: size.w, height: size.h }
+      : { width: 1, height: 1 };
+
+  const shouldRenderChart = hasFullNumericSize || size !== null;
 
   return (
     <div
       ref={boxRef}
       style={{
-        width: containerWidth,
-        height: containerHeight,
-        minWidth: 1,
-        minHeight: 1,
+        width: typeof width === 'number' ? `${width}px` : width,
+        height: typeof height === 'number' ? `${height}px` : height,
       }}
     >
-      <ResponsiveContainer width="100%" height="100%" {...rest}>
-        {children}
-      </ResponsiveContainer>
+      {shouldRenderChart ? (
+        <ResponsiveContainer
+          width="100%"
+          height="100%"
+          initialDimension={initialDimension}
+          {...rest}
+        >
+          {children}
+        </ResponsiveContainer>
+      ) : null}
     </div>
   );
 };
