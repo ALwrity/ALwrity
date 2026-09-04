@@ -1,7 +1,12 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { YouTubeActionModal } from "../YouTubeActionModal";
 import { youtubeStudioApi } from "../../../../services/youtubeStudioApi";
-import { youtubeCommentVideoHeading } from "../youtubeCommentVideoHeading";
+import { YouTubeCommentInboxRow } from "../YouTubeCommentInboxRow";
+import { YouTubeCommentVideoGroup } from "../YouTubeCommentVideoGroup";
+import {
+  groupYouTubeInboxCommentsByVideo,
+  type YouTubeInboxComment,
+} from "../youtubeCommentVideoGroups";
 import type { PhaseModalSharedProps } from "./phaseModalTypes";
 import {
   YOUTUBE_WEDGE_MODAL_MAX_WIDTH,
@@ -16,11 +21,17 @@ export const CommentAssistantModal: React.FC<
   }
 > = ({ open, onClose, niche, shell }) => {
   const [loading, setLoading] = useState(false);
-  const [comments, setComments] = useState<any[]>([]);
+  const [comments, setComments] = useState<YouTubeInboxComment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
+
+  const videoGroups = useMemo(
+    () => groupYouTubeInboxCommentsByVideo(comments),
+    [comments],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -34,10 +45,18 @@ export const CommentAssistantModal: React.FC<
         });
         setError(res.message || "Could not load comments. Please try again.");
         setComments([]);
+      } else if (!Array.isArray(res.comments)) {
+        console.warn("[YouTubeCommentAssistant] Inbox unsuccessful", {
+          commentsIsArray: false,
+        });
+        setError("Could not load comments. Please try again.");
+        setComments([]);
       } else {
-        const next = res.comments || [];
+        const next = res.comments;
+        const groups = groupYouTubeInboxCommentsByVideo(next);
         console.info("[YouTubeCommentAssistant] Inbox load complete", {
           commentCount: next.length,
+          groupCount: groups.length,
         });
         setComments(next);
       }
@@ -52,11 +71,17 @@ export const CommentAssistantModal: React.FC<
     }
   }, []);
 
+  const firstGroupKey = videoGroups[0]?.key ?? null;
+
   useEffect(() => {
     if (open) void load();
   }, [open, load]);
 
-  const draft = async (c: any) => {
+  useEffect(() => {
+    setExpandedGroupKey(firstGroupKey);
+  }, [comments, firstGroupKey]);
+
+  const draft = async (c: YouTubeInboxComment) => {
     setBusyId(c.comment_id);
     setStatus(null);
     try {
@@ -90,7 +115,7 @@ export const CommentAssistantModal: React.FC<
     }
   };
 
-  const send = async (c: any) => {
+  const send = async (c: YouTubeInboxComment) => {
     const text = drafts[c.comment_id]?.trim();
     if (!text) return;
     setBusyId(c.comment_id);
@@ -141,41 +166,30 @@ export const CommentAssistantModal: React.FC<
       {error && <p className="yt-modal-intro">{error}</p>}
       {status && <p className="yt-modal-intro">{status}</p>}
       <div className="yt-comment-list">
-        {comments.map((c) => (
-          <div key={c.comment_id} className="yt-comment-inbox-card">
-            <div className="yt-comment-video-heading">
-              {youtubeCommentVideoHeading(c)}
-            </div>
-            <div className="yt-comment-author">{c.author}</div>
-            <div className="yt-comment-body">{c.text}</div>
-            <textarea
-              className="yt-comment-draft"
-              value={drafts[c.comment_id] || ""}
-              onChange={(e) =>
-                setDrafts((prev) => ({ ...prev, [c.comment_id]: e.target.value }))
-              }
-              rows={2}
-              placeholder="Draft reply…"
-            />
-            <div className="yt-comment-actions">
-              <button
-                type="button"
-                className="yt-rail-btn"
-                disabled={busyId === c.comment_id}
-                onClick={() => void draft(c)}
-              >
-                Draft with AI
-              </button>
-              <button
-                type="button"
-                className="yt-rail-btn yt-rail-btn--primary"
-                disabled={busyId === c.comment_id || !drafts[c.comment_id]?.trim()}
-                onClick={() => void send(c)}
-              >
-                Send (HITL)
-              </button>
-            </div>
-          </div>
+        {videoGroups.map((group) => (
+          <YouTubeCommentVideoGroup
+            key={group.key}
+            heading={group.heading}
+            commentCount={group.comments.length}
+            expanded={expandedGroupKey === group.key}
+            onToggle={() =>
+              setExpandedGroupKey((prev) => (prev === group.key ? null : group.key))
+            }
+          >
+            {group.comments.map((c, rowIndex) => (
+              <YouTubeCommentInboxRow
+                key={c.comment_id || `${group.key}-${rowIndex}`}
+                comment={c}
+                draftText={drafts[c.comment_id || ""] || ""}
+                busy={busyId === c.comment_id}
+                onDraftChange={(value) =>
+                  setDrafts((prev) => ({ ...prev, [c.comment_id || ""]: value }))
+                }
+                onDraft={() => void draft(c)}
+                onSend={() => void send(c)}
+              />
+            ))}
+          </YouTubeCommentVideoGroup>
         ))}
         {!loading && comments.length === 0 && !error && (
           <p className="yt-modal-intro">No recent comments found.</p>

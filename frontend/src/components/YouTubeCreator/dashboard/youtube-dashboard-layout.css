@@ -596,6 +596,75 @@ body.youtube-studio-view #root {
   gap: 12px;
 }
 
+.yt-comment-video-group {
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.yt-comment-video-group-header {
+  width: 100%;
+  margin: 0;
+  padding: 12px;
+  border: none;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.yt-comment-video-group-header:hover {
+  background: #fafafa;
+}
+
+.yt-comment-video-group-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.yt-comment-video-group-kicker {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #606060;
+}
+
+.yt-comment-video-group-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.yt-comment-video-group-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ff0000;
+  background: #fff5f5;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.yt-comment-video-group-chevron {
+  font-size: 0.8125rem;
+  color: #606060;
+}
+
+.yt-comment-video-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 12px 12px;
+  border-top: 1px solid #e5e5e5;
+}
+
+.yt-comment-video-group-body .yt-comment-inbox-card {
+  border: 1px solid #e5e5e5;
+}
+
 .yt-comment-inbox-card {
   border: 1px solid #e5e5e5;
   border-radius: 12px;
