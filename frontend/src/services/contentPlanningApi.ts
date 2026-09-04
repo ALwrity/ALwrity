@@ -443,9 +443,7 @@ class ContentPlanningAPI {
   async getAIAnalyticsWithRetry(userId?: number, maxRetries: number = 2): Promise<any> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const response = await apiClient.get(`${this.baseURL}/ai-analytics/`, { 
-          params: { user_id: userId || 1 }
-        });
+        const response = await apiClient.get(`${this.baseURL}/ai-analytics/`);
         return response.data;
       } catch (error: any) {
         if (error.response?.status === 429 && attempt < maxRetries) {
@@ -463,7 +461,7 @@ class ContentPlanningAPI {
   // AI Analytics with force refresh option
   async getAIAnalyticsWithRefresh(userId?: number, forceRefresh = false): Promise<any> {
     try {
-      const params: any = { user_id: userId || 1 };
+      const params: any = {};
       if (forceRefresh) {
         params.force_refresh = true;
       }
@@ -477,7 +475,7 @@ class ContentPlanningAPI {
 
   async getGapAnalysesWithRefresh(userId?: number, forceRefresh = false): Promise<any> {
     try {
-      const params: any = { user_id: userId || 1 };
+      const params: any = {};
       if (forceRefresh) {
         params.force_refresh = true;
       }
@@ -701,7 +699,8 @@ class ContentPlanningAPI {
     }
     
     // EventSource doesn't support custom headers, so we pass token as query parameter
-    const url = `${this.baseURL}/enhanced-strategies/stream/strategic-intelligence?user_id=${userId || 1}&token=${encodeURIComponent(token)}`;
+    // Backend uses JWT auth (Depends(get_current_user)), not the user_id query param.
+    const url = `${this.baseURL}/enhanced-strategies/stream/strategic-intelligence?token=${encodeURIComponent(token)}`;
     return new EventSource(url);
   }
 
@@ -725,11 +724,86 @@ class ContentPlanningAPI {
 
     eventSource.onerror = (error) => {
       console.error('SSE Error:', error);
+      // Phase 5: Don't immediately close - let the caller handle reconnection
+      // The orchestrator's hard timeout will prevent indefinite hanging
       onError?.(error);
-      eventSource.close();
+      // Note: Connection will be closed by the orchestrator's cleanup or hard timeout
     };
 
     return eventSource;
+  }
+
+  // Phase 5: SSE with automatic reconnection
+  async createEventSourceWithReconnect(
+    url: string,
+    options: {
+      maxRetries?: number;
+      baseDelay?: number;
+      onMessage: (data: any) => void;
+      onError?: (error: any) => void;
+      onComplete?: () => void;
+    }
+  ): Promise<{ eventSource: EventSource; cleanup: () => void }> {
+    const { maxRetries = 3, baseDelay = 1000, onMessage, onError, onComplete } = options;
+    let retryCount = 0;
+    let eventSource: EventSource | null = null;
+    let isCleanedUp = false;
+
+    const connect = (): EventSource => {
+      const es = new EventSource(url);
+      
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          onMessage(data);
+          
+          if (data.type === 'result' || data.type === 'error') {
+            es.close();
+            onComplete?.();
+          }
+        } catch (error) {
+          console.error('Error parsing SSE data:', error);
+          onError?.(error);
+        }
+      };
+
+      es.onerror = (error) => {
+        console.error(`SSE Error (attempt ${retryCount + 1}/${maxRetries + 1}):`, error);
+        
+        if (isCleanedUp) {
+          return;
+        }
+
+        if (retryCount < maxRetries) {
+          retryCount++;
+          const delay = baseDelay * Math.pow(2, retryCount - 1);
+          console.log(`Reconnecting in ${delay}ms...`);
+          setTimeout(() => {
+            if (!isCleanedUp) {
+              eventSource = connect();
+            }
+          }, delay);
+        } else {
+          console.error('Max SSE reconnection attempts reached');
+          onError?.(error);
+          es.close();
+        }
+      };
+
+      return es;
+    };
+
+    eventSource = connect();
+
+    return {
+      eventSource,
+      cleanup: () => {
+        isCleanedUp = true;
+        if (eventSource) {
+          eventSource.close();
+        }
+      }
+    };
   }
 
   // Polling and Status Methods
@@ -888,7 +962,8 @@ class ContentPlanningAPI {
     }
     
     // EventSource doesn't support custom headers, so we pass token as query parameter
-    const url = `${this.baseURL}/enhanced-strategies/stream/keyword-research?user_id=${userId || 1}&token=${encodeURIComponent(token)}`;
+    // Backend uses JWT auth (Depends(get_current_user)), not the user_id query param.
+    const url = `${this.baseURL}/enhanced-strategies/stream/keyword-research?token=${encodeURIComponent(token)}`;
     return new EventSource(url);
   }
 

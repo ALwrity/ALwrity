@@ -2,9 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { contentPlanningApi } from '../services/contentPlanningApi';
 
-// Global flag to prevent multiple simultaneous auto-population calls
-let isAutoPopulating = false;
-
 // Helper function to detect generic placeholder values
 const isGenericPlaceholder = (fieldId: string, value: any): boolean => {
   if (!value) return false;
@@ -675,26 +672,19 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
   
   // Auto-Population Actions
   autofillStrategyFields: async () => {
-    if (isAutoPopulating) {
-      console.log('⏸️ Autofill skipped - already running globally');
+    // Phase 5 fix: use store loading state instead of module-level variable
+    if (get().loading) {
+      console.log('⏸️ Autofill skipped - already loading');
       return;
     }
 
-    isAutoPopulating = true;
+    if (get().autoPopulationBlocked) {
+      console.log('⏸️ Autofill skipped - blocked due to previous errors');
+      return;
+    }
 
-    try {
-      if (get().loading) {
-        console.log('⏸️ Autofill skipped - already loading');
-        return;
-      }
-
-      if (get().autoPopulationBlocked) {
-        console.log('⏸️ Autofill skipped - blocked due to previous errors');
-        return;
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 500));
-      set({ loading: true, error: null });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    set({ loading: true, error: null });
 
       console.log('🚀 Starting autofill...');
       const response = await contentPlanningApi.autofill();
@@ -787,23 +777,16 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
         error: error.message || 'Autofill failed. Please try again.',
         autoPopulationBlocked: true,
       });
-    } finally {
-      isAutoPopulating = false;
     }
   },
 
   regenerateAIFields: async () => {
-    if (isAutoPopulating) {
-      console.log('⏸️ Regenerate AI skipped - already running globally');
+    // Phase 5 fix: use store loading state instead of module-level variable
+    if (get().loading) {
+      console.log('⏸️ Regenerate AI skipped - already loading');
       return;
     }
-    isAutoPopulating = true;
-    try {
-      if (get().loading) {
-        console.log('⏸️ Regenerate AI skipped - already loading');
-        return;
-      }
-      set({ loading: true, error: null });
+    set({ loading: true, error: null });
       console.log('🔄 Regenerating AI fields...');
       const response = await contentPlanningApi.regenerateAIFields();
       if (!response) throw new Error('Invalid response from regenerate-ai endpoint');
@@ -853,8 +836,6 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
     } catch (error: any) {
       console.error('❌ AI regeneration error:', error);
       set({ loading: false, error: error.message || 'AI regeneration failed.' });
-    } finally {
-      isAutoPopulating = false;
     }
   },
 

@@ -112,6 +112,7 @@ router = APIRouter(tags=["AI Strategy Generation"])
 # the GET path already returns 404 for missing tasks, so a pruned
 # expired task surfaces the same way to the client.
 TASK_STATUS_TTL_SECONDS = 3600
+TASK_STATUS_MAX_SIZE = 1000
 
 
 def _prune_expired_tasks() -> None:
@@ -132,6 +133,28 @@ def _prune_expired_tasks() -> None:
     now = datetime.utcnow().timestamp()
     expired = [task_id for task_id, exp in expires_at.items() if exp <= now]
     for task_id in expired:
+        store.pop(task_id, None)
+        expires_at.pop(task_id, None)
+
+
+def _enforce_max_size() -> None:
+    """Drop oldest entries when the in-memory task store exceeds TASK_STATUS_MAX_SIZE.
+
+    This is a safety-net against unbounded growth in deployments where pruning
+    alone is insufficient (e.g. many concurrent generations with long TTLs).
+    The oldest-expiry entries are removed first.
+    """
+    store = getattr(generate_comprehensive_strategy_polling, "_task_status", None)
+    if not store:
+        return
+    expires_at = getattr(generate_comprehensive_strategy_polling, "_task_expires_at", None)
+    if not expires_at:
+        return
+    if len(store) <= TASK_STATUS_MAX_SIZE:
+        return
+    sorted_ids = sorted(expires_at, key=lambda t: expires_at[t])
+    to_remove = len(store) - TASK_STATUS_MAX_SIZE
+    for task_id in sorted_ids[:to_remove]:
         store.pop(task_id, None)
         expires_at.pop(task_id, None)
 
@@ -792,6 +815,7 @@ async def generate_comprehensive_strategy_polling(
         # adding a new one, so the in-memory store cannot grow
         # without bound.
         _prune_expired_tasks()
+        _enforce_max_size()
 
         generate_comprehensive_strategy_polling._task_status[task_id] = generation_status
         generate_comprehensive_strategy_polling._task_expires_at[task_id] = (

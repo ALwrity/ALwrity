@@ -315,12 +315,15 @@ const ContentPlanningDashboard: React.FC = () => {
   // Load dashboard data using orchestrator
   // Note: ProtectedRoute ensures user is authenticated before this component renders
   useEffect(() => {
+    let cleanup: (() => void) | undefined;
+    
     const loadDashboardData = async () => {
       setLoading(true);
       setError(null);
       
       try {
-        await contentPlanningOrchestrator.loadDashboardData();
+        const result = await contentPlanningOrchestrator.loadDashboardData();
+        cleanup = result.cleanup;
         setLoading(false);
       } catch (error: any) {
         console.error('Error loading dashboard data:', error);
@@ -337,6 +340,13 @@ const ContentPlanningDashboard: React.FC = () => {
       setError('An unexpected error occurred while loading the dashboard');
       setLoading(false);
     }
+
+    // Cleanup on unmount: close all SSE connections
+    return () => {
+      if (cleanup) {
+        cleanup();
+      }
+    };
   }, []);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {

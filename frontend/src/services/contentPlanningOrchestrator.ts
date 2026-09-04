@@ -27,6 +27,7 @@ export class ContentPlanningOrchestrator {
   private onProgressUpdate?: (statuses: ServiceStatus[]) => void;
   private onDataUpdate?: (data: Partial<DashboardData>) => void;
   private latestDashboardData: DashboardData | null = null;
+  private activeEventSources: EventSource[] = [];
 
   constructor() {
     this.initializeServiceStatuses();
@@ -80,7 +81,10 @@ export class ContentPlanningOrchestrator {
     }
   }
 
-  public async loadDashboardData(): Promise<DashboardData> {
+  public async loadDashboardData(): Promise<DashboardData & { cleanup: () => void }> {
+    // Close any existing EventSource connections before starting new ones
+    this.closeAllEventSources();
+    
     // Reset all service statuses
     this.serviceStatuses.forEach((status, name) => {
       this.updateServiceStatus(name, {
@@ -130,7 +134,21 @@ export class ContentPlanningOrchestrator {
     });
 
     this.latestDashboardData = dashboardData;
-    return dashboardData;
+    
+    // Return dashboard data with cleanup function
+    return {
+      ...dashboardData,
+      cleanup: () => this.closeAllEventSources()
+    };
+  }
+
+  private closeAllEventSources(): void {
+    for (const es of this.activeEventSources) {
+      try {
+        es.close();
+      } catch {}
+    }
+    this.activeEventSources = [];
   }
 
   private async loadStrategies() {
@@ -148,9 +166,6 @@ export class ContentPlanningOrchestrator {
         progress: 50,
         message: 'Processing strategy data...'
       });
-
-      // Simulate processing time for better UX
-      await new Promise(resolve => setTimeout(resolve, 500));
       
       this.updateServiceStatus('strategies', {
         status: 'success',
@@ -188,17 +203,12 @@ export class ContentPlanningOrchestrator {
         progress: 30,
         message: 'Analyzing content gaps...'
       });
-
-      // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 800));
       
       this.updateServiceStatus('gapAnalyses', {
         status: 'loading',
         progress: 70,
         message: 'Processing gap analysis results...'
       });
-
-      await new Promise(resolve => setTimeout(resolve, 500));
       
       this.updateServiceStatus('gapAnalyses', {
         status: 'success',
@@ -252,6 +262,7 @@ export class ContentPlanningOrchestrator {
           const currentStrategyId = this.latestDashboardData?.strategies?.[0]?.id;
           if (currentStrategyId) {
             const statusSource = await contentPlanningApi.streamAIGenerationStatus(currentStrategyId);
+            this.activeEventSources.push(statusSource);
             statusSource.onmessage = (event: MessageEvent) => {
               try {
                 const data = JSON.parse(event.data);
@@ -277,7 +288,8 @@ export class ContentPlanningOrchestrator {
         } catch {}
 
         // 2) Data stream for insights (Strategic Intelligence)
-        const intelSource = await contentPlanningApi.streamStrategicIntelligence(1);
+        const intelSource = await contentPlanningApi.streamStrategicIntelligence();
+        this.activeEventSources.push(intelSource);
           contentPlanningApi.handleSSEData(
             intelSource,
             (data) => {
@@ -340,9 +352,6 @@ export class ContentPlanningOrchestrator {
         progress: 50,
         message: 'Processing calendar data...'
       });
-
-      // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 300));
       
       this.updateServiceStatus('calendarEvents', {
         status: 'success',
