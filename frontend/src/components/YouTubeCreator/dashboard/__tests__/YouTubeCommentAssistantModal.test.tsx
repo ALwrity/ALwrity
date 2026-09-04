@@ -13,6 +13,7 @@ vi.mock("../../../../services/youtubeStudioApi", () => ({
     getCommentInbox: vi.fn(),
     draftCommentReply: vi.fn(),
     sendCommentReply: vi.fn(),
+    listCommentReplies: vi.fn(),
   },
 }));
 
@@ -418,5 +419,154 @@ describe("YouTube Comment Reply Assistant modal", () => {
       expect(screen.getByText(/Could not send that reply/i)).toBeTruthy();
     });
     expect(screen.queryByText(/status code 503/i)).toBeNull();
+  });
+
+  it("lists nested replies under the parent and keeps Draft/Send on the parent", async () => {
+    mockedStudioApi.getCommentInbox.mockResolvedValueOnce({
+      success: true,
+      comments: [
+        {
+          ...inboxComment,
+          total_reply_count: 2,
+          replies: [
+            { comment_id: "r-1", author: "Pat", text: "Me too" },
+            { comment_id: "r-2", author: "Lee", text: "Same here" },
+          ],
+        },
+      ],
+    });
+    renderAssistant();
+
+    await waitFor(() => {
+      expect(screen.getByText("Pat")).toBeTruthy();
+    });
+    expect(screen.getByText("Me too")).toBeTruthy();
+    expect(screen.getByText("Lee")).toBeTruthy();
+    expect(screen.getByText("Same here")).toBeTruthy();
+    expect(screen.getByText("Replies")).toBeTruthy();
+    expect(screen.getByText("2 replies")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Draft with AI" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Send (HITL)" })).toHaveLength(1);
+    expect(mockedStudioApi.listCommentReplies).not.toHaveBeenCalled();
+  });
+
+  it("does not show a Replies heading when the parent has no replies", async () => {
+    renderAssistant();
+    await waitFor(() => expect(screen.getByText("Sam")).toBeTruthy());
+    expect(screen.queryByText("Replies")).toBeNull();
+    expect(screen.queryByText("1 reply")).toBeNull();
+    expect(screen.queryByText(/^\d+ replies$/)).toBeNull();
+    expect(mockedStudioApi.listCommentReplies).not.toHaveBeenCalled();
+  });
+
+  it("Show more replies loads extra rows with parent_id", async () => {
+    mockedStudioApi.getCommentInbox.mockResolvedValueOnce({
+      success: true,
+      comments: [
+        {
+          ...inboxComment,
+          total_reply_count: 3,
+          replies: [{ comment_id: "r-1", author: "Pat", text: "Me too" }],
+        },
+      ],
+    });
+    mockedStudioApi.listCommentReplies.mockResolvedValueOnce({
+      success: true,
+      replies: [
+        { comment_id: "r-1", author: "Pat", text: "Me too" },
+        { comment_id: "r-3", author: "Kim", text: "Thanks" },
+      ],
+    });
+    renderAssistant();
+    await waitFor(() => expect(screen.getByText("Pat")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Show more replies" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Kim")).toBeTruthy();
+    });
+    expect(screen.getByText("Thanks")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Show more replies" })).toBeNull();
+    expect(mockedStudioApi.listCommentReplies).toHaveBeenCalledWith({
+      parent_id: "c-1",
+      max_results: 20,
+    });
+  });
+
+  it("shows a user-safe Show more error and keeps the parent comment", async () => {
+    mockedStudioApi.getCommentInbox.mockResolvedValueOnce({
+      success: true,
+      comments: [
+        {
+          ...inboxComment,
+          total_reply_count: 8,
+          replies: [{ comment_id: "r-1", author: "Pat", text: "Me too" }],
+        },
+      ],
+    });
+    mockedStudioApi.listCommentReplies.mockResolvedValueOnce({
+      success: false,
+      message: "That comment could not be found. It may have been removed.",
+    });
+    renderAssistant();
+    await waitFor(() => expect(screen.getByText("Sam")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Show more replies" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("That comment could not be found. It may have been removed."),
+      ).toBeTruthy();
+    });
+    expect(screen.getByText("Sam")).toBeTruthy();
+    expect(screen.getByText("Loved the intro")).toBeTruthy();
+    expect(screen.getByText("Pat")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Show more replies" })).toBeTruthy();
+  });
+
+  it("does not show thrown request text when Show more fails", async () => {
+    mockedStudioApi.getCommentInbox.mockResolvedValueOnce({
+      success: true,
+      comments: [
+        {
+          ...inboxComment,
+          total_reply_count: 8,
+          replies: [{ comment_id: "r-1", author: "Pat", text: "Me too" }],
+        },
+      ],
+    });
+    mockedStudioApi.listCommentReplies.mockRejectedValueOnce(
+      new Error("Request failed with status code 500"),
+    );
+    renderAssistant();
+    await waitFor(() => expect(screen.getByText("Sam")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Show more replies" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Could not load replies/i)).toBeTruthy();
+    });
+    expect(screen.queryByText(/status code 500/i)).toBeNull();
+    expect(screen.getByText("Sam")).toBeTruthy();
+  });
+
+  it("shows Show more when YouTube truncated replies and none were inlined", async () => {
+    mockedStudioApi.getCommentInbox.mockResolvedValueOnce({
+      success: true,
+      comments: [
+        {
+          ...inboxComment,
+          total_reply_count: 6,
+          replies: [],
+        },
+      ],
+    });
+    renderAssistant();
+    await waitFor(() => expect(screen.getByText("Sam")).toBeTruthy());
+
+    expect(screen.getByText("Replies")).toBeTruthy();
+    expect(screen.getByText("6 replies")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Show more replies" })).toBeTruthy();
+    expect(mockedStudioApi.listCommentReplies).not.toHaveBeenCalled();
   });
 });

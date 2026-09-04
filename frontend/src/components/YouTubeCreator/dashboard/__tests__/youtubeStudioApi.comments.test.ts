@@ -93,4 +93,36 @@ describe("youtubeStudioApi comment assistant", () => {
     });
     expect(result.comment_id).toBe("reply-9");
   });
+
+  it("loads extra replies from GET /api/youtube/comments/replies with parent_id", async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: {
+        success: true,
+        replies: [{ comment_id: "r-3", author: "Kim", text: "Thanks" }],
+      },
+    });
+
+    const result = await youtubeStudioApi.listCommentReplies({
+      parent_id: "c-1",
+      max_results: 20,
+    });
+
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/comments/replies", {
+      params: { parent_id: "c-1", max_results: 20 },
+    });
+    expect(result.success).toBe(true);
+    expect(result.replies[0].author).toBe("Kim");
+  });
+
+  it("omits optional listCommentReplies params when unset", async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: { success: true, replies: [] },
+    });
+
+    await youtubeStudioApi.listCommentReplies({ parent_id: "c-1" });
+
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/comments/replies", {
+      params: { parent_id: "c-1" },
+    });
+  });
 });

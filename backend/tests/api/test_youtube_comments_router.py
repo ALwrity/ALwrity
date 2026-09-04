@@ -218,6 +218,84 @@ class TestYouTubeCommentsRouter:
         assert kwargs["parent_id"] == "c-1"
         assert kwargs["text"] == "Thanks for watching"
 
+    def test_replies_path_forwards_parent_id(self):
+        service = MagicMock()
+        service.list_replies.return_value = {
+            "success": True,
+            "replies": [{"comment_id": "r-1", "author": "Pat", "text": "Me too"}],
+        }
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.get(
+            "/api/youtube/comments/replies",
+            params={"parent_id": "c-1", "max_results": 20},
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is True
+        assert body["replies"][0]["author"] == "Pat"
+        service.list_replies.assert_called_once()
+        kwargs = service.list_replies.call_args.kwargs
+        assert kwargs["parent_id"] == "c-1"
+        assert kwargs["max_results"] == 20
+
+    def test_replies_defaults_max_results_to_youtube_default(self):
+        service = MagicMock()
+        service.list_replies.return_value = {"success": True, "replies": []}
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.get(
+            "/api/youtube/comments/replies",
+            params={"parent_id": "c-1"},
+        )
+
+        assert resp.status_code == 200
+        assert service.list_replies.call_args.kwargs["max_results"] == 20
+
+    def test_replies_requires_parent_id(self):
+        service = MagicMock()
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.get("/api/youtube/comments/replies")
+
+        assert resp.status_code == 422
+        service.list_replies.assert_not_called()
+
+    def test_replies_rejects_max_results_above_youtube_limit(self):
+        service = MagicMock()
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.get(
+            "/api/youtube/comments/replies",
+            params={"parent_id": "c-1", "max_results": 101},
+        )
+
+        assert resp.status_code == 422
+        service.list_replies.assert_not_called()
+
+    def test_replies_route_returns_documented_list_error_without_500(self):
+        service = MagicMock()
+        service.list_replies.return_value = {
+            "success": False,
+            "error_code": "commentNotFound",
+            "message": "That comment could not be found. It may have been removed.",
+            "replies": [],
+        }
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.get(
+            "/api/youtube/comments/replies",
+            params={"parent_id": "c-1"},
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is False
+        assert body["error_code"] == "commentNotFound"
+        assert body["replies"] == []
+        assert "secret" not in (body.get("message") or "").lower()
+
     def test_inbox_route_unexpected_error_does_not_leak_detail(self):
         service = MagicMock()
         service.list_inbox.side_effect = RuntimeError("secret-stack")
@@ -257,3 +335,18 @@ class TestYouTubeCommentsRouter:
         assert resp.status_code == 500
         detail = str(resp.json().get("detail") or "")
         assert "token-secret" not in detail
+
+    def test_replies_route_unexpected_error_does_not_leak_detail(self):
+        service = MagicMock()
+        service.list_replies.side_effect = RuntimeError("secret-stack")
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.get(
+            "/api/youtube/comments/replies",
+            params={"parent_id": "c-1"},
+        )
+
+        assert resp.status_code == 500
+        detail = str(resp.json().get("detail") or "")
+        assert "secret-stack" not in detail
+        assert "replies" in detail.lower() or "try again" in detail.lower()
