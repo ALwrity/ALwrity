@@ -58,6 +58,12 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   const [useAnalysisForGenAI, setUseAnalysisForGenAI] = useState(true);
   const [activeTab, setActiveTab] = useState<'website' | 'linkedin' | 'youtube'>('website');
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const [viewedTabs, setViewedTabs] = useState<Record<number, boolean>>({
+    0: true, // Brand Intelligence is active by default, so it's viewed
+    1: false,
+    2: false,
+  });
+  const allTabsViewed = viewedTabs[0] && viewedTabs[1] && viewedTabs[2];
   const [integrationData, setIntegrationData] = useState<any>(null);
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
   const { user } = useUser();
@@ -102,6 +108,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
     website,
     analysis,
     onValidationChange,
+    allTabsViewed,
   });
 
   useEffect(() => {
@@ -216,6 +223,8 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
           existingAnalysis={existingAnalysis}
           handleLoadExistingConfirm={handleLoadExistingConfirm}
           handleStartFresh={handleStartFresh}
+          viewedTabs={viewedTabs}
+          setViewedTabs={setViewedTabs}
         />
       )}
 

@@ -48,6 +48,7 @@ interface WebsiteIntegrationsSectionProps {
   onIntegrationChange: (data: IntegrationData) => void;
   connectedPlatforms: string[];
   setConnectedPlatforms: React.Dispatch<React.SetStateAction<string[]>>;
+  variant?: 'embedded' | 'standalone';
 }
 
 const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
@@ -55,6 +56,7 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
   onIntegrationChange,
   connectedPlatforms,
   setConnectedPlatforms,
+  variant = 'standalone',
 }) => {
   const { gscSites, connectedPlatforms: gscInternalPlatforms, handleGSCConnect } = useGSCConnection();
   const { isLoading, showToast, setShowToast, toastMessage, handleConnect } = usePlatformConnections();
@@ -248,120 +250,134 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
     connectedPlatforms,
   ]);
 
+  const isEmbedded = variant === 'embedded';
+
+  const content = (
+    <>
+      <Fade in timeout={800}>
+        <div>
+          <PlatformSection
+            title="Website & Content Platforms — WordPress, Wix, and content management"
+            description="Connect your website and analytics platforms to enable AI-powered content publishing and insights — all connections are optional."
+            platforms={websitePlatforms}
+            connectedPlatforms={connectedPlatforms}
+            gscSites={null}
+            isLoading={isLoading}
+            onConnect={handlePlatformConnect}
+            onDisconnect={(platformId) => {
+              setConnectedPlatforms(connectedPlatforms.filter(p => p !== platformId));
+            }}
+            setConnectedPlatforms={setConnectedPlatforms}
+          />
+        </div>
+      </Fade>
+
+      <Fade in timeout={1000}>
+        <div>
+          <PlatformSection
+            title="Analytics & SEO"
+            description="Connect analytics platforms for data-driven content optimization"
+            platforms={analyticsPlatforms}
+            connectedPlatforms={connectedPlatforms}
+            gscSites={gscSites}
+            isLoading={isLoading}
+            onConnect={handlePlatformConnect}
+          />
+        </div>
+      </Fade>
+
+      {/* Primary Site Selection */}
+      {availableSites.length > 0 && (
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#334155' }}>
+            Primary Site for Content Publishing
+          </Typography>
+          <FormControl component="fieldset" sx={{ width: '100%' }}>
+            <RadioGroup value={primarySite} onChange={(e) => setPrimarySite(e.target.value)}>
+              {availableSites.map((site, index) => (
+                <FormControlLabel
+                  key={index}
+                  value={site.url}
+                  control={<Radio size="small" sx={{ '&.Mui-checked': { color: '#22c55e' } }} />}
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: primarySite === site.url ? 600 : 400 }}>
+                        {site.url ? site.url.replace(/^https?:\/\//, '') : 'No URL'}
+                      </Typography>
+                      <Chip label={site.source} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 600, bgcolor: site.source === 'Wix' ? '#000' : '#21759b', color: '#fff' }} />
+                    </Box>
+                  }
+                  sx={{ m: 0, p: 0.25, borderRadius: 1, bgcolor: primarySite === site.url ? '#f0fdf4' : undefined, '&:hover': { bgcolor: '#f8fafc' } }}
+                />
+              ))}
+            </RadioGroup>
+          </FormControl>
+        </Box>
+      )}
+    </>
+  );
+
   return (
-    <Box sx={{ mt: 3, animation: 'fadeIn 0.6s ease-out' }}>
-      <Accordion
-        defaultExpanded={true}
-        sx={{
-          borderRadius: 3,
-          border: '1px solid #CBD5E1',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-          bgcolor: '#EFF6FF',
-          '&:before': { display: 'none' },
-          '&.Mui-expanded': { margin: 0, mb: 2 },
-        }}
-      >
-        <AccordionSummary
-          expandIcon={<ExpandMoreIcon />}
+    <Box sx={{ mt: isEmbedded ? 0 : 3, animation: 'fadeIn 0.6s ease-out' }}>
+      {isEmbedded ? (
+        <Box sx={{ p: 3 }}>
+          {content}
+        </Box>
+      ) : (
+        <Accordion
+          defaultExpanded={true}
           sx={{
             borderRadius: 3,
+            border: '1px solid #CBD5E1',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
             bgcolor: '#EFF6FF',
-            '&.Mui-expanded': {
-              borderBottom: '1px solid #CBD5E1',
-              borderBottomLeftRadius: 0,
-              borderBottomRightRadius: 0,
-            },
+            '&:before': { display: 'none' },
+            '&.Mui-expanded': { margin: 0, mb: 2 },
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <CheckCircleIcon sx={{ color: connectedPlatforms.length > 0 ? '#2563EB' : '#94A3B8' }} />
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1E293B' }}>
-              Connect Website Platforms
-            </Typography>
-            {primarySite && (
-              <Chip size="small" label={primarySite.replace(/^https?:\/\//, '')} variant="outlined" color="success" sx={{ fontWeight: 600 }} />
-            )}
-            {connectedPlatforms.length > 0 && (
-              <Chip
-                icon={<CheckCircleIcon sx={{ fontSize: 18, color: '#FFFFFF' }} />}
-                label={`${connectedPlatforms.length} Connected`}
-                sx={{
-                  background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
-                  color: '#FFFFFF',
-                  fontWeight: 700,
-                  fontSize: '0.8rem',
-                  height: 30,
-                  px: 1,
-                  '& .MuiChip-icon': { ml: 0.5 },
-                  boxShadow: '0 2px 8px rgba(37, 99, 235, 0.35)',
-                }}
-              />
-            )}
-          </Box>
-        </AccordionSummary>
-        <AccordionDetails sx={{ p: 2.5 }}>
-          <Fade in timeout={800}>
-            <div>
-              <PlatformSection
-                title="Website & Content Platforms — WordPress, Wix, and content management"
-                description="Connect your website and analytics platforms to enable AI-powered content publishing and insights — all connections are optional."
-                platforms={websitePlatforms}
-                connectedPlatforms={connectedPlatforms}
-                gscSites={null}
-                isLoading={isLoading}
-                onConnect={handlePlatformConnect}
-                onDisconnect={(platformId) => {
-                  setConnectedPlatforms(connectedPlatforms.filter(p => p !== platformId));
-                }}
-                setConnectedPlatforms={setConnectedPlatforms}
-              />
-            </div>
-          </Fade>
-
-          <Fade in timeout={1000}>
-            <div>
-              <PlatformSection
-                title="Analytics & SEO"
-                description="Connect analytics platforms for data-driven content optimization"
-                platforms={analyticsPlatforms}
-                connectedPlatforms={connectedPlatforms}
-                gscSites={gscSites}
-                isLoading={isLoading}
-                onConnect={handlePlatformConnect}
-              />
-            </div>
-          </Fade>
-
-          {/* Primary Site Selection */}
-          {availableSites.length > 0 && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#334155' }}>
-                Primary Site for Content Publishing
+          <AccordionSummary
+            expandIcon={<ExpandMoreIcon />}
+            sx={{
+              borderRadius: 3,
+              bgcolor: '#EFF6FF',
+              '&.Mui-expanded': {
+                borderBottom: '1px solid #CBD5E1',
+                borderBottomLeftRadius: 0,
+                borderBottomRightRadius: 0,
+              },
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <CheckCircleIcon sx={{ color: connectedPlatforms.length > 0 ? '#2563EB' : '#94A3B8' }} />
+              <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1E293B' }}>
+                Connect Website Platforms
               </Typography>
-              <FormControl component="fieldset" sx={{ width: '100%' }}>
-                <RadioGroup value={primarySite} onChange={(e) => setPrimarySite(e.target.value)}>
-                  {availableSites.map((site, index) => (
-                    <FormControlLabel
-                      key={index}
-                      value={site.url}
-                      control={<Radio size="small" sx={{ '&.Mui-checked': { color: '#22c55e' } }} />}
-                      label={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="body2" sx={{ fontWeight: primarySite === site.url ? 600 : 400 }}>
-                            {site.url ? site.url.replace(/^https?:\/\//, '') : 'No URL'}
-                          </Typography>
-                          <Chip label={site.source} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 600, bgcolor: site.source === 'Wix' ? '#000' : '#21759b', color: '#fff' }} />
-                        </Box>
-                      }
-                      sx={{ m: 0, p: 0.25, borderRadius: 1, bgcolor: primarySite === site.url ? '#f0fdf4' : undefined, '&:hover': { bgcolor: '#f8fafc' } }}
-                    />
-                  ))}
-                </RadioGroup>
-              </FormControl>
+              {primarySite && (
+                <Chip size="small" label={primarySite.replace(/^https?:\/\//, '')} variant="outlined" color="success" sx={{ fontWeight: 600 }} />
+              )}
+              {connectedPlatforms.length > 0 && (
+                <Chip
+                  icon={<CheckCircleIcon sx={{ fontSize: 18, color: '#FFFFFF' }} />}
+                  label={`${connectedPlatforms.length} Connected`}
+                  sx={{
+                    background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                    color: '#FFFFFF',
+                    fontWeight: 700,
+                    fontSize: '0.8rem',
+                    height: 30,
+                    px: 1,
+                    '& .MuiChip-icon': { ml: 0.5 },
+                    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.35)',
+                  }}
+                />
+              )}
             </Box>
-          )}
-        </AccordionDetails>
-      </Accordion>
+          </AccordionSummary>
+          <AccordionDetails sx={{ p: 2.5 }}>
+            {content}
+          </AccordionDetails>
+        </Accordion>
+      )}
 
       <Snackbar
         open={showToast}

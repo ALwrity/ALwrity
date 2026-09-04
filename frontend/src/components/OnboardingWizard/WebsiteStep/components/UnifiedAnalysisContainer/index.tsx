@@ -30,6 +30,7 @@ const UnifiedAnalysisContainer: React.FC<UnifiedAnalysisContainerProps> = ({
   onSave,
   defaultDomain = 'overview',
   defaultTab = 'insights',
+  hideOuterCard = false,
 }) => {
   // Ensure starting activeDomain is valid for the starting activeTab
   const initialTab = (defaultTab as string) === 'refine' || (defaultTab as string) === 'actions' ? 'refine_actions' : defaultTab;
@@ -100,6 +101,106 @@ const UnifiedAnalysisContainer: React.FC<UnifiedAnalysisContainerProps> = ({
 
   if (!analysis) return null;
 
+  const innerContent = (
+    <>
+      {/* ── Guideline warning ───────────────────────── */}
+      {guidelineWarning && (
+        <Alert severity="warning" sx={{ borderRadius: 0 }}>
+          {guidelineWarning}
+        </Alert>
+      )}
+
+      {/* ── Combined Header Row: ANALYSIS DOMAINS + Horizontal Tabs ── */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'stretch',
+          borderBottom: '1px solid #E2E8F0',
+          bgcolor: '#FFFFFF',
+        }}
+      >
+        {/* Left: ANALYSIS DOMAINS Label (aligned with sidebar) */}
+        <Box
+          sx={{
+            width: 200,
+            flexShrink: 0,
+            borderRight: '1px solid #E2E8F0',
+            bgcolor: '#FFFFFF',
+            display: 'flex',
+            alignItems: 'center',
+            px: 2,
+            py: 0.75, // Reduced padding to match the 20% height reduction of the top bar
+          }}
+        >
+          <Typography
+            variant="caption"
+            sx={{
+              color: '#94A3B8',
+              fontWeight: 700,
+              letterSpacing: '0.07em',
+              textTransform: 'uppercase',
+              fontSize: '0.65rem',
+            }}
+          >
+            Analysis Domains
+          </Typography>
+        </Box>
+
+        {/* Right: Horizontal Tabs & Controls */}
+        <Box sx={{ flex: 1, display: 'flex', alignItems: 'stretch' }}>
+          <AnalysisTopBar
+            activeTab={activeTab}
+            activeDomain={activeDomain}
+            onTabChange={handleTabChange}
+            isEditable={isEditable}
+            onEditableChange={setIsEditable}
+            confidence={analysis.meta?.confidence}
+            onSave={onSave}
+          />
+        </Box>
+      </Box>
+
+      {/* ── Body: Sidebar + Content Stage ───────────────────────────── */}
+      <Box sx={{ display: 'flex', minHeight: 500 }}>
+        <AnalysisSidebar
+          activeDomain={activeDomain}
+          onDomainChange={handleDomainChange}
+          analysis={analysis}
+          crawlResult={crawlResult}
+          activeTab={activeTab}
+        />
+
+        <Box
+          data-testid="content-stage"
+          sx={{
+            flex: 1,
+            overflow: 'auto',
+            bgcolor: '#FFFFFF',
+            '& .MuiTypography-root': { color: '#111827' },
+            '& .MuiPaper-root': { backgroundColor: '#ffffff' },
+            '& .MuiCard-root': { backgroundColor: '#ffffff' },
+          }}
+        >
+          <AnalysisContentStage
+            activeDomain={activeDomain}
+            activeTab={activeTab}
+            analysis={analysis}
+            crawlResult={crawlResult}
+            domainName={domainName}
+            isEditable={isEditable}
+            onUpdate={handleSectionUpdate}
+            onSave={onSave}
+            onRunSEOAudit={handleRunSEOAudit}
+          />
+        </Box>
+      </Box>
+    </>
+  );
+
+  if (hideOuterCard) {
+    return innerContent;
+  }
+
   return (
     <Card
       data-testid="unified-analysis-container"
@@ -138,98 +239,8 @@ const UnifiedAnalysisContainer: React.FC<UnifiedAnalysisContainerProps> = ({
         </Box>
       </Box>
 
-      {/* ── Guideline warning ───────────────────────── */}
-      {guidelineWarning && (
-        <Alert severity="warning" sx={{ borderRadius: 0 }}>
-          {guidelineWarning}
-        </Alert>
-      )}
-
       <CardContent sx={{ p: 0 }}>
-        {/* ── Combined Header Row: ANALYSIS DOMAINS + Horizontal Tabs ── */}
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'stretch',
-            borderBottom: '1px solid #E2E8F0',
-            bgcolor: '#FFFFFF',
-          }}
-        >
-          {/* Left: ANALYSIS DOMAINS Label (aligned with sidebar) */}
-          <Box
-            sx={{
-              width: 200,
-              flexShrink: 0,
-              borderRight: '1px solid #E2E8F0',
-              bgcolor: '#FFFFFF',
-              display: 'flex',
-              alignItems: 'center',
-              px: 2,
-              py: 1.5,
-            }}
-          >
-            <Typography
-              variant="caption"
-              sx={{
-                color: '#94A3B8',
-                fontWeight: 700,
-                letterSpacing: '0.07em',
-                textTransform: 'uppercase',
-                fontSize: '0.65rem',
-              }}
-            >
-              Analysis Domains
-            </Typography>
-          </Box>
-
-          {/* Right: Horizontal Tabs & Controls */}
-          <Box sx={{ flex: 1, display: 'flex', alignItems: 'stretch' }}>
-            <AnalysisTopBar
-              activeTab={activeTab}
-              activeDomain={activeDomain}
-              onTabChange={handleTabChange}
-              isEditable={isEditable}
-              onEditableChange={setIsEditable}
-              confidence={analysis.meta?.confidence}
-              onSave={onSave}
-            />
-          </Box>
-        </Box>
-
-        {/* ── Body: Sidebar + Content Stage ───────────────────────────── */}
-        <Box sx={{ display: 'flex', minHeight: 500 }}>
-          <AnalysisSidebar
-            activeDomain={activeDomain}
-            onDomainChange={handleDomainChange}
-            analysis={analysis}
-            crawlResult={crawlResult}
-            activeTab={activeTab}
-          />
-
-          <Box
-            data-testid="content-stage"
-            sx={{
-              flex: 1,
-              overflow: 'auto',
-              bgcolor: '#FFFFFF',
-              '& .MuiTypography-root': { color: '#111827' },
-              '& .MuiPaper-root': { backgroundColor: '#ffffff' },
-              '& .MuiCard-root': { backgroundColor: '#ffffff' },
-            }}
-          >
-            <AnalysisContentStage
-              activeDomain={activeDomain}
-              activeTab={activeTab}
-              analysis={analysis}
-              crawlResult={crawlResult}
-              domainName={domainName}
-              isEditable={isEditable}
-              onUpdate={handleSectionUpdate}
-              onSave={onSave}
-              onRunSEOAudit={handleRunSEOAudit}
-            />
-          </Box>
-        </Box>
+        {innerContent}
       </CardContent>
     </Card>
   );
