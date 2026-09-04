@@ -5,10 +5,83 @@ import {
   Alert,
   Snackbar,
   Button,
-  useTheme
+  useTheme,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Typography,
+  Chip,
+  CircularProgress,
+  Paper,
+  IconButton,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import Lightbulb from '@mui/icons-material/Lightbulb';
 import Storage from '@mui/icons-material/Storage';
+import Search from '@mui/icons-material/Search';
+import FilterList from '@mui/icons-material/FilterList';
+import CloudUpload from '@mui/icons-material/CloudUpload';
+import Business from '@mui/icons-material/Business';
+import People from '@mui/icons-material/People';
+import TrendingUp from '@mui/icons-material/TrendingUp';
+import Analytics from '@mui/icons-material/Analytics';
+import Settings from '@mui/icons-material/Settings';
+import AddCircle from '@mui/icons-material/AddCircle';
+import Build from '@mui/icons-material/Build';
+import Description from '@mui/icons-material/Description';
+import Psychology from '@mui/icons-material/Psychology';
+import AutoAwesome from '@mui/icons-material/AutoAwesome';
+import Assessment from '@mui/icons-material/Assessment';
+import CloudQueue from '@mui/icons-material/CloudQueue';
+import QueryBuilder from '@mui/icons-material/QueryBuilder';
+import FactCheck from '@mui/icons-material/FactCheck';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import ErrorOutline from '@mui/icons-material/ErrorOutline';
+import Warning from '@mui/icons-material/Warning';
+import Info from '@mui/icons-material/Info';
+import EmojiObjects from '@mui/icons-material/EmojiObjects';
+import Star from '@mui/icons-material/Star';
+import Favorite from '@mui/icons-material/Favorite';
+import LocationOn from '@mui/icons-material/LocationOn';
+import Language from '@mui/icons-material/Language';
+import Phone from '@mui/icons-material/Phone';
+import Email from '@mui/icons-material/Email';
+import AccountTree from '@mui/icons-material/AccountTree';
+import Timeline from '@mui/icons-material/Timeline';
+import BarChart from '@mui/icons-material/BarChart';
+import ShowChart from '@mui/icons-material/ShowChart';
+import TrendingFlat from '@mui/icons-material/TrendingFlat';
+import DataUsage from '@mui/icons-material/DataUsage';
+import StorageIcon from '@mui/icons-material/Storage';
+import Layers from '@mui/icons-material/Layers';
+import GridOn from '@mui/icons-material/GridOn';
+import DragIndicator from '@mui/icons-material/DragIndicator';
+import VerticalAlignTop from '@mui/icons-material/VerticalAlignTop';
+import VerticalAlignBottom from '@mui/icons-material/VerticalAlignBottom';
+import HorizontalRule from '@mui/icons-material/HorizontalRule';
+import LineAxis from '@mui/icons-material/LineAxis';
+import Straighten from '@mui/icons-material/Straighten';
+import AspectRatio from '@mui/icons-material/AspectRatio';
+import Crop from '@mui/icons-material/Crop';
+import Crop169 from '@mui/icons-material/Crop169';
+import Crop32 from '@mui/icons-material/Crop32';
+import Crop54 from '@mui/icons-material/Crop54';
+import Crop75 from '@mui/icons-material/Crop75';
+import CropDone from '@mui/icons-material/CropDone';
+import AutoFixHigh from '@mui/icons-material/AutoFixHigh';
+import MagicButton from '@mui/icons-material/MagicButton';
+import AutoAwesomeMotion from '@mui/icons-material/AutoAwesomeMotion';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
@@ -16,6 +89,7 @@ import AskAlwrityIcon from '../../assets/images/AskAlwrity-min.ico';
 import { SubscriptionGuard } from '../SubscriptionGuard';
 import { apiClient } from '../../api/client';
 import { useOnboardingTasksStatus } from '../../hooks/useOnboardingTasksStatus';
+import { useOnboardingCompletion } from '../../utils/useOnboardingCompletion';
 
 // Shared components
 import DashboardHeader from '../shared/DashboardHeader';
@@ -29,6 +103,7 @@ import EnhancedBillingDashboard from '../billing/EnhancedBillingDashboard';
 import CompactSidebar from './components/CompactSidebar';
 import TeamHuddleWidget from './components/TeamHuddleWidget';
 import ContentGuardianCard from './components/ContentGuardianCard';
+import OnboardingCompletionCTA from './OnboardingCompletionCTA';
 
 // Shared types and utilities
 import { Tool } from '../shared/types';
@@ -169,6 +244,10 @@ const MainDashboard: React.FC = () => {
   // Onboarding background tasks status (shared React Query poller)
   const { data: onboardingTasks, isError: onboardingTasksError } = useOnboardingTasksStatus();
   const [showOnboardingStatus, setShowOnboardingStatus] = React.useState(true);
+  
+  // Onboarding completion CTA state - show when onboarding complete and no active strategy
+  const { hasCompletedOnboarding, hasActiveStrategy, loading: onboardingCompletionLoading } = useOnboardingCompletion();
+  const [showStrategyCTA, setShowStrategyCTA] = React.useState(true);
 
   // State to track if we need to start a newly generated workflow
   const [shouldStartWorkflow, setShouldStartWorkflow] = React.useState(false);
@@ -443,6 +522,18 @@ const MainDashboard: React.FC = () => {
               <DashboardOnboardingStatus
                 {...onboardingTasks}
                 onDismiss={() => setShowOnboardingStatus(false)}
+              />
+            )}
+
+            {/* Onboarding completion CTA - show when onboarding is complete and no strategy exists */}
+            {showStrategyCTA && !onboardingCompletionLoading && (
+              <OnboardingCompletionCTA
+                hasCompletedOnboarding={hasCompletedOnboarding}
+                hasActiveStrategy={hasActiveStrategy}
+                onCreateStrategy={() => {
+                  navigate('/content-planning', { state: { activeTab: 4 } });
+                }}
+                onDismiss={() => setShowStrategyCTA(false)}
               />
             )}
 

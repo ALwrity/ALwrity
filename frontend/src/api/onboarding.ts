@@ -40,6 +40,9 @@ export interface OnboardingTasksStatusResponse {
   completed_count: number;
   failed_count: number;
   all_done: boolean;
+  has_completed_onboarding?: boolean;
+  has_active_strategy?: boolean;
+  onboarding_data_available?: boolean;
 }
 
 export async function fetchOnboardingTasksStatus(): Promise<OnboardingTasksStatusResponse> {
