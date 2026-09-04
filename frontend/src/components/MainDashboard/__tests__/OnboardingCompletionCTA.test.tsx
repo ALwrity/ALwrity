@@ -116,7 +116,7 @@ describe('OnboardingCompletionCTA', () => {
       />
     );
     
-    expect(screen.getByText(/plan your marketing impact/i)).toBeInTheDocument();
+    expect(screen.getByText(/plan your first 30 days of content/i)).toBeInTheDocument();
     expect(screen.getByText(/first content strategy/i)).toBeInTheDocument();
   });
 });

@@ -686,6 +686,7 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
     await new Promise(resolve => setTimeout(resolve, 500));
     set({ loading: true, error: null });
 
+    try {
       console.log('🚀 Starting autofill...');
       const response = await contentPlanningApi.autofill();
 
@@ -787,6 +788,8 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
       return;
     }
     set({ loading: true, error: null });
+
+    try {
       console.log('🔄 Regenerating AI fields...');
       const response = await contentPlanningApi.regenerateAIFields();
       if (!response) throw new Error('Invalid response from regenerate-ai endpoint');
