@@ -7,6 +7,10 @@ from pydantic import BaseModel, Field
 from loguru import logger
 
 from middleware.auth_middleware import get_current_user
+from services.youtube.youtube_comments_list_errors import (
+    YOUTUBE_COMMENT_THREADS_DEFAULT_RESULTS,
+    YOUTUBE_COMMENT_THREADS_MAX_RESULTS,
+)
 from services.youtube.youtube_comments_service import YouTubeCommentsService
 from services.youtube.youtube_oauth_service import YouTubeOAuthService
 from services.youtube.youtube_publish_log import youtube_publish_error_log_fields
@@ -36,7 +40,11 @@ def get_comments_service(
 
 @router.get("/inbox")
 def get_comment_inbox(
-    max_results: int = Query(20, ge=1, le=50),
+    max_results: int = Query(
+        YOUTUBE_COMMENT_THREADS_DEFAULT_RESULTS,
+        ge=1,
+        le=YOUTUBE_COMMENT_THREADS_MAX_RESULTS,
+    ),
     token_id: Optional[int] = Query(None),
     user: dict = Depends(get_current_user),
     service: YouTubeCommentsService = Depends(get_comments_service),
@@ -51,7 +59,14 @@ def get_comment_inbox(
             bool(token_id),
             max_results,
         )
-        return service.list_inbox(user_id, token_id=token_id, max_results=max_results)
+        result = service.list_inbox(user_id, token_id=token_id, max_results=max_results)
+        if not result.get("success"):
+            logger.warning(
+                "[youtube_comments] Inbox route unsuccessful user_id={} error_code={}",
+                user_id,
+                result.get("error_code"),
+            )
+        return result
     except HTTPException:
         raise
     except Exception as e:
