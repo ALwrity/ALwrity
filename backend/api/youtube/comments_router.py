@@ -9,6 +9,7 @@ from loguru import logger
 from middleware.auth_middleware import get_current_user
 from services.youtube.youtube_comments_service import YouTubeCommentsService
 from services.youtube.youtube_oauth_service import YouTubeOAuthService
+from services.youtube.youtube_publish_log import youtube_publish_error_log_fields
 from .oauth_router import get_oauth_service
 
 router = APIRouter(prefix="/comments", tags=["youtube-comments"])
@@ -44,10 +45,27 @@ def get_comment_inbox(
     if not user_id:
         raise HTTPException(status_code=401, detail="Authentication required")
     try:
+        logger.info(
+            "[youtube_comments] Inbox route user_id={} has_token_id={} max_results={}",
+            user_id,
+            bool(token_id),
+            max_results,
+        )
         return service.list_inbox(user_id, token_id=token_id, max_results=max_results)
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"YouTube comments inbox route error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        fields = youtube_publish_error_log_fields(e)
+        logger.error(
+            "[youtube_comments] Inbox route failed user_id={} error_type={} http_status={}",
+            user_id,
+            fields["error_type"],
+            fields["http_status"],
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not load comments. Please try again.",
+        )
 
 
 @router.post("/draft-reply")
@@ -60,6 +78,12 @@ def draft_comment_reply(
     if not user_id:
         raise HTTPException(status_code=401, detail="Authentication required")
     try:
+        logger.info(
+            "[youtube_comments] Draft route user_id={} comment_length={} has_niche={}",
+            user_id,
+            len(body.comment_text or ""),
+            bool(body.channel_niche),
+        )
         return service.draft_reply(
             user_id=user_id,
             comment_text=body.comment_text,
@@ -67,9 +91,20 @@ def draft_comment_reply(
             channel_niche=body.channel_niche,
             persona_notes=body.persona_notes,
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"YouTube draft reply route error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        fields = youtube_publish_error_log_fields(e)
+        logger.error(
+            "[youtube_comments] Draft route failed user_id={} error_type={} http_status={}",
+            user_id,
+            fields["error_type"],
+            fields["http_status"],
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not draft a reply. Please try again.",
+        )
 
 
 @router.post("/reply")
@@ -82,12 +117,29 @@ def send_comment_reply(
     if not user_id:
         raise HTTPException(status_code=401, detail="Authentication required")
     try:
+        logger.info(
+            "[youtube_comments] Send route user_id={} has_parent_id={} reply_length={}",
+            user_id,
+            bool(body.parent_id),
+            len(body.text or ""),
+        )
         return service.send_reply(
             user_id=user_id,
             parent_id=body.parent_id,
             text=body.text,
             token_id=body.token_id,
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"YouTube send reply route error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        fields = youtube_publish_error_log_fields(e)
+        logger.error(
+            "[youtube_comments] Send route failed user_id={} error_type={} http_status={}",
+            user_id,
+            fields["error_type"],
+            fields["http_status"],
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not send that reply. Please try again.",
+        )

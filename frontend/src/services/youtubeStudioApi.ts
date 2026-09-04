@@ -15,8 +15,25 @@ export const youtubeStudioApi = {
   },
 
   async getCommentInbox(params?: { max_results?: number; token_id?: number }) {
-    const response = await apiClient.get(`${API_BASE}/comments/inbox`, { params });
-    return response.data;
+    console.info("[youtubeStudioApi] comment inbox start", {
+      maxResults: params?.max_results,
+      hasTokenId: Boolean(params?.token_id),
+    });
+    try {
+      const response = await apiClient.get(`${API_BASE}/comments/inbox`, { params });
+      console.info("[youtubeStudioApi] comment inbox complete", {
+        success: Boolean(response.data?.success),
+        commentCount: Array.isArray(response.data?.comments)
+          ? response.data.comments.length
+          : 0,
+      });
+      return response.data;
+    } catch (inboxError) {
+      console.error("[youtubeStudioApi] comment inbox failed", {
+        errorName: inboxError instanceof Error ? inboxError.name : "Error",
+      });
+      throw inboxError;
+    }
   },
 
   async draftCommentReply(body: {
@@ -25,13 +42,45 @@ export const youtubeStudioApi = {
     channel_niche?: string;
     persona_notes?: string;
   }) {
-    const response = await apiClient.post(`${API_BASE}/comments/draft-reply`, body);
-    return response.data;
+    console.info("[youtubeStudioApi] comment draft start", {
+      commentLength: (body.comment_text || "").length,
+      hasNiche: Boolean(body.channel_niche),
+      hasVideoTitle: Boolean(body.video_title),
+    });
+    try {
+      const response = await apiClient.post(`${API_BASE}/comments/draft-reply`, body);
+      console.info("[youtubeStudioApi] comment draft complete", {
+        success: Boolean(response.data?.success),
+        hasDraft: Boolean(response.data?.draft),
+      });
+      return response.data;
+    } catch (draftError) {
+      console.error("[youtubeStudioApi] comment draft failed", {
+        errorName: draftError instanceof Error ? draftError.name : "Error",
+      });
+      throw draftError;
+    }
   },
 
   async sendCommentReply(body: { parent_id: string; text: string; token_id?: number }) {
-    const response = await apiClient.post(`${API_BASE}/comments/reply`, body);
-    return response.data;
+    console.info("[youtubeStudioApi] comment send start", {
+      hasParentId: Boolean(body.parent_id),
+      replyLength: (body.text || "").length,
+      hasTokenId: Boolean(body.token_id),
+    });
+    try {
+      const response = await apiClient.post(`${API_BASE}/comments/reply`, body);
+      console.info("[youtubeStudioApi] comment send complete", {
+        success: Boolean(response.data?.success),
+        hasReplyId: Boolean(response.data?.comment_id),
+      });
+      return response.data;
+    } catch (sendError) {
+      console.error("[youtubeStudioApi] comment send failed", {
+        errorName: sendError instanceof Error ? sendError.name : "Error",
+      });
+      throw sendError;
+    }
   },
 
   async listChannelVideos(params?: { max_results?: number; token_id?: number }) {

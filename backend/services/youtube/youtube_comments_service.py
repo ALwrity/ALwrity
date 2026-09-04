@@ -4,13 +4,47 @@ YouTube comment inbox + HITL reply helpers (Data API v3).
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from googleapiclient.discovery import build
 from loguru import logger
 
 from services.llm_providers.main_text_generation import llm_text_gen
 from services.youtube.youtube_oauth_service import YouTubeOAuthService
+from services.youtube.youtube_publish_log import (
+    youtube_publish_error_log_fields,
+    youtube_publish_error_status,
+)
+
+YouTubeCommentAction = Literal["inbox", "draft", "reply"]
+
+
+def user_safe_comment_error(
+    exc: BaseException,
+    *,
+    action: YouTubeCommentAction,
+) -> str:
+    """User-facing copy for unexpected failures. Never leak Google/LLM text."""
+    status = youtube_publish_error_status(exc)
+    if status in (401,):
+        return "YouTube auth failed. Please reconnect your YouTube channel."
+    if status == 403:
+        if action == "inbox":
+            return (
+                "YouTube would not load comments. Check comment permissions and try again."
+            )
+        if action == "reply":
+            return (
+                "YouTube would not post that reply. Check comment permissions and try again."
+            )
+        return "YouTube rejected this request. Check channel permissions and try again."
+    if status in (429, 500, 503):
+        return "YouTube is busy. Please try again in a few minutes."
+    if action == "inbox":
+        return "Could not load comments. Please try again."
+    if action == "draft":
+        return "Could not draft a reply. Please try again."
+    return "Could not send that reply. Please try again."
 
 
 class YouTubeCommentsService:
@@ -23,9 +57,19 @@ class YouTubeCommentsService:
         token_id: Optional[int] = None,
         max_results: int = 20,
     ) -> Dict[str, Any]:
+        logger.info(
+            "[youtube_comments] Inbox start user_id={} has_token_id={} max_results={}",
+            user_id,
+            bool(token_id),
+            max_results,
+        )
         try:
             creds = self.oauth_service.get_valid_credentials(user_id, token_id)
             if not creds:
+                logger.warning(
+                    "[youtube_comments] Inbox skipped not_connected user_id={}",
+                    user_id,
+                )
                 return {
                     "success": False,
                     "error_code": "not_connected",
@@ -36,6 +80,7 @@ class YouTubeCommentsService:
             channel = youtube.channels().list(part="id", mine=True).execute()
             items = channel.get("items") or []
             if not items:
+                logger.warning("[youtube_comments] Inbox no_channel user_id={}", user_id)
                 return {
                     "success": False,
                     "error_code": "no_channel",
@@ -75,17 +120,28 @@ class YouTubeCommentsService:
                     }
                 )
 
+            logger.info(
+                "[youtube_comments] Inbox complete user_id={} comment_count={}",
+                user_id,
+                len(comments),
+            )
             return {
                 "success": True,
                 "comments": comments,
                 "message": f"Loaded {len(comments)} recent comments.",
             }
         except Exception as e:
-            logger.error(f"YouTube comments inbox failed for {user_id}: {e}")
+            fields = youtube_publish_error_log_fields(e)
+            logger.error(
+                "[youtube_comments] Inbox failed user_id={} error_type={} http_status={}",
+                user_id,
+                fields["error_type"],
+                fields["http_status"],
+            )
             return {
                 "success": False,
                 "error_code": "inbox_failed",
-                "message": str(e),
+                "message": user_safe_comment_error(e, action="inbox"),
                 "comments": [],
             }
 
@@ -98,6 +154,14 @@ class YouTubeCommentsService:
         persona_notes: Optional[str] = None,
     ) -> Dict[str, Any]:
         """LLM draft only — human must approve before send (HITL)."""
+        logger.info(
+            "[youtube_comments] Draft start user_id={} comment_length={} "
+            "has_video_title={} has_niche={}",
+            user_id,
+            len(comment_text or ""),
+            bool(video_title and str(video_title).strip()),
+            bool(channel_niche and str(channel_niche).strip()),
+        )
         try:
             prompt = (
                 "Draft a short, authentic YouTube comment reply for an SME thought-leader. "
@@ -122,18 +186,29 @@ class YouTubeCommentsService:
             )
             text = (draft or "").strip().strip('"')
             if not text:
+                logger.warning(
+                    "[youtube_comments] Draft empty user_id={}",
+                    user_id,
+                )
                 return {
                     "success": False,
                     "error_code": "empty_draft",
                     "message": "Could not draft a reply. Try again.",
                 }
+            logger.info("[youtube_comments] Draft complete user_id={}", user_id)
             return {"success": True, "draft": text, "message": "Draft ready for HITL review."}
         except Exception as e:
-            logger.error(f"YouTube comment draft failed for {user_id}: {e}")
+            fields = youtube_publish_error_log_fields(e)
+            logger.error(
+                "[youtube_comments] Draft failed user_id={} error_type={} http_status={}",
+                user_id,
+                fields["error_type"],
+                fields["http_status"],
+            )
             return {
                 "success": False,
                 "error_code": "draft_failed",
-                "message": str(e),
+                "message": user_safe_comment_error(e, action="draft"),
             }
 
     def send_reply(
@@ -144,9 +219,18 @@ class YouTubeCommentsService:
         token_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Post an approved reply (HITL). parent_id is the comment/thread parent id."""
+        logger.info(
+            "[youtube_comments] Send start user_id={} has_parent_id={} reply_length={} "
+            "has_token_id={}",
+            user_id,
+            bool(parent_id),
+            len(text or ""),
+            bool(token_id),
+        )
         try:
             text = (text or "").strip()
             if not text:
+                logger.warning("[youtube_comments] Send skipped empty_text user_id={}", user_id)
                 return {
                     "success": False,
                     "error_code": "empty_text",
@@ -154,6 +238,10 @@ class YouTubeCommentsService:
                 }
             creds = self.oauth_service.get_valid_credentials(user_id, token_id)
             if not creds:
+                logger.warning(
+                    "[youtube_comments] Send skipped not_connected user_id={}",
+                    user_id,
+                )
                 return {
                     "success": False,
                     "error_code": "not_connected",
@@ -168,15 +256,26 @@ class YouTubeCommentsService:
                 }
             }
             resp = youtube.comments().insert(part="snippet", body=body).execute()
+            logger.info(
+                "[youtube_comments] Send complete user_id={} has_reply_id={}",
+                user_id,
+                bool(resp.get("id")),
+            )
             return {
                 "success": True,
                 "comment_id": resp.get("id"),
                 "message": "Reply published.",
             }
         except Exception as e:
-            logger.error(f"YouTube comment reply failed for {user_id}: {e}")
+            fields = youtube_publish_error_log_fields(e)
+            logger.error(
+                "[youtube_comments] Send failed user_id={} error_type={} http_status={}",
+                user_id,
+                fields["error_type"],
+                fields["http_status"],
+            )
             return {
                 "success": False,
                 "error_code": "reply_failed",
-                "message": str(e),
+                "message": user_safe_comment_error(e, action="reply"),
             }
