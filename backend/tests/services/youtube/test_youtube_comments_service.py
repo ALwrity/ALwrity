@@ -222,6 +222,43 @@ class TestYouTubeCommentsServiceDraft:
         assert result["error_code"] == "draft_failed"
         assert "provider down" not in (result.get("message") or "").lower()
 
+    def test_draft_does_not_call_comments_insert(self):
+        youtube = MagicMock()
+        with patch(
+            "services.youtube.youtube_comments_service.build",
+            return_value=youtube,
+        ), patch(
+            "services.youtube.youtube_comments_service.llm_text_gen",
+            return_value="Thanks",
+        ):
+            _service(_connected_oauth()).draft_reply(USER_ID, comment_text="Nice")
+
+        youtube.comments.return_value.insert.assert_not_called()
+
+    def test_draft_strips_surrounding_quotes_for_hitl_box(self):
+        with patch(
+            "services.youtube.youtube_comments_service.llm_text_gen",
+            return_value='"Thanks for watching"',
+        ):
+            result = _service().draft_reply(USER_ID, comment_text="Nice video")
+
+        assert result["success"] is True
+        assert result["draft"] == "Thanks for watching"
+
+    def test_draft_includes_optional_video_title_in_prompt_not_insert(self):
+        with patch(
+            "services.youtube.youtube_comments_service.llm_text_gen",
+            return_value="Thanks",
+        ) as llm:
+            result = _service().draft_reply(
+                USER_ID,
+                comment_text="How do I start?",
+                video_title="Rank Videos in 7 Days",
+            )
+
+        assert result["success"] is True
+        assert "Rank Videos in 7 Days" in llm.call_args.kwargs["prompt"]
+
 
 class TestYouTubeCommentsServiceSend:
     def test_empty_text_does_not_call_youtube(self):
@@ -274,6 +311,29 @@ class TestYouTubeCommentsServiceSend:
         assert insert_kwargs["part"] == "snippet"
         assert insert_kwargs["body"]["snippet"]["parentId"] == "c-1"
         assert insert_kwargs["body"]["snippet"]["textOriginal"] == "Thanks for watching"
+        youtube.commentThreads.return_value.insert.assert_not_called()
+
+    def test_send_does_not_silently_truncate_approved_hitl_text(self):
+        youtube = MagicMock()
+        youtube.comments.return_value.insert.return_value.execute.return_value = {
+            "id": "reply-long"
+        }
+        approved = "A" * 9001
+
+        with patch(
+            "services.youtube.youtube_comments_service.build",
+            return_value=youtube,
+        ):
+            result = _service(_connected_oauth()).send_reply(
+                USER_ID, parent_id="c-1", text=approved
+            )
+
+        assert result["success"] is True
+        sent = youtube.comments.return_value.insert.call_args.kwargs["body"]["snippet"][
+            "textOriginal"
+        ]
+        assert sent == approved
+        assert len(sent) == 9001
 
     def test_send_failure_does_not_leak_exception_text(self):
         youtube = MagicMock()

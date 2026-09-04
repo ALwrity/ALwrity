@@ -84,13 +84,20 @@ def draft_comment_reply(
             len(body.comment_text or ""),
             bool(body.channel_niche),
         )
-        return service.draft_reply(
+        result = service.draft_reply(
             user_id=user_id,
             comment_text=body.comment_text,
             video_title=body.video_title,
             channel_niche=body.channel_niche,
             persona_notes=body.persona_notes,
         )
+        if not result.get("success"):
+            logger.warning(
+                "[youtube_comments] Draft route unsuccessful user_id={} error_code={}",
+                user_id,
+                result.get("error_code"),
+            )
+        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -123,12 +130,19 @@ def send_comment_reply(
             bool(body.parent_id),
             len(body.text or ""),
         )
-        return service.send_reply(
+        result = service.send_reply(
             user_id=user_id,
             parent_id=body.parent_id,
             text=body.text,
             token_id=body.token_id,
         )
+        if not result.get("success"):
+            logger.warning(
+                "[youtube_comments] Send route unsuccessful user_id={} error_code={}",
+                user_id,
+                result.get("error_code"),
+            )
+        return result
     except HTTPException:
         raise
     except Exception as e:

@@ -10,6 +10,12 @@ from googleapiclient.discovery import build
 from loguru import logger
 
 from services.llm_providers.main_text_generation import llm_text_gen
+from services.youtube.youtube_comments_insert_errors import (
+    YOUTUBE_COMMENTS_INSERT_QUOTA_COST,
+    user_safe_youtube_comment_insert_error,
+    youtube_comment_http_error_reason,
+    youtube_comment_insert_error_code,
+)
 from services.youtube.youtube_oauth_service import YouTubeOAuthService
 from services.youtube.youtube_publish_log import (
     youtube_publish_error_log_fields,
@@ -25,6 +31,10 @@ def user_safe_comment_error(
     action: YouTubeCommentAction,
 ) -> str:
     """User-facing copy for unexpected failures. Never leak Google/LLM text."""
+    if action == "reply":
+        documented = user_safe_youtube_comment_insert_error(exc)
+        if documented:
+            return documented
     status = youtube_publish_error_status(exc)
     if status in (401,):
         return "YouTube auth failed. Please reconnect your YouTube channel."
@@ -156,11 +166,12 @@ class YouTubeCommentsService:
         """LLM draft only — human must approve before send (HITL)."""
         logger.info(
             "[youtube_comments] Draft start user_id={} comment_length={} "
-            "has_video_title={} has_niche={}",
+            "has_video_title={} has_niche={} has_persona_notes={}",
             user_id,
             len(comment_text or ""),
             bool(video_title and str(video_title).strip()),
             bool(channel_niche and str(channel_niche).strip()),
+            bool(persona_notes and str(persona_notes).strip()),
         )
         try:
             prompt = (
@@ -195,7 +206,11 @@ class YouTubeCommentsService:
                     "error_code": "empty_draft",
                     "message": "Could not draft a reply. Try again.",
                 }
-            logger.info("[youtube_comments] Draft complete user_id={}", user_id)
+            logger.info(
+                "[youtube_comments] Draft complete user_id={} draft_length={}",
+                user_id,
+                len(text),
+            )
             return {"success": True, "draft": text, "message": "Draft ready for HITL review."}
         except Exception as e:
             fields = youtube_publish_error_log_fields(e)
@@ -221,11 +236,12 @@ class YouTubeCommentsService:
         """Post an approved reply (HITL). parent_id is the comment/thread parent id."""
         logger.info(
             "[youtube_comments] Send start user_id={} has_parent_id={} reply_length={} "
-            "has_token_id={}",
+            "has_token_id={} quota_cost={}",
             user_id,
             bool(parent_id),
             len(text or ""),
             bool(token_id),
+            YOUTUBE_COMMENTS_INSERT_QUOTA_COST,
         )
         try:
             text = (text or "").strip()
@@ -252,14 +268,15 @@ class YouTubeCommentsService:
             body = {
                 "snippet": {
                     "parentId": parent_id,
-                    "textOriginal": text[:9000],
+                    "textOriginal": text,
                 }
             }
             resp = youtube.comments().insert(part="snippet", body=body).execute()
             logger.info(
-                "[youtube_comments] Send complete user_id={} has_reply_id={}",
+                "[youtube_comments] Send complete user_id={} has_reply_id={} quota_cost={}",
                 user_id,
                 bool(resp.get("id")),
+                YOUTUBE_COMMENTS_INSERT_QUOTA_COST,
             )
             return {
                 "success": True,
@@ -268,14 +285,17 @@ class YouTubeCommentsService:
             }
         except Exception as e:
             fields = youtube_publish_error_log_fields(e)
+            _status, youtube_reason = youtube_comment_http_error_reason(e)
             logger.error(
-                "[youtube_comments] Send failed user_id={} error_type={} http_status={}",
+                "[youtube_comments] Send failed user_id={} error_type={} "
+                "http_status={} youtube_reason={}",
                 user_id,
                 fields["error_type"],
                 fields["http_status"],
+                youtube_reason,
             )
             return {
                 "success": False,
-                "error_code": "reply_failed",
+                "error_code": youtube_comment_insert_error_code(e) or "reply_failed",
                 "message": user_safe_comment_error(e, action="reply"),
             }
