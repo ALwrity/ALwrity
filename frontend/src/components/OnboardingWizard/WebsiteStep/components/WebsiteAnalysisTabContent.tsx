@@ -10,6 +10,8 @@ import {
   Chip,
 } from '@mui/material';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
+import HistoryIcon from '@mui/icons-material/History';
+import { extractDomainName } from '../utils/websiteUtils';
 // Extracted components
 import { StyleAnalysis } from './UnifiedAnalysisContainer/types';
 import UnifiedAnalysisContainer from './UnifiedAnalysisContainer/index';
@@ -35,6 +37,11 @@ interface WebsiteAnalysisTabContentProps {
   handleIntegrationChange: (data: any) => void;
   connectedPlatforms: string[];
   setConnectedPlatforms: React.Dispatch<React.SetStateAction<string[]>>;
+
+  // Zero-Waste Smart Inline Alert additions
+  existingAnalysis: any;
+  handleLoadExistingConfirm: () => void;
+  handleStartFresh: () => void;
 }
 
 const WebsiteAnalysisTabContent: React.FC<WebsiteAnalysisTabContentProps> = ({
@@ -55,6 +62,9 @@ const WebsiteAnalysisTabContent: React.FC<WebsiteAnalysisTabContentProps> = ({
   handleIntegrationChange,
   connectedPlatforms,
   setConnectedPlatforms,
+  existingAnalysis,
+  handleLoadExistingConfirm,
+  handleStartFresh,
 }) => {
   const analyticsPlatforms = ['gsc', 'bing'];
 
@@ -132,6 +142,83 @@ const WebsiteAnalysisTabContent: React.FC<WebsiteAnalysisTabContentProps> = ({
           {loading ? 'Analyzing...' : analysis ? 'Re-Analyze' : 'Analyze'}
         </Button>
       </Box>
+
+      {/* Zero-Waste Inline Smart Banner */}
+      {existingAnalysis && !analysis && !loading && (
+        <Box 
+          sx={{ 
+            mt: 2,
+            mb: 1, 
+            p: 2, 
+            bgcolor: '#EFF6FF', 
+            border: '1px solid #BFDBFE', 
+            borderRadius: 2, 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between',
+            gap: 2,
+            animation: 'fadeIn 0.3s ease-out'
+          }}
+        >
+          <Box display="flex" alignItems="center" gap={1.5}>
+            <HistoryIcon sx={{ color: '#2563EB' }} />
+            <Box>
+              <Typography variant="body2" sx={{ color: '#1E293B', fontWeight: 600 }}>
+                Previous analysis found for <strong>{extractDomainName(website)}</strong>
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#475569' }}>
+                Completed on {existingAnalysis.analysis_date ? new Date(existingAnalysis.analysis_date).toLocaleDateString() : 'a previous session'}
+              </Typography>
+            </Box>
+          </Box>
+          <Box display="flex" gap={1}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleLoadExistingConfirm}
+              startIcon={<HistoryIcon />}
+              sx={{
+                whiteSpace: 'nowrap',
+                borderColor: '#BFDBFE',
+                color: '#2563EB',
+                textTransform: 'none',
+                fontWeight: 600,
+                '&:hover': { borderColor: '#3B82F6', bgcolor: '#EFF6FF' }
+              }}
+            >
+              Load Saved Analysis
+            </Button>
+            <Button
+              variant="text"
+              size="small"
+              onClick={handleStartFresh}
+              sx={{ color: '#64748B', textTransform: 'none', fontWeight: 500 }}
+            >
+              Clear
+            </Button>
+          </Box>
+        </Box>
+      )}
+
+      {/* Start Fresh Reset Option (Active Analysis loaded) */}
+      {analysis && !loading && (
+        <Box display="flex" justifyContent="flex-end" sx={{ mt: 1, mb: 2 }}>
+          <Button
+            variant="text"
+            size="small"
+            onClick={handleStartFresh}
+            sx={{ 
+              color: '#64748B', 
+              textTransform: 'none',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              '&:hover': { color: '#EF4444', bgcolor: '#FEF2F2' }
+            }}
+          >
+            Reset & Analyze Another Website
+          </Button>
+        </Box>
+      )}
 
       {/* Success / Error Alerts */}
       {error && (
