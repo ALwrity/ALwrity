@@ -37,6 +37,7 @@ import { useWorkflowStore } from '../../../stores/workflowStore';
 import { TodayTask } from '../../../types/workflow';
 import { PlanTransparencyPanel } from '../../OnboardingWizard/FinalStep/components/PlanTransparency';
 import { toPanelData } from '../../../utils/todayWorkflowTransparency';
+import { taskQualityChips } from '../../../utils/todayTaskQuality';
 
 interface EnhancedTodayModalProps {
   open: boolean;
@@ -309,6 +310,15 @@ const getTaskStatus = (task: TodayTask) => {
     }
   };
 
+  const qualityChipColor = (tone: 'success' | 'warning' | 'info' | 'default') => {
+    switch (tone) {
+      case 'success': return { bg: '#e6f4ea', color: '#1e7e34', border: '#b7e0c3' };
+      case 'warning': return { bg: '#fff8e1', color: '#b45309', border: '#fde68a' };
+      case 'info': return { bg: '#e3f2fd', color: '#1565c0', border: '#a9d0f5' };
+      default: return { bg: '#f3f4f6', color: '#6b7280', border: '#d1d5db' };
+    }
+  };
+
   return (
     <Modal
       open={open}
@@ -531,6 +541,24 @@ const getTaskStatus = (task: TodayTask) => {
                         </Box>
 
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {taskQualityChips(task).map((chip, chipIndex) => {
+                            const c = qualityChipColor(chip.tone);
+                            return (
+                              <Chip
+                                key={`${chip.label}-${chipIndex}`}
+                                label={chip.label}
+                                size="small"
+                                sx={{
+                                  height: 20,
+                                  fontSize: '0.65rem',
+                                  fontWeight: 700,
+                                  bgcolor: c.bg,
+                                  color: c.color,
+                                  border: `1px solid ${c.border}`,
+                                }}
+                              />
+                            );
+                          })}
                           <Chip
                             label={status}
                             size="small"
@@ -613,7 +641,7 @@ const getTaskStatus = (task: TodayTask) => {
                                 "{task.metadata.reasoning}"
                               </Typography>
                             )}
-                            {(task.metadata.selection_reason?.length || task.metadata.confidence !== undefined || task.evidence) && (
+                            {(task.metadata.selection_reason?.length || task.evidence) && (
                               <Box sx={{ mt: 1 }}>
                                 <Typography variant="caption" sx={{ fontWeight: 700, color: '#444', display: 'block' }}>
                                   Recommended today because:
@@ -626,11 +654,6 @@ const getTaskStatus = (task: TodayTask) => {
                                 {task.evidence && (
                                   <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>
                                     Evidence: {Array.isArray(task.evidence) ? task.evidence.join(', ') : task.evidence}
-                                  </Typography>
-                                )}
-                                {task.metadata.confidence !== undefined && (
-                                  <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>
-                                    Confidence: {Math.round(Number(task.metadata.confidence) * 100)}%
                                   </Typography>
                                 )}
                                 {task.kpi && <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>Expected KPI: {task.kpi}</Typography>}
