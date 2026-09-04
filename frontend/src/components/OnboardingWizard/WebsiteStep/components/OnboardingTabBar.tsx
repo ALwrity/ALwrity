@@ -1,5 +1,6 @@
 import React from 'react';
-import { Box, Button, Tooltip } from '@mui/material';
+import { Box, Button, Tooltip, SxProps, Theme } from '@mui/material';
+import { keyframes } from '@mui/system';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import YouTubeIcon from '@mui/icons-material/YouTube';
@@ -11,6 +12,7 @@ interface OnboardingTabBarProps {
   hasWebsiteAnalysis: boolean;
   linkedinConnected: boolean;
   youtubeConnected: boolean;
+  hasInput?: boolean;
   backgroundTasks: {
     tasks: Record<string, {
       status: string;
@@ -29,29 +31,84 @@ interface OnboardingTabBarProps {
   onViewResults?: (taskKey: string) => void;
 }
 
+const selectedBlingGlow = keyframes`
+  0% {
+    transform: translateY(0) scale(1);
+    border-color: #6366F1;
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.18), 0 0 0 1px rgba(99, 102, 241, 0.06);
+  }
+  3.33% {
+    transform: translateY(-8px) scale(1.04);
+    border-color: #6366F1;
+    box-shadow: 0 20px 35px rgba(99, 102, 241, 0.35), 0 0 25px rgba(99, 102, 241, 0.25), 0 0 10px rgba(139, 92, 246, 0.2);
+  }
+  30% {
+    transform: translateY(-8px) scale(1.04);
+    border-color: #6366F1;
+    box-shadow: 0 20px 35px rgba(99, 102, 241, 0.35), 0 0 25px rgba(99, 102, 241, 0.25), 0 0 10px rgba(139, 92, 246, 0.2);
+  }
+  33.33% {
+    transform: translateY(0) scale(1);
+    border-color: #6366F1;
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.18), 0 0 0 1px rgba(99, 102, 241, 0.06);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    border-color: #6366F1;
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.18), 0 0 0 1px rgba(99, 102, 241, 0.06);
+  }
+`;
+
+const unselectedBlingGlow = keyframes`
+  0% {
+    transform: translateY(0) scale(1);
+    box-shadow: none;
+    border-color: #E2E8F0;
+  }
+  3.33% {
+    transform: translateY(-8px) scale(1.04);
+    border-color: #6366F1;
+    box-shadow: 0 20px 35px rgba(99, 102, 241, 0.35), 0 0 25px rgba(99, 102, 241, 0.25), 0 0 10px rgba(139, 92, 246, 0.2);
+  }
+  30% {
+    transform: translateY(-8px) scale(1.04);
+    border-color: #6366F1;
+    box-shadow: 0 20px 35px rgba(99, 102, 241, 0.35), 0 0 25px rgba(99, 102, 241, 0.25), 0 0 10px rgba(139, 92, 246, 0.2);
+  }
+  33.33% {
+    transform: translateY(0) scale(1);
+    box-shadow: none;
+    border-color: #E2E8F0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow: none;
+    border-color: #E2E8F0;
+  }
+`;
+
 const OnboardingTabBar: React.FC<OnboardingTabBarProps> = ({
   activeTab,
   setActiveTab,
   hasWebsiteAnalysis,
   linkedinConnected,
   youtubeConnected,
+  hasInput = false,
   backgroundTasks,
   onViewResults,
 }) => {
-  // Selected state: white pill with blue border and soft glow
-  const selectedStyle = {
+  const selectedStyle: SxProps<Theme> = {
     background: '#FFFFFF',
-    border: '2px solid #3B82F6',
+    border: '2px solid #6366F1',
     color: '#0F172A',
-    boxShadow: '0 4px 16px rgba(59, 130, 246, 0.18), 0 0 0 1px rgba(59, 130, 246, 0.06)',
+    boxShadow: '0 4px 16px rgba(99, 102, 241, 0.18), 0 0 0 1px rgba(99, 102, 241, 0.06)',
     '&:hover': {
       background: '#FFFFFF',
-      border: '2px solid #3B82F6',
-      boxShadow: '0 6px 20px rgba(59, 130, 246, 0.24), 0 0 0 1px rgba(59, 130, 246, 0.08)',
+      border: '2px solid #6366F1',
+      boxShadow: '0 6px 20px rgba(99, 102, 241, 0.24), 0 0 0 1px rgba(99, 102, 241, 0.08)',
     },
   };
 
-  // Status bulb style with size increased by 2px (from 10px to 12px)
   const statusBulb = (active: boolean) => ({
     width: 12,
     height: 12,
@@ -64,7 +121,7 @@ const OnboardingTabBar: React.FC<OnboardingTabBarProps> = ({
     flexShrink: 0,
   });
 
-  const buttonBaseStyle = {
+  const buttonBaseStyle: SxProps<Theme> = {
     width: '100%',
     display: 'inline-flex',
     alignItems: 'center',
@@ -94,7 +151,7 @@ const OnboardingTabBar: React.FC<OnboardingTabBarProps> = ({
     minWidth: 0,
   };
 
-  const unselectedStyle = {
+  const unselectedStyle: SxProps<Theme> = {
     bgcolor: '#FFFFFF',
     border: '1px solid #E2E8F0',
     color: '#64748B',
@@ -102,7 +159,23 @@ const OnboardingTabBar: React.FC<OnboardingTabBarProps> = ({
     '&:hover': {
       bgcolor: '#FFFFFF',
       borderColor: '#CBD5E1',
+      animationPlayState: 'paused',
     },
+  };
+
+  const getAnimationStyle = (tab: 'website' | 'linkedin' | 'youtube'): SxProps<Theme> => {
+    if (hasInput) return {};
+
+    let delay = '0s';
+    if (tab === 'linkedin') delay = '1.53s';
+    if (tab === 'youtube') delay = '3.07s';
+
+    const animationName = activeTab === tab ? selectedBlingGlow : unselectedBlingGlow;
+
+    return {
+      animation: `${animationName} 4.6s ease-in-out infinite`,
+      animationDelay: delay,
+    };
   };
 
   return (
@@ -123,12 +196,13 @@ const OnboardingTabBar: React.FC<OnboardingTabBarProps> = ({
               sx={{
                 ...buttonBaseStyle,
                 ...(activeTab === 'website' ? selectedStyle : unselectedStyle),
+                ...getAnimationStyle('website'),
               }}
             >
               <Box component="span" sx={buttonContentStyle}>
                 <Box sx={statusBulb(hasWebsiteAnalysis)} />
-                <AnalyticsIcon sx={{ fontSize: 20, flexShrink: 0, color: activeTab === 'website' ? '#3B82F6' : '#64748B' }} />
-                Website Analysis
+                <AnalyticsIcon sx={{ fontSize: 20, flexShrink: 0, color: activeTab === 'website' ? '#6366F1' : '#64748B' }} />
+                Website
               </Box>
             </Button>
           </Box>
@@ -141,6 +215,7 @@ const OnboardingTabBar: React.FC<OnboardingTabBarProps> = ({
               sx={{
                 ...buttonBaseStyle,
                 ...(activeTab === 'linkedin' ? selectedStyle : unselectedStyle),
+                ...getAnimationStyle('linkedin'),
               }}
             >
               <Box component="span" sx={buttonContentStyle}>
@@ -159,6 +234,7 @@ const OnboardingTabBar: React.FC<OnboardingTabBarProps> = ({
               sx={{
                 ...buttonBaseStyle,
                 ...(activeTab === 'youtube' ? selectedStyle : unselectedStyle),
+                ...getAnimationStyle('youtube'),
               }}
             >
               <Box component="span" sx={buttonContentStyle}>

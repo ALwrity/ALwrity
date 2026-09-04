@@ -67,6 +67,18 @@ const WebsiteAnalysisTabContent: React.FC<WebsiteAnalysisTabContentProps> = ({
   handleStartFresh,
 }) => {
   const analyticsPlatforms = ['gsc', 'bing'];
+  const dashboardRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    const dashboardEl = dashboardRef.current;
+    if (!analysis || !dashboardEl) return;
+
+    const timer = window.setTimeout(() => {
+      dashboardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+
+    return () => window.clearTimeout(timer);
+  }, [analysis]);
 
   return (
     <>
@@ -241,6 +253,7 @@ const WebsiteAnalysisTabContent: React.FC<WebsiteAnalysisTabContentProps> = ({
         <>
           {/* ── Brand Intelligence Dashboard ─────────────────────────── */}
           <Box
+            ref={dashboardRef}
             data-testid="unified-container-wrapper"
             sx={{ animation: 'fadeIn 0.5s ease-in', mb: 3 }}
           >

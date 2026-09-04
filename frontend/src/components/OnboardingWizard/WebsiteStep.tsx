@@ -57,6 +57,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   const [analysisWarning, setAnalysisWarning] = useState<string | null>(null);
   const [useAnalysisForGenAI, setUseAnalysisForGenAI] = useState(true);
   const [activeTab, setActiveTab] = useState<'website' | 'linkedin' | 'youtube'>('website');
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const [integrationData, setIntegrationData] = useState<any>(null);
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
   const { user } = useUser();
@@ -161,10 +162,14 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
       {/* Tab Bar */}
       <OnboardingTabBar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          setHasUserInteracted(true);
+        }}
         hasWebsiteAnalysis={hasWebsiteAnalysis}
         linkedinConnected={linkedinConnected}
         youtubeConnected={youtubeConnected}
+        hasInput={hasUserInteracted || linkedinConnected || youtubeConnected || hasWebsiteAnalysis}
         backgroundTasks={backgroundTasks || null}
         onViewResults={onViewBackgroundResults}
       />
@@ -173,7 +178,12 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
       {activeTab === 'website' && (
         <WebsiteAnalysisTabContent
           website={website}
-          setWebsite={setWebsite}
+          setWebsite={(url) => {
+            setWebsite(url);
+            if (url.trim() !== '') {
+              setHasUserInteracted(true);
+            }
+          }}
           loading={loading}
           error={error}
           success={success}
