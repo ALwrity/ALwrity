@@ -73,6 +73,46 @@ class TestYouTubeCommentsRouter:
         assert body["success"] is False
         assert body.get("comment_id") is None
 
+    def test_draft_route_returns_service_failure_without_500(self):
+        service = MagicMock()
+        service.draft_reply.return_value = {
+            "success": False,
+            "error_code": "empty_draft",
+            "message": "Could not draft a reply. Try again.",
+        }
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.post(
+            "/api/youtube/comments/draft-reply",
+            json={"comment_text": "Nice video"},
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is False
+        assert body["error_code"] == "empty_draft"
+        assert "Try again" in body["message"]
+
+    def test_send_route_returns_documented_insert_error_without_500(self):
+        service = MagicMock()
+        service.send_reply.return_value = {
+            "success": False,
+            "error_code": "parentCommentNotFound",
+            "message": "That comment could not be found. It may have been removed.",
+        }
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.post(
+            "/api/youtube/comments/reply",
+            json={"parent_id": "c-1", "text": "Thanks"},
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is False
+        assert body["error_code"] == "parentCommentNotFound"
+        assert "secret" not in (body.get("message") or "").lower()
+
     def test_inbox_returns_service_comments_including_video_id(self):
         service = MagicMock()
         service.list_inbox.return_value = {

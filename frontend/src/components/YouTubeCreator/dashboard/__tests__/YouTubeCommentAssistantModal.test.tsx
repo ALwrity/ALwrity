@@ -121,6 +121,23 @@ describe("YouTube Comment Reply Assistant modal", () => {
     });
   });
 
+  it("shows Draft with AI unsuccessful message from the API", async () => {
+    mockedStudioApi.draftCommentReply.mockResolvedValueOnce({
+      success: false,
+      error_code: "empty_draft",
+      message: "Could not draft a reply. Try again.",
+    });
+    renderAssistant();
+    await waitFor(() => expect(screen.getByText("Sam")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Draft with AI" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Could not draft a reply. Try again.")).toBeTruthy();
+    });
+    expect(screen.getByPlaceholderText("Draft reply…")).toHaveValue("");
+  });
+
   it("does not show thrown request text when draft fails", async () => {
     mockedStudioApi.draftCommentReply.mockRejectedValueOnce(
       new Error("Request failed with status code 502"),
@@ -163,6 +180,27 @@ describe("YouTube Comment Reply Assistant modal", () => {
       expect(screen.getByText("Reply published.")).toBeTruthy();
     });
     expect(mockedStudioApi.getCommentInbox.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("shows Send (HITL) unsuccessful insert message from the API", async () => {
+    mockedStudioApi.sendCommentReply.mockResolvedValueOnce({
+      success: false,
+      error_code: "operationNotSupported",
+      message: "YouTube would not allow a reply on that comment.",
+    });
+    renderAssistant();
+    await waitFor(() => expect(screen.getByText("Sam")).toBeTruthy());
+    fireEvent.change(screen.getByPlaceholderText("Draft reply…"), {
+      target: { value: "Thanks for watching" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send (HITL)" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("YouTube would not allow a reply on that comment."),
+      ).toBeTruthy();
+    });
+    expect(mockedStudioApi.getCommentInbox.mock.calls.length).toBe(1);
   });
 
   it("does not show thrown request text when send fails", async () => {
