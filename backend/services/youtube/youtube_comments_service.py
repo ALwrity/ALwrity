@@ -16,6 +16,13 @@ from services.youtube.youtube_comments_insert_errors import (
     youtube_comment_http_error_reason,
     youtube_comment_insert_error_code,
 )
+from services.youtube.youtube_comments_list_errors import (
+    YOUTUBE_COMMENT_THREADS_DEFAULT_RESULTS,
+    YOUTUBE_COMMENT_THREADS_LIST_QUOTA_COST,
+    YOUTUBE_COMMENT_THREADS_MAX_RESULTS,
+    user_safe_youtube_comment_threads_list_error,
+    youtube_comment_threads_list_error_code,
+)
 from services.youtube.youtube_oauth_service import YouTubeOAuthService
 from services.youtube.youtube_publish_log import (
     youtube_publish_error_log_fields,
@@ -33,6 +40,10 @@ def user_safe_comment_error(
     """User-facing copy for unexpected failures. Never leak Google/LLM text."""
     if action == "reply":
         documented = user_safe_youtube_comment_insert_error(exc)
+        if documented:
+            return documented
+    if action == "inbox":
+        documented = user_safe_youtube_comment_threads_list_error(exc)
         if documented:
             return documented
     status = youtube_publish_error_status(exc)
@@ -65,13 +76,19 @@ class YouTubeCommentsService:
         self,
         user_id: str,
         token_id: Optional[int] = None,
-        max_results: int = 20,
+        max_results: int = YOUTUBE_COMMENT_THREADS_DEFAULT_RESULTS,
     ) -> Dict[str, Any]:
+        page_size = min(
+            max(int(max_results), 1),
+            YOUTUBE_COMMENT_THREADS_MAX_RESULTS,
+        )
         logger.info(
-            "[youtube_comments] Inbox start user_id={} has_token_id={} max_results={}",
+            "[youtube_comments] Inbox start user_id={} has_token_id={} max_results={} "
+            "quota_cost={}",
             user_id,
             bool(token_id),
-            max_results,
+            page_size,
+            YOUTUBE_COMMENT_THREADS_LIST_QUOTA_COST,
         )
         try:
             creds = self.oauth_service.get_valid_credentials(user_id, token_id)
@@ -103,7 +120,7 @@ class YouTubeCommentsService:
                 .list(
                     part="snippet,replies",
                     allThreadsRelatedToChannelId=channel_id,
-                    maxResults=min(max_results, 50),
+                    maxResults=page_size,
                     order="time",
                     textFormat="plainText",
                 )
@@ -131,9 +148,10 @@ class YouTubeCommentsService:
                 )
 
             logger.info(
-                "[youtube_comments] Inbox complete user_id={} comment_count={}",
+                "[youtube_comments] Inbox complete user_id={} comment_count={} quota_cost={}",
                 user_id,
                 len(comments),
+                YOUTUBE_COMMENT_THREADS_LIST_QUOTA_COST,
             )
             return {
                 "success": True,
@@ -142,15 +160,18 @@ class YouTubeCommentsService:
             }
         except Exception as e:
             fields = youtube_publish_error_log_fields(e)
+            _status, youtube_reason = youtube_comment_http_error_reason(e)
             logger.error(
-                "[youtube_comments] Inbox failed user_id={} error_type={} http_status={}",
+                "[youtube_comments] Inbox failed user_id={} error_type={} "
+                "http_status={} youtube_reason={}",
                 user_id,
                 fields["error_type"],
                 fields["http_status"],
+                youtube_reason,
             )
             return {
                 "success": False,
-                "error_code": "inbox_failed",
+                "error_code": youtube_comment_threads_list_error_code(e) or "inbox_failed",
                 "message": user_safe_comment_error(e, action="inbox"),
                 "comments": [],
             }

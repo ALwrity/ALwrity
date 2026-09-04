@@ -46,6 +46,34 @@ class TestYouTubeCommentsRouter:
         assert body["comments"] == []
         assert "author" not in body
 
+    def test_inbox_rejects_max_results_above_youtube_limit(self):
+        service = MagicMock()
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.get("/api/youtube/comments/inbox", params={"max_results": 101})
+
+        assert resp.status_code == 422
+        service.list_inbox.assert_not_called()
+
+    def test_inbox_route_returns_documented_list_error_without_500(self):
+        service = MagicMock()
+        service.list_inbox.return_value = {
+            "success": False,
+            "error_code": "channelNotFound",
+            "message": "That YouTube channel could not be found.",
+            "comments": [],
+        }
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.get("/api/youtube/comments/inbox")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is False
+        assert body["error_code"] == "channelNotFound"
+        assert body["comments"] == []
+        assert "secret" not in (body.get("message") or "").lower()
+
     def test_draft_reply_requires_comment_text(self):
         service = MagicMock()
         client = youtube_studio_client({get_comments_service: lambda: service})

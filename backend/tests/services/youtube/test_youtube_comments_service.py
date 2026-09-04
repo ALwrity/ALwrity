@@ -130,7 +130,7 @@ class TestYouTubeCommentsServiceInbox:
         assert list_kwargs["order"] == "time"
         assert "snippet" in list_kwargs["part"]
 
-    def test_inbox_caps_max_results_at_fifty(self):
+    def test_inbox_caps_max_results_at_one_hundred(self):
         youtube = _youtube_inbox([])
 
         with patch(
@@ -139,7 +139,7 @@ class TestYouTubeCommentsServiceInbox:
         ):
             _service(_connected_oauth()).list_inbox(USER_ID, max_results=99)
 
-        assert youtube.commentThreads.return_value.list.call_args.kwargs["maxResults"] == 50
+        assert youtube.commentThreads.return_value.list.call_args.kwargs["maxResults"] == 99
 
     def test_inbox_failure_returns_error_not_fake_comments(self):
         oauth = _connected_oauth()
