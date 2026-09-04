@@ -7,6 +7,7 @@ import {
   groupYouTubeInboxCommentsByVideo,
   type YouTubeInboxComment,
 } from "../youtubeCommentVideoGroups";
+import { isYouTubeIframeVideoId } from "../youtubeCommentEmbedVideoId";
 import type { PhaseModalSharedProps } from "./phaseModalTypes";
 import {
   YOUTUBE_WEDGE_MODAL_MAX_WIDTH,
@@ -57,6 +58,9 @@ export const CommentAssistantModal: React.FC<
         console.info("[YouTubeCommentAssistant] Inbox load complete", {
           commentCount: next.length,
           groupCount: groups.length,
+          hasEmbeddableVideo: groups.some((group) =>
+            isYouTubeIframeVideoId(group.key),
+          ),
         });
         setComments(next);
       }
@@ -171,6 +175,7 @@ export const CommentAssistantModal: React.FC<
             key={group.key}
             heading={group.heading}
             commentCount={group.comments.length}
+            videoId={group.key}
             expanded={expandedGroupKey === group.key}
             onToggle={() =>
               setExpandedGroupKey((prev) => (prev === group.key ? null : group.key))

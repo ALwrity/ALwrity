@@ -665,6 +665,32 @@ body.youtube-studio-view #root {
   border: 1px solid #e5e5e5;
 }
 
+.yt-comment-iframe-wrap {
+  position: relative;
+  width: 100%;
+  min-width: 200px;
+  min-height: 200px;
+  aspect-ratio: 16 / 9;
+  background: #0f0f0f;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.yt-comment-iframe-host {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+}
+
+.yt-comment-iframe-error {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 0.8125rem;
+  color: #606060;
+  background: #ffffff;
+}
+
 .yt-comment-inbox-card {
   border: 1px solid #e5e5e5;
   border-radius: 12px;

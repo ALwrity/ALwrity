@@ -16,6 +16,12 @@ vi.mock("../../../../services/youtubeStudioApi", () => ({
   },
 }));
 
+vi.mock("../YouTubeCommentIframePlayer", () => ({
+  YouTubeCommentIframePlayer: ({ videoId }: { videoId: string }) => (
+    <div data-testid="youtube-comment-iframe-player" data-video-id={videoId} />
+  ),
+}));
+
 const mockedStudioApi = vi.mocked(youtubeStudioApi);
 
 const inboxComment = {
@@ -64,6 +70,10 @@ describe("YouTube Comment Reply Assistant modal", () => {
     expect(screen.getByText("Your video")).toBeTruthy();
     expect(screen.getByText("1 comment")).toBeTruthy();
     expect(screen.queryByText("abcdefghijk")).toBeNull();
+    expect(screen.getByTestId("youtube-comment-iframe-player")).toHaveAttribute(
+      "data-video-id",
+      "abcdefghijk",
+    );
     expect(mockedStudioApi.getCommentInbox).toHaveBeenCalledWith({ max_results: 20 });
   });
 
@@ -138,6 +148,29 @@ describe("YouTube Comment Reply Assistant modal", () => {
     });
     expect(screen.getByText("Your video")).toBeTruthy();
     expect(screen.getByText("Rank Videos in 7 Days")).toBeTruthy();
+    expect(screen.queryByTestId("youtube-comment-iframe-player")).toBeNull();
+  });
+
+  it("does not embed a player for a non-YouTube video id", async () => {
+    mockedStudioApi.getCommentInbox.mockResolvedValueOnce({
+      success: true,
+      comments: [
+        {
+          comment_id: "c-9",
+          video_id: "vid-1",
+          video_title: "Draft clip",
+          author: "Sam",
+          text: "Loved the intro",
+        },
+      ],
+    });
+    renderAssistant();
+
+    await waitFor(() => {
+      expect(screen.getByText("Sam")).toBeTruthy();
+    });
+    expect(screen.queryByTestId("youtube-comment-iframe-player")).toBeNull();
+    expect(screen.getByText("Loved the intro")).toBeTruthy();
   });
 
   it("Draft with AI still uses the selected row when a video has two comments", async () => {
