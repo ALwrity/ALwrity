@@ -28,7 +28,28 @@ export interface TodayWorkflowScheduleStatus {
   meeting_preflight?: MeetingPreflight;
   agent_evidence?: AgentEvidence[];
   proposal_review?: { normalized_proposals?: ProposalReviewDecision[]; summary?: Record<string, number> };
+  proposal_review_summary?: ProposalReviewSummary;
   guardian_review?: { decisions?: GuardianDecision[]; summary?: Record<string, number>; limitations?: string[] };
+  guardian_health?: number | null;
+  quality_status?: string | null;
+  contextuality_validation?: Record<string, any>;
+  limitations?: string[];
+}
+
+export interface ProposalReviewSummary {
+  counts: {
+    accepted: number;
+    rejected: number;
+    merged: number;
+    deferred: number;
+    quarantined: number;
+  };
+  flagged?: Array<{
+    title?: string | null;
+    agent?: string | null;
+    status?: string | null;
+    reasons?: string[];
+  }>;
 }
 
 export interface GuardianDecision {
@@ -61,6 +82,20 @@ export interface AgentEvidence {
   analysis?: string;
   confidence?: number;
   proposed_tasks?: Array<Record<string, any>>;
+  /** Provenance for the semantic-index (SIF) searches the agent ran while
+   *  producing this evidence. Surfaces what was searched, not just the result. */
+  sif_queries?: SifQueryProvenance[];
+}
+
+export interface SifQueryProvenance {
+  query: string;
+  limit?: number;
+  trigger?: string;
+  result_count?: number;
+  outcome?: 'success' | 'miss' | 'miss_healed' | 'error';
+  error?: string | null;
+  heal?: { healed?: boolean; bootstrap_indexed?: number; website_sync_new?: number } | null;
+  timestamp?: string;
 }
 
 export interface AgentScheduleDecision {

@@ -35,6 +35,8 @@ import FallbackIcon from '@mui/icons-material/WarningAmber';
 import { useNavigate } from 'react-router-dom';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import { TodayTask } from '../../../types/workflow';
+import { PlanTransparencyPanel } from '../../OnboardingWizard/FinalStep/components/PlanTransparency';
+import { toPanelData } from '../../../utils/todayWorkflowTransparency';
 
 interface EnhancedTodayModalProps {
   open: boolean;
@@ -91,14 +93,9 @@ const EnhancedTodayModal: React.FC<EnhancedTodayModalProps> = ({
     }));
   const heldProposals = [...guardianQuarantines, ...reviewHolds];
   const preflight = scheduleStatus?.meeting_preflight;
-  const freshness = preflight?.checks?.freshness;
-  const providerCheck = preflight?.checks?.providers;
   const agentSchedule = scheduleStatus?.agent_schedule || [];
-  const agentEvidence = scheduleStatus?.agent_evidence || [];
-  const meetingLimitations = [
-    ...(preflight?.limitations || []),
-    ...(scheduleStatus?.guardian_review?.limitations || []),
-  ];
+  // Same transparency block the onboarding preview renders via the panel.
+  const transparencyPanelData = toPanelData(scheduleStatus);
 
   const handleTaskAction = async (task: TodayTask) => {
     if (!task.enabled) return;
@@ -429,12 +426,10 @@ const getTaskStatus = (task: TodayTask) => {
               <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#23252F', mb: 1 }}>
                 Daily meeting transparency
               </Typography>
-              <Typography variant="caption" sx={{ display: 'block', color: '#5A5F6A', mb: 1.5 }}>
+              <Typography variant="caption" sx={{ display: 'block', color: '#5A5F6A', mb: 1 }}>
                 Meeting time: {scheduleStatus?.meeting_timestamp || preflight?.checked_at || 'Not recorded'}
               </Typography>
-              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 1.5 }}>
-                <Chip size="small" label={`Freshness: ${freshness?.status || 'unknown'}`} />
-                <Chip size="small" label={`Providers: ${providerCheck?.status || 'unknown'}`} />
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 1 }}>
                 <Chip size="small" label={`${agentSchedule.filter((agent) => agent.participates).length} agents participated`} />
               </Stack>
               {agentSchedule.length > 0 && (
@@ -446,17 +441,8 @@ const getTaskStatus = (task: TodayTask) => {
                   ))}
                 </Stack>
               )}
-              {agentEvidence.length > 0 && (
-                <Typography variant="caption" sx={{ display: 'block', color: '#5A5F6A' }}>
-                  Evidence sources: {agentEvidence.flatMap((item) => item.evidence || []).map((item) => String(item)).slice(0, 4).join(', ') || 'No evidence returned'}
-                </Typography>
-              )}
-              {meetingLimitations.length > 0 && (
-                <Alert severity="info" sx={{ mt: 1.5 }}>
-                  {meetingLimitations.map((limitation, index) => (
-                    <Typography key={index} variant="caption" display="block">{limitation}</Typography>
-                  ))}
-                </Alert>
+              {transparencyPanelData && (
+                <PlanTransparencyPanel data={transparencyPanelData} variant="inline" />
               )}
             </CardContent>
           </Card>

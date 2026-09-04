@@ -178,6 +178,13 @@ async def generate_agent_enhanced_plan(
         result = dict(result)
         result["meeting_id"] = meeting_id
         result["meeting_status"] = status
+        # Self-describing plan_json: persist when this meeting finalized so the
+        # UI can render a concrete "Meeting time" even before the preflight's
+        # nested checked_at is wired up. Prefer the preflight's check time so an
+        # early-rejected (limited/failed) meeting still reports when the data
+        # snapshot was taken; fall back to wall-clock now.
+        preflight_checked = (result.get("meeting_preflight") or {}).get("checked_at") if isinstance(result.get("meeting_preflight"), dict) else None
+        result["meeting_timestamp"] = preflight_checked or datetime.now(timezone.utc).isoformat()
         finish_daily_meeting(db, meeting, status, result, error_message=error_message)
 
         # Enqueue daily digest email (non-blocking). Never let a digest
