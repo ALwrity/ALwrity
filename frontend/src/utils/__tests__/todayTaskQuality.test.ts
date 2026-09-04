@@ -55,16 +55,35 @@ describe("taskQualityChips", () => {
     expect(chip?.tone).toBe("success");
   });
 
-  it("shows ROI chip when roi_score is present", () => {
+  it("shows ROI chip for 0-100 scale (LinkedIn pipeline)", () => {
+    const roi = taskQualityChips(task({ metadata: { roi_score: 75 } }))
+      .find((c) => c.label.includes("ROI"));
+    expect(roi?.label).toBe("75% ROI");
+  });
+
+  it("shows ROI chip for 0-1 scale (gap radar)", () => {
     const roi = taskQualityChips(task({ metadata: { roi_score: 0.75 } }))
       .find((c) => c.label.includes("ROI"));
     expect(roi?.label).toBe("75% ROI");
   });
 
   it("prefers impact_label over ROI when both are present", () => {
-    const chip = taskQualityChips(task({ metadata: { roi_score: 0.4, impact_label: "high" } }))
-      .find((c) => c.label.includes("high"));
-    expect(chip?.label).toBe("Impact: high");
+    const chip = taskQualityChips(task({ metadata: { roi_score: 0.4, impact_label: "High ROI" } }))
+      .find((c) => c.label.includes("High ROI"));
+    expect(chip?.label).toBe("Impact: High ROI");
+  });
+
+  it("shows a selection_score chip when present", () => {
+    const chip = taskQualityChips(task({ metadata: { selection_score: 0.82 } }))
+      .find((c) => c.label.includes("selection"));
+    expect(chip?.label).toBe("82% selection score");
+    expect(chip?.tone).toBe("success");
+  });
+
+  it("selection_score uses amber tone for mid values", () => {
+    const chip = taskQualityChips(task({ metadata: { selection_score: 0.5 } }))
+      .find((c) => c.label.includes("selection"));
+    expect(chip?.tone).toBe("warning");
   });
 
   it("returns an empty list for a task with no quality data", () => {
@@ -76,7 +95,7 @@ describe("taskQualityChips", () => {
   });
 
   it("never emits clickable/actionable junk and all labels are non-empty", () => {
-    const chips = taskQualityChips(task({ metadata: { confidence: 0.9, synthesis_mode: "llm", roi_score: 0.9 } }));
+    const chips = taskQualityChips(task({ metadata: { confidence: 0.9, synthesis_mode: "llm", selection_score: 0.8, roi_score: 75 } }));
     expect(chips.length).toBeGreaterThan(0);
     expect(chips.every((c: QualityChip) => c.label.length > 0)).toBe(true);
   });

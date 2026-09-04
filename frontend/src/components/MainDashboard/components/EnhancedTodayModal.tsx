@@ -656,6 +656,11 @@ const getTaskStatus = (task: TodayTask) => {
                                     Evidence: {Array.isArray(task.evidence) ? task.evidence.join(', ') : task.evidence}
                                   </Typography>
                                 )}
+                                {task.metadata.evidence_links && (task.metadata.evidence_links as string[]).length > 0 && (
+                                  <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>
+                                    Sources: {(task.metadata.evidence_links as string[]).join(', ')}
+                                  </Typography>
+                                )}
                                 {task.kpi && <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>Expected KPI: {task.kpi}</Typography>}
                                 {task.metadata.required_action && <Typography variant="caption" sx={{ color: '#666', display: 'block' }}>Required action: {task.metadata.required_action}</Typography>}
                               </Box>
