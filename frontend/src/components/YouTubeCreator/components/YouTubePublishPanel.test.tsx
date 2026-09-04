@@ -158,6 +158,32 @@ describe("YouTubePublishPanel title, schedule, and publish", () => {
     );
   });
 
+  it("shows a progress bar while publish is running", () => {
+    mockedUseYouTubePublish.mockReturnValue(
+      connectedState({
+        publishState: {
+          publishing: true,
+          taskId: "task-1",
+          videoUrl: null,
+          videoId: null,
+          progress: "Waiting for YouTube to finish the video...",
+          error: null,
+        },
+      }),
+    );
+
+    render(
+      <YouTubePublishPanel
+        videoUrl={CREATOR_VIDEO_URL}
+        scenes={baseScenes}
+        videoPlan={basePlan}
+      />,
+    );
+
+    expect(screen.getByRole("progressbar", { name: /Publish progress/i })).toBeTruthy();
+    expect(screen.getByText(/Waiting for YouTube to finish the video/i)).toBeTruthy();
+  });
+
   it("disables Publish while an upload is in progress", () => {
     mockedUseYouTubePublish.mockReturnValue(
       connectedState({
@@ -180,7 +206,7 @@ describe("YouTubePublishPanel title, schedule, and publish", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /Uploading to YouTube/i })).toHaveProperty(
+    expect(screen.getByRole("button", { name: /Publishing/i })).toHaveProperty(
       "disabled",
       true,
     );
@@ -391,5 +417,40 @@ describe("YouTubePublishPanel title, schedule, and publish", () => {
     expect(
       screen.getByText(/YouTube keeps this private until this time/i),
     ).toBeTruthy();
+  });
+});
+
+describe("YouTubePublishPanel cover picture applied copy", () => {
+  beforeEach(() => {
+    mockedUseYouTubePublish.mockReset();
+  });
+
+  it("does not claim the picture is visible on the watch page when applied", () => {
+    mockedUseYouTubePublish.mockReturnValue(
+      connectedState({
+        publishState: {
+          publishing: false,
+          taskId: "task-1",
+          videoUrl: "https://youtu.be/abc",
+          videoId: "abc",
+          progress: "Published!",
+          error: null,
+          thumbnailApplied: true,
+        },
+      }),
+    );
+
+    render(
+      <YouTubePublishPanel
+        videoUrl={CREATOR_VIDEO_URL}
+        scenes={baseScenes}
+        videoPlan={basePlan}
+      />,
+    );
+
+    expect(screen.getByText(/Published successfully/i)).toBeTruthy();
+    expect(screen.queryByText(/YouTube accepted the cover picture/i)).toBeNull();
+    expect(screen.getByText(/We sent the cover picture to YouTube/i)).toBeTruthy();
+    expect(screen.getByText(/YouTube Studio/i)).toBeTruthy();
   });
 });

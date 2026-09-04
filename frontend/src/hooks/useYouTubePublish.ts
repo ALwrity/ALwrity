@@ -20,6 +20,8 @@ interface YouTubePublishState {
   videoId: string | null;
   progress: string;
   error: string | null;
+  thumbnailError?: string | null;
+  thumbnailApplied?: boolean | null;
 }
 
 interface YouTubeStatus {
@@ -198,6 +200,8 @@ export function useYouTubePublish() {
       made_for_kids?: boolean;
       age_restricted?: boolean;
       publish_at?: string;
+      thumbnail_path?: string;
+      duration_type?: "shorts" | "medium" | "long";
     }
   ) => {
     const channel = status.channels.find((c) => c.is_active);
@@ -217,6 +221,8 @@ export function useYouTubePublish() {
         hasSchedule: Boolean(options?.publish_at),
         madeForKids: options?.made_for_kids ?? false,
         ageRestricted: Boolean(options?.age_restricted),
+        hasThumbnail: Boolean(options?.thumbnail_path),
+        durationType: options?.duration_type,
         ...sourceMeta,
       });
       setPublishState({
@@ -226,6 +232,8 @@ export function useYouTubePublish() {
         videoId: null,
         progress: 'Starting publish...',
         error: null,
+        thumbnailError: null,
+        thumbnailApplied: null,
       });
 
       const result = await youtubeApi.startPublish({
@@ -239,6 +247,12 @@ export function useYouTubePublish() {
         made_for_kids: options?.made_for_kids ?? false,
         ...(options?.age_restricted ? { age_restricted: true } : {}),
         publish_at: options?.publish_at,
+        ...(options?.thumbnail_path
+          ? {
+              thumbnail_path: options.thumbnail_path,
+              duration_type: options.duration_type || "medium",
+            }
+          : {}),
       });
 
       const taskId = result.task_id;
@@ -280,6 +294,8 @@ export function useYouTubePublish() {
               videoId: pollResult.video_id || null,
               progress: 'Published!',
               error: null,
+              thumbnailError: pollResult.thumbnail_error || null,
+              thumbnailApplied: pollResult.thumbnail_applied ?? null,
             });
           } else if (!pollResult.success && pollResult.error) {
             if (publishPollRef.current) clearInterval(publishPollRef.current);
