@@ -25,15 +25,26 @@ export const CommentAssistantModal: React.FC<
     setLoading(true);
     setError(null);
     try {
+      console.info("[YouTubeCommentAssistant] Inbox load start");
       const res = await youtubeStudioApi.getCommentInbox({ max_results: 20 });
       if (!res.success) {
-        setError(res.message || "Failed to load comments");
+        console.warn("[YouTubeCommentAssistant] Inbox unsuccessful", {
+          hasMessage: Boolean(res.message),
+        });
+        setError(res.message || "Could not load comments. Please try again.");
         setComments([]);
       } else {
-        setComments(res.comments || []);
+        const next = res.comments || [];
+        console.info("[YouTubeCommentAssistant] Inbox load complete", {
+          commentCount: next.length,
+        });
+        setComments(next);
       }
-    } catch (e: any) {
-      setError(e?.message || "Inbox failed");
+    } catch (loadError) {
+      console.error("[YouTubeCommentAssistant] Inbox load failed", {
+        errorName: loadError instanceof Error ? loadError.name : "Error",
+      });
+      setError("Could not load comments. Please try again.");
       setComments([]);
     } finally {
       setLoading(false);
@@ -48,17 +59,30 @@ export const CommentAssistantModal: React.FC<
     setBusyId(c.comment_id);
     setStatus(null);
     try {
+      console.info("[YouTubeCommentAssistant] Draft start", {
+        hasCommentId: Boolean(c.comment_id),
+        commentLength: (c.text || "").length,
+      });
       const res = await youtubeStudioApi.draftCommentReply({
         comment_text: c.text || "",
         channel_niche: niche || undefined,
       });
       if (res.success && res.draft) {
+        console.info("[YouTubeCommentAssistant] Draft complete", {
+          hasCommentId: Boolean(c.comment_id),
+        });
         setDrafts((prev) => ({ ...prev, [c.comment_id]: res.draft }));
       } else {
-        setStatus(res.message || "Draft failed");
+        console.warn("[YouTubeCommentAssistant] Draft unsuccessful", {
+          hasMessage: Boolean(res.message),
+        });
+        setStatus(res.message || "Could not draft a reply. Please try again.");
       }
-    } catch (e: any) {
-      setStatus(e?.message || "Draft failed");
+    } catch (draftError) {
+      console.error("[YouTubeCommentAssistant] Draft failed", {
+        errorName: draftError instanceof Error ? draftError.name : "Error",
+      });
+      setStatus("Could not draft a reply. Please try again.");
     } finally {
       setBusyId(null);
     }
@@ -70,14 +94,30 @@ export const CommentAssistantModal: React.FC<
     setBusyId(c.comment_id);
     setStatus(null);
     try {
+      console.info("[YouTubeCommentAssistant] Send start", {
+        hasCommentId: Boolean(c.comment_id),
+        replyLength: text.length,
+      });
       const res = await youtubeStudioApi.sendCommentReply({
         parent_id: c.comment_id,
         text,
       });
-      setStatus(res.message || (res.success ? "Reply sent" : "Send failed"));
-      if (res.success) void load();
-    } catch (e: any) {
-      setStatus(e?.message || "Send failed");
+      setStatus(res.message || (res.success ? "Reply sent" : "Could not send that reply. Please try again."));
+      if (res.success) {
+        console.info("[YouTubeCommentAssistant] Send complete", {
+          hasCommentId: Boolean(c.comment_id),
+        });
+        void load();
+      } else {
+        console.warn("[YouTubeCommentAssistant] Send unsuccessful", {
+          hasMessage: Boolean(res.message),
+        });
+      }
+    } catch (sendError) {
+      console.error("[YouTubeCommentAssistant] Send failed", {
+        errorName: sendError instanceof Error ? sendError.name : "Error",
+      });
+      setStatus("Could not send that reply. Please try again.");
     } finally {
       setBusyId(null);
     }
