@@ -42,6 +42,24 @@ describe("youtubeStudioApi comment assistant", () => {
     expect(result.comments[0].author).toBe("Sam");
   });
 
+  it("forwards optional video_title on draft-reply", async () => {
+    vi.mocked(apiClient.post).mockResolvedValueOnce({
+      data: { success: true, draft: "Thanks for watching." },
+    });
+
+    await youtubeStudioApi.draftCommentReply({
+      comment_text: "How do I start?",
+      channel_niche: "seo",
+      video_title: "Rank Videos in 7 Days",
+    });
+
+    expect(apiClient.post).toHaveBeenCalledWith("/api/youtube/comments/draft-reply", {
+      comment_text: "How do I start?",
+      channel_niche: "seo",
+      video_title: "Rank Videos in 7 Days",
+    });
+  });
+
   it("drafts a HITL reply via POST /api/youtube/comments/draft-reply", async () => {
     vi.mocked(apiClient.post).mockResolvedValueOnce({
       data: { success: true, draft: "Thanks for watching." },

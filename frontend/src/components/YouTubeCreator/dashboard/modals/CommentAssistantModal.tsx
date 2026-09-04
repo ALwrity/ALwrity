@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { YouTubeActionModal } from "../YouTubeActionModal";
 import { youtubeStudioApi } from "../../../../services/youtubeStudioApi";
+import { youtubeCommentVideoHeading } from "../youtubeCommentVideoHeading";
 import type { PhaseModalSharedProps } from "./phaseModalTypes";
 import {
   YOUTUBE_WEDGE_MODAL_MAX_WIDTH,
@@ -66,6 +67,7 @@ export const CommentAssistantModal: React.FC<
       const res = await youtubeStudioApi.draftCommentReply({
         comment_text: c.text || "",
         channel_niche: niche || undefined,
+        video_title: c.video_title || undefined,
       });
       if (res.success && res.draft) {
         console.info("[YouTubeCommentAssistant] Draft complete", {
@@ -138,30 +140,24 @@ export const CommentAssistantModal: React.FC<
       {loading && <p className="yt-modal-intro">Loading inbox…</p>}
       {error && <p className="yt-modal-intro">{error}</p>}
       {status && <p className="yt-modal-intro">{status}</p>}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="yt-comment-list">
         {comments.map((c) => (
-          <div
-            key={c.comment_id}
-            style={{ border: "1px solid #e5e5e5", borderRadius: 12, padding: 12 }}
-          >
-            <div style={{ fontWeight: 700, fontSize: 13 }}>{c.author}</div>
-            <div style={{ fontSize: 13, color: "#606060", margin: "6px 0" }}>{c.text}</div>
+          <div key={c.comment_id} className="yt-comment-inbox-card">
+            <div className="yt-comment-video-heading">
+              {youtubeCommentVideoHeading(c)}
+            </div>
+            <div className="yt-comment-author">{c.author}</div>
+            <div className="yt-comment-body">{c.text}</div>
             <textarea
+              className="yt-comment-draft"
               value={drafts[c.comment_id] || ""}
               onChange={(e) =>
                 setDrafts((prev) => ({ ...prev, [c.comment_id]: e.target.value }))
               }
               rows={2}
               placeholder="Draft reply…"
-              style={{
-                width: "100%",
-                borderRadius: 8,
-                border: "1px solid #e5e5e5",
-                padding: 8,
-                fontFamily: "inherit",
-              }}
             />
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <div className="yt-comment-actions">
               <button
                 type="button"
                 className="yt-rail-btn"
