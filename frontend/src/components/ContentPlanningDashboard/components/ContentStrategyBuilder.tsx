@@ -367,8 +367,8 @@ const ContentStrategyBuilder: React.FC = () => {
   // Determine if we have autofill data
   const hasAutofillData = Object.keys(autoPopulatedFields).length > 0;
   
-  // Get last autofill time from session storage or use current time
-  const lastAutofillTime = sessionStorage.getItem('lastAutofillTime') || new Date().toISOString();
+  // Get last autofill time from session storage - stable across renders
+  const lastAutofillTimeRef = useRef<string>(sessionStorage.getItem('lastAutofillTime') || '');
   
   // Get data source from store
   const dataSource = Object.keys(dataSources).length > 0 ? 'Onboarding Database' : undefined;
@@ -380,21 +380,32 @@ const ContentStrategyBuilder: React.FC = () => {
   const personalizationDataCount = Object.keys(personalizationData || {}).length;
   const confidenceScoresCount = Object.keys(confidenceScores).length;
 
+  // Use a ref to track last logged state - prevents infinite re-renders
+  const lastLoggedSignatureRef = useRef<string>('');
+
   useEffect(() => {
     // Only log in development and when there's meaningful data change
     if (process.env.NODE_ENV === 'development' && (autoPopulatedFieldsCount > 0 || dataSourcesCount > 0)) {
-      console.log('📋 StrategyBuilder: Autofill data status:', {
-        hasAutofillData,
-        autoPopulatedFieldsCount,
-        dataSourcesCount,
-        inputDataPointsCount,
-        personalizationDataCount,
-        confidenceScoresCount,
-        lastAutofillTime,
-        dataSource
-      });
+      // Build a stable signature from the actual data (excluding the unstable timestamp)
+      const signature = `${autoPopulatedFieldsCount}-${dataSourcesCount}-${inputDataPointsCount}-${personalizationDataCount}-${confidenceScoresCount}-${dataSource}`;
+      
+      // Only log when the data signature actually changes
+      if (signature !== lastLoggedSignatureRef.current) {
+        lastLoggedSignatureRef.current = signature;
+        const lastAutofillTime = lastAutofillTimeRef.current || new Date().toISOString();
+        console.log('📋 StrategyBuilder: Autofill data status:', {
+          hasAutofillData,
+          autoPopulatedFieldsCount,
+          dataSourcesCount,
+          inputDataPointsCount,
+          personalizationDataCount,
+          confidenceScoresCount,
+          lastAutofillTime,
+          dataSource
+        });
+      }
     }
-  }, [hasAutofillData, autoPopulatedFieldsCount, dataSourcesCount, inputDataPointsCount, personalizationDataCount, confidenceScoresCount, lastAutofillTime, dataSource]);
+  }, [hasAutofillData, autoPopulatedFieldsCount, dataSourcesCount, inputDataPointsCount, personalizationDataCount, confidenceScoresCount, dataSource]);
 
 
 

@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { contentPlanningApi } from '../services/contentPlanningApi';
 
+// Module-level loading flags to prevent runaway autofill loops
+let autofillLoading = false;
+let regenerateAILoading = false;
+
 // Helper function to detect generic placeholder values
 const isGenericPlaceholder = (fieldId: string, value: any): boolean => {
   if (!value) return false;
@@ -672,8 +676,8 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
   
   // Auto-Population Actions
   autofillStrategyFields: async () => {
-    // Phase 5 fix: use store loading state instead of module-level variable
-    if (get().loading) {
+    // Use module-level loading flag to prevent runaway loops
+    if (autofillLoading) {
       console.log('⏸️ Autofill skipped - already loading');
       return;
     }
@@ -684,6 +688,7 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
     }
 
     await new Promise(resolve => setTimeout(resolve, 500));
+    autofillLoading = true;
     set({ loading: true, error: null });
 
     try {
@@ -778,15 +783,19 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
         error: error.message || 'Autofill failed. Please try again.',
         autoPopulationBlocked: true,
       });
+    } finally {
+      autofillLoading = false;
     }
   },
 
   regenerateAIFields: async () => {
-    // Phase 5 fix: use store loading state instead of module-level variable
-    if (get().loading) {
+    // Use module-level loading flag to prevent runaway loops
+    if (regenerateAILoading) {
       console.log('⏸️ Regenerate AI skipped - already loading');
       return;
     }
+    
+    regenerateAILoading = true;
     set({ loading: true, error: null });
 
     try {
@@ -839,6 +848,8 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
     } catch (error: any) {
       console.error('❌ AI regeneration error:', error);
       set({ loading: false, error: error.message || 'AI regeneration failed.' });
+    } finally {
+      regenerateAILoading = false;
     }
   },
 

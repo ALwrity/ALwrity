@@ -202,6 +202,9 @@ interface ContentPlanningStore {
   deleteStrategy: (id: string) => Promise<void>;
   setCurrentStrategy: (strategy: ContentStrategy | null) => void;
   setLatestGeneratedStrategy: (strategy: any | null) => void;
+
+  // Prefill from onboarding data (Phase 3 gap integration: full wire)
+  prefillStrategy: (prefilledData: any) => void;
   
   // Calendar actions
   createEvent: (event: Omit<CalendarEvent, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
@@ -365,6 +368,20 @@ export const useContentPlanningStore = create<ContentPlanningStore>((set, get) =
     }
   },
   
+  // Prefill from onboarding data (Phase 3 gap integration: full prefill wire)
+  prefillStrategy: (prefilledData: any) => {
+    set((state) => ({
+      // Apply prefill to current form state; the builder form should
+      // read this data via store or props. See prefill-integration.md.
+      strategies: state.strategies,
+      currentStrategy: state.currentStrategy ? {
+        ...state.currentStrategy,
+        ...prefilledData,
+      } : null,
+      latestGeneratedStrategy: prefilledData ? { ...prefilledData } : state.latestGeneratedStrategy,
+    }));
+  },
+
   setCurrentStrategy: (strategy) => set({ currentStrategy: strategy }),
       setLatestGeneratedStrategy: (strategy) => {
       console.log('🔧 Store: Setting latest generated strategy:', {

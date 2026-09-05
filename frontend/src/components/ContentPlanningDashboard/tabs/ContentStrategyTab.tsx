@@ -34,6 +34,7 @@ const ContentStrategyTab: React.FC = () => {
   const error = useContentPlanningStore(state => state.error);
   const loadStrategies = useContentPlanningStore(state => state.loadStrategies);
   const setLatestGeneratedStrategy = useContentPlanningStore(state => state.setLatestGeneratedStrategy);
+  const prefillStrategy = useContentPlanningStore(state => state.prefillStrategy);
 
   // Real data states
   const [strategyData, setStrategyData] = useState<StrategyData | null>(null);
@@ -77,24 +78,45 @@ const ContentStrategyTab: React.FC = () => {
     }
   }, [location.state, latestGeneratedStrategy]);
 
-  // Prefill from onboarding data when arriving from the onboarding CTA
-  // (Phase 3: strategy builder prefill integration — utility is ready,
-  //  the full form-field mapping is documented in prefill-integration.md)
+  // Phase 3: Full prefill integration — when arriving from onboarding,
+  // fetch the endpoint, apply prefill, and pass data via navigation state.
   useEffect(() => {
     const locationState = (location.state || {}) as any;
     if (locationState?.fromOnboarding && strategyStatus === 'none') {
-      console.log('🔄 StrategyPrefill: detected fromOnboarding flag, attempting prefill');
+      console.log('🔄 StrategyPrefill: detected fromOnboarding flag, fetching onboarding summary');
       (async () => {
         try {
-          // Note: backend endpoint /api/onboarding/summary is not yet
-          // implemented in production; prefill utility is tested (11 tests).
-          // When endpoint lands, replace this with the real fetch call.
-          // For now, the pure helper and navigation link are wired.
-          console.log('🔄 StrategyPrefill: would call /api/onboarding/summary and apply prefilledData to form');
+          const res = await fetch('/api/onboarding/summary');
+          if (!res.ok) {
+            console.warn('Strategy prefill: endpoint returned', res.status);
+            return;
+          }
+          const onboardingData: any = await res.json();
+          const input = {
+            fromOnboarding: true,
+            quickInputs: {
+              primary_goal: 'traffic',
+              budget_range: 'medium',
+              timeline: '12 months',
+            },
+          };
+          const prefilledData = strategyPrefill(onboardingData, input);
+          console.log('✅ StrategyPrefill applied:', prefilledData);
+          // Wire through the store (Phase 3: full prefill integration)
+          if (prefillStrategy) {
+            prefillStrategy(prefilledData);
+          }
+          // Pass prefill data into navigation so the Create tab can consume it
+          // The Create tab reads from sessionStorage or location state.
+          sessionStorage.setItem('prefilledStrategyData', JSON.stringify(prefilledData));
+          sessionStorage.setItem('prefillFromOnboarding', 'true');
         } catch (err) {
-          console.error('Strategy prefill skipped (no endpoint):', err);
+          console.error('Strategy prefill skipped (fetch error):', err);
         }
       })();
+    } else if (sessionStorage.getItem('prefillFromOnboarding') === 'true') {
+      // Clean up the session flag if we're not coming from onboarding
+      sessionStorage.removeItem('prefillFromOnboarding');
     }
   }, [location.state?.fromOnboarding, strategyStatus]);
 
@@ -269,14 +291,28 @@ const ContentStrategyTab: React.FC = () => {
 
   const handleEditStrategy = () => {
     setShowOnboarding(false);
-    // Navigate to Create tab (index 4) to edit strategy
-    navigate('/content-planning', { state: { activeTab: 4 } });
+    const prefillData = sessionStorage.getItem('prefilledStrategyData');
+    const prefillFrom = sessionStorage.getItem('prefillFromOnboarding');
+    navigate('/content-planning', {
+      state: {
+        activeTab: 4,
+        fromOnboarding: prefillFrom === 'true',
+        prefilledData: prefillData ? JSON.parse(prefillData) : null,
+      },
+    });
   };
 
   const handleCreateNewStrategy = () => {
     setShowOnboarding(false);
-    // Navigate to Create tab (index 4) to create new strategy
-    navigate('/content-planning', { state: { activeTab: 4 } });
+    const prefillData = sessionStorage.getItem('prefilledStrategyData');
+    const prefillFrom = sessionStorage.getItem('prefillFromOnboarding');
+    navigate('/content-planning', {
+      state: {
+        activeTab: 4,
+        fromOnboarding: prefillFrom === 'true',
+        prefilledData: prefillData ? JSON.parse(prefillData) : null,
+      },
+    });
   };
 
   const handleCloseOnboarding = () => {
