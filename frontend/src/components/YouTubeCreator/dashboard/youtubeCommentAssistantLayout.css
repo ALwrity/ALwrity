@@ -1,0 +1,56 @@
+/**
+ * Comment Reply Assistant context/work layout and portaled overflow menu.
+ * Hub chrome stays in youtube-dashboard-layout.css.
+ */
+
+.yt-comment-video-group-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.yt-comment-video-group-body--split {
+  grid-template-columns: minmax(200px, 320px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.yt-comment-video-group-context {
+  position: sticky;
+  top: 0;
+  min-width: 200px;
+  max-width: 320px;
+}
+
+.yt-comment-video-group-context .yt-comment-iframe-wrap {
+  width: 100%;
+  max-width: 320px;
+}
+
+.yt-comment-video-group-work {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: min(52vh, 28rem);
+  overscroll-behavior: auto;
+  padding-bottom: 4px;
+}
+
+@media (max-width: 720px) {
+  .yt-comment-video-group-body--split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .yt-comment-video-group-context {
+    max-width: 320px;
+    position: static;
+  }
+}
+
+.yt-comment-overflow-menu--portal {
+  position: fixed;
+  right: auto;
+  top: auto;
+  margin: 0;
+}
