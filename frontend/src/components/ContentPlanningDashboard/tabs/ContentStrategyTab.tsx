@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Paper,
@@ -17,6 +17,7 @@ import StrategyIntelligenceTab from '../components/StrategyIntelligence/Strategy
 import StrategyOnboardingDialog from '../components/StrategyOnboardingDialog';
 import { StrategyData } from '../components/StrategyIntelligence/types/strategy.types';
 import { useUser } from '@clerk/clerk-react';
+import { strategyPrefill, OnboardingData, StrategyPrefillOutput } from '../../../utils/strategyPrefill';
 
 const ContentStrategyTab: React.FC = () => {
   const location = useLocation();
@@ -75,6 +76,27 @@ const ContentStrategyTab: React.FC = () => {
       // Note: We don't clear the cache here as it might be needed for the current session
     }
   }, [location.state, latestGeneratedStrategy]);
+
+  // Prefill from onboarding data when arriving from the onboarding CTA
+  // (Phase 3: strategy builder prefill integration — utility is ready,
+  //  the full form-field mapping is documented in prefill-integration.md)
+  useEffect(() => {
+    const locationState = (location.state || {}) as any;
+    if (locationState?.fromOnboarding && strategyStatus === 'none') {
+      console.log('🔄 StrategyPrefill: detected fromOnboarding flag, attempting prefill');
+      (async () => {
+        try {
+          // Note: backend endpoint /api/onboarding/summary is not yet
+          // implemented in production; prefill utility is tested (11 tests).
+          // When endpoint lands, replace this with the real fetch call.
+          // For now, the pure helper and navigation link are wired.
+          console.log('🔄 StrategyPrefill: would call /api/onboarding/summary and apply prefilledData to form');
+        } catch (err) {
+          console.error('Strategy prefill skipped (no endpoint):', err);
+        }
+      })();
+    }
+  }, [location.state?.fromOnboarding, strategyStatus]);
 
   // Track strategy status changes for debugging (with debounce)
   useEffect(() => {
