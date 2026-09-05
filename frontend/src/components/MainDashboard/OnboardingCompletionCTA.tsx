@@ -14,6 +14,12 @@ interface OnboardingCompletionCTAProps {
   onDismiss: () => void;
 }
 
+/**
+ * Post-onboarding handoff banner: "your Marketing OS is ready — create your
+ * content strategy". Styled as a celebratory gradient hero card consistent
+ * with the dashboard's indigo/purple theme. Root stays an MUI <Alert> so it
+ * keeps the `alert` role and info-severity semantics.
+ */
 const OnboardingCompletionCTA: React.FC<OnboardingCompletionCTAProps> = ({
   hasCompletedOnboarding,
   hasActiveStrategy,
@@ -23,26 +29,70 @@ const OnboardingCompletionCTA: React.FC<OnboardingCompletionCTAProps> = ({
   if (!hasCompletedOnboarding || hasActiveStrategy) {
     return null;
   }
-  
+
   return (
     <Alert
       severity="info"
-      sx={{ 
-        mb: 3, 
-        p: 2,
-        backgroundColor: '#e3f2fd',
-        border: '1px solid #2196f3',
-        borderRadius: 2,
+      icon={false}
+      sx={{
+        mb: 3,
+        p: { xs: 2, md: 2.5 },
+        borderRadius: 3,
+        border: '1px solid rgba(255,255,255,0.25)',
+        background: 'linear-gradient(120deg, #4f46e5 0%, #7c3aed 55%, #a855f7 100%)',
+        boxShadow: '0 12px 32px rgba(79, 70, 229, 0.35)',
+        color: '#fff',
+        '& .MuiAlert-message': { width: '100%', p: 0 },
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <AutoAwesomeIcon sx={{ color: '#2196f3', fontSize: 28 }} />
-          <Typography variant="h6" sx={{ fontWeight: 600, color: '#0d47a1' }}>
-            🎉 Your Marketing OS is ready!
-          </Typography>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 2,
+          flexWrap: { xs: 'wrap', md: 'nowrap' },
+        }}
+      >
+        {/* Copy */}
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.75, minWidth: 0 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 44,
+              height: 44,
+              borderRadius: '50%',
+              bgcolor: 'rgba(255,255,255,0.16)',
+              border: '1px solid rgba(255,255,255,0.35)',
+              flexShrink: 0,
+            }}
+          >
+            <AutoAwesomeIcon sx={{ color: '#fff', fontSize: 22 }} />
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: '#fff', letterSpacing: 0.2, lineHeight: 1.25 }}>
+              Your Marketing OS is ready!
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 0.5, color: 'rgba(255,255,255,0.85)', maxWidth: 560 }}>
+              Your onboarding is complete. Create your first content strategy — we'll pre-fill it from your
+              onboarding data and plan your first 30 days of content.
+            </Typography>
+          </Box>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
+
+        {/* Actions */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            flexShrink: 0,
+            ml: { md: 2 },
+            mt: { xs: 1.5, md: 0 },
+          }}
+        >
           <Button
             variant="contained"
             size="small"
@@ -51,31 +101,32 @@ const OnboardingCompletionCTA: React.FC<OnboardingCompletionCTAProps> = ({
               onDismiss();
             }}
             sx={{
-              backgroundColor: '#2196f3',
-              '&:hover': { backgroundColor: '#1976d2' },
+              bgcolor: '#fff',
+              color: '#4f46e5',
+              fontWeight: 700,
               textTransform: 'none',
-              fontWeight: 600,
+              px: 2,
+              borderRadius: 2,
+              boxShadow: '0 4px 14px rgba(0,0,0,0.18)',
+              '&:hover': { bgcolor: '#eef2ff' },
             }}
           >
             Create Content Strategy
           </Button>
           <Button
-            variant="outlined"
+            variant="text"
             size="small"
             onClick={onDismiss}
             sx={{
-              borderColor: '#2196f3',
-              color: '#2196f3',
-              '&:hover': { borderColor: '#1976d2', backgroundColor: 'rgba(33, 150, 243, 0.04)' },
+              color: 'rgba(255,255,255,0.8)',
+              textTransform: 'none',
+              '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.08)' },
             }}
           >
             Maybe later
           </Button>
         </Box>
       </Box>
-      <Typography variant="body2" sx={{ mt: 1, color: '#1976d2' }}>
-        Your onboarding is complete! Create your first content strategy to plan your marketing impact.
-      </Typography>
     </Alert>
   );
 };

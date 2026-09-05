@@ -80,8 +80,16 @@ class AutoFillService:
 
         analytics = await normalize_analytics_combined(gsc, bing) if (gsc or bing) else {}
 
-        quality_scores = calculate_quality_scores_from_raw(website, research, api_keys)
-        confidence_levels = calculate_confidence_from_raw(website, research, api_keys)
+        quality_scores = calculate_quality_scores_from_raw({
+            'website_analysis': website,
+            'research_preferences': research,
+            'api_keys_data': api_keys,
+        })
+        confidence_levels = calculate_confidence_from_raw({
+            'website_analysis': website,
+            'research_preferences': research,
+            'api_keys_data': api_keys,
+        })
         data_freshness = calculate_data_freshness(session_raw)
 
         fields = transform_to_fields(
