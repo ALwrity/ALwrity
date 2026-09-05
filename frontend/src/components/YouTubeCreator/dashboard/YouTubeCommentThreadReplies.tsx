@@ -4,6 +4,7 @@ import {
   youtubeCommentReplyCountLabel,
   type YouTubeInboxReply,
 } from "./youtubeCommentVideoGroups";
+import { YouTubeCommentThreadReplyRow } from "./YouTubeCommentThreadReplyRow";
 
 function mergeYouTubeInboxReplies(
   current: YouTubeInboxReply[],
@@ -104,17 +105,17 @@ export const YouTubeCommentThreadReplies: React.FC<{
         </span>
       </div>
       {rows.map((reply, index) => (
-        <div
+        <YouTubeCommentThreadReplyRow
           key={reply.comment_id || `reply-${index}`}
-          className="yt-comment-thread-reply"
-        >
-          {reply.author ? (
-            <div className="yt-comment-thread-reply-author">{reply.author}</div>
-          ) : null}
-          {reply.text ? (
-            <div className="yt-comment-thread-reply-body">{reply.text}</div>
-          ) : null}
-        </div>
+          reply={reply}
+          onSaved={(commentId, text) =>
+            setRows((prev) =>
+              prev.map((row) =>
+                row.comment_id === commentId ? { ...row, text } : row,
+              ),
+            )
+          }
+        />
       ))}
       {error ? (
         <p className="yt-comment-thread-replies-error">{error}</p>

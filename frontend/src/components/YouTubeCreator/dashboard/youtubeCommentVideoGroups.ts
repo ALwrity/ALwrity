@@ -13,6 +13,7 @@ export type YouTubeInboxReply = {
   author?: string;
   text?: string;
   published_at?: string;
+  can_edit?: boolean;
 };
 
 export type YouTubeInboxComment = {

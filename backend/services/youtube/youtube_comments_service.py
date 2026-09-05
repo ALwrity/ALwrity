@@ -14,6 +14,7 @@ from services.youtube.youtube_comment_thread_replies import (
     map_youtube_comment_reply_items,
     map_youtube_thread_replies,
 )
+from services.youtube.youtube_comment_update import execute_youtube_comment_update
 from services.youtube.youtube_comment_video_titles import (
     attach_youtube_comment_video_titles,
 )
@@ -151,11 +152,13 @@ class YouTubeCommentsService:
 
             comments: List[Dict[str, Any]] = []
             reply_row_count = 0
+            can_edit_count = 0
             for thread in threads.get("items") or []:
                 top = (thread.get("snippet") or {}).get("topLevelComment", {})
                 tsn = top.get("snippet") or {}
-                replies = map_youtube_thread_replies(thread)
+                replies = map_youtube_thread_replies(thread, mine_channel_id=channel_id)
                 reply_row_count += len(replies)
+                can_edit_count += sum(1 for row in replies if row.get("can_edit"))
                 comments.append(
                     {
                         "thread_id": thread.get("id"),
@@ -181,11 +184,12 @@ class YouTubeCommentsService:
             }
             logger.info(
                 "[youtube_comments] Inbox complete user_id={} comment_count={} "
-                "unique_video_id_count={} reply_row_count={} quota_cost={}",
+                "unique_video_id_count={} reply_row_count={} can_edit_count={} quota_cost={}",
                 user_id,
                 len(comments),
                 len(unique_video_ids),
                 reply_row_count,
+                can_edit_count,
                 YOUTUBE_COMMENT_THREADS_LIST_QUOTA_COST,
             )
             return {
@@ -258,6 +262,23 @@ class YouTubeCommentsService:
                 }
 
             youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
+            mine_channel_id = ""
+            try:
+                channel = youtube.channels().list(part="id", mine=True).execute()
+                channel_items = channel.get("items") if isinstance(channel, dict) else None
+                if not isinstance(channel_items, list):
+                    channel_items = []
+                if channel_items and isinstance(channel_items[0], dict):
+                    mine_channel_id = str(channel_items[0].get("id") or "").strip()
+            except Exception as channel_exc:
+                fields = youtube_publish_error_log_fields(channel_exc)
+                logger.warning(
+                    "[youtube_comments] Replies list mine channel skipped user_id={} "
+                    "error_type={} http_status={}",
+                    user_id,
+                    fields["error_type"],
+                    fields["http_status"],
+                )
             resp = (
                 youtube.comments()
                 .list(
@@ -268,14 +289,19 @@ class YouTubeCommentsService:
                 )
                 .execute()
             )
-            replies = map_youtube_comment_reply_items(resp.get("items"))
+            replies = map_youtube_comment_reply_items(
+                resp.get("items"),
+                mine_channel_id=mine_channel_id,
+            )
+            can_edit_count = sum(1 for row in replies if row.get("can_edit"))
             logger.info(
                 "[youtube_comments] Replies list complete user_id={} has_parent_id={} "
-                "max_results={} returned_count={} quota_cost={}",
+                "max_results={} returned_count={} can_edit_count={} quota_cost={}",
                 user_id,
                 True,
                 page_size,
                 len(replies),
+                can_edit_count,
                 YOUTUBE_COMMENTS_LIST_QUOTA_COST,
             )
             return {
@@ -304,6 +330,22 @@ class YouTubeCommentsService:
                 "message": user_safe_comment_error(e, action="replies"),
                 "replies": [],
             }
+
+    def update_reply(
+        self,
+        user_id: str,
+        comment_id: str,
+        text: str,
+        token_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Comments.update for HITL edit of an owned reply."""
+        return execute_youtube_comment_update(
+            self.oauth_service,
+            user_id,
+            comment_id,
+            text,
+            token_id=token_id,
+        )
 
     def draft_reply(
         self,
