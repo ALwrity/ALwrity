@@ -742,6 +742,10 @@ body.youtube-studio-view #root {
   margin-top: 8px;
 }
 
+.yt-comment-action-progress {
+  margin: 10px 0;
+}
+
 .yt-comment-thread-replies {
   margin-top: 10px;
   padding-left: 12px;

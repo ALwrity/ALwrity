@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { youtubeStudioApi } from "../../../services/youtubeStudioApi";
 import type { YouTubeInboxReply } from "./youtubeCommentVideoGroups";
 import { YouTubeCommentReplyOverflowMenu } from "./YouTubeCommentReplyOverflowMenu";
+import { YouTubeCommentActionProgressPanel } from "./YouTubeCommentActionProgressPanel";
 
 export const YouTubeCommentThreadReplyRow: React.FC<{
   reply: YouTubeInboxReply;
@@ -130,6 +131,7 @@ export const YouTubeCommentThreadReplyRow: React.FC<{
           {error ? (
             <p className="yt-comment-thread-replies-error">{error}</p>
           ) : null}
+          {busy ? <YouTubeCommentActionProgressPanel action="save" /> : null}
           <div className="yt-comment-actions">
             <button
               type="button"
@@ -158,6 +160,7 @@ export const YouTubeCommentThreadReplyRow: React.FC<{
           {error ? (
             <p className="yt-comment-thread-replies-error">{error}</p>
           ) : null}
+          {busy ? <YouTubeCommentActionProgressPanel action="delete" /> : null}
           <div className="yt-comment-actions">
             <button
               type="button"

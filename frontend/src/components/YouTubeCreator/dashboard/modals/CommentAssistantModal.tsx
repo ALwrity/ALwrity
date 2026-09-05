@@ -7,6 +7,7 @@ import {
   groupYouTubeInboxCommentsByVideo,
   type YouTubeInboxComment,
 } from "../youtubeCommentVideoGroups";
+import type { YouTubeCommentParentBusyAction } from "../youtubeCommentActionLoader";
 import { isYouTubeIframeVideoId } from "../youtubeCommentEmbedVideoId";
 import type { PhaseModalSharedProps } from "./phaseModalTypes";
 import {
@@ -26,6 +27,7 @@ export const CommentAssistantModal: React.FC<
   const [error, setError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [busyAction, setBusyAction] = useState<YouTubeCommentParentBusyAction | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
 
@@ -87,6 +89,7 @@ export const CommentAssistantModal: React.FC<
 
   const draft = async (c: YouTubeInboxComment) => {
     setBusyId(c.comment_id);
+    setBusyAction("draft");
     setStatus(null);
     try {
       console.info("[YouTubeCommentAssistant] Draft start", {
@@ -116,6 +119,7 @@ export const CommentAssistantModal: React.FC<
       setStatus("Could not draft a reply. Please try again.");
     } finally {
       setBusyId(null);
+      setBusyAction(null);
     }
   };
 
@@ -123,6 +127,7 @@ export const CommentAssistantModal: React.FC<
     const text = drafts[c.comment_id]?.trim();
     if (!text) return;
     setBusyId(c.comment_id);
+    setBusyAction("send");
     setStatus(null);
     try {
       console.info("[YouTubeCommentAssistant] Send start", {
@@ -151,6 +156,7 @@ export const CommentAssistantModal: React.FC<
       setStatus("Could not send that reply. Please try again.");
     } finally {
       setBusyId(null);
+      setBusyAction(null);
     }
   };
 
@@ -187,6 +193,7 @@ export const CommentAssistantModal: React.FC<
                 comment={c}
                 draftText={drafts[c.comment_id || ""] || ""}
                 busy={busyId === c.comment_id}
+                busyAction={busyId === c.comment_id ? busyAction : null}
                 onDraftChange={(value) =>
                   setDrafts((prev) => ({ ...prev, [c.comment_id || ""]: value }))
                 }
