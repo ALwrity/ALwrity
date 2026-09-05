@@ -10,6 +10,7 @@ vi.mock("../../../../api/client", () => ({
     get: vi.fn(),
     post: vi.fn(),
     put: vi.fn(),
+    delete: vi.fn(),
   },
 }));
 
@@ -147,5 +148,35 @@ describe("youtubeStudioApi comment assistant", () => {
     });
     expect(result.comment_id).toBe("r-own");
     expect(result.text).toBe("Thanks for watching");
+  });
+
+  it("deletes an approved reply via DELETE /api/youtube/comments/delete", async () => {
+    vi.mocked(apiClient.delete).mockResolvedValueOnce({
+      data: { success: true },
+    });
+
+    const result = await youtubeStudioApi.deleteCommentReply({
+      comment_id: "r-own",
+    });
+
+    expect(apiClient.delete).toHaveBeenCalledWith("/api/youtube/comments/delete", {
+      params: { comment_id: "r-own" },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("forwards optional token_id on comment delete", async () => {
+    vi.mocked(apiClient.delete).mockResolvedValueOnce({
+      data: { success: true },
+    });
+
+    await youtubeStudioApi.deleteCommentReply({
+      comment_id: "r-own",
+      token_id: 3,
+    });
+
+    expect(apiClient.delete).toHaveBeenCalledWith("/api/youtube/comments/delete", {
+      params: { comment_id: "r-own", token_id: 3 },
+    });
   });
 });

@@ -425,3 +425,86 @@ class TestYouTubeCommentsRouter:
         detail = str(resp.json().get("detail") or "")
         assert "secret-stack" not in detail
         assert "edit" in detail.lower() or "try again" in detail.lower()
+
+    def test_delete_path_forwards_comment_id_without_body(self):
+        service = MagicMock()
+        service.delete_reply.return_value = {
+            "success": True,
+            "message": "Reply deleted.",
+        }
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.delete(
+            "/api/youtube/comments/delete",
+            params={"comment_id": "r-1"},
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is True
+        kwargs = service.delete_reply.call_args.kwargs
+        assert kwargs["comment_id"] == "r-1"
+        assert "text" not in kwargs
+        assert "body" not in kwargs
+
+    def test_delete_forwards_optional_token_id(self):
+        service = MagicMock()
+        service.delete_reply.return_value = {"success": True, "message": "Reply deleted."}
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.delete(
+            "/api/youtube/comments/delete",
+            params={"comment_id": "r-1", "token_id": 7},
+        )
+
+        assert resp.status_code == 200
+        assert service.delete_reply.call_args.kwargs["token_id"] == 7
+
+    def test_delete_requires_comment_id(self):
+        service = MagicMock()
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        missing_id = client.delete("/api/youtube/comments/delete")
+        empty_id = client.delete(
+            "/api/youtube/comments/delete",
+            params={"comment_id": ""},
+        )
+
+        assert missing_id.status_code == 422
+        assert empty_id.status_code == 422
+        service.delete_reply.assert_not_called()
+
+    def test_delete_route_returns_documented_error_without_500(self):
+        service = MagicMock()
+        service.delete_reply.return_value = {
+            "success": False,
+            "error_code": "commentNotFound",
+            "message": "That comment could not be found. It may have been removed.",
+        }
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.delete(
+            "/api/youtube/comments/delete",
+            params={"comment_id": "r-1"},
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is False
+        assert body["error_code"] == "commentNotFound"
+        assert "secret" not in (body.get("message") or "").lower()
+
+    def test_delete_route_unexpected_error_does_not_leak_detail(self):
+        service = MagicMock()
+        service.delete_reply.side_effect = RuntimeError("secret-stack")
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.delete(
+            "/api/youtube/comments/delete",
+            params={"comment_id": "r-1"},
+        )
+
+        assert resp.status_code == 500
+        detail = str(resp.json().get("detail") or "")
+        assert "secret-stack" not in detail
+        assert "delete" in detail.lower() or "try again" in detail.lower()

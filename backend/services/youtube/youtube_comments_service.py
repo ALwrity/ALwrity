@@ -14,6 +14,7 @@ from services.youtube.youtube_comment_thread_replies import (
     map_youtube_comment_reply_items,
     map_youtube_thread_replies,
 )
+from services.youtube.youtube_comment_delete import execute_youtube_comment_delete
 from services.youtube.youtube_comment_update import execute_youtube_comment_update
 from services.youtube.youtube_comment_video_titles import (
     attach_youtube_comment_video_titles,
@@ -331,20 +332,16 @@ class YouTubeCommentsService:
                 "replies": [],
             }
 
-    def update_reply(
-        self,
-        user_id: str,
-        comment_id: str,
-        text: str,
-        token_id: Optional[int] = None,
-    ) -> Dict[str, Any]:
+    def update_reply(self, user_id: str, comment_id: str, text: str, token_id: Optional[int] = None) -> Dict[str, Any]:
         """Comments.update for HITL edit of an owned reply."""
         return execute_youtube_comment_update(
-            self.oauth_service,
-            user_id,
-            comment_id,
-            text,
-            token_id=token_id,
+            self.oauth_service, user_id, comment_id, text, token_id=token_id
+        )
+
+    def delete_reply(self, user_id: str, comment_id: str, token_id: Optional[int] = None) -> Dict[str, Any]:
+        """Comments.delete for HITL delete of an owned reply."""
+        return execute_youtube_comment_delete(
+            self.oauth_service, user_id, comment_id, token_id=token_id
         )
 
     def draft_reply(

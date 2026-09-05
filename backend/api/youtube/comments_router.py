@@ -189,6 +189,51 @@ def update_comment_reply(
         )
 
 
+@router.delete("/delete")
+def delete_comment_reply(
+    comment_id: str = Query(..., min_length=1),
+    token_id: Optional[int] = Query(None),
+    user: dict = Depends(get_current_user),
+    service: YouTubeCommentsService = Depends(get_comments_service),
+):
+    user_id = user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        logger.info(
+            "[youtube_comments] Delete route user_id={} has_comment_id={} has_token_id={}",
+            user_id,
+            bool(comment_id),
+            bool(token_id),
+        )
+        result = service.delete_reply(
+            user_id=user_id,
+            comment_id=comment_id,
+            token_id=token_id,
+        )
+        if not result.get("success"):
+            logger.warning(
+                "[youtube_comments] Delete route unsuccessful user_id={} error_code={}",
+                user_id,
+                result.get("error_code"),
+            )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        fields = youtube_publish_error_log_fields(e)
+        logger.error(
+            "[youtube_comments] Delete route failed user_id={} error_type={} http_status={}",
+            user_id,
+            fields["error_type"],
+            fields["http_status"],
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not delete that reply. Please try again.",
+        )
+
+
 @router.post("/draft-reply")
 def draft_comment_reply(
     body: DraftReplyRequest,
