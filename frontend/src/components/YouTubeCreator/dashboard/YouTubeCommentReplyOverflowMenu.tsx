@@ -1,8 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import DriveFileRenameOutlineRoundedIcon from "@mui/icons-material/DriveFileRenameOutlineRounded";
+import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 
 export const YouTubeCommentReplyOverflowMenu: React.FC<{
   onEdit: () => void;
-}> = ({ onEdit }) => {
+  onDelete: () => void;
+}> = ({ onEdit, onDelete }) => {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -37,7 +41,7 @@ export const YouTubeCommentReplyOverflowMenu: React.FC<{
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
       >
-        ⋮
+        <MoreVertRoundedIcon className="yt-comment-overflow-icon" aria-hidden="true" />
       </button>
       {open ? (
         <div className="yt-comment-overflow-menu" role="menu">
@@ -51,21 +55,27 @@ export const YouTubeCommentReplyOverflowMenu: React.FC<{
               onEdit();
             }}
           >
-            <svg
+            <DriveFileRenameOutlineRoundedIcon
               className="yt-comment-overflow-icon"
-              viewBox="0 0 24 24"
-              width="18"
-              height="18"
               aria-hidden="true"
-            >
-              <path
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                d="M4 20h4.5L19 9.5 14.5 5 4 15.5V20zM14.5 5l4.5 4.5"
-              />
-            </svg>
+            />
             Edit
+          </button>
+          <button
+            type="button"
+            className="yt-comment-overflow-item"
+            role="menuitem"
+            aria-label="Delete"
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+          >
+            <DeleteOutlineRoundedIcon
+              className="yt-comment-overflow-icon"
+              aria-hidden="true"
+            />
+            Delete
           </button>
         </div>
       ) : null}

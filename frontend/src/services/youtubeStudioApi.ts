@@ -147,6 +147,34 @@ export const youtubeStudioApi = {
     }
   },
 
+  async deleteCommentReply(params: { comment_id: string; token_id?: number }) {
+    console.info("[youtubeStudioApi] comment delete start", {
+      hasCommentId: Boolean(params.comment_id),
+      hasTokenId: Boolean(params.token_id),
+    });
+    try {
+      const query: { comment_id: string; token_id?: number } = {
+        comment_id: params.comment_id,
+      };
+      if (params.token_id != null) {
+        query.token_id = params.token_id;
+      }
+      const response = await apiClient.delete(`${API_BASE}/comments/delete`, {
+        params: query,
+      });
+      console.info("[youtubeStudioApi] comment delete complete", {
+        success: Boolean(response.data?.success),
+        hasCommentId: Boolean(params.comment_id),
+      });
+      return response.data;
+    } catch (deleteError) {
+      console.error("[youtubeStudioApi] comment delete failed", {
+        errorName: deleteError instanceof Error ? deleteError.name : "Error",
+      });
+      throw deleteError;
+    }
+  },
+
   async listChannelVideos(params?: { max_results?: number; token_id?: number }) {
     const response = await apiClient.get(`${API_BASE}/studio/videos`, { params });
     return response.data;

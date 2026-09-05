@@ -41,17 +41,19 @@ export const YouTubeCommentThreadReplies: React.FC<{
   const [rows, setRows] = useState<YouTubeInboxReply[]>(
     Array.isArray(replies) ? replies : [],
   );
+  const [removedCount, setRemovedCount] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadedMore, setLoadedMore] = useState(false);
 
   useEffect(() => {
     setRows(Array.isArray(replies) ? replies : []);
+    setRemovedCount(0);
     setLoadedMore(false);
     setError(null);
   }, [parentId, replies]);
 
-  const count = Math.max(Number(totalReplyCount) || 0, rows.length);
+  const count = Math.max((Number(totalReplyCount) || 0) - removedCount, rows.length);
   const canShowMore = Boolean(parentId) && !loadedMore && count > rows.length;
 
   if (count <= 0) {
@@ -115,6 +117,10 @@ export const YouTubeCommentThreadReplies: React.FC<{
               ),
             )
           }
+          onDeleted={(commentId) => {
+            setRows((prev) => prev.filter((row) => row.comment_id !== commentId));
+            setRemovedCount((prev) => prev + 1);
+          }}
         />
       ))}
       {error ? (

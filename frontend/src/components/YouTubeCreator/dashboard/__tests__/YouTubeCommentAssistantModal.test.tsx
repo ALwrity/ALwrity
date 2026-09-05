@@ -15,6 +15,7 @@ vi.mock("../../../../services/youtubeStudioApi", () => ({
     sendCommentReply: vi.fn(),
     listCommentReplies: vi.fn(),
     updateCommentReply: vi.fn(),
+    deleteCommentReply: vi.fn(),
   },
 }));
 
@@ -601,7 +602,7 @@ describe("YouTube Comment Reply Assistant modal", () => {
     expect(screen.getAllByRole("button", { name: "More actions" })).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
     expect(screen.getByRole("menuitem", { name: "Edit" })).toBeTruthy();
-    expect(screen.queryByRole("menuitem", { name: /delete/i })).toBeNull();
+    expect(screen.getByRole("menuitem", { name: "Delete" })).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "Draft with AI" })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Send (HITL)" })).toHaveLength(1);
   });
@@ -789,6 +790,239 @@ describe("YouTube Comment Reply Assistant modal", () => {
       expect(screen.getByText(/Could not save that edit/i)).toBeTruthy();
     });
     expect(screen.queryByText(/status code 503/i)).toBeNull();
+    expect(screen.getByText("Loved the intro")).toBeTruthy();
+  });
+
+  it("Delete asks for confirmation and Cancel does not call the API", async () => {
+    mockedStudioApi.getCommentInbox.mockResolvedValueOnce({
+      success: true,
+      comments: [
+        {
+          ...inboxComment,
+          total_reply_count: 1,
+          replies: [
+            {
+              comment_id: "r-own",
+              author: "MyChannel",
+              text: "Thanks",
+              can_edit: true,
+            },
+          ],
+        },
+      ],
+    });
+    renderAssistant();
+    await waitFor(() => expect(screen.getByText("Thanks")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+
+    expect(screen.getByText("Delete this reply?")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.getByText("Thanks")).toBeTruthy();
+    expect(screen.queryByText("Delete this reply?")).toBeNull();
+    expect(mockedStudioApi.deleteCommentReply).not.toHaveBeenCalled();
+    expect(screen.getAllByRole("button", { name: "Draft with AI" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Send (HITL)" })).toHaveLength(1);
+  });
+
+  it("confirm Delete removes the reply without sending a parent reply", async () => {
+    mockedStudioApi.getCommentInbox.mockResolvedValueOnce({
+      success: true,
+      comments: [
+        {
+          ...inboxComment,
+          total_reply_count: 1,
+          replies: [
+            {
+              comment_id: "r-own",
+              author: "MyChannel",
+              text: "Thanks",
+              can_edit: true,
+            },
+          ],
+        },
+      ],
+    });
+    mockedStudioApi.deleteCommentReply.mockResolvedValueOnce({ success: true });
+    renderAssistant();
+    await waitFor(() => expect(screen.getByText("Thanks")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Thanks")).toBeNull();
+    });
+    expect(mockedStudioApi.deleteCommentReply).toHaveBeenCalledWith({
+      comment_id: "r-own",
+    });
+    expect(mockedStudioApi.sendCommentReply).not.toHaveBeenCalled();
+    expect(mockedStudioApi.getCommentInbox.mock.calls.length).toBe(1);
+    expect(screen.getByText("Loved the intro")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Draft with AI" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Send (HITL)" })).toHaveLength(1);
+    expect(screen.queryByText("Replies")).toBeNull();
+  });
+
+  it("keeps a viewer reply when the creator deletes their own reply", async () => {
+    mockedStudioApi.getCommentInbox.mockResolvedValueOnce({
+      success: true,
+      comments: [
+        {
+          ...inboxComment,
+          total_reply_count: 2,
+          replies: [
+            {
+              comment_id: "r-own",
+              author: "MyChannel",
+              text: "Thanks",
+              can_edit: true,
+            },
+            {
+              comment_id: "r-viewer",
+              author: "Pat",
+              text: "Me too",
+              can_edit: false,
+            },
+          ],
+        },
+      ],
+    });
+    mockedStudioApi.deleteCommentReply.mockResolvedValueOnce({ success: true });
+    renderAssistant();
+    await waitFor(() => expect(screen.getByText("Pat")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Thanks")).toBeNull();
+    });
+    expect(screen.getByText("Me too")).toBeTruthy();
+    expect(screen.getByText("1 reply")).toBeTruthy();
+    expect(screen.getByText("Loved the intro")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Draft with AI" })).toHaveLength(1);
+  });
+
+  it("disables confirm actions while delete is in progress", async () => {
+    mockedStudioApi.getCommentInbox.mockResolvedValueOnce({
+      success: true,
+      comments: [
+        {
+          ...inboxComment,
+          total_reply_count: 1,
+          replies: [
+            {
+              comment_id: "r-own",
+              author: "MyChannel",
+              text: "Thanks",
+              can_edit: true,
+            },
+          ],
+        },
+      ],
+    });
+    let finishDelete: (value: { success: boolean }) => void = () => undefined;
+    mockedStudioApi.deleteCommentReply.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishDelete = resolve;
+        }),
+    );
+    renderAssistant();
+    await waitFor(() => expect(screen.getByText("Thanks")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(screen.getByRole("button", { name: "Delete" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveProperty("disabled", true);
+
+    finishDelete({ success: true });
+    await waitFor(() => {
+      expect(screen.queryByText("Thanks")).toBeNull();
+    });
+  });
+
+  it("keeps the reply and parent comment when delete fails", async () => {
+    mockedStudioApi.getCommentInbox.mockResolvedValueOnce({
+      success: true,
+      comments: [
+        {
+          ...inboxComment,
+          total_reply_count: 1,
+          replies: [
+            {
+              comment_id: "r-own",
+              author: "MyChannel",
+              text: "Thanks",
+              can_edit: true,
+            },
+          ],
+        },
+      ],
+    });
+    mockedStudioApi.deleteCommentReply.mockResolvedValueOnce({
+      success: false,
+      message: "YouTube would not delete that comment. Check comment permissions and try again.",
+    });
+    renderAssistant();
+    await waitFor(() => expect(screen.getByText("Sam")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "YouTube would not delete that comment. Check comment permissions and try again.",
+        ),
+      ).toBeTruthy();
+    });
+    expect(screen.getByText("Thanks")).toBeTruthy();
+    expect(screen.getByText("Sam")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Draft with AI" })).toHaveLength(1);
+  });
+
+  it("does not show thrown request text when reply delete fails", async () => {
+    mockedStudioApi.getCommentInbox.mockResolvedValueOnce({
+      success: true,
+      comments: [
+        {
+          ...inboxComment,
+          total_reply_count: 1,
+          replies: [
+            {
+              comment_id: "r-own",
+              author: "MyChannel",
+              text: "Thanks",
+              can_edit: true,
+            },
+          ],
+        },
+      ],
+    });
+    mockedStudioApi.deleteCommentReply.mockRejectedValueOnce(
+      new Error("Request failed with status code 503"),
+    );
+    renderAssistant();
+    await waitFor(() => expect(screen.getByText("Sam")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Could not delete that reply/i)).toBeTruthy();
+    });
+    expect(screen.queryByText(/status code 503/i)).toBeNull();
+    expect(screen.getByText("Thanks")).toBeTruthy();
     expect(screen.getByText("Loved the intro")).toBeTruthy();
   });
 });

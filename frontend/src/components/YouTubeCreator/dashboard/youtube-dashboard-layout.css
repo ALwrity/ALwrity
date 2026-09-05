@@ -795,8 +795,10 @@ body.youtube-studio-view #root {
   height: 32px;
   border-radius: 50%;
   cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 
 .yt-comment-overflow-trigger:hover {
@@ -836,6 +838,22 @@ body.youtube-studio-view #root {
 
 .yt-comment-overflow-icon {
   flex-shrink: 0;
+  font-size: 20px !important;
+  width: 20px;
+  height: 20px;
+  color: #606060;
+}
+
+.yt-comment-overflow-item:hover .yt-comment-overflow-icon {
+  color: #0f0f0f;
+}
+
+.yt-comment-thread-reply-confirm {
+  margin: 6px 0 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #0f0f0f;
+  line-height: 1.4;
 }
 
 .yt-comment-thread-reply-author {
