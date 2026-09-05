@@ -1,9 +1,15 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
+import { WEBSITE_STEP_HEADER_TOP_MARGIN } from '../constants/websiteStepLayout';
 
 const WebsiteStepHeader: React.FC = () => {
   return (
-    <Box sx={{ mb: 3, mt: 0 }}>
+    <Box
+      data-testid="website-step-header"
+      data-top-spacing-xs={WEBSITE_STEP_HEADER_TOP_MARGIN.xs}
+      data-top-spacing-md={WEBSITE_STEP_HEADER_TOP_MARGIN.md}
+      sx={{ mb: 3, mt: WEBSITE_STEP_HEADER_TOP_MARGIN }}
+    >
       <Typography
         variant="h4"
         component="h1"

@@ -81,7 +81,7 @@ describe('WebsiteAnalysisTabContent - Tab Layout & View Tracking', () => {
     );
 
     // Verify hint alert is present
-    expect(screen.getByText(/Please explore all three tabs/i)).toBeInTheDocument();
+    expect(screen.getByText(/Explore all 3 tabs to unlock your brand's growth engine/i)).toBeInTheDocument();
   });
 
   it('hides the hint alert when all tabs have been viewed', () => {
@@ -97,7 +97,50 @@ describe('WebsiteAnalysisTabContent - Tab Layout & View Tracking', () => {
     );
 
     // Verify hint alert is NOT present
-    expect(screen.queryByText(/Please explore all three tabs/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Explore all 3 tabs to unlock your brand's growth engine/i)).not.toBeInTheDocument();
+  });
+
+  it('hides inline URL bar in dashboard-first mode', () => {
+    render(
+      <WebsiteAnalysisTabContent
+        {...baseProps}
+        dashboardFirstMode={true}
+        suppressDashboardScroll={true}
+        viewedTabs={{ 0: true, 1: true, 2: true }}
+        setViewedTabs={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByTestId('website-url-action-bar')).not.toBeInTheDocument();
+    expect(screen.getByTestId('unified-folder-tab-dashboard')).toBeInTheDocument();
+  });
+
+  it('places the unified dashboard above setup controls in dashboard-first mode', () => {
+    render(
+      <WebsiteAnalysisTabContent
+        {...baseProps}
+        dashboardFirstMode={true}
+        suppressDashboardScroll={true}
+        viewedTabs={{ 0: true, 1: true, 2: true }}
+        setViewedTabs={vi.fn()}
+      />
+    );
+
+    const dashboard = screen.getByTestId('unified-folder-tab-dashboard');
+    const setup = screen.getByTestId('website-setup-section');
+    expect(dashboard.compareDocumentPosition(setup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('shows Analyze New Website in the URL bar when analysis is loaded', () => {
+    render(
+      <WebsiteAnalysisTabContent
+        {...baseProps}
+        viewedTabs={{ 0: true, 1: false, 2: false }}
+        setViewedTabs={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /analyze new website/i })).toBeInTheDocument();
   });
 
   it('calls setViewedTabs when switching tabs', () => {

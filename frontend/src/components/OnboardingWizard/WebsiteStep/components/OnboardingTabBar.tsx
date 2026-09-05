@@ -4,7 +4,7 @@ import { keyframes } from '@mui/system';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import YouTubeIcon from '@mui/icons-material/YouTube';
-import SystemStatusChip from '../../common/SystemStatusChip';
+import { WebsiteTabUrlHoverPanel } from './WebsiteUrlActionBar';
 
 interface OnboardingTabBarProps {
   activeTab: 'website' | 'linkedin' | 'youtube';
@@ -13,6 +13,12 @@ interface OnboardingTabBarProps {
   linkedinConnected: boolean;
   youtubeConnected: boolean;
   hasInput?: boolean;
+  showWebsiteUrlHoverPanel?: boolean;
+  website?: string;
+  setWebsite?: (url: string) => void;
+  websiteLoading?: boolean;
+  onAnalyze?: () => void;
+  onAnalyzeNewWebsite?: () => void;
   backgroundTasks: {
     tasks: Record<string, {
       status: string;
@@ -94,6 +100,12 @@ const OnboardingTabBar: React.FC<OnboardingTabBarProps> = ({
   linkedinConnected,
   youtubeConnected,
   hasInput = false,
+  showWebsiteUrlHoverPanel = false,
+  website = '',
+  setWebsite,
+  websiteLoading = false,
+  onAnalyze,
+  onAnalyzeNewWebsite,
   backgroundTasks,
   onViewResults,
 }) => {
@@ -178,8 +190,32 @@ const OnboardingTabBar: React.FC<OnboardingTabBarProps> = ({
     };
   };
 
+  const urlHoverEnabled =
+    showWebsiteUrlHoverPanel &&
+    hasWebsiteAnalysis &&
+    !!setWebsite &&
+    !!onAnalyze &&
+    !!onAnalyzeNewWebsite;
+
+  const websiteButton = (
+    <Button
+      onClick={() => setActiveTab('website')}
+      sx={{
+        ...buttonBaseStyle,
+        ...(activeTab === 'website' ? selectedStyle : unselectedStyle),
+        ...getAnimationStyle('website'),
+      }}
+    >
+      <Box component="span" sx={buttonContentStyle}>
+        <Box sx={statusBulb(hasWebsiteAnalysis)} />
+        <AnalyticsIcon sx={{ fontSize: 20, flexShrink: 0, color: activeTab === 'website' ? '#6366F1' : '#64748B' }} />
+        Website
+      </Box>
+    </Button>
+  );
+
   return (
-    <Box sx={{ display: 'flex', gap: 1.5, mb: 3, alignItems: 'center', width: '100%' }}>
+    <Box sx={{ display: 'flex', gap: 1.5, mb: showWebsiteUrlHoverPanel ? 2.5 : 3, alignItems: 'center', width: '100%' }}>
       <Box
         sx={{
           display: 'grid',
@@ -189,24 +225,24 @@ const OnboardingTabBar: React.FC<OnboardingTabBarProps> = ({
           minWidth: 0,
         }}
       >
-        <Tooltip title="Connect Your Website" arrow placement="top">
-          <Box component="span" sx={{ display: 'flex', minWidth: 0 }}>
-            <Button
-              onClick={() => setActiveTab('website')}
-              sx={{
-                ...buttonBaseStyle,
-                ...(activeTab === 'website' ? selectedStyle : unselectedStyle),
-                ...getAnimationStyle('website'),
-              }}
-            >
-              <Box component="span" sx={buttonContentStyle}>
-                <Box sx={statusBulb(hasWebsiteAnalysis)} />
-                <AnalyticsIcon sx={{ fontSize: 20, flexShrink: 0, color: activeTab === 'website' ? '#6366F1' : '#64748B' }} />
-                Website
-              </Box>
-            </Button>
-          </Box>
-        </Tooltip>
+        {urlHoverEnabled ? (
+          <WebsiteTabUrlHoverPanel
+            enabled={urlHoverEnabled}
+            website={website}
+            setWebsite={setWebsite!}
+            loading={websiteLoading}
+            onAnalyze={onAnalyze!}
+            onAnalyzeNewWebsite={onAnalyzeNewWebsite!}
+          >
+            {websiteButton}
+          </WebsiteTabUrlHoverPanel>
+        ) : (
+          <Tooltip title="Connect Your Website" arrow placement="top">
+            <Box component="span" sx={{ display: 'flex', minWidth: 0 }}>
+              {websiteButton}
+            </Box>
+          </Tooltip>
+        )}
 
         <Tooltip title="Connect Your LinkedIn profile for Professional content publishing" arrow placement="top">
           <Box component="span" sx={{ display: 'flex', minWidth: 0 }}>

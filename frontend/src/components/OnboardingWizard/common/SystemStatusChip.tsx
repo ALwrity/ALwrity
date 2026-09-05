@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Box, Typography, LinearProgress, Collapse, IconButton } from '@mui/material';
+import React, { useState, useRef } from 'react';
+import { Box, Typography, LinearProgress, Collapse, IconButton, Popover } from '@mui/material';
 import { keyframes } from '@mui/system';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
@@ -242,6 +242,7 @@ const SystemStatusChip: React.FC<SystemStatusChipProps> = ({
         : '#ef4444';
 
   const isCompact = variant === 'compact';
+  const compactAnchorRef = useRef<HTMLDivElement | null>(null);
 
   const chipContent = (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
@@ -303,49 +304,66 @@ const SystemStatusChip: React.FC<SystemStatusChipProps> = ({
 
   if (isCompact) {
     return (
-      <Box
-        onMouseEnter={() => setHoverOpen(true)}
-        onMouseLeave={() => setHoverOpen(false)}
-        sx={{ position: 'relative', flexShrink: 0, width: 'fit-content' }}
-      >
+      <>
         <Box
-          sx={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'flex-start',
-            width: 'fit-content',
-            px: 1.5,
-            py: 0.75,
-            borderRadius: '10px',
-            border: '1px solid #e2e8f0',
-            bgcolor: '#FFFFFF',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            '&:hover': { 
-              bgcolor: '#f8fafc',
-              borderColor: '#cbd5e1',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
-            },
-          }}
+          ref={compactAnchorRef}
+          onMouseEnter={() => setHoverOpen(true)}
+          onMouseLeave={() => setHoverOpen(false)}
+          sx={{ position: 'relative', flexShrink: 0, width: 'fit-content' }}
         >
-          {chipContent}
-        </Box>
-
-        {hoverOpen && (
           <Box
             sx={{
-              position: 'absolute',
-              top: 'calc(100% + 8px)',
-              right: 0,
-              zIndex: 1400,
-              width: 468,
-              maxWidth: 'min(468px, 92vw)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'flex-start',
+              width: 'fit-content',
+              px: 1.5,
+              py: 0.75,
+              borderRadius: '10px',
+              border: '1px solid #e2e8f0',
+              bgcolor: '#FFFFFF',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                bgcolor: '#f8fafc',
+                borderColor: '#cbd5e1',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
+              },
             }}
           >
-            {taskPanel}
+            {chipContent}
           </Box>
-        )}
-      </Box>
+        </Box>
+        <Popover
+          open={hoverOpen}
+          anchorEl={compactAnchorRef.current}
+          onClose={() => setHoverOpen(false)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          disableRestoreFocus
+          slotProps={{
+            backdrop: { invisible: true },
+            paper: {
+              'data-testid': 'background-tasks-popover',
+              onMouseEnter: () => setHoverOpen(true),
+              onMouseLeave: () => setHoverOpen(false),
+              sx: {
+                mt: 0.75,
+                p: 0,
+                bgcolor: 'transparent',
+                backgroundImage: 'none',
+                boxShadow: 'none',
+                overflow: 'visible',
+                width: { xs: 'min(468px, 92vw)', sm: 468 },
+                maxWidth: '92vw',
+              },
+            },
+          }}
+          sx={{ pointerEvents: 'none', zIndex: 1700 }}
+        >
+          <Box sx={{ pointerEvents: 'auto' }}>{taskPanel}</Box>
+        </Popover>
+      </>
     );
   }
 

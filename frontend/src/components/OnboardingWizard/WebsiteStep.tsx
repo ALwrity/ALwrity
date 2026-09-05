@@ -22,6 +22,11 @@ import { apiClient } from '../../api/client';
 
 // Extracted utilities
 import { fixUrlFormat } from './WebsiteStep/utils';
+import { STEP0_NAV_TITLE } from './WebsiteStep/constants/websiteStepLayout';
+import {
+  ALL_FOLDER_TABS_VIEWED,
+  shouldShowDashboardFirst,
+} from './WebsiteStep/utils/websiteStepReturnExperience';
 
 // Constants and interfaces
 import {
@@ -47,6 +52,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   onViewBackgroundResults,
   success: propSuccess,
   setSuccess: propSetSuccess,
+  isConnectStepCompleted = false,
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [internalSuccess, setInternalSuccess] = useState<string | null>(null);
@@ -112,9 +118,19 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   });
 
   useEffect(() => {
+    if (isConnectStepCompleted) {
+      setViewedTabs(ALL_FOLDER_TABS_VIEWED);
+      return;
+    }
+    if (!analysis) {
+      setViewedTabs({ 0: true, 1: false, 2: false });
+    }
+  }, [isConnectStepCompleted, analysis]);
+
+  useEffect(() => {
     // Update header content when component mounts
     updateHeaderContent({
-      title: 'Let ALwrity Learn Your Brand',
+      title: STEP0_NAV_TITLE,
       description: 'Let Alwrity analyze your website to understand your brand voice, writing style, and content characteristics. This helps us generate content that matches your existing tone and resonates with your audience.'
     });
   }, [updateHeaderContent]);
@@ -148,6 +164,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   }, [onDataReady, website, domainName, analysis, crawlResult, useAnalysisForGenAI, integrationData, connectedPlatforms, email, emailDigestOptIn, userTimezone]);
 
   const hasWebsiteAnalysis = !!(website.trim() && analysis);
+  const showDashboardFirst = shouldShowDashboardFirst(hasWebsiteAnalysis);
 
   return (
     <Box sx={{ 
@@ -155,7 +172,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
       width: '100%',
       mx: 0,
       px: { xs: 1.5, md: 2 },
-      pb: { xs: 1.5, md: 2 },
+      pb: 0,
       pt: { xs: 0.375, md: 0.625 },
       position: 'relative',
       '@keyframes fadeIn': {
@@ -163,8 +180,8 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
         '100%': { opacity: 1, transform: 'translateY(0)' }
       }
     }}>
-      {/* Header Title */}
-      <WebsiteStepHeader />
+      {/* Header Title — hidden when returning with completed analysis */}
+      {!showDashboardFirst && <WebsiteStepHeader />}
 
       {/* Tab Bar */}
       <OnboardingTabBar
@@ -177,6 +194,17 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
         linkedinConnected={linkedinConnected}
         youtubeConnected={youtubeConnected}
         hasInput={hasUserInteracted || linkedinConnected || youtubeConnected || hasWebsiteAnalysis}
+        showWebsiteUrlHoverPanel={showDashboardFirst}
+        website={website}
+        setWebsite={(url) => {
+          setWebsite(url);
+          if (url.trim() !== '') {
+            setHasUserInteracted(true);
+          }
+        }}
+        websiteLoading={loading}
+        onAnalyze={handleAnalyze}
+        onAnalyzeNewWebsite={handleStartFresh}
         backgroundTasks={backgroundTasks || null}
         onViewResults={onViewBackgroundResults}
       />
@@ -225,6 +253,8 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
           handleStartFresh={handleStartFresh}
           viewedTabs={viewedTabs}
           setViewedTabs={setViewedTabs}
+          dashboardFirstMode={showDashboardFirst}
+          suppressDashboardScroll={showDashboardFirst}
         />
       )}
 

@@ -25,6 +25,8 @@ export interface WebsiteStepProps {
   onViewBackgroundResults?: (taskKey: string) => void;
   success?: string | null;
   setSuccess?: (msg: string | null) => void;
+  /** True when Connect Platforms step is officially completed in the wizard. */
+  isConnectStepCompleted?: boolean;
 }
 
 export interface AnalysisProgress {
