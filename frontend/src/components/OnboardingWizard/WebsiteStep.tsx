@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import {
   Box,
@@ -25,8 +25,11 @@ import { fixUrlFormat } from './WebsiteStep/utils';
 import { STEP0_NAV_TITLE } from './WebsiteStep/constants/websiteStepLayout';
 import {
   ALL_FOLDER_TABS_VIEWED,
+  isConnectStepFullyUnlocked,
+  resolveViewedTabsForReturn,
   shouldShowDashboardFirst,
 } from './WebsiteStep/utils/websiteStepReturnExperience';
+import { DEFAULT_VIEWED_TABS } from './utils/onboardingWebsiteReset';
 
 // Constants and interfaces
 import {
@@ -53,6 +56,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   success: propSuccess,
   setSuccess: propSetSuccess,
   isConnectStepCompleted = false,
+  onWebsiteAnalysisChanged,
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [internalSuccess, setInternalSuccess] = useState<string | null>(null);
@@ -64,11 +68,9 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   const [useAnalysisForGenAI, setUseAnalysisForGenAI] = useState(true);
   const [activeTab, setActiveTab] = useState<'website' | 'linkedin' | 'youtube'>('website');
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
-  const [viewedTabs, setViewedTabs] = useState<Record<number, boolean>>({
-    0: true, // Brand Intelligence is active by default, so it's viewed
-    1: false,
-    2: false,
-  });
+  const [viewedTabs, setViewedTabs] = useState<Record<number, boolean>>(() =>
+    resolveViewedTabsForReturn(isConnectStepCompleted, DEFAULT_VIEWED_TABS, '')
+  );
   const allTabsViewed = viewedTabs[0] && viewedTabs[1] && viewedTabs[2];
   const [integrationData, setIntegrationData] = useState<any>(null);
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
@@ -98,7 +100,14 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
     setSuccess,
     setError,
     setAnalysisWarning,
+    onWebsiteAnalysisChanged,
   });
+
+  const connectStepFullyUnlocked = isConnectStepFullyUnlocked(
+    isConnectStepCompleted,
+    website
+  );
+  const prevConnectCompletedRef = useRef(isConnectStepCompleted);
 
   // Use custom hook for LinkedIn profile summary, Clerk email, and validation changes
   const {
@@ -115,17 +124,17 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
     analysis,
     onValidationChange,
     allTabsViewed,
+    isConnectStepCompleted,
   });
 
   useEffect(() => {
-    if (isConnectStepCompleted) {
+    if (connectStepFullyUnlocked) {
       setViewedTabs(ALL_FOLDER_TABS_VIEWED);
-      return;
+    } else if (prevConnectCompletedRef.current && !isConnectStepCompleted) {
+      setViewedTabs(DEFAULT_VIEWED_TABS);
     }
-    if (!analysis) {
-      setViewedTabs({ 0: true, 1: false, 2: false });
-    }
-  }, [isConnectStepCompleted, analysis]);
+    prevConnectCompletedRef.current = isConnectStepCompleted;
+  }, [connectStepFullyUnlocked, isConnectStepCompleted]);
 
   useEffect(() => {
     // Update header content when component mounts

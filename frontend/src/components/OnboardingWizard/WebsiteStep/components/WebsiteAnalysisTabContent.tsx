@@ -32,6 +32,7 @@ import {
   folderTabsContainerSx,
   getFolderTabSx,
 } from './unifiedFolderTabStyles';
+import { shouldShowFolderTabExploreHint } from '../utils/websiteStepReturnExperience';
 
 interface WebsiteAnalysisTabContentProps {
   website: string;
@@ -203,7 +204,7 @@ const WebsiteAnalysisTabContent: React.FC<WebsiteAnalysisTabContentProps> = ({
       data-testid="unified-folder-tab-dashboard"
     >
           {/* Hint Alert - guides user and hides once all tabs are viewed */}
-          {!(viewedTabs[0] && viewedTabs[1] && viewedTabs[2]) && (
+          {shouldShowFolderTabExploreHint(viewedTabs) && (
             <Box
               sx={{
                 display: 'flex',

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { isWebsiteStepValidForContinue } from '../utils/websiteStepReturnExperience';
 
 interface UseWebsiteStepEffectsProps {
   initialData: any;
@@ -9,6 +10,7 @@ interface UseWebsiteStepEffectsProps {
   analysis: any;
   onValidationChange?: (isValid: boolean) => void;
   allTabsViewed: boolean;
+  isConnectStepCompleted?: boolean;
 }
 
 export function useWebsiteStepEffects({
@@ -20,6 +22,7 @@ export function useWebsiteStepEffects({
   analysis,
   onValidationChange,
   allTabsViewed,
+  isConnectStepCompleted = false,
 }: UseWebsiteStepEffectsProps) {
   const [linkedinProfile, setLinkedinProfile] = useState<any>(null);
   const [email, setEmail] = useState<string>('');
@@ -67,13 +70,18 @@ export function useWebsiteStepEffects({
   // Notify parent when validation state changes (guard against infinite loops)
   const prevValidRef = useRef<boolean | null>(null);
   useEffect(() => {
-    const hasWebsiteAnalysis = !!(website.trim() && analysis);
-    const isValid = (hasWebsiteAnalysis && allTabsViewed) || linkedinConnected;
+    const isValid = isWebsiteStepValidForContinue({
+      isConnectStepCompleted,
+      website,
+      analysis,
+      allTabsViewed,
+      linkedinConnected,
+    });
     if (isValid !== prevValidRef.current && onValidationChange) {
       prevValidRef.current = isValid;
       onValidationChange(isValid);
     }
-  }, [website, analysis, linkedinConnected, onValidationChange, allTabsViewed]);
+  }, [website, analysis, linkedinConnected, onValidationChange, allTabsViewed, isConnectStepCompleted]);
 
   return {
     linkedinProfile,

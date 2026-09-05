@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Competitor } from '../WebsiteStep/components';
 import type { ContentPillarData } from './ContentPillarsSection';
 import { aiApiClient, longRunningApiClient } from '../../../api/client';
+import { normalizeWebsiteUrl } from '../utils/onboardingWebsiteReset';
 
 interface UseCompetitorDiscoveryProps {
   userUrl: string;
@@ -331,8 +332,18 @@ export function useCompetitorDiscovery({
         setSocialMediaAccounts(mergeCrawlSocialMedia(initialData.social_media_accounts));
       }
 
-      // 1. Check for backend competitors data (SSOT)
-      if (initialData?.competitors?.length > 0) {
+      const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
+      const initialWebsiteUrl =
+        initialData?.website ||
+        initialData?.website_url ||
+        initialData?.userUrl ||
+        '';
+      const backendMatchesCurrentWebsite =
+        !initialWebsiteUrl ||
+        normalizeWebsiteUrl(initialWebsiteUrl) === normalizeWebsiteUrl(finalUserUrl);
+
+      // 1. Check for backend competitors data (SSOT) — only when URL matches
+      if (initialData?.competitors?.length > 0 && backendMatchesCurrentWebsite) {
         setCompetitors(initialData.competitors);
         if (initialData.researchSummary) setResearchSummary(initialData.researchSummary);
         setContentPillars(initialData.content_pillars || null);
@@ -364,6 +375,13 @@ export function useCompetitorDiscovery({
           await refreshContentPillars();
         }
         return;
+      }
+
+      if (initialData?.competitors?.length > 0 && !backendMatchesCurrentWebsite) {
+        console.warn(
+          '[useCompetitorDiscovery] Ignoring stale backend competitors for mismatched website URL',
+          { initialWebsiteUrl, finalUserUrl }
+        );
       }
 
       // 2. Try to load from cache

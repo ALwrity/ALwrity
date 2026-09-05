@@ -6,12 +6,9 @@ export const FOLDER_TAB_PARTITION_COLOR = '#E2E8F0';
 export const FOLDER_TAB_CARD_GRADIENT =
   'linear-gradient(90deg, #EC4899 0%, #8B5CF6 50%, #3B82F6 100%)';
 
-/**
- * Even pink → purple → blue loop on the active tab's top and side edges.
- * Bottom edge stays flat so the grey partition can sit only under the selected cell.
- */
-export const FOLDER_TAB_ACTIVE_BORDER_GRADIENT =
-  'conic-gradient(from 225deg at 50% calc(100% - 2px), #EC4899 0deg, #D946EF 72deg, #8B5CF6 144deg, #6366F1 216deg, #3B82F6 288deg, #EC4899 360deg)';
+/** Side + top coloured edges for the active folder tab cell. */
+export const FOLDER_TAB_ACTIVE_SIDE_GRADIENT =
+  'linear-gradient(90deg, #EC4899 0%, #8B5CF6 50%, #3B82F6 100%)';
 
 /** Header row shell — no full-width partition; per-tab styling owns the baseline. */
 export const folderTabHeaderSx: SxProps<Theme> = {
@@ -21,19 +18,28 @@ export const folderTabHeaderSx: SxProps<Theme> = {
   mx: '-3px',
   marginTop: '-3px',
   borderBottom: 'none',
+  overflow: 'visible',
 };
 
 export const folderTabsContainerSx: SxProps<Theme> = {
   width: '100%',
-  '& .MuiTabs-indicator': { display: 'none' },
+  overflow: 'visible',
+  '& .MuiTabs-scroller': {
+    overflow: 'visible !important',
+  },
   '& .MuiTabs-flexContainer': {
     alignItems: 'flex-end',
     width: '100%',
     gap: 0,
+    overflow: 'visible',
   },
   '& .MuiTab-root': {
     minHeight: 72,
+    overflow: 'visible',
+    opacity: 1,
+    maxWidth: 'none',
   },
+  '& .MuiTabs-indicator': { display: 'none' },
 };
 
 const inactiveTabBaselineSx: SxProps<Theme> = {
@@ -46,6 +52,7 @@ const inactiveTabBaselineSx: SxProps<Theme> = {
     height: '3px',
     background: FOLDER_TAB_CARD_GRADIENT,
     pointerEvents: 'none',
+    zIndex: 1,
   },
 };
 
@@ -67,6 +74,7 @@ export function getFolderTabSx(
     position: 'relative',
     borderRadius: '24px 24px 0 0',
     transition: 'background-color 0.2s ease',
+    overflow: 'visible',
   };
 
   if (!isActive) {
@@ -74,6 +82,7 @@ export function getFolderTabSx(
       ...base,
       bgcolor: '#F8FAFC',
       border: 'none',
+      borderBottom: 'none',
       zIndex: 1,
       ...inactiveTabBaselineSx,
       '&:hover': { bgcolor: '#F1F5F9' },
@@ -83,11 +92,14 @@ export function getFolderTabSx(
   return {
     ...base,
     bgcolor: '#FFFFFF',
-    background: `linear-gradient(#fff, #fff) padding-box, ${FOLDER_TAB_ACTIVE_BORDER_GRADIENT} border-box`,
-    border: '3px solid transparent',
-    borderBottom: `1px solid ${FOLDER_TAB_PARTITION_COLOR}`,
-    marginBottom: '-1px',
-    zIndex: 2,
+    background: `linear-gradient(#fff, #fff) padding-box, ${FOLDER_TAB_ACTIVE_SIDE_GRADIENT} border-box`,
+    borderTop: '3px solid transparent',
+    borderLeft: '3px solid transparent',
+    borderRight: '3px solid transparent',
+    borderBottom: `2px solid ${FOLDER_TAB_PARTITION_COLOR}`,
+    marginBottom: '-2px',
+    zIndex: 3,
+    '&::after': { display: 'none' },
     ...(isFirst && { borderTopLeftRadius: '22px' }),
     ...(isLast && { borderTopRightRadius: '22px' }),
     '&:hover': { bgcolor: '#FFFFFF' },

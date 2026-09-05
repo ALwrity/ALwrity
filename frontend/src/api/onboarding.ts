@@ -149,6 +149,17 @@ export async function resetOnboarding() {
   return res.data;
 }
 
+export async function invalidateDownstreamOnboardingSteps(payload?: {
+  website_url?: string;
+  reason?: string;
+}) {
+  const res: AxiosResponse<any> = await apiClient.post(
+    '/api/onboarding/invalidate-downstream',
+    payload || {}
+  );
+  return res.data;
+}
+
 // New functions for FinalStep data loading
 export async function getOnboardingSummary() {
   const res: AxiosResponse<any> = await apiClient.get('/api/onboarding/summary');

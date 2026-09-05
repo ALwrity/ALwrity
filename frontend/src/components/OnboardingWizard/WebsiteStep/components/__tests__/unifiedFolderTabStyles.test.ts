@@ -14,10 +14,10 @@ describe('unifiedFolderTabStyles', () => {
 
   it('shows grey partition only on the active tab cell', () => {
     const activeSx = getFolderTabSx(true, 1) as Record<string, unknown>;
-    expect(activeSx.borderBottom).toBe(`1px solid ${FOLDER_TAB_PARTITION_COLOR}`);
-    expect(String(activeSx.background)).toContain('conic-gradient');
-    expect(activeSx.marginBottom).toBe('-1px');
-    expect(activeSx['&::after']).toBeUndefined();
+    expect(activeSx.borderBottom).toBe(`2px solid ${FOLDER_TAB_PARTITION_COLOR}`);
+    expect(String(activeSx.background)).toContain('linear-gradient');
+    expect(activeSx.marginBottom).toBe('-2px');
+    expect((activeSx['&::after'] as Record<string, unknown>)?.display).toBe('none');
   });
 
   it('shows coloured gradient baseline on inactive tab cells', () => {

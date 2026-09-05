@@ -27,6 +27,11 @@ export interface WebsiteStepProps {
   setSuccess?: (msg: string | null) => void;
   /** True when Connect Platforms step is officially completed in the wizard. */
   isConnectStepCompleted?: boolean;
+  /** Called when website analysis changes and downstream steps must reset. */
+  onWebsiteAnalysisChanged?: (params: {
+    websiteUrl: string;
+    reason: 'reanalyze' | 'new_website' | 'start_fresh' | 'load_existing';
+  }) => void | Promise<void>;
 }
 
 export interface AnalysisProgress {

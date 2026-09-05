@@ -95,7 +95,7 @@ const AnalysisTopBar: React.FC<AnalysisTopBarProps> = ({
                   alignItems: 'center',
                   justifyContent: 'center',
                   px: { xs: 2.5, sm: 3.5 },
-                  py: 0.5, // Reduced padding to fit the 20% height reduction
+                  py: 0.5,
                   minWidth: { xs: 120, sm: 160 },
                   cursor: 'pointer',
                   bgcolor: isActive ? '#FFFFFF' : '#F8FAFC',
