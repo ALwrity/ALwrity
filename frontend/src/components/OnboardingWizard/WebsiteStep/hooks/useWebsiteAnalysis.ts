@@ -13,17 +13,27 @@ import {
   fetchLastAnalysis,
   extractDomainName
 } from '../utils/websiteUtils';
+import {
+  getStoredWebsiteUrl,
+  markDownstreamDirty,
+  shouldInvalidateDownstream,
+} from '../../utils/onboardingWebsiteReset';
 
 interface UseWebsiteAnalysisProps {
   setSuccess: (msg: string | null) => void;
   setError: (msg: string | null) => void;
   setAnalysisWarning: (msg: string | null) => void;
+  onWebsiteAnalysisChanged?: (params: {
+    websiteUrl: string;
+    reason: 'reanalyze' | 'new_website' | 'start_fresh' | 'load_existing';
+  }) => void | Promise<void>;
 }
 
 export function useWebsiteAnalysis({
   setSuccess,
   setError,
-  setAnalysisWarning
+  setAnalysisWarning,
+  onWebsiteAnalysisChanged,
 }: UseWebsiteAnalysisProps) {
   const [website, setWebsite] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,6 +45,20 @@ export function useWebsiteAnalysis({
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [progress, setProgress] = useState<AnalysisProgress[]>(INITIAL_PROGRESS_STEPS);
   const urlWasPreFilledRef = useRef(false);
+  const lastCommittedAnalysisUrlRef = useRef<string>(getStoredWebsiteUrl());
+
+  const notifyWebsiteAnalysisChanged = async (
+    websiteUrl: string,
+    reason: 'reanalyze' | 'new_website' | 'start_fresh' | 'load_existing'
+  ) => {
+    markDownstreamDirty();
+    lastCommittedAnalysisUrlRef.current = websiteUrl;
+    try {
+      await onWebsiteAnalysisChanged?.({ websiteUrl, reason });
+    } catch (err) {
+      console.error('[useWebsiteAnalysis] Failed to invalidate downstream onboarding state:', err);
+    }
+  };
 
   // A. Load active analysis from previous session silently on mount (Auto-hydration)
   useEffect(() => {
@@ -74,6 +98,18 @@ export function useWebsiteAnalysis({
       }
       setHasCheckedExisting(false);
       setExistingAnalysis(null);
+
+      const previousUrl = lastCommittedAnalysisUrlRef.current || getStoredWebsiteUrl();
+      const nextUrl = fixUrlFormat(website) || website;
+      if (
+        analysis &&
+        shouldInvalidateDownstream({
+          previousUrl,
+          nextUrl,
+        })
+      ) {
+        void notifyWebsiteAnalysisChanged(nextUrl, 'new_website');
+      }
 
       // Clear mismatched old content to prevent confusing UI while typing
       setAnalysis(null);
@@ -142,6 +178,7 @@ export function useWebsiteAnalysis({
         const fixedUrl = fixUrlFormat(website) || website;
         localStorage.setItem('website_url', fixedUrl);
         localStorage.setItem('website_analysis_data', JSON.stringify(result.analysis));
+        await notifyWebsiteAnalysisChanged(fixedUrl, 'load_existing');
       } else {
         setError('Failed to load previous analysis. Please trigger a new one.');
       }
@@ -186,6 +223,18 @@ export function useWebsiteAnalysis({
             
             localStorage.setItem('website_url', fixedUrl);
             localStorage.setItem('website_analysis_data', JSON.stringify(loadResult.analysis));
+            if (
+              isExplicitReanalyze ||
+              shouldInvalidateDownstream({
+                previousUrl: lastCommittedAnalysisUrlRef.current || getStoredWebsiteUrl(),
+                nextUrl: fixedUrl,
+              })
+            ) {
+              await notifyWebsiteAnalysisChanged(
+                fixedUrl,
+                isExplicitReanalyze ? 'reanalyze' : 'load_existing'
+              );
+            }
           } else {
             setError('Failed to load existing analysis database record.');
           }
@@ -210,6 +259,10 @@ export function useWebsiteAnalysis({
 
         localStorage.setItem('website_url', fixedUrl);
         localStorage.setItem('website_analysis_data', JSON.stringify(analysisResult.analysis));
+        await notifyWebsiteAnalysisChanged(
+          fixedUrl,
+          isExplicitReanalyze ? 'reanalyze' : 'new_website'
+        );
 
         if (analysisResult.warning) {
           setSuccess(`Website style analysis completed successfully! Note: ${analysisResult.warning}`);
@@ -244,6 +297,8 @@ export function useWebsiteAnalysis({
 
     localStorage.removeItem('website_url');
     localStorage.removeItem('website_analysis_data');
+    lastCommittedAnalysisUrlRef.current = '';
+    void notifyWebsiteAnalysisChanged('', 'start_fresh');
     setProgress(prev => prev.map(p => ({ ...p, completed: false })));
   };
 

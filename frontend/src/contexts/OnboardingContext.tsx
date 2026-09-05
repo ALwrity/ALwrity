@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { useAuth } from '@clerk/clerk-react';
 import { apiClient, ConnectionError, NetworkError } from '../api/client';
 import { shouldSkipOnboarding } from '../utils/demoMode';
+import { isDownstreamDirty } from '../components/OnboardingWizard/utils/onboardingWebsiteReset';
 
 /**
  * Onboarding Context
@@ -77,6 +78,7 @@ interface OnboardingContextValue {
   clearError: () => void;
   initializeOnboarding: () => void;
   resetOnboarding: () => void;
+  resetOptimisticProgressFloor: () => void;
 }
 
 const OnboardingContext = createContext<OnboardingContextValue | undefined>(undefined);
@@ -182,8 +184,17 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
 
       const serverProgress = onboarding.completion_percentage ?? 0;
       const floor = optimisticProgressFloorRef.current;
-      const mergedProgress = Math.max(serverProgress, floor);
-      if (serverProgress >= floor) {
+      const downstreamDirty = isDownstreamDirty();
+      let mergedProgress = Math.max(serverProgress, floor);
+
+      if (downstreamDirty) {
+        optimisticProgressFloorRef.current = 0;
+        mergedProgress = serverProgress;
+        console.log(
+          'OnboardingContext: Downstream dirty — trusting server progress',
+          { serverProgress }
+        );
+      } else if (serverProgress >= floor) {
         optimisticProgressFloorRef.current = 0;
       } else if (floor > 0) {
         console.log(
@@ -310,6 +321,10 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     refresh();
   }, [data, refresh]);
 
+  const resetOptimisticProgressFloor = useCallback(() => {
+    optimisticProgressFloorRef.current = 0;
+  }, []);
+
   /**
    * Clear error state
    */
@@ -366,6 +381,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     clearError,
     initializeOnboarding,
     resetOnboarding,
+    resetOptimisticProgressFloor,
   };
 
   return (

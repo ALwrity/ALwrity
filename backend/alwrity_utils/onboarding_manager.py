@@ -3,7 +3,7 @@ Onboarding Manager Module
 Handles all onboarding-related endpoints and functionality.
 """
 
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Query
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Query, Body
 from fastapi.responses import FileResponse
 from typing import Dict, Any, Optional
 from loguru import logger
@@ -154,6 +154,23 @@ class OnboardingManager:
                 return await reset_onboarding(current_user, hard=hard)
             except Exception as e:
                 logger.error(f"Error in onboarding_reset: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.post("/api/onboarding/invalidate-downstream")
+        async def onboarding_invalidate_downstream(
+            payload: Optional[Dict[str, Any]] = Body(default=None),
+            current_user: dict = Depends(get_current_user),
+        ):
+            """Clear steps 2+ when website analysis changes in Connect Platforms."""
+            try:
+                from api.onboarding_utils.onboarding_downstream_invalidation import (
+                    invalidate_downstream_onboarding,
+                )
+                return await invalidate_downstream_onboarding(current_user, payload)
+            except ValueError as ve:
+                raise HTTPException(status_code=401, detail=str(ve))
+            except Exception as e:
+                logger.error(f"Error in onboarding_invalidate_downstream: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
         # Scheduled tasks status endpoint

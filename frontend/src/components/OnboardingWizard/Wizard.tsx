@@ -32,6 +32,16 @@ import {
   progressPercentAfterStepComplete,
 } from './common/onboardingProgressState';
 import { STEP0_NAV_TITLE } from './WebsiteStep/constants/websiteStepLayout';
+import {
+  applyDownstreamDirtyProgressOverride,
+  clearDownstreamDirtyFlag,
+  clearDownstreamLocalCaches,
+  normalizeWebsiteUrl,
+  setCommittedStep1WebsiteUrl,
+  stripDownstreamStepData,
+} from './utils/onboardingWebsiteReset';
+import { mergeBackendStepsIntoStepData } from './utils/wizardStepDataSync';
+import { invalidateDownstreamOnboardingSteps } from '../../api/onboarding';
 
 
 // Set to true in dev to restore verbose per-action tracing
@@ -59,7 +69,7 @@ const getBackendStep = (backendSteps: any[], frontendIndex: number) =>
 
 const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   const [activeStep, setActiveStep] = useState(0);
-  const { loading, currentStep, completionPercentage, data, refresh, markStepComplete } = useOnboarding();
+  const { loading, currentStep, completionPercentage, data, refresh, markStepComplete, resetOptimisticProgressFloor } = useOnboarding();
   const [direction, setDirection] = useState<'left' | 'right'>('right');
   const [showHelp, setShowHelp] = useState(false);
   const [showProgressMessage, setShowProgressMessage] = useState(false);
@@ -71,6 +81,13 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   const [retryNextStep, setRetryNextStep] = useState<number>(0);
   // sessionId removed - backend uses Clerk user ID from auth token
   const [stepData, setStepData] = useState<any>(null);
+  const [downstreamLocked, setDownstreamLocked] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('onboarding_downstream_dirty') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const { user } = useUser();
   const [email, setEmail] = useState<string>('');
 
@@ -140,12 +157,23 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   const isOnboardingComplete = data?.onboarding?.is_completed ?? false;
 
   // Progress-first SSOT: ring, checkmarks, and step access all derive from completion_percentage.
-  const progressState = useMemo(
-    () => getOnboardingProgressState(completionPercentage, steps.length, isOnboardingComplete),
-    [completionPercentage, steps.length, isOnboardingComplete]
-  );
+  const progressState = useMemo(() => {
+    const base = getOnboardingProgressState(completionPercentage, steps.length, isOnboardingComplete);
+    if (!downstreamLocked) {
+      return base;
+    }
+    return applyDownstreamDirtyProgressOverride(base);
+  }, [completionPercentage, steps.length, isOnboardingComplete, downstreamLocked]);
 
   const { percent: setupProgressPercent, completedFrontier, furthestAccessibleStep } = progressState;
+  const isConnectStepOfficiallyComplete = completedFrontier >= 0 && !downstreamLocked;
+
+  useEffect(() => {
+    if (isConnectStepOfficiallyComplete) {
+      setDownstreamLocked(false);
+      clearDownstreamDirtyFlag();
+    }
+  }, [isConnectStepOfficiallyComplete]);
 
   // Prevent activeStep from sitting ahead of what completion_percentage unlocks.
   useEffect(() => {
@@ -216,6 +244,12 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
 
   // Validate current step data
   useEffect(() => {
+    if (activeStep === 0 && isConnectStepOfficiallyComplete) {
+      setIsCurrentStepValid(true);
+      setValidationMessage('');
+      return;
+    }
+
     // For step 0 (Website) and step 2 (Persona), use the step validation state if available
     if ((activeStep === 0 || activeStep === 2) && stepValidationStates[activeStep] !== undefined) {
       setIsCurrentStepValid(stepValidationStates[activeStep]);
@@ -245,7 +279,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     } else {
       setValidationMessage('');
     }
-  }, [activeStep, stepData, isStepDataValid, competitorDataCollector, stepValidationStates]);
+  }, [activeStep, stepData, isStepDataValid, competitorDataCollector, stepValidationStates, isConnectStepOfficiallyComplete]);
   
   // Handle validation changes from individual steps
   const handleStepValidationChange = useCallback((step: number, isValid: boolean) => {
@@ -282,6 +316,59 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     }
   }, []);
 
+  const handleWebsiteAnalysisChanged = useCallback(async ({
+    websiteUrl,
+    reason,
+  }: {
+    websiteUrl: string;
+    reason: 'reanalyze' | 'new_website' | 'start_fresh' | 'load_existing';
+  }) => {
+    console.log('[Wizard] Website analysis changed — invalidating downstream steps:', {
+      websiteUrl,
+      reason,
+    });
+
+    setDownstreamLocked(true);
+    clearDownstreamLocalCaches();
+    resetOptimisticProgressFloor();
+    setStepData((prev: any) => {
+      const next = stripDownstreamStepData(prev) as Record<string, unknown>;
+      delete next.analysis;
+      delete next.crawlResult;
+      delete next.domainName;
+      if (websiteUrl) {
+        next.website = websiteUrl;
+        next.website_url = websiteUrl;
+      } else {
+        delete next.website;
+        delete next.website_url;
+      }
+      return next;
+    });
+
+    try {
+      await invalidateDownstreamOnboardingSteps({
+        website_url: websiteUrl || undefined,
+        reason,
+      });
+    } catch (err) {
+      console.error('[Wizard] Backend invalidate-downstream failed; continuing with local reset:', err);
+    }
+
+    try {
+      await refresh();
+    } catch (err) {
+      console.error('[Wizard] Refresh after website analysis change failed:', err);
+    }
+
+    if (activeStep > 0) {
+      setActiveStep(0);
+      try {
+        localStorage.setItem('onboarding_active_step', '0');
+      } catch (_e) {}
+    }
+  }, [activeStep, refresh, resetOptimisticProgressFloor]);
+
   // Seed stepData from OnboardingContext when data loads
   useEffect(() => {
     if (!data?.onboarding?.steps) return;
@@ -291,23 +378,16 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     // Merge step payload data from backend.
     // Renumbered: 1=Connect, 2=Research, 3=Personalization (frontend 0,1,2).
     if (onboarding.steps && Array.isArray(onboarding.steps)) {
+      setStepData((prev: any) => mergeBackendStepsIntoStepData(onboarding.steps, prev));
+
       const step1Data = getBackendStep(onboarding.steps, 0);
       if (step1Data?.data) {
         const d = step1Data.data;
-        setStepData((prev: any) => ({
-          ...prev,
-          ...d,
-          website: d.website || d.website_url,
-          analysis: d.analysis || d
-        }));
-      }
-      const step2Data = getBackendStep(onboarding.steps, 1);
-      if (step2Data?.data) {
-        setStepData((prev: any) => ({ ...prev, ...step2Data.data }));
-      }
-      const step3Data = getBackendStep(onboarding.steps, 2);
-      if (step3Data?.data) {
-        setStepData((prev: any) => ({ ...prev, ...step3Data.data }));
+        const committedWebsite = d.website || d.website_url;
+        if (committedWebsite && step1Data.status === 'completed') {
+          setCommittedStep1WebsiteUrl(committedWebsite);
+          setDownstreamLocked(false);
+        }
       }
     }
     
@@ -542,6 +622,18 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
 
       const stepResponse = await getCurrentStep();
       trace('Wizard: Backend step after completion:', stepResponse.step);
+
+      if (currentStepNumber === 1 && onboardingType === 'website') {
+        const committedUrl =
+          currentStepData?.website ||
+          currentStepData?.website_url ||
+          localStorage.getItem('website_url') ||
+          '';
+        if (committedUrl) {
+          setCommittedStep1WebsiteUrl(committedUrl);
+          setDownstreamLocked(false);
+        }
+      }
     }
     
     setActiveStep(nextStep);
@@ -746,9 +838,18 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         onViewBackgroundResults={handleViewBackgroundResults}
         success={successMessage}
         setSuccess={setSuccessMessage}
-        isConnectStepCompleted={completedFrontier >= 0}
+        isConnectStepCompleted={isConnectStepOfficiallyComplete}
+        onWebsiteAnalysisChanged={handleWebsiteAnalysisChanged}
       />
     );
+
+    const resolvedWebsiteUrl =
+      (typeof window !== 'undefined' ? localStorage.getItem('website_url') : null) ||
+      stepData?.website ||
+      stepData?.website_url ||
+      'unknown';
+
+    const researchStepKey = normalizeWebsiteUrl(resolvedWebsiteUrl);
 
     const stepComponents = [
       step0Component,
@@ -763,17 +864,17 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         />
       ) : (
         <CompetitorAnalysisStep 
-          key="research" 
+          key={`research-${researchStepKey}`} 
           onContinue={handleNext} 
           onBack={handleBack}
-          userUrl={stepData?.website || stepData?.website_url || localStorage.getItem('website_url') || ''}
+          userUrl={resolvedWebsiteUrl === 'unknown' ? '' : resolvedWebsiteUrl}
           industryContext={stepData?.industryContext}
           initialData={stepData}
           onDataReady={handleCompetitorDataReady}
         />
       ),
       <PersonalizationStep 
-        key="personalization" 
+        key={`personalization-${researchStepKey}`}
         onContinue={handleNext} 
         onValidationChange={onStep2Valid}
         onDataChange={handleStepDataChange}
