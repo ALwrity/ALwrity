@@ -3,6 +3,7 @@
  * Import once from YouTubeCreator.tsx so CSS always loads with the route shell.
  */
 import "./youtube-dashboard-layout.css";
+import "./youtubeCommentAssistantLayout.css";
 import "./youtube-rail-controls.css";
 import "./youtube-mobile-landing.css";
 import "./youtube-hero-radial.css";
