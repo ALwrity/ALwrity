@@ -1,15 +1,18 @@
 import React from "react";
 import type { YouTubeInboxComment } from "./youtubeCommentVideoGroups";
 import { YouTubeCommentThreadReplies } from "./YouTubeCommentThreadReplies";
+import { YouTubeCommentActionProgressPanel } from "./YouTubeCommentActionProgressPanel";
+import type { YouTubeCommentParentBusyAction } from "./youtubeCommentActionLoader";
 
 export const YouTubeCommentInboxRow: React.FC<{
   comment: YouTubeInboxComment;
   draftText: string;
   busy: boolean;
+  busyAction?: YouTubeCommentParentBusyAction | null;
   onDraftChange: (value: string) => void;
   onDraft: () => void;
   onSend: () => void;
-}> = ({ comment, draftText, busy, onDraftChange, onDraft, onSend }) => {
+}> = ({ comment, draftText, busy, busyAction, onDraftChange, onDraft, onSend }) => {
   const commentId = comment.comment_id || "";
   return (
     <div className="yt-comment-inbox-card">
@@ -28,6 +31,9 @@ export const YouTubeCommentInboxRow: React.FC<{
         placeholder="Draft reply…"
         disabled={!commentId}
       />
+      {busyAction === "draft" || busyAction === "send" ? (
+        <YouTubeCommentActionProgressPanel action={busyAction} />
+      ) : null}
       <div className="yt-comment-actions">
         <button
           type="button"
