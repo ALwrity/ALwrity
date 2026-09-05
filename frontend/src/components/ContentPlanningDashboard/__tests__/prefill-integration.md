@@ -119,5 +119,5 @@ Create `/api/onboarding/summary` endpoint that returns:
 
 - Prefill utility: ✅ Complete and tested
 - Backend API: ❌ Not implemented
-- Component integration: ⚠️ Partially implemented
+- Component integration: ⚠️ Partially implemented — CTA passes `fromOnboarding: true`; StrategyOnboardingDialog detects flag; full builder form mapping requires connecting `strategyBuilderStore` prefill actions to the builder UI (documented below)
 - Tests: ⚠️ 11 utility tests passing, component tests need work
