@@ -26,12 +26,12 @@ import { WizardStepper } from './common/WizardStepper';
 import { WizardRetryBar } from './common/WizardRetryBar';
 import { WizardNavigation } from './common/WizardNavigation';
 import { WizardLoadingState } from './common/WizardLoadingState';
-import SystemStatusChip from './common/SystemStatusChip';
 import { useOnboardingTasksStatus } from '../../hooks/useOnboardingTasksStatus';
 import {
   getOnboardingProgressState,
   progressPercentAfterStepComplete,
 } from './common/onboardingProgressState';
+import { STEP0_NAV_TITLE } from './WebsiteStep/constants/websiteStepLayout';
 
 
 // Set to true in dev to restore verbose per-action tracing
@@ -655,7 +655,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         });
       } else {
         setStepHeaderContent({
-          title: "Let ALwrity Learn Your Brand",
+          title: STEP0_NAV_TITLE,
           description: "Let Alwrity analyze your website to understand your brand voice, writing style, and content characteristics. This helps us generate content that matches your existing tone and resonates with your audience."
         });
       }
@@ -746,6 +746,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         onViewBackgroundResults={handleViewBackgroundResults}
         success={successMessage}
         setSuccess={setSuccessMessage}
+        isConnectStepCompleted={completedFrontier >= 0}
       />
     );
 
@@ -785,7 +786,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
 
     return (
       <Slide direction={direction} in={true} mountOnEnter unmountOnExit key={`step-${step}`}>
-        <Box sx={{ minHeight: '500px', display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ minHeight: 'auto', display: 'flex', flexDirection: 'column' }}>
           {stepComponents[step]}
         </Box>
       </Slide>
@@ -847,6 +848,8 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           onHelpToggle={() => setShowHelp(!showHelp)}
           email={email}
           onEmailChange={handleEmailChange}
+          backgroundTasks={backgroundTasks}
+          onViewBackgroundResults={handleViewBackgroundResults}
         />
 
         {/* Separated Step Progression Stepper (White Background Box below Navigation Bar) */}
@@ -872,6 +875,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         <Box sx={{
           p: { xs: 2, md: 4 },
           pt: activeStep === 0 ? { xs: 1.375, md: 1.625 } : { xs: 2, md: 3 },
+          pb: activeStep === 0 ? { xs: 0.5, md: 1 } : { xs: 2, md: 4 },
           flexGrow: 1,
           width: '100%',
           overflow: 'visible',
@@ -892,21 +896,8 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
               '& > *': { pointerEvents: 'auto' },
             }}
           >
-            {/* Background Tasks Button */}
-            {backgroundTasks &&
-              backgroundTasks.tasks &&
-              Object.keys(backgroundTasks.tasks).length > 0 && (
-              <SystemStatusChip
-                variant="compact"
-                activeTasks={backgroundTasks.total - backgroundTasks.completed_count - backgroundTasks.failed_count}
-                totalTasks={backgroundTasks.total}
-                tasks={backgroundTasks.tasks}
-                onViewResults={handleViewBackgroundResults}
-              />
-            )}
-
-            {/* Floating Success Message */}
-            {successMessage && (successMessage.toLowerCase().includes('previous analysis') || successMessage.toLowerCase().includes('loaded previous')) && (
+          {/* Floating Success Message */}
+          {successMessage && (successMessage.toLowerCase().includes('previous analysis') || successMessage.toLowerCase().includes('loaded previous')) && (
               <Box
                 sx={{
                   bgcolor: '#FFFFFF',

@@ -10,6 +10,23 @@ import HelpOutline from '@mui/icons-material/HelpOutline';
 import Close from '@mui/icons-material/Close';
 import UserBadge from '../../shared/UserBadge';
 import { EmailBadgePopover } from './EmailBadgePopover';
+import SystemStatusChip from './SystemStatusChip';
+
+interface BackgroundTasksState {
+  tasks: Record<string, {
+    status: string;
+    started_at?: string | null;
+    progress_pct?: number;
+    failure_reason?: string | null;
+    recurring?: boolean;
+    last_success?: string | null;
+    next_execution?: string | null;
+  }>;
+  total: number;
+  completed_count: number;
+  failed_count: number;
+  all_done?: boolean;
+}
 
 interface WizardHeaderProps {
   stepHeaderContent: {
@@ -23,6 +40,8 @@ interface WizardHeaderProps {
   onHelpToggle: () => void;
   email: string;
   onEmailChange: (email: string) => void;
+  backgroundTasks?: BackgroundTasksState | null;
+  onViewBackgroundResults?: (taskKey: string) => void;
 }
 
 export const WizardHeader: React.FC<WizardHeaderProps> = ({
@@ -33,16 +52,21 @@ export const WizardHeader: React.FC<WizardHeaderProps> = ({
   isMobile,
   onHelpToggle,
   email,
-  onEmailChange
+  onEmailChange,
+  backgroundTasks,
+  onViewBackgroundResults,
 }) => {
+  const showBackgroundTasks =
+    !!backgroundTasks?.tasks && Object.keys(backgroundTasks.tasks).length > 0;
+
   return (
     <Box
       sx={{
         background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
         color: 'white',
-        p: { xs: 1.5, md: 2.24 }, // Increased height by 10% from 1.36/2.04
+        p: { xs: 1.5, md: 2.24 },
         position: 'relative',
-        overflow: 'hidden',
+        overflow: 'visible',
         '&::before': {
           content: '""',
           position: 'absolute',
@@ -93,11 +117,25 @@ export const WizardHeader: React.FC<WizardHeaderProps> = ({
           </Typography>
         </Box>
         
-        {/* Right Action container: Help & Skip */}
+        {/* Right Action container: Background Tasks, Help & Skip */}
         <Box sx={{ display: 'flex', gap: 1.5, flex: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
+          {showBackgroundTasks && backgroundTasks && (
+            <SystemStatusChip
+              variant="compact"
+              activeTasks={
+                backgroundTasks.total -
+                backgroundTasks.completed_count -
+                backgroundTasks.failed_count
+              }
+              totalTasks={backgroundTasks.total}
+              tasks={backgroundTasks.tasks}
+              onViewResults={onViewBackgroundResults}
+            />
+          )}
           <Tooltip title="Get Help" arrow>
             <IconButton
               onClick={onHelpToggle}
+              aria-label="Get Help"
               sx={{
                 color: 'white',
                 bgcolor: 'rgba(255, 255, 255, 0.1)',

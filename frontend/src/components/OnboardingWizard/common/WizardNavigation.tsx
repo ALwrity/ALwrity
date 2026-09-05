@@ -8,6 +8,10 @@ import {
 import ArrowBack from '@mui/icons-material/ArrowBack';
 import ArrowForward from '@mui/icons-material/ArrowForward';
 import CheckCircle from '@mui/icons-material/CheckCircle';
+import {
+  WIZARD_ACTIVE_NEXT_BUTTON_GRADIENT,
+  WIZARD_ACTIVE_NEXT_BUTTON_HOVER_GRADIENT,
+} from './onboardingButtonStyles';
 
 interface WizardNavigationProps {
   activeStep: number;
@@ -37,9 +41,9 @@ export const WizardNavigation: React.FC<WizardNavigationProps> = ({
 
   return (
     <Box
+      data-testid="wizard-footer-bar"
       sx={{
-        p: { xs: 2, md: 3 },
-        pt: 2,
+        p: { xs: 1.5, md: 2.24 },
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -93,23 +97,33 @@ export const WizardNavigation: React.FC<WizardNavigationProps> = ({
               endIcon={<ArrowForward />}
               id="wizard-next-button"
               data-testid="wizard-next-button"
+              data-active-gradient={WIZARD_ACTIVE_NEXT_BUTTON_GRADIENT}
+              data-hover-gradient={WIZARD_ACTIVE_NEXT_BUTTON_HOVER_GRADIENT}
               sx={{
                 borderRadius: 2,
                 textTransform: 'none',
                 fontWeight: 600,
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                background: isCurrentStepValid
+                  ? WIZARD_ACTIVE_NEXT_BUTTON_GRADIENT
+                  : 'rgba(0,0,0,0.1)',
+                boxShadow: isCurrentStepValid
+                  ? '0 4px 14px rgba(236, 72, 153, 0.28)'
+                  : 'none',
                 '&:hover': {
-                  background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                  transform: 'translateY(-1px)',
-                  boxShadow: '0 6px 16px rgba(102, 126, 234, 0.4)',
+                  background: isCurrentStepValid
+                    ? WIZARD_ACTIVE_NEXT_BUTTON_HOVER_GRADIENT
+                    : 'rgba(0,0,0,0.1)',
+                  transform: isCurrentStepValid ? 'translateY(-1px)' : 'none',
+                  boxShadow: isCurrentStepValid
+                    ? '0 6px 18px rgba(168, 85, 247, 0.35)'
+                    : 'none',
                 },
                 '&:disabled': {
                   background: 'rgba(0,0,0,0.1)',
                   color: 'rgba(0,0,0,0.4)',
                   boxShadow: 'none',
                   transform: 'none',
-                }
+                },
               }}
             >
               {nextLabel}
