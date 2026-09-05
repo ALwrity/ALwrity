@@ -12,8 +12,20 @@ export const YouTubeCommentInboxRow: React.FC<{
   onDraftChange: (value: string) => void;
   onDraft: () => void;
   onSend: () => void;
-}> = ({ comment, draftText, busy, busyAction, onDraftChange, onDraft, onSend }) => {
+  onCancelDraft: () => void;
+}> = ({
+  comment,
+  draftText,
+  busy,
+  busyAction,
+  onDraftChange,
+  onDraft,
+  onSend,
+  onCancelDraft,
+}) => {
   const commentId = comment.comment_id || "";
+  const canCancelDraft =
+    Boolean(commentId) && (busyAction === "draft" || Boolean(draftText.trim()));
   return (
     <div className="yt-comment-inbox-card">
       <div className="yt-comment-author">{comment.author}</div>
@@ -35,6 +47,16 @@ export const YouTubeCommentInboxRow: React.FC<{
         <YouTubeCommentActionProgressPanel action={busyAction} />
       ) : null}
       <div className="yt-comment-actions">
+        {canCancelDraft ? (
+          <button
+            type="button"
+            className="yt-rail-btn"
+            disabled={busy && busyAction !== "draft"}
+            onClick={onCancelDraft}
+          >
+            Cancel
+          </button>
+        ) : null}
         <button
           type="button"
           className="yt-rail-btn"

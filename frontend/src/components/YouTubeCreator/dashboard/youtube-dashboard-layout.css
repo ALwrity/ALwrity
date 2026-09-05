@@ -364,9 +364,15 @@ body.youtube-studio-view #root {
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
-.yt-rail-btn:hover {
+.yt-rail-btn:hover:not(:disabled) {
   border-color: #ff0000;
   box-shadow: 0 2px 10px rgba(255, 0, 0, 0.12);
+}
+
+.yt-rail-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+  box-shadow: none;
 }
 
 .yt-rail-btn--primary {
@@ -375,7 +381,7 @@ body.youtube-studio-view #root {
   color: #fff;
 }
 
-.yt-rail-btn--primary:hover {
+.yt-rail-btn--primary:hover:not(:disabled) {
   background: #e60000;
 }
 
@@ -752,27 +758,34 @@ body.youtube-studio-view #root {
   border-left: 2px solid #e5e5e5;
 }
 
-.yt-comment-thread-replies-heading {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 0 0 8px;
-}
-
-.yt-comment-thread-replies-label {
-  margin: 0;
-  font-size: 0.75rem;
+.yt-comment-thread-replies-expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+  color: #0f0f0f;
+  font-family: inherit;
+  font-size: 0.8125rem;
   font-weight: 600;
-  color: #606060;
-  line-height: 1.35;
+  letter-spacing: 0.01em;
+  cursor: pointer;
 }
 
-.yt-comment-thread-replies-count {
-  margin: 0;
+.yt-comment-thread-replies-expand:hover:not(:disabled) {
+  color: #ff0000;
+}
+
+.yt-comment-thread-replies-expand:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.yt-comment-thread-replies-expand-chevron {
   font-size: 0.75rem;
-  font-weight: 400;
-  color: #606060;
-  line-height: 1.35;
+  line-height: 1;
 }
 
 .yt-comment-thread-reply {

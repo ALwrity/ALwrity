@@ -2,7 +2,7 @@
  * Existing YouTube Comment Reply Assistant client methods.
  * Hub wedge and Podcast Maker are out of scope.
  */
-import { youtubeStudioApi } from "../../../../services/youtubeStudioApi";
+import { isYouTubeStudioRequestCanceled, youtubeStudioApi } from "../../../../services/youtubeStudioApi";
 import { apiClient } from "../../../../api/client";
 
 vi.mock("../../../../api/client", () => ({
@@ -77,6 +77,24 @@ describe("youtubeStudioApi comment assistant", () => {
       channel_niche: "seo",
     });
     expect(result.draft).toBe("Thanks for watching.");
+  });
+
+  it("forwards abort signal on draft-reply without putting it in the body", async () => {
+    const controller = new AbortController();
+    vi.mocked(apiClient.post).mockResolvedValueOnce({
+      data: { success: true, draft: "Thanks" },
+    });
+
+    await youtubeStudioApi.draftCommentReply(
+      { comment_text: "How do I start?" },
+      { signal: controller.signal },
+    );
+
+    expect(apiClient.post).toHaveBeenCalledWith(
+      "/api/youtube/comments/draft-reply",
+      { comment_text: "How do I start?" },
+      { signal: controller.signal },
+    );
   });
 
   it("sends an approved reply via POST /api/youtube/comments/reply", async () => {
@@ -178,5 +196,13 @@ describe("youtubeStudioApi comment assistant", () => {
     expect(apiClient.delete).toHaveBeenCalledWith("/api/youtube/comments/delete", {
       params: { comment_id: "r-own", token_id: 3 },
     });
+  });
+
+  it("treats axios cancel and abort as cancelled draft requests", () => {
+    expect(isYouTubeStudioRequestCanceled({ code: "ERR_CANCELED" })).toBe(true);
+    expect(isYouTubeStudioRequestCanceled({ name: "AbortError" })).toBe(true);
+    expect(isYouTubeStudioRequestCanceled({ name: "CanceledError" })).toBe(true);
+    expect(isYouTubeStudioRequestCanceled({ name: "Error" })).toBe(false);
+    expect(isYouTubeStudioRequestCanceled("canceled")).toBe(false);
   });
 });

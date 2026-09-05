@@ -45,16 +45,27 @@ export const YouTubeCommentThreadReplies: React.FC<{
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadedMore, setLoadedMore] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  const repliesSyncKey = `${parentId || ""}:${(Array.isArray(replies) ? replies : [])
+    .map((row) => (row.comment_id || "").trim())
+    .join("|")}`;
 
   useEffect(() => {
     setRows(Array.isArray(replies) ? replies : []);
     setRemovedCount(0);
     setLoadedMore(false);
     setError(null);
-  }, [parentId, replies]);
+    setExpanded(false);
+  }, [repliesSyncKey]);
 
   const count = Math.max((Number(totalReplyCount) || 0) - removedCount, rows.length);
-  const canShowMore = Boolean(parentId) && !loadedMore && count > rows.length;
+  const canShowMore =
+    expanded && Boolean(parentId) && !loadedMore && count > rows.length;
+
+  if (rows.length === 0 && removedCount === 0) {
+    return null;
+  }
 
   if (count <= 0) {
     return null;
@@ -86,8 +97,14 @@ export const YouTubeCommentThreadReplies: React.FC<{
         replyCount: extra.length,
         hasParentId: true,
       });
+      if (extra.length === 0) {
+        setRemovedCount(Math.max(Number(totalReplyCount) || 0, 0));
+        setLoadedMore(true);
+        return;
+      }
       setRows((prev) => mergeYouTubeInboxReplies(prev, extra));
       setLoadedMore(true);
+      setExpanded(true);
     } catch (loadError) {
       console.error("[YouTubeCommentThreadReplies] Show more failed", {
         errorName: loadError instanceof Error ? loadError.name : "Error",
@@ -98,14 +115,43 @@ export const YouTubeCommentThreadReplies: React.FC<{
     }
   };
 
+  const openThread = () => {
+    console.info("[YouTubeCommentThreadReplies] Thread expand", {
+      hasParentId: Boolean(parentId),
+      inlinedCount: rows.length,
+    });
+    if (rows.length > 0) {
+      setExpanded(true);
+      return;
+    }
+    void loadMore();
+  };
+
+  if (!expanded || rows.length === 0) {
+    return (
+      <div className="yt-comment-thread-replies">
+        {error ? (
+          <p className="yt-comment-thread-replies-error">{error}</p>
+        ) : null}
+        <button
+          type="button"
+          className="yt-comment-thread-replies-expand"
+          aria-label={youtubeCommentReplyCountLabel(count)}
+          aria-expanded={false}
+          disabled={busy || !parentId}
+          onClick={openThread}
+        >
+          <span>{youtubeCommentReplyCountLabel(count)}</span>
+          <span className="yt-comment-thread-replies-expand-chevron" aria-hidden="true">
+            ▾
+          </span>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="yt-comment-thread-replies">
-      <div className="yt-comment-thread-replies-heading">
-        <span className="yt-comment-thread-replies-label">Replies</span>
-        <span className="yt-comment-thread-replies-count">
-          {youtubeCommentReplyCountLabel(count)}
-        </span>
-      </div>
       {rows.map((reply, index) => (
         <YouTubeCommentThreadReplyRow
           key={reply.comment_id || `reply-${index}`}
@@ -136,6 +182,24 @@ export const YouTubeCommentThreadReplies: React.FC<{
           Show more replies
         </button>
       ) : null}
+      <button
+        type="button"
+        className="yt-comment-thread-replies-expand"
+        aria-label="Hide replies"
+        aria-expanded={true}
+        onClick={() => {
+          console.info("[YouTubeCommentThreadReplies] Thread collapse", {
+            hasParentId: Boolean(parentId),
+            replyCount: rows.length,
+          });
+          setExpanded(false);
+        }}
+      >
+        <span>Hide replies</span>
+        <span className="yt-comment-thread-replies-expand-chevron" aria-hidden="true">
+          ▴
+        </span>
+      </button>
     </div>
   );
 };

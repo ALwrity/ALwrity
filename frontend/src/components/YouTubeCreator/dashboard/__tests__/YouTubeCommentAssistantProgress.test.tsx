@@ -4,72 +4,21 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { CommentAssistantModal } from "../modals/CommentAssistantModal";
 import { YouTubeCommentActionProgressPanel } from "../YouTubeCommentActionProgressPanel";
-import { youtubeStudioApi } from "../../../../services/youtubeStudioApi";
-
-vi.mock("../../../../services/youtubeStudioApi", () => ({
-  youtubeStudioApi: {
-    getCommentInbox: vi.fn(),
-    draftCommentReply: vi.fn(),
-    sendCommentReply: vi.fn(),
-    listCommentReplies: vi.fn(),
-    updateCommentReply: vi.fn(),
-    deleteCommentReply: vi.fn(),
-  },
-}));
-
-vi.mock("../YouTubeCommentIframePlayer", () => ({
-  YouTubeCommentIframePlayer: ({ videoId }: { videoId: string }) => (
-    <div data-testid="youtube-comment-iframe-player" data-video-id={videoId} />
-  ),
-}));
-
-const mockedStudioApi = vi.mocked(youtubeStudioApi);
-
-const inboxComment = {
-  comment_id: "c-1",
-  video_id: "abcdefghijk",
-  video_title: "Rank Videos in 7 Days",
-  author: "Sam",
-  text: "Loved the intro",
-};
-
-const ownReplyInbox = {
-  ...inboxComment,
-  total_reply_count: 1,
-  replies: [
-    {
-      comment_id: "r-own",
-      author: "MyChannel",
-      text: "Thanks",
-      can_edit: true,
-    },
-  ],
-};
-
-function renderAssistant() {
-  return render(
-    <CommentAssistantModal open onClose={vi.fn()} niche="seo" />,
-  );
-}
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
-}
+import {
+  deferred,
+  expandThreadReplies,
+  inboxComment,
+  mockedStudioApi,
+  ownReplyInbox,
+  renderAssistant,
+  stubLoadedInbox,
+} from "./youtubeCommentAssistantTestSetup";
 
 describe("YouTube Comment Reply Assistant action progress", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedStudioApi.getCommentInbox.mockResolvedValue({
-      success: true,
-      comments: [inboxComment],
-      message: "Loaded 1 recent comments.",
-    });
+    stubLoadedInbox();
   });
 
   it("shows Drafting reply until the draft fills the box", async () => {
@@ -148,6 +97,8 @@ describe("YouTube Comment Reply Assistant action progress", () => {
     const pending = deferred<{ success: boolean; text: string }>();
     mockedStudioApi.updateCommentReply.mockReturnValueOnce(pending.promise);
     renderAssistant();
+    await waitFor(() => expect(screen.getByText("Sam")).toBeTruthy());
+    await expandThreadReplies();
     await waitFor(() => expect(screen.getByText("Thanks")).toBeTruthy());
 
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
@@ -174,6 +125,8 @@ describe("YouTube Comment Reply Assistant action progress", () => {
     const pending = deferred<{ success: boolean }>();
     mockedStudioApi.deleteCommentReply.mockReturnValueOnce(pending.promise);
     renderAssistant();
+    await waitFor(() => expect(screen.getByText("Sam")).toBeTruthy());
+    await expandThreadReplies();
     await waitFor(() => expect(screen.getByText("Thanks")).toBeTruthy());
 
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
@@ -200,6 +153,8 @@ describe("YouTube Comment Reply Assistant action progress", () => {
       new Error("Request failed with status code 503"),
     );
     renderAssistant();
+    await waitFor(() => expect(screen.getByText("Sam")).toBeTruthy());
+    await expandThreadReplies();
     await waitFor(() => expect(screen.getByText("Thanks")).toBeTruthy());
 
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
@@ -243,6 +198,8 @@ describe("YouTube Comment Reply Assistant action progress", () => {
       new Error("Request failed with status code 503"),
     );
     renderAssistant();
+    await waitFor(() => expect(screen.getByText("Sam")).toBeTruthy());
+    await expandThreadReplies();
     await waitFor(() => expect(screen.getByText("Thanks")).toBeTruthy());
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Edit" }));
