@@ -215,8 +215,15 @@ class ContentPlanningAPI {
   async getStrategies(userId?: number) {
     // Note: apiClient interceptor handles authentication token injection
     // ProtectedRoute ensures user is authenticated before component renders
+    //
+    // TRAILING SLASH REQUIRED: the backend registers this list route at
+    // "/enhanced-strategies/" (with slash). Requesting it bare triggers a
+    // FastAPI redirect_slashes 307 whose Location is absolute
+    // (http://localhost:8000/... via the Vite proxy's changeOrigin), making
+    // the browser's follow a CROSS-ORIGIN redirect — which strips the
+    // Authorization header per the fetch spec → 401 "auth_header_received=NO".
     const params = userId ? { user_id: userId } : {};
-    const response = await apiClient.get(`${this.baseURL}/enhanced-strategies`, { params });
+    const response = await apiClient.get(`${this.baseURL}/enhanced-strategies/`, { params });
     return response.data?.data || response.data;
   }
 
@@ -573,7 +580,8 @@ class ContentPlanningAPI {
     return this.handleRequest(async () => {
       const params: any = {};
       if (userId) params.user_id = userId;
-      const response = await apiClient.get(`${this.baseURL}/enhanced-strategies`, { params });
+      // Trailing slash required — see getStrategies() comment above.
+      const response = await apiClient.get(`${this.baseURL}/enhanced-strategies/`, { params });
       return response.data?.data || response.data;
     });
   }

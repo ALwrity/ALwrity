@@ -119,13 +119,25 @@ class AIStrategyGenerator:
                 failed_components.append("risk_assessment")
             
             # Step 7: Compile comprehensive strategy (NO CONTENT CALENDAR)
+            # Resolve the configured LLM provider/model for accurate metadata.
+            # GPT_PROVIDER pattern — see services/llm_providers/tenant_provider_config.py
+            # and services/llm_providers/main_text_generation.py.
+            try:
+                from services.llm_providers.tenant_provider_config import tenant_provider_config_resolver
+                _cfg = tenant_provider_config_resolver.resolve(modality="text", user_id=str(user_id))
+                _provider = _cfg.selected_providers[0] if _cfg.selected_providers else "gemini"
+                _model = _cfg.model_policy.get("default_model")
+            except Exception:
+                _provider, _model = "gemini", None
+
             comprehensive_strategy = {
                 "strategy_metadata": {
                     "generated_at": datetime.utcnow().isoformat(),
                     "user_id": user_id,
                     "strategy_name": strategy_name or f"AI-Generated Strategy {datetime.utcnow().strftime('%Y-%m-%d')}",
                     "generation_version": "2.0",
-                    "ai_model": "gemini-pro",
+                    "ai_provider": _provider,
+                    "ai_model": _model or _provider,
                     "personalization_level": "high",
                     "ai_generated": True,
                     "comprehensive": True,

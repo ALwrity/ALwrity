@@ -219,7 +219,12 @@ const App: React.FC = () => {
   // Render app with or without CopilotKit based on whether we have a key
   const renderApp = () => {
     return (
-      <Router>
+      <Router
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <AuthenticatedCopilotWrapper apiKey={copilotApiKey}>
           <ConditionalCopilotKit>
             <TokenInstaller />

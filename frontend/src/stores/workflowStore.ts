@@ -189,7 +189,52 @@ export const useWorkflowStore = create<WorkflowState>()(
           const params: Record<string, string> = {};
           if (date) params.date = date;
           if (workflowType) params.workflow_type = workflowType;
-          const resp = await apiClient.get('/api/today-workflow', { params });
+
+          // 1) Probe existence via /status. This endpoint always returns 200
+          //    with a `generated` flag, so the "no plan yet" case never
+          //    produces a 404 on the wire (neither axios-level nor the
+          //    browser's native network log). See backend api/today_workflow.py.
+          const statusResp = await apiClient.get('/api/today-workflow/status', { params });
+          const statusData = statusResp?.data?.data as TodayWorkflowScheduleStatus | undefined;
+
+          if (!statusData || statusData.generated !== true) {
+            // "No workflow yet" is an expected empty state, not an error.
+            set({
+              currentWorkflow: null,
+              workflowProgress: null,
+              navigationState: null,
+              scheduleStatus: statusData || null,
+              isLoading: false,
+              isDegradedMode: false,
+              degradedModeReason: null,
+              lastCachedAt: requestedDate === today ? Date.now() : null,
+            });
+            return;
+          }
+
+          // 2) Plan exists — fetch the full workflow. validateStatus is kept
+          //    as a defense for the race where the plan is deleted between
+          //    the probe and this fetch; it must not be the primary signal.
+          const resp = await apiClient.get('/api/today-workflow', {
+            params,
+            validateStatus: (status) => status === 200 || status === 404,
+          });
+
+          if (resp.status === 404) {
+            // Race: plan disappeared between probe and fetch. Treat as empty.
+            set({
+              currentWorkflow: null,
+              workflowProgress: null,
+              navigationState: null,
+              scheduleStatus: statusData,
+              isLoading: false,
+              isDegradedMode: false,
+              degradedModeReason: null,
+              lastCachedAt: requestedDate === today ? Date.now() : null,
+            });
+            return;
+          }
+
           const serverWorkflow = resp?.data?.data?.workflow as DailyWorkflow | undefined;
           const planSummary = resp?.data?.data?.plan?.provenance_summary;
           const scheduleStatus = resp?.data?.data?.schedule_status as TodayWorkflowScheduleStatus | undefined;
@@ -221,20 +266,8 @@ export const useWorkflowStore = create<WorkflowState>()(
             suggestedAction: 'Refresh and try again. If this persists, contact support.'
           });
         } catch (error: any) {
-          if (error?.response?.status === 404) {
-            set({
-              currentWorkflow: null,
-              workflowProgress: null,
-              navigationState: null,
-              isLoading: false,
-              isDegradedMode: false,
-              degradedModeReason: null,
-              lastCachedAt: null,
-            });
-            await get().refreshScheduleStatus(date);
-            return;
-          }
-
+          // 404 cannot reach here: the /status probe resolves the "no plan
+          // yet" case inline above, and validateStatus guards the race.
           set({
             error: toWorkflowError(error, 'Failed to load workflow from server.'),
             isLoading: false,
