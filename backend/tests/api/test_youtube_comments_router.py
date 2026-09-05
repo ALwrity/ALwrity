@@ -350,3 +350,78 @@ class TestYouTubeCommentsRouter:
         detail = str(resp.json().get("detail") or "")
         assert "secret-stack" not in detail
         assert "replies" in detail.lower() or "try again" in detail.lower()
+
+    def test_update_path_forwards_comment_id_and_text(self):
+        service = MagicMock()
+        service.update_reply.return_value = {
+            "success": True,
+            "comment_id": "r-1",
+            "text": "Thanks for watching",
+            "message": "Reply updated.",
+        }
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.put(
+            "/api/youtube/comments/update",
+            json={"comment_id": "r-1", "text": "Thanks for watching"},
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is True
+        assert body["text"] == "Thanks for watching"
+        kwargs = service.update_reply.call_args.kwargs
+        assert kwargs["comment_id"] == "r-1"
+        assert kwargs["text"] == "Thanks for watching"
+
+    def test_update_requires_comment_id_and_text(self):
+        service = MagicMock()
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        missing_id = client.put(
+            "/api/youtube/comments/update",
+            json={"text": "Thanks"},
+        )
+        empty_text = client.put(
+            "/api/youtube/comments/update",
+            json={"comment_id": "r-1", "text": ""},
+        )
+
+        assert missing_id.status_code == 422
+        assert empty_text.status_code == 422
+        service.update_reply.assert_not_called()
+
+    def test_update_route_returns_documented_error_without_500(self):
+        service = MagicMock()
+        service.update_reply.return_value = {
+            "success": False,
+            "error_code": "commentNotFound",
+            "message": "That comment could not be found. It may have been removed.",
+        }
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.put(
+            "/api/youtube/comments/update",
+            json={"comment_id": "r-1", "text": "Thanks"},
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is False
+        assert body["error_code"] == "commentNotFound"
+        assert "secret" not in (body.get("message") or "").lower()
+
+    def test_update_route_unexpected_error_does_not_leak_detail(self):
+        service = MagicMock()
+        service.update_reply.side_effect = RuntimeError("secret-stack")
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.put(
+            "/api/youtube/comments/update",
+            json={"comment_id": "r-1", "text": "Thanks"},
+        )
+
+        assert resp.status_code == 500
+        detail = str(resp.json().get("detail") or "")
+        assert "secret-stack" not in detail
+        assert "edit" in detail.lower() or "try again" in detail.lower()

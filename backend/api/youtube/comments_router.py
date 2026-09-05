@@ -36,6 +36,12 @@ class SendReplyRequest(BaseModel):
     token_id: Optional[int] = None
 
 
+class UpdateReplyRequest(BaseModel):
+    comment_id: str = Field(..., min_length=1)
+    text: str = Field(..., min_length=1)
+    token_id: Optional[int] = None
+
+
 def get_comments_service(
     oauth_service: YouTubeOAuthService = Depends(get_oauth_service),
 ) -> YouTubeCommentsService:
@@ -135,6 +141,51 @@ def get_comment_replies(
         raise HTTPException(
             status_code=500,
             detail="Could not load replies. Please try again.",
+        )
+
+
+@router.put("/update")
+def update_comment_reply(
+    body: UpdateReplyRequest,
+    user: dict = Depends(get_current_user),
+    service: YouTubeCommentsService = Depends(get_comments_service),
+):
+    user_id = user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        logger.info(
+            "[youtube_comments] Update route user_id={} has_comment_id={} text_length={}",
+            user_id,
+            bool(body.comment_id),
+            len(body.text or ""),
+        )
+        result = service.update_reply(
+            user_id=user_id,
+            comment_id=body.comment_id,
+            text=body.text,
+            token_id=body.token_id,
+        )
+        if not result.get("success"):
+            logger.warning(
+                "[youtube_comments] Update route unsuccessful user_id={} error_code={}",
+                user_id,
+                result.get("error_code"),
+            )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        fields = youtube_publish_error_log_fields(e)
+        logger.error(
+            "[youtube_comments] Update route failed user_id={} error_type={} http_status={}",
+            user_id,
+            fields["error_type"],
+            fields["http_status"],
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not save that edit. Please try again.",
         )
 
 

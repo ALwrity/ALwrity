@@ -122,6 +122,31 @@ export const youtubeStudioApi = {
     }
   },
 
+  async updateCommentReply(body: {
+    comment_id: string;
+    text: string;
+    token_id?: number;
+  }) {
+    console.info("[youtubeStudioApi] comment update start", {
+      hasCommentId: Boolean(body.comment_id),
+      textLength: (body.text || "").length,
+      hasTokenId: Boolean(body.token_id),
+    });
+    try {
+      const response = await apiClient.put(`${API_BASE}/comments/update`, body);
+      console.info("[youtubeStudioApi] comment update complete", {
+        success: Boolean(response.data?.success),
+        hasCommentId: Boolean(response.data?.comment_id),
+      });
+      return response.data;
+    } catch (updateError) {
+      console.error("[youtubeStudioApi] comment update failed", {
+        errorName: updateError instanceof Error ? updateError.name : "Error",
+      });
+      throw updateError;
+    }
+  },
+
   async listChannelVideos(params?: { max_results?: number; token_id?: number }) {
     const response = await apiClient.get(`${API_BASE}/studio/videos`, { params });
     return response.data;

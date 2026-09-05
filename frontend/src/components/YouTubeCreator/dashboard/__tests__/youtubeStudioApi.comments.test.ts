@@ -9,6 +9,7 @@ vi.mock("../../../../api/client", () => ({
   apiClient: {
     get: vi.fn(),
     post: vi.fn(),
+    put: vi.fn(),
   },
 }));
 
@@ -124,5 +125,27 @@ describe("youtubeStudioApi comment assistant", () => {
     expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/comments/replies", {
       params: { parent_id: "c-1" },
     });
+  });
+
+  it("updates an approved reply via PUT /api/youtube/comments/update", async () => {
+    vi.mocked(apiClient.put).mockResolvedValueOnce({
+      data: {
+        success: true,
+        comment_id: "r-own",
+        text: "Thanks for watching",
+      },
+    });
+
+    const result = await youtubeStudioApi.updateCommentReply({
+      comment_id: "r-own",
+      text: "Thanks for watching",
+    });
+
+    expect(apiClient.put).toHaveBeenCalledWith("/api/youtube/comments/update", {
+      comment_id: "r-own",
+      text: "Thanks for watching",
+    });
+    expect(result.comment_id).toBe("r-own");
+    expect(result.text).toBe("Thanks for watching");
   });
 });
