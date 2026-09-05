@@ -1,5 +1,6 @@
 import React from "react";
 import type { YouTubeInboxComment } from "./youtubeCommentVideoGroups";
+import { YouTubeCommentThreadReplies } from "./YouTubeCommentThreadReplies";
 
 export const YouTubeCommentInboxRow: React.FC<{
   comment: YouTubeInboxComment;
@@ -14,6 +15,11 @@ export const YouTubeCommentInboxRow: React.FC<{
     <div className="yt-comment-inbox-card">
       <div className="yt-comment-author">{comment.author}</div>
       <div className="yt-comment-body">{comment.text}</div>
+      <YouTubeCommentThreadReplies
+        parentId={commentId}
+        replies={comment.replies}
+        totalReplyCount={comment.total_reply_count}
+      />
       <textarea
         className="yt-comment-draft"
         value={draftText}

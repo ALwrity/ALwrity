@@ -11,6 +11,10 @@ from services.youtube.youtube_comments_list_errors import (
     YOUTUBE_COMMENT_THREADS_DEFAULT_RESULTS,
     YOUTUBE_COMMENT_THREADS_MAX_RESULTS,
 )
+from services.youtube.youtube_comments_replies_list_errors import (
+    YOUTUBE_COMMENTS_LIST_DEFAULT_RESULTS,
+    YOUTUBE_COMMENTS_LIST_MAX_RESULTS,
+)
 from services.youtube.youtube_comments_service import YouTubeCommentsService
 from services.youtube.youtube_oauth_service import YouTubeOAuthService
 from services.youtube.youtube_publish_log import youtube_publish_error_log_fields
@@ -80,6 +84,57 @@ def get_comment_inbox(
         raise HTTPException(
             status_code=500,
             detail="Could not load comments. Please try again.",
+        )
+
+
+@router.get("/replies")
+def get_comment_replies(
+    parent_id: str = Query(..., min_length=1),
+    max_results: int = Query(
+        YOUTUBE_COMMENTS_LIST_DEFAULT_RESULTS,
+        ge=1,
+        le=YOUTUBE_COMMENTS_LIST_MAX_RESULTS,
+    ),
+    token_id: Optional[int] = Query(None),
+    user: dict = Depends(get_current_user),
+    service: YouTubeCommentsService = Depends(get_comments_service),
+):
+    user_id = user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        logger.info(
+            "[youtube_comments] Replies route user_id={} has_parent_id={} max_results={}",
+            user_id,
+            bool(parent_id),
+            max_results,
+        )
+        result = service.list_replies(
+            user_id,
+            parent_id=parent_id,
+            token_id=token_id,
+            max_results=max_results,
+        )
+        if not result.get("success"):
+            logger.warning(
+                "[youtube_comments] Replies route unsuccessful user_id={} error_code={}",
+                user_id,
+                result.get("error_code"),
+            )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        fields = youtube_publish_error_log_fields(e)
+        logger.error(
+            "[youtube_comments] Replies route failed user_id={} error_type={} http_status={}",
+            user_id,
+            fields["error_type"],
+            fields["http_status"],
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not load replies. Please try again.",
         )
 
 

@@ -10,6 +10,10 @@ from googleapiclient.discovery import build
 from loguru import logger
 
 from services.llm_providers.main_text_generation import llm_text_gen
+from services.youtube.youtube_comment_thread_replies import (
+    map_youtube_comment_reply_items,
+    map_youtube_thread_replies,
+)
 from services.youtube.youtube_comment_video_titles import (
     attach_youtube_comment_video_titles,
 )
@@ -26,13 +30,20 @@ from services.youtube.youtube_comments_list_errors import (
     user_safe_youtube_comment_threads_list_error,
     youtube_comment_threads_list_error_code,
 )
+from services.youtube.youtube_comments_replies_list_errors import (
+    YOUTUBE_COMMENTS_LIST_DEFAULT_RESULTS,
+    YOUTUBE_COMMENTS_LIST_MAX_RESULTS,
+    YOUTUBE_COMMENTS_LIST_QUOTA_COST,
+    user_safe_youtube_comments_list_error,
+    youtube_comments_list_error_code,
+)
 from services.youtube.youtube_oauth_service import YouTubeOAuthService
 from services.youtube.youtube_publish_log import (
     youtube_publish_error_log_fields,
     youtube_publish_error_status,
 )
 
-YouTubeCommentAction = Literal["inbox", "draft", "reply"]
+YouTubeCommentAction = Literal["inbox", "draft", "reply", "replies"]
 
 
 def user_safe_comment_error(
@@ -49,6 +60,14 @@ def user_safe_comment_error(
         documented = user_safe_youtube_comment_threads_list_error(exc)
         if documented:
             return documented
+    if action == "replies":
+        documented = user_safe_youtube_comments_list_error(exc)
+        if documented:
+            return documented
+        status = youtube_publish_error_status(exc)
+        if status in (401,):
+            return "YouTube auth failed. Please reconnect your YouTube channel."
+        return "Could not load replies. Please try again."
     status = youtube_publish_error_status(exc)
     if status in (401,):
         return "YouTube auth failed. Please reconnect your YouTube channel."
@@ -131,9 +150,12 @@ class YouTubeCommentsService:
             )
 
             comments: List[Dict[str, Any]] = []
+            reply_row_count = 0
             for thread in threads.get("items") or []:
                 top = (thread.get("snippet") or {}).get("topLevelComment", {})
                 tsn = top.get("snippet") or {}
+                replies = map_youtube_thread_replies(thread)
+                reply_row_count += len(replies)
                 comments.append(
                     {
                         "thread_id": thread.get("id"),
@@ -147,6 +169,7 @@ class YouTubeCommentsService:
                             "totalReplyCount", 0
                         ),
                         "can_reply": (thread.get("snippet") or {}).get("canReply", True),
+                        "replies": replies,
                     }
                 )
 
@@ -158,10 +181,11 @@ class YouTubeCommentsService:
             }
             logger.info(
                 "[youtube_comments] Inbox complete user_id={} comment_count={} "
-                "unique_video_id_count={} quota_cost={}",
+                "unique_video_id_count={} reply_row_count={} quota_cost={}",
                 user_id,
                 len(comments),
                 len(unique_video_ids),
+                reply_row_count,
                 YOUTUBE_COMMENT_THREADS_LIST_QUOTA_COST,
             )
             return {
@@ -185,6 +209,100 @@ class YouTubeCommentsService:
                 "error_code": youtube_comment_threads_list_error_code(e) or "inbox_failed",
                 "message": user_safe_comment_error(e, action="inbox"),
                 "comments": [],
+            }
+
+    def list_replies(
+        self,
+        user_id: str,
+        parent_id: str,
+        token_id: Optional[int] = None,
+        max_results: int = YOUTUBE_COMMENTS_LIST_DEFAULT_RESULTS,
+    ) -> Dict[str, Any]:
+        """Comments.list for Show more. GET parentId only — never the id filter."""
+        page_size = min(
+            max(int(max_results), 1),
+            YOUTUBE_COMMENTS_LIST_MAX_RESULTS,
+        )
+        parent = (parent_id or "").strip()
+        logger.info(
+            "[youtube_comments] Replies list start user_id={} has_parent_id={} "
+            "max_results={} quota_cost={}",
+            user_id,
+            bool(parent),
+            page_size,
+            YOUTUBE_COMMENTS_LIST_QUOTA_COST,
+        )
+        if not parent:
+            logger.warning(
+                "[youtube_comments] Replies list skipped empty_parent user_id={}",
+                user_id,
+            )
+            return {
+                "success": False,
+                "error_code": "parent_id_required",
+                "message": "A parent comment is required to load replies.",
+                "replies": [],
+            }
+        try:
+            creds = self.oauth_service.get_valid_credentials(user_id, token_id)
+            if not creds:
+                logger.warning(
+                    "[youtube_comments] Replies list skipped not_connected user_id={}",
+                    user_id,
+                )
+                return {
+                    "success": False,
+                    "error_code": "not_connected",
+                    "message": "Connect YouTube to load comments.",
+                    "replies": [],
+                }
+
+            youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
+            resp = (
+                youtube.comments()
+                .list(
+                    part="snippet",
+                    parentId=parent,
+                    maxResults=page_size,
+                    textFormat="plainText",
+                )
+                .execute()
+            )
+            replies = map_youtube_comment_reply_items(resp.get("items"))
+            logger.info(
+                "[youtube_comments] Replies list complete user_id={} has_parent_id={} "
+                "max_results={} returned_count={} quota_cost={}",
+                user_id,
+                True,
+                page_size,
+                len(replies),
+                YOUTUBE_COMMENTS_LIST_QUOTA_COST,
+            )
+            return {
+                "success": True,
+                "replies": replies,
+                "message": f"Loaded {len(replies)} replies.",
+            }
+        except Exception as e:
+            fields = youtube_publish_error_log_fields(e)
+            _status, youtube_reason = youtube_comment_http_error_reason(e)
+            logger.error(
+                "[youtube_comments] Replies list failed user_id={} error_type={} "
+                "http_status={} youtube_reason={} has_parent_id={} max_results={} "
+                "quota_cost={}",
+                user_id,
+                fields["error_type"],
+                fields["http_status"],
+                youtube_reason,
+                True,
+                page_size,
+                YOUTUBE_COMMENTS_LIST_QUOTA_COST,
+            )
+            return {
+                "success": False,
+                "error_code": youtube_comments_list_error_code(e) or "replies_failed",
+                "message": user_safe_comment_error(e, action="replies"),
+                "replies": [],
             }
 
     def draft_reply(

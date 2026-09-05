@@ -83,6 +83,45 @@ export const youtubeStudioApi = {
     }
   },
 
+  async listCommentReplies(params: {
+    parent_id: string;
+    max_results?: number;
+    token_id?: number;
+  }) {
+    console.info("[youtubeStudioApi] comment replies start", {
+      hasParentId: Boolean(params.parent_id),
+      maxResults: params.max_results,
+      hasTokenId: Boolean(params.token_id),
+    });
+    try {
+      const query: { parent_id: string; max_results?: number; token_id?: number } = {
+        parent_id: params.parent_id,
+      };
+      if (params.max_results != null) {
+        query.max_results = params.max_results;
+      }
+      if (params.token_id != null) {
+        query.token_id = params.token_id;
+      }
+      const response = await apiClient.get(`${API_BASE}/comments/replies`, {
+        params: query,
+      });
+      console.info("[youtubeStudioApi] comment replies complete", {
+        success: Boolean(response.data?.success),
+        replyCount: Array.isArray(response.data?.replies)
+          ? response.data.replies.length
+          : 0,
+        hasParentId: true,
+      });
+      return response.data;
+    } catch (repliesError) {
+      console.error("[youtubeStudioApi] comment replies failed", {
+        errorName: repliesError instanceof Error ? repliesError.name : "Error",
+      });
+      throw repliesError;
+    }
+  },
+
   async listChannelVideos(params?: { max_results?: number; token_id?: number }) {
     const response = await apiClient.get(`${API_BASE}/studio/videos`, { params });
     return response.data;

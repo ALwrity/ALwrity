@@ -742,6 +742,63 @@ body.youtube-studio-view #root {
   margin-top: 8px;
 }
 
+.yt-comment-thread-replies {
+  margin-top: 10px;
+  padding-left: 12px;
+  border-left: 2px solid #e5e5e5;
+}
+
+.yt-comment-thread-replies-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.yt-comment-thread-replies-label {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #606060;
+  line-height: 1.35;
+}
+
+.yt-comment-thread-replies-count {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #606060;
+  line-height: 1.35;
+}
+
+.yt-comment-thread-reply {
+  margin: 0 0 8px;
+}
+
+.yt-comment-thread-reply-author {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #0f0f0f;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.yt-comment-thread-reply-body {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  color: #606060;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.yt-comment-thread-replies-error {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  color: #606060;
+  line-height: 1.35;
+}
+
 .yt-modal-close {
   border: none;
   background: #f0f0f0;

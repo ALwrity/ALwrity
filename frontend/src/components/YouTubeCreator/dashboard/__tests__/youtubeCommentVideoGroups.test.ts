@@ -6,6 +6,7 @@ import {
   YOUTUBE_COMMENT_VIDEO_UNAVAILABLE_GROUP_KEY,
   groupYouTubeInboxCommentsByVideo,
   youtubeCommentCountLabel,
+  youtubeCommentReplyCountLabel,
 } from "../youtubeCommentVideoGroups";
 
 describe("groupYouTubeInboxCommentsByVideo", () => {
@@ -104,10 +105,10 @@ describe("groupYouTubeInboxCommentsByVideo", () => {
   });
 });
 
-describe("youtubeCommentCountLabel", () => {
+describe("youtubeCommentReplyCountLabel", () => {
   it("uses singular and plural Studio copy", () => {
-    expect(youtubeCommentCountLabel(1)).toBe("1 comment");
-    expect(youtubeCommentCountLabel(2)).toBe("2 comments");
-    expect(youtubeCommentCountLabel(0)).toBe("0 comments");
+    expect(youtubeCommentReplyCountLabel(1)).toBe("1 reply");
+    expect(youtubeCommentReplyCountLabel(2)).toBe("2 replies");
+    expect(youtubeCommentReplyCountLabel(0)).toBe("0 replies");
   });
 });
