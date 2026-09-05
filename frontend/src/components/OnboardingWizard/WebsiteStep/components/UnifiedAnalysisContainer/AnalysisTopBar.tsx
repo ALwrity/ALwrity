@@ -71,7 +71,7 @@ const AnalysisTopBar: React.FC<AnalysisTopBarProps> = ({
         justifyContent: 'space-between',
         flexWrap: 'wrap',
         width: '100%',
-        minHeight: 64,
+        minHeight: 50, // Reduced height by 20% (from 64px to 50px)
       }}
     >
       {/* Tabs */}
@@ -95,7 +95,7 @@ const AnalysisTopBar: React.FC<AnalysisTopBarProps> = ({
                   alignItems: 'center',
                   justifyContent: 'center',
                   px: { xs: 2.5, sm: 3.5 },
-                  py: 1,
+                  py: 0.5, // Reduced padding to fit the 20% height reduction
                   minWidth: { xs: 120, sm: 160 },
                   cursor: 'pointer',
                   bgcolor: isActive ? '#FFFFFF' : '#F8FAFC',

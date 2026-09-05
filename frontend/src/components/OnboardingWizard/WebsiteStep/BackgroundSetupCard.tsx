@@ -175,6 +175,7 @@ interface BackgroundSetupCardProps {
   brandAnalysis?: any;
   seoAudit?: any;
   onConfigChange?: (prefs: Record<string, { enabled: boolean; delay_mins: number }>) => void;
+  variant?: 'embedded' | 'standalone';
 }
 
 export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
@@ -182,6 +183,7 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
   brandAnalysis,
   seoAudit,
   onConfigChange,
+  variant = 'standalone',
 }) => {
   const [prefs, setPrefs] = useState<Record<string, TaskConfig>>(TASK_DEFAULTS);
   const [saving, setSaving] = useState(false);
@@ -381,43 +383,47 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
     };
   }, [seoAudit, lastHealthRun]);
 
+  const isEmbedded = variant === 'embedded';
+
   if (error) {
     return (
-      <Paper sx={{ p: 3, mt: 2, border: "1px solid #e2e8f0", borderRadius: 2 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Smart Background Setup</Typography>
+      <Box sx={{ p: isEmbedded ? 0 : 3, mt: isEmbedded ? 0 : 2 }}>
+        {!isEmbedded && <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Smart Background Setup</Typography>}
         <Typography variant="body2" color="error">{error}</Typography>
-      </Paper>
+      </Box>
     );
   }
 
   const taskIds = Object.keys(prefs || {});
   const enabledCount = taskIds.filter((id) => prefs[id].enabled).length;
 
-  return (
-    <Paper sx={{ p: 0, mt: 3, border: "1px solid #e0e0e0", borderRadius: 2, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+  const content = (
+    <>
       {/* Header */}
-      <Box
-        sx={{
-          px: 3,
-          py: 2,
-          bgcolor: "#fafafa",
-          borderBottom: "1px solid #eee",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <Box>
-          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#1e293b" }}>
-            ⚙️ Smart Background Setup
-          </Typography>
-          <Typography variant="body2" sx={{ color: "#64748b", mt: 0.5 }}>
-            {enabledCount} of {taskIds.length} tasks enabled — these run in the background
-            after you continue to keep your brand intelligence fresh.
-          </Typography>
+      {!isEmbedded && (
+        <Box
+          sx={{
+            px: 3,
+            py: 2,
+            bgcolor: "#fafafa",
+            borderBottom: "1px solid #eee",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#1e293b" }}>
+              ⚙️ Smart Background Setup
+            </Typography>
+            <Typography variant="body2" sx={{ color: "#64748b", mt: 0.5 }}>
+              {enabledCount} of {taskIds.length} tasks enabled — these run in the background
+              after you continue to keep your brand intelligence fresh.
+            </Typography>
+          </Box>
+          {saving && <CircularProgress size={16} sx={{ flexShrink: 0 }} />}
         </Box>
-        {saving && <CircularProgress size={16} sx={{ flexShrink: 0 }} />}
-      </Box>
+      )}
 
       {/* Task list */}
       {taskIds.map((taskId) => {
@@ -640,6 +646,20 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
           </Box>
         );
       })}
+    </>
+  );
+
+  if (isEmbedded) {
+    return (
+      <Box sx={{ p: 3, overflow: "hidden" }}>
+        {content}
+      </Box>
+    );
+  }
+
+  return (
+    <Paper sx={{ p: 0, mt: 3, border: "1px solid #e0e0e0", borderRadius: 2, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+      {content}
     </Paper>
   );
 };

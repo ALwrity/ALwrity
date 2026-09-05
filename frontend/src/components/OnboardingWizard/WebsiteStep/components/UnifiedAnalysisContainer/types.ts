@@ -118,6 +118,7 @@ export interface UnifiedAnalysisContainerProps {
   // New: optional starting position
   defaultDomain?: DomainKey;
   defaultTab?: TabKey;
+  hideOuterCard?: boolean;
 }
 
 export interface DomainConfig {

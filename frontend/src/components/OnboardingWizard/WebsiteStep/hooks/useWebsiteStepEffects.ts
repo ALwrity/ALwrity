@@ -8,6 +8,7 @@ interface UseWebsiteStepEffectsProps {
   website: string;
   analysis: any;
   onValidationChange?: (isValid: boolean) => void;
+  allTabsViewed: boolean;
 }
 
 export function useWebsiteStepEffects({
@@ -18,6 +19,7 @@ export function useWebsiteStepEffects({
   website,
   analysis,
   onValidationChange,
+  allTabsViewed,
 }: UseWebsiteStepEffectsProps) {
   const [linkedinProfile, setLinkedinProfile] = useState<any>(null);
   const [email, setEmail] = useState<string>('');
@@ -66,12 +68,12 @@ export function useWebsiteStepEffects({
   const prevValidRef = useRef<boolean | null>(null);
   useEffect(() => {
     const hasWebsiteAnalysis = !!(website.trim() && analysis);
-    const isValid = hasWebsiteAnalysis || linkedinConnected;
+    const isValid = (hasWebsiteAnalysis && allTabsViewed) || linkedinConnected;
     if (isValid !== prevValidRef.current && onValidationChange) {
       prevValidRef.current = isValid;
       onValidationChange(isValid);
     }
-  }, [website, analysis, linkedinConnected, onValidationChange]);
+  }, [website, analysis, linkedinConnected, onValidationChange, allTabsViewed]);
 
   return {
     linkedinProfile,
