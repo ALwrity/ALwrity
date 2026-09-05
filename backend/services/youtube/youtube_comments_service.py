@@ -13,6 +13,7 @@ from services.llm_providers.main_text_generation import llm_text_gen
 from services.youtube.youtube_comment_thread_replies import (
     map_youtube_comment_reply_items,
     map_youtube_thread_replies,
+    optional_youtube_comment_like_count,
 )
 from services.youtube.youtube_comment_delete import execute_youtube_comment_delete
 from services.youtube.youtube_comment_update import execute_youtube_comment_update
@@ -160,22 +161,23 @@ class YouTubeCommentsService:
                 replies = map_youtube_thread_replies(thread, mine_channel_id=channel_id)
                 reply_row_count += len(replies)
                 can_edit_count += sum(1 for row in replies if row.get("can_edit"))
-                comments.append(
-                    {
-                        "thread_id": thread.get("id"),
-                        "comment_id": top.get("id"),
-                        "video_id": tsn.get("videoId"),
-                        "author": tsn.get("authorDisplayName"),
-                        "text": tsn.get("textDisplay") or tsn.get("textOriginal"),
-                        "like_count": tsn.get("likeCount"),
-                        "published_at": tsn.get("publishedAt"),
-                        "total_reply_count": (thread.get("snippet") or {}).get(
-                            "totalReplyCount", 0
-                        ),
-                        "can_reply": (thread.get("snippet") or {}).get("canReply", True),
-                        "replies": replies,
-                    }
-                )
+                inbox_row: Dict[str, Any] = {
+                    "thread_id": thread.get("id"),
+                    "comment_id": top.get("id"),
+                    "video_id": tsn.get("videoId"),
+                    "author": tsn.get("authorDisplayName"),
+                    "text": tsn.get("textDisplay") or tsn.get("textOriginal"),
+                    "published_at": tsn.get("publishedAt"),
+                    "total_reply_count": (thread.get("snippet") or {}).get(
+                        "totalReplyCount", 0
+                    ),
+                    "can_reply": (thread.get("snippet") or {}).get("canReply", True),
+                    "replies": replies,
+                }
+                likes = optional_youtube_comment_like_count(tsn)
+                if likes is not None:
+                    inbox_row["like_count"] = likes
+                comments.append(inbox_row)
 
             attach_youtube_comment_video_titles(youtube, comments, user_id=user_id)
             unique_video_ids = {

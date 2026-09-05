@@ -124,6 +124,7 @@ class TestYouTubeCommentsServiceInbox:
         assert comment["video_id"] == "vid-1"
         assert comment["author"] == "Sam"
         assert comment["text"] == "Loved the intro"
+        assert comment["like_count"] == 3
         assert comment["thread_id"] == "thread-1"
         assert comment["video_title"] == "vid-1"
         list_kwargs = youtube.commentThreads.return_value.list.call_args.kwargs
@@ -131,6 +132,20 @@ class TestYouTubeCommentsServiceInbox:
         assert list_kwargs["maxResults"] == 20
         assert list_kwargs["order"] == "time"
         assert "snippet" in list_kwargs["part"]
+
+    def test_inbox_omits_invalid_parent_like_count(self):
+        thread = _thread(comment_id="c-1", video_id="vid-1", author="Sam", text="Loved the intro")
+        thread["snippet"]["topLevelComment"]["snippet"]["likeCount"] = "nope"
+
+        youtube = _youtube_inbox([thread])
+        with patch(
+            "services.youtube.youtube_comments_service.build",
+            return_value=youtube,
+        ):
+            result = _service(_connected_oauth()).list_inbox(USER_ID)
+
+        assert result["success"] is True
+        assert "like_count" not in result["comments"][0]
 
     def test_inbox_caps_max_results_at_one_hundred(self):
         youtube = _youtube_inbox([])

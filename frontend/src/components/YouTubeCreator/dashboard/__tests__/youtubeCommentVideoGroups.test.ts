@@ -6,7 +6,9 @@ import {
   YOUTUBE_COMMENT_VIDEO_UNAVAILABLE_GROUP_KEY,
   groupYouTubeInboxCommentsByVideo,
   youtubeCommentCountLabel,
+  youtubeCommentLikeCountLabel,
   youtubeCommentReplyCountLabel,
+  youtubeCommentVisibleLikeCount,
 } from "../youtubeCommentVideoGroups";
 
 describe("groupYouTubeInboxCommentsByVideo", () => {
@@ -110,5 +112,21 @@ describe("youtubeCommentReplyCountLabel", () => {
     expect(youtubeCommentReplyCountLabel(1)).toBe("1 reply");
     expect(youtubeCommentReplyCountLabel(2)).toBe("2 replies");
     expect(youtubeCommentReplyCountLabel(0)).toBe("0 replies");
+  });
+});
+
+describe("youtubeCommentLikeCountLabel", () => {
+  it("uses singular and plural Studio copy and hides empty counts", () => {
+    expect(youtubeCommentLikeCountLabel(1)).toBe("1 like");
+    expect(youtubeCommentLikeCountLabel(3)).toBe("3 likes");
+    expect(youtubeCommentVisibleLikeCount(3)).toBe(3);
+    expect(youtubeCommentVisibleLikeCount(1)).toBe(1);
+    expect(youtubeCommentVisibleLikeCount(0)).toBeNull();
+    expect(youtubeCommentVisibleLikeCount(undefined)).toBeNull();
+    expect(youtubeCommentVisibleLikeCount(Number.NaN)).toBeNull();
+    expect(youtubeCommentVisibleLikeCount("3")).toBe(3);
+    expect(youtubeCommentVisibleLikeCount(-1)).toBeNull();
+    expect(youtubeCommentVisibleLikeCount("nope")).toBeNull();
+    expect(youtubeCommentVisibleLikeCount(null)).toBeNull();
   });
 });
