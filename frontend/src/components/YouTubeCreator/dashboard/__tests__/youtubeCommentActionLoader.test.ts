@@ -7,18 +7,29 @@ import {
   type YouTubeCommentProgressAction,
 } from "../youtubeCommentActionLoader";
 
-const ACTIONS: YouTubeCommentProgressAction[] = ["draft", "send", "save", "delete"];
+const ACTIONS: YouTubeCommentProgressAction[] = [
+  "draft",
+  "send",
+  "save",
+  "delete",
+  "hide",
+  "hideUser",
+];
 
 describe("youtubeCommentActionLoader", () => {
   it("gives each action its own title and steps", () => {
     const titles = ACTIONS.map(
       (action) => getYouTubeCommentActionLoaderCopy(action).title,
     );
-    expect(new Set(titles).size).toBe(4);
+    expect(new Set(titles).size).toBe(6);
     expect(getYouTubeCommentActionLoaderCopy("draft").title).toBe("Drafting reply");
     expect(getYouTubeCommentActionLoaderCopy("send").title).toBe("Sending reply");
     expect(getYouTubeCommentActionLoaderCopy("save").title).toBe("Saving edit");
     expect(getYouTubeCommentActionLoaderCopy("delete").title).toBe("Deleting reply");
+    expect(getYouTubeCommentActionLoaderCopy("hide").title).toBe("Hiding comment");
+    expect(getYouTubeCommentActionLoaderCopy("hideUser").title).toBe(
+      "Hiding user from channel",
+    );
     expect(getYouTubeCommentActionLoaderCopy("draft").steps).toEqual([
       "Apply your channel voice",
       "Read the comment",
@@ -35,9 +46,14 @@ describe("youtubeCommentActionLoader", () => {
       "Update on YouTube",
       "Confirm",
     ]);
-    expect(getYouTubeCommentActionLoaderCopy("delete").steps).toEqual([
-      "Confirm delete",
-      "Remove on YouTube",
+    expect(getYouTubeCommentActionLoaderCopy("hide").steps).toEqual([
+      "Confirm hide",
+      "Update on YouTube",
+      "Confirm",
+    ]);
+    expect(getYouTubeCommentActionLoaderCopy("hideUser").steps).toEqual([
+      "Confirm hide user",
+      "Update on YouTube",
       "Confirm",
     ]);
   });
@@ -48,7 +64,7 @@ describe("youtubeCommentActionLoader", () => {
     );
     expect(YOUTUBE_COMMENT_DRAFT_LOADER_INTERVAL_MS).toBe(4000);
     expect(YOUTUBE_COMMENT_API_LOADER_INTERVAL_MS).toBe(1200);
-    for (const action of ["send", "save", "delete"] as const) {
+    for (const action of ["send", "save", "delete", "hide", "hideUser"] as const) {
       expect(getYouTubeCommentActionLoaderCopy(action).intervalMs).toBe(
         YOUTUBE_COMMENT_API_LOADER_INTERVAL_MS,
       );

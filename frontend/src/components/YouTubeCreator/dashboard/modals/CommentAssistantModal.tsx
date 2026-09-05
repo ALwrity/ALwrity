@@ -262,6 +262,20 @@ export const CommentAssistantModal: React.FC<
                 onDraft={() => void draft(c)}
                 onSend={() => void send(c)}
                 onCancelDraft={() => cancelDraft(c.comment_id || "")}
+                onHidden={(commentId, message) => {
+                  console.info("[YouTubeCommentAssistant] Parent hidden", {
+                    hasCommentId: Boolean(commentId),
+                  });
+                  setComments((prev) =>
+                    prev.filter((row) => (row.comment_id || "") !== commentId),
+                  );
+                  setDrafts((prev) => {
+                    const next = { ...prev };
+                    delete next[commentId];
+                    return next;
+                  });
+                  setStatus(message);
+                }}
               />
             ))}
           </YouTubeCommentVideoGroup>

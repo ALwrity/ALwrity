@@ -33,6 +33,7 @@ describe("YouTube Comment Reply Assistant layout stylesheet", () => {
     expect(layoutCss).not.toMatch(/yt-comment-video-group-work/);
     expect(layoutCss).not.toMatch(/yt-comment-overflow-menu--portal/);
     expect(layoutCss).not.toMatch(/yt-comment-like-count/);
+    expect(layoutCss).not.toMatch(/yt-comment-inbox-head/);
 
     expect(assistantCss).toMatch(/\.yt-comment-video-group-body--split/);
     expect(assistantCss).toMatch(/\.yt-comment-video-group-context/);
@@ -42,6 +43,7 @@ describe("YouTube Comment Reply Assistant layout stylesheet", () => {
     expect(assistantCss).toMatch(/max-height:\s*min\(52vh,\s*28rem\)/);
     expect(assistantCss).toMatch(/@media \(max-width:\s*720px\)/);
     expect(assistantCss).toMatch(/\.yt-comment-like-count/);
+    expect(assistantCss).toMatch(/\.yt-comment-inbox-head/);
     expect(assistantCss).toMatch(/color:\s*#606060/);
   });
 });

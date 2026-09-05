@@ -199,6 +199,42 @@ export const youtubeStudioApi = {
     }
   },
 
+  async setCommentModerationStatus(body: {
+    comment_id: string;
+    ban_author: boolean;
+    token_id?: number;
+  }) {
+    console.info("[youtubeStudioApi] comment moderate start", {
+      hasCommentId: Boolean(body.comment_id),
+      banAuthor: Boolean(body.ban_author),
+      hasTokenId: Boolean(body.token_id),
+    });
+    try {
+      const payload: {
+        comment_id: string;
+        ban_author: boolean;
+        token_id?: number;
+      } = {
+        comment_id: body.comment_id,
+        ban_author: body.ban_author,
+      };
+      if (body.token_id != null) {
+        payload.token_id = body.token_id;
+      }
+      const response = await apiClient.post(`${API_BASE}/comments/moderate`, payload);
+      console.info("[youtubeStudioApi] comment moderate complete", {
+        success: Boolean(response.data?.success),
+        banAuthor: Boolean(body.ban_author),
+      });
+      return response.data;
+    } catch (moderateError) {
+      console.error("[youtubeStudioApi] comment moderate failed", {
+        errorName: moderateError instanceof Error ? moderateError.name : "Error",
+      });
+      throw moderateError;
+    }
+  },
+
   async listChannelVideos(params?: { max_results?: number; token_id?: number }) {
     const response = await apiClient.get(`${API_BASE}/studio/videos`, { params });
     return response.data;

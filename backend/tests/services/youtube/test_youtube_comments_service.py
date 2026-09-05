@@ -125,6 +125,7 @@ class TestYouTubeCommentsServiceInbox:
         assert comment["author"] == "Sam"
         assert comment["text"] == "Loved the intro"
         assert comment["like_count"] == 3
+        assert comment["can_hide_user"] is True
         assert comment["thread_id"] == "thread-1"
         assert comment["video_title"] == "vid-1"
         list_kwargs = youtube.commentThreads.return_value.list.call_args.kwargs
@@ -146,6 +147,36 @@ class TestYouTubeCommentsServiceInbox:
 
         assert result["success"] is True
         assert "like_count" not in result["comments"][0]
+
+    def test_inbox_omits_hide_user_when_parent_is_the_channel(self):
+        thread = _thread(comment_id="c-1", video_id="vid-1", author="Sam", text="Loved the intro")
+        thread["snippet"]["topLevelComment"]["snippet"]["authorChannelId"] = {
+            "value": "UC123"
+        }
+        youtube = _youtube_inbox([thread])
+        with patch(
+            "services.youtube.youtube_comments_service.build",
+            return_value=youtube,
+        ):
+            result = _service(_connected_oauth()).list_inbox(USER_ID)
+
+        assert result["success"] is True
+        assert result["comments"][0]["can_hide_user"] is False
+
+    def test_inbox_allows_hide_user_when_parent_is_a_viewer(self):
+        thread = _thread(comment_id="c-1", video_id="vid-1", author="Sam", text="Loved the intro")
+        thread["snippet"]["topLevelComment"]["snippet"]["authorChannelId"] = {
+            "value": "UC-viewer"
+        }
+        youtube = _youtube_inbox([thread])
+        with patch(
+            "services.youtube.youtube_comments_service.build",
+            return_value=youtube,
+        ):
+            result = _service(_connected_oauth()).list_inbox(USER_ID)
+
+        assert result["success"] is True
+        assert result["comments"][0]["can_hide_user"] is True
 
     def test_inbox_caps_max_results_at_one_hundred(self):
         youtube = _youtube_inbox([])

@@ -26,6 +26,7 @@ export type YouTubeInboxComment = {
   replies?: YouTubeInboxReply[];
   total_reply_count?: number;
   like_count?: number;
+  can_hide_user?: boolean;
 };
 
 export type YouTubeCommentVideoGroupModel = {

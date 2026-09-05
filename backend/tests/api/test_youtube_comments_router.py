@@ -508,3 +508,105 @@ class TestYouTubeCommentsRouter:
         detail = str(resp.json().get("detail") or "")
         assert "secret-stack" not in detail
         assert "delete" in detail.lower() or "try again" in detail.lower()
+
+    def test_moderate_path_forwards_comment_id_and_ban_author(self):
+        service = MagicMock()
+        service.set_comment_moderation.return_value = {
+            "success": True,
+            "message": "Comment hidden.",
+        }
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.post(
+            "/api/youtube/comments/moderate",
+            json={"comment_id": "c-1", "ban_author": False},
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is True
+        kwargs = service.set_comment_moderation.call_args.kwargs
+        assert kwargs["comment_id"] == "c-1"
+        assert kwargs["ban_author"] is False
+        assert "moderationStatus" not in kwargs
+
+    def test_moderate_forwards_ban_author_true_and_token_id(self):
+        service = MagicMock()
+        service.set_comment_moderation.return_value = {
+            "success": True,
+            "message": "User hidden from the channel.",
+        }
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.post(
+            "/api/youtube/comments/moderate",
+            json={"comment_id": "c-1", "ban_author": True, "token_id": 7},
+        )
+
+        assert resp.status_code == 200
+        kwargs = service.set_comment_moderation.call_args.kwargs
+        assert kwargs["ban_author"] is True
+        assert kwargs["token_id"] == 7
+
+    def test_moderate_requires_comment_id(self):
+        service = MagicMock()
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        missing = client.post("/api/youtube/comments/moderate", json={"ban_author": False})
+        empty = client.post(
+            "/api/youtube/comments/moderate",
+            json={"comment_id": "", "ban_author": False},
+        )
+
+        assert missing.status_code == 422
+        assert empty.status_code == 422
+        service.set_comment_moderation.assert_not_called()
+
+    def test_moderate_route_returns_documented_error_without_500(self):
+        service = MagicMock()
+        service.set_comment_moderation.return_value = {
+            "success": False,
+            "error_code": "commentNotFound",
+            "message": "That comment could not be found. It may have been removed.",
+        }
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.post(
+            "/api/youtube/comments/moderate",
+            json={"comment_id": "c-1", "ban_author": False},
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is False
+        assert body["error_code"] == "commentNotFound"
+        assert "secret" not in (body.get("message") or "").lower()
+
+    def test_moderate_route_unexpected_error_does_not_leak_detail(self):
+        service = MagicMock()
+        service.set_comment_moderation.side_effect = RuntimeError("secret-stack")
+        client = youtube_studio_client({get_comments_service: lambda: service})
+
+        resp = client.post(
+            "/api/youtube/comments/moderate",
+            json={"comment_id": "c-1", "ban_author": False},
+        )
+
+        assert resp.status_code == 500
+        detail = str(resp.json().get("detail") or "")
+        assert "secret-stack" not in detail
+        assert "hide" in detail.lower() or "try again" in detail.lower()
+
+    def test_moderate_requires_auth(self):
+        from middleware.auth_middleware import get_current_user
+        from tests.api.youtube_studio_test_client import youtube_studio_client as make_client
+
+        service = MagicMock()
+        client = make_client({get_comments_service: lambda: service})
+        client.app.dependency_overrides[get_current_user] = lambda: {}
+        resp = client.post(
+            "/api/youtube/comments/moderate",
+            json={"comment_id": "c-1", "ban_author": False},
+        )
+        assert resp.status_code == 401
+        service.set_comment_moderation.assert_not_called()
