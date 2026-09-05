@@ -1,6 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { YouTubeActionModal } from "../YouTubeActionModal";
-import { youtubeStudioApi } from "../../../../services/youtubeStudioApi";
+import {
+  isYouTubeStudioRequestCanceled,
+  youtubeStudioApi,
+} from "../../../../services/youtubeStudioApi";
 import { YouTubeCommentInboxRow } from "../YouTubeCommentInboxRow";
 import { YouTubeCommentVideoGroup } from "../YouTubeCommentVideoGroup";
 import {
@@ -30,6 +33,8 @@ export const CommentAssistantModal: React.FC<
   const [busyAction, setBusyAction] = useState<YouTubeCommentParentBusyAction | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
+  const draftAbortRef = useRef<AbortController | null>(null);
+  const draftRequestIdRef = useRef(0);
 
   const videoGroups = useMemo(
     () => groupYouTubeInboxCommentsByVideo(comments),
@@ -87,7 +92,28 @@ export const CommentAssistantModal: React.FC<
     setExpandedGroupKey(firstGroupKey);
   }, [comments, firstGroupKey]);
 
+  useEffect(() => {
+    if (open || !draftAbortRef.current) {
+      return;
+    }
+    console.info("[YouTubeCommentAssistant] Draft cancel requested", {
+      reason: "closed",
+      hadInFlight: true,
+    });
+    draftRequestIdRef.current += 1;
+    draftAbortRef.current.abort();
+    draftAbortRef.current = null;
+    setBusyId(null);
+    setBusyAction(null);
+    setStatus(null);
+  }, [open]);
+
   const draft = async (c: YouTubeInboxComment) => {
+    const requestId = draftRequestIdRef.current + 1;
+    draftRequestIdRef.current = requestId;
+    draftAbortRef.current?.abort();
+    const abortController = new AbortController();
+    draftAbortRef.current = abortController;
     setBusyId(c.comment_id);
     setBusyAction("draft");
     setStatus(null);
@@ -96,11 +122,17 @@ export const CommentAssistantModal: React.FC<
         hasCommentId: Boolean(c.comment_id),
         commentLength: (c.text || "").length,
       });
-      const res = await youtubeStudioApi.draftCommentReply({
-        comment_text: c.text || "",
-        channel_niche: niche || undefined,
-        video_title: c.video_title || undefined,
-      });
+      const res = await youtubeStudioApi.draftCommentReply(
+        {
+          comment_text: c.text || "",
+          channel_niche: niche || undefined,
+          video_title: c.video_title || undefined,
+        },
+        { signal: abortController.signal },
+      );
+      if (requestId !== draftRequestIdRef.current) {
+        return;
+      }
       if (res.success && res.draft) {
         console.info("[YouTubeCommentAssistant] Draft complete", {
           hasCommentId: Boolean(c.comment_id),
@@ -113,11 +145,41 @@ export const CommentAssistantModal: React.FC<
         setStatus(res.message || "Could not draft a reply. Please try again.");
       }
     } catch (draftError) {
+      if (isYouTubeStudioRequestCanceled(draftError)) {
+        console.info("[YouTubeCommentAssistant] Draft cancelled", {
+          hasCommentId: Boolean(c.comment_id),
+          superseded: requestId !== draftRequestIdRef.current,
+        });
+        return;
+      }
+      if (requestId !== draftRequestIdRef.current) {
+        return;
+      }
       console.error("[YouTubeCommentAssistant] Draft failed", {
         errorName: draftError instanceof Error ? draftError.name : "Error",
       });
       setStatus("Could not draft a reply. Please try again.");
     } finally {
+      if (requestId === draftRequestIdRef.current) {
+        setBusyId(null);
+        setBusyAction(null);
+        draftAbortRef.current = null;
+      }
+    }
+  };
+
+  const cancelDraft = (commentId: string) => {
+    console.info("[YouTubeCommentAssistant] Draft cancel requested", {
+      reason: "user",
+      hasCommentId: Boolean(commentId),
+      hadInFlight: Boolean(draftAbortRef.current),
+    });
+    draftRequestIdRef.current += 1;
+    draftAbortRef.current?.abort();
+    draftAbortRef.current = null;
+    setDrafts((prev) => ({ ...prev, [commentId]: "" }));
+    setStatus(null);
+    if (busyId === commentId && busyAction === "draft") {
       setBusyId(null);
       setBusyAction(null);
     }
@@ -199,6 +261,7 @@ export const CommentAssistantModal: React.FC<
                 }
                 onDraft={() => void draft(c)}
                 onSend={() => void send(c)}
+                onCancelDraft={() => cancelDraft(c.comment_id || "")}
               />
             ))}
           </YouTubeCommentVideoGroup>

@@ -2,6 +2,18 @@ import { apiClient } from "../api/client";
 
 const API_BASE = "/api/youtube";
 
+export function isYouTubeStudioRequestCanceled(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const candidate = error as { code?: string; name?: string };
+  return (
+    candidate.code === "ERR_CANCELED" ||
+    candidate.name === "CanceledError" ||
+    candidate.name === "AbortError"
+  );
+}
+
 /** Studio Hub client methods. Separate from the core youtubeApi object so webpack/TS pick them up. */
 export const youtubeStudioApi = {
   async getChannelPulse(params?: { days?: number; token_id?: number }) {
@@ -36,25 +48,37 @@ export const youtubeStudioApi = {
     }
   },
 
-  async draftCommentReply(body: {
-    comment_text: string;
-    video_title?: string;
-    channel_niche?: string;
-    persona_notes?: string;
-  }) {
+  async draftCommentReply(
+    body: {
+      comment_text: string;
+      video_title?: string;
+      channel_niche?: string;
+      persona_notes?: string;
+    },
+    options?: { signal?: AbortSignal },
+  ) {
     console.info("[youtubeStudioApi] comment draft start", {
       commentLength: (body.comment_text || "").length,
       hasNiche: Boolean(body.channel_niche),
       hasVideoTitle: Boolean(body.video_title),
+      hasAbortSignal: Boolean(options?.signal),
     });
     try {
-      const response = await apiClient.post(`${API_BASE}/comments/draft-reply`, body);
+      const response = options?.signal
+        ? await apiClient.post(`${API_BASE}/comments/draft-reply`, body, {
+            signal: options.signal,
+          })
+        : await apiClient.post(`${API_BASE}/comments/draft-reply`, body);
       console.info("[youtubeStudioApi] comment draft complete", {
         success: Boolean(response.data?.success),
         hasDraft: Boolean(response.data?.draft),
       });
       return response.data;
     } catch (draftError) {
+      if (isYouTubeStudioRequestCanceled(draftError)) {
+        console.info("[youtubeStudioApi] comment draft cancelled");
+        throw draftError;
+      }
       console.error("[youtubeStudioApi] comment draft failed", {
         errorName: draftError instanceof Error ? draftError.name : "Error",
       });
