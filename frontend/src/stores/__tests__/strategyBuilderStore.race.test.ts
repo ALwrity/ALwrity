@@ -1,16 +1,21 @@
 /**
- * Phase 5: Verify isAutoPopulating race condition is fixed.
+ * Verify autofill/regenerate concurrency control cannot enter a runaway
+ * loop or permanent lock.
  *
- * The old code used a module-level variable that was set BEFORE checking
- * get().loading. If loading was true, the function returned early without
- * resetting isAutoPopulating, causing a permanent lock.
+ * History:
+ * - Phase 5: isAutoPopulating was set BEFORE checking get().loading, so an
+ *   early return under loading permanently locked autofill.
+ * - Runaway-loop fix: store-level `loading` alone proved unreliable across
+ *   re-renders (the check-then-set window let concurrent calls through and
+ *   the console flooded). The shipped design uses dedicated module-level
+ *   flags (autofillLoading / regenerateAILoading), set immediately before
+ *   the async work and reset in `finally` — so concurrent calls are
+ *   skipped and the flag can never leak on error paths.
  *
- * Phase 5 fix: Use get().loading directly, or wrap the flag in try/finally.
+ * This test pins the CURRENT design: module-level flags + finally reset.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// Read the store source to verify the pattern is fixed
+import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -19,14 +24,23 @@ const storeSource = readFileSync(
   'utf-8',
 );
 
-describe('strategyBuilderStore — Phase 5: isAutoPopulating race condition', () => {
-  it('does NOT use module-level isAutoPopulating variable', () => {
-    // The fix removes the module-level variable entirely
+describe('strategyBuilderStore — autofill concurrency control', () => {
+  it('does NOT use the old isAutoPopulating flag (permanent-lock pattern)', () => {
     expect(storeSource).not.toContain('let isAutoPopulating = false');
   });
 
-  it('uses get().loading for concurrency control instead of module-level flag', () => {
-    // The fix should use the store's loading state for control
-    expect(storeSource).toContain('get().loading');
+  it('uses dedicated module-level flags for autofill and regenerate', () => {
+    expect(storeSource).toContain('let autofillLoading = false');
+    expect(storeSource).toContain('let regenerateAILoading = false');
+  });
+
+  it('checks the flag before starting work (skip concurrent calls)', () => {
+    expect(storeSource).toMatch(/autofillStrategyFields[\s\S]*?if \(autofillLoading\)/);
+    expect(storeSource).toMatch(/regenerateAIFields[\s\S]*?if \(regenerateAILoading\)/);
+  });
+
+  it('resets the flags in finally blocks (no permanent lock on error)', () => {
+    expect(storeSource).toMatch(/finally\s*\{[\s\S]*?autofillLoading = false/);
+    expect(storeSource).toMatch(/finally\s*\{[\s\S]*?regenerateAILoading = false/);
   });
 });

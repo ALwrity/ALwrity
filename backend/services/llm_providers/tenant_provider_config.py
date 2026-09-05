@@ -49,7 +49,10 @@ class TenantProviderConfigResolver:
     }
 
     _DEFAULT_MODELS: Dict[Tuple[str, str], str] = {
-        ("text", "google"): "gemini-2.0-flash-001",
+        # Key must match the NORMALIZED provider name from _normalize_provider()
+        # (gemini/google → "gemini"), otherwise the lookup always misses and
+        # model_policy["default_model"] resolves to None for gemini.
+        ("text", "gemini"): "gemini-2.0-flash-001",
         ("text", "huggingface"): "mistralai/Mistral-7B-Instruct-v0.3:groq",
         ("image", "wavespeed"): "flux-kontext-pro",
         ("image", "huggingface"): "black-forest-labs/FLUX.1-Krea-dev",

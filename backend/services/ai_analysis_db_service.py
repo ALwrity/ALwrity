@@ -12,6 +12,47 @@ from loguru import logger
 from models.content_planning import AIAnalysisResult, ContentStrategy
 from services.database import get_db_session
 
+
+def _summarize_personalized_data_tree(data: Any, max_lines: int = 12) -> str:
+    """Compact presence-tree for personalized-data logging.
+
+    Shows which top-level data sources are present/missing (with type+size for
+    collections, truncated preview for scalars) instead of dumping full
+    payloads into the console. Keeps the diagnostic value — "which data did
+    this analysis use?" — without the wall of JSON.
+    """
+    if not data:
+        return "none"
+    if not isinstance(data, dict):
+        size = len(data) if hasattr(data, "__len__") else "?"
+        return f"{type(data).__name__}·len={size}"
+
+    lines: List[str] = []
+    present = missing = 0
+    for key, value in data.items():
+        if value is None or value == {} or value == []:
+            missing += 1
+            lines.append(f"✗ {key} — MISSING")
+        else:
+            present += 1
+            if isinstance(value, dict):
+                desc = f"dict·{len(value)} keys"
+            elif isinstance(value, list):
+                desc = f"list·{len(value)} items"
+            else:
+                text = str(value)
+                desc = text if len(text) <= 40 else text[:37] + "..."
+            lines.append(f"✓ {key} ({desc})")
+        if len(lines) >= max_lines:
+            remaining = len(data) - len(lines)
+            if remaining > 0:
+                lines.append(f"… +{remaining} more")
+            break
+
+    header = f"{present}/{len(data)} sources present, {missing} missing"
+    return header + "\n       " + "\n       ".join(lines)
+
+
 class AIAnalysisDBService:
     """Service for managing AI analysis results in the database."""
     
@@ -119,7 +160,7 @@ class AIAnalysisDBService:
                 logger.info(f"   - Strategy ID: {result_dict['strategy_id']}")
                 logger.info(f"   - Analysis Type: {result_dict['analysis_type']}")
                 logger.info(f"   - Analysis Date: {result_dict['analysis_date']}")
-                logger.info(f"   - Personalized Data Used: {result_dict['personalized_data_used']}")
+                logger.info(f"   - Personalized Data Used [{_summarize_personalized_data_tree(result_dict['personalized_data_used'])}]")
                 logger.info(f"   - AI Service Status: {result_dict['ai_service_status']}")
                 
                 # Log results structure

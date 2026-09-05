@@ -89,24 +89,39 @@ async def check_ai_services_health(
     Check AI services health separately
     """
     try:
+        # Resolve the configured LLM provider up front (GPT_PROVIDER), so the
+        # response shape uses a provider-agnostic key like "gemini_provider",
+        # "huggingface_provider", etc. Falls back to "gemini_provider" if the
+        # resolver itself fails (e.g. during early startup).
+        try:
+            from services.llm_providers.tenant_provider_config import tenant_provider_config_resolver
+            user_id = str(current_user.get("id")) if current_user else None
+            _cfg = tenant_provider_config_resolver.resolve(modality="text", user_id=user_id)
+            provider_key = f"{_cfg.selected_providers[0]}_provider" if _cfg.selected_providers else "gemini_provider"
+        except Exception:
+            provider_key = "gemini_provider"
+
         health_status = {
             "status": "healthy",
             "timestamp": datetime.utcnow().isoformat(),
             "services": {
-                "gemini_provider": False,
+                provider_key: False,
                 "ai_analytics_service": False,
                 "ai_engine_service": False
             }
         }
         
-        # Test Gemini provider
+        # Verify the configured provider has a usable key. Follows the same
+        # pattern as services/llm_providers/main_text_generation.py and
+        # services/llm_providers/tenant_provider_config.py.
         try:
-            from services.llm_providers.gemini_provider import get_gemini_api_key
-            api_key = get_gemini_api_key()
-            if api_key:
-                health_status["services"]["gemini_provider"] = True
+            from services.llm_providers.tenant_provider_config import tenant_provider_config_resolver
+            user_id = str(current_user.get("id")) if current_user else None
+            config = tenant_provider_config_resolver.resolve(modality="text", user_id=user_id)
+            if config.selected_providers and config.provider_keys:
+                health_status["services"][provider_key] = True
         except Exception as e:
-            logger.warning(f"Gemini provider health check failed: {e}")
+            logger.warning(f"LLM provider health check failed: {e}")
         
         # Test AI Analytics Service
         try:
@@ -131,12 +146,23 @@ async def check_ai_services_health(
         return health_status
     except Exception as e:
         logger.error(f"AI services health check failed: {e}")
+        # On catastrophic failure, still report the configured provider key
+        # (so dashboards reflect the real GPT_PROVIDER choice) plus the
+        # two always-on services.
+        try:
+            from services.llm_providers.tenant_provider_config import tenant_provider_config_resolver
+            user_id = str(current_user.get("id")) if current_user else None
+            config = tenant_provider_config_resolver.resolve(modality="text", user_id=user_id)
+            primary = config.selected_providers[0] if config.selected_providers else "gemini"
+            provider_key = f"{primary}_provider"
+        except Exception:
+            provider_key = "gemini_provider"
         return {
             "status": "unhealthy",
             "timestamp": datetime.utcnow().isoformat(),
             "error": str(e),
             "services": {
-                "gemini_provider": False,
+                provider_key: False,
                 "ai_analytics_service": False,
                 "ai_engine_service": False
             }
