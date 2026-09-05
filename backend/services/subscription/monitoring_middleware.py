@@ -344,7 +344,10 @@ async def check_usage_limits_middleware(request: Request, user_id: str, request_
         return _build_usage_enforcement_unavailable_response()
     finally:
         if db is not None:
-            db.close()
+            try:
+                db.close()
+            except Exception as close_err:
+                logger.debug(f"DB session close skipped (usage-check block): {close_err}")
 
 async def monitoring_middleware(request: Request, call_next):
     """Enhanced FastAPI middleware for monitoring API calls with usage tracking."""
@@ -440,7 +443,11 @@ async def monitoring_middleware(request: Request, call_next):
         if request.method != "OPTIONS":
             limit_response = await check_usage_limits_middleware(request, user_id, request_body)
             if limit_response:
-                if db: db.close()
+                if db is not None:
+                    try:
+                        db.close()
+                    except Exception as close_err:
+                        logger.debug(f"DB session close skipped (usage-check): {close_err}")
                 return limit_response
     except Exception as e:
         logger.error(f"Error in usage limits middleware: {e}")
@@ -546,8 +553,11 @@ async def monitoring_middleware(request: Request, call_next):
             content={"error": "Internal server error"}
         )
     finally:
-        if db:
-            db.close()
+        if db is not None:
+            try:
+                db.close()
+            except Exception as close_err:
+                logger.debug(f"DB session close skipped (main middleware finally): {close_err}")
 
 async def get_monitoring_stats(minutes: int = 5) -> Dict[str, Any]:
     """Get current monitoring statistics."""
@@ -607,7 +617,10 @@ async def get_lightweight_stats(user_id: str) -> Dict[str, Any]:
                     APIRequest.timestamp >= five_minutes_ago
                 ).first()
             finally:
-                thread_db.close()
+                try:
+                    thread_db.close()
+                except Exception as close_err:
+                    logger.debug(f"DB session close skipped (thread_db finally): {close_err}")
 
         stats = await run_in_threadpool(_fetch_stats)
         
@@ -666,4 +679,7 @@ async def get_lightweight_stats(user_id: str) -> Dict[str, Any]:
         }
     finally:
         if db is not None:
-            db.close()
+            try:
+                db.close()
+            except Exception as close_err:
+                logger.debug(f"DB session close skipped (stats finally): {close_err}")
