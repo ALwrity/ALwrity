@@ -8,6 +8,10 @@ from typing import Dict, Any, List, Optional, Union
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from loguru import logger
+from api.onboarding_utils.website_change_invalidation import (
+    extract_onboarding_website_url,
+    should_reuse_persona_cache,
+)
 import os
 
 # Rate limiting configuration
@@ -55,6 +59,14 @@ def _load_persona_data(db: Session, user_id: str) -> Optional[Dict[str, Any]]:
     if not session or not session.persona_data:
         return None
     pd = session.persona_data
+    from models.onboarding import WebsiteAnalysis
+
+    latest_analysis = (
+        db.query(WebsiteAnalysis)
+        .filter(WebsiteAnalysis.session_id == session.id)
+        .order_by(WebsiteAnalysis.updated_at.desc())
+        .first()
+    )
     return {
         "success": True,
         "core_persona": pd.core_persona,
@@ -62,6 +74,7 @@ def _load_persona_data(db: Session, user_id: str) -> Optional[Dict[str, Any]]:
         "quality_metrics": pd.quality_metrics,
         "selected_platforms": pd.selected_platforms,
         "timestamp": pd.updated_at.isoformat() if pd.updated_at else None,
+        "website_url": latest_analysis.website_url if latest_analysis else None,
     }
 
 
@@ -290,7 +303,13 @@ async def generate_writing_personas_async(
         # If fresh cache exists for this user, short-circuit and return a completed task
         # (unless the caller explicitly requested a forced regeneration).
         cached = _load_persona_data(db, user_id)
-        if cached and not persona_request.force:
+        request_website_url = extract_onboarding_website_url(persona_request.onboarding_data)
+        session_website_url = (cached or {}).get("website_url") or ""
+        if (
+            cached
+            and not persona_request.force
+            and should_reuse_persona_cache(request_website_url, session_website_url)
+        ):
             task_id = str(uuid.uuid4())
             _create_persona_task(
                 user_id=user_id,

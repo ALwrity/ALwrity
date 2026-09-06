@@ -95,13 +95,15 @@ class WebsiteOnboardingStrategy:
         logger.info(f" Step 1: Extracted website_data keys: {list(website_data.keys()) if website_data else 'None'}")
         if website_data:
             try:
-                saved = svc._save_website_analysis(user_id, website_data, db)
-                if saved:
+                save_result = svc._save_website_analysis(user_id, website_data, db)
+                if save_result:
                     logger.info(f" Saved website analysis for user {user_id}")
                     svc.record_connected_platform(user_id, "website", db)
 
                     website_url = website_data.get('website') or website_data.get('website_url')
-                    if website_url:
+                    if website_url and (
+                        save_result.is_new_analysis or save_result.website_url_changed
+                    ):
                         from api.onboarding_utils.onboarding_task_scheduler import schedule_step2_tasks
                         # Read user task preferences from session
                         prefs = None
@@ -112,6 +114,15 @@ class WebsiteOnboardingStrategy:
                         except Exception:
                             pass
                         schedule_step2_tasks(user_id, db, website_url, preferences=prefs)
+                        logger.info(
+                            f"[onboarding:website_change] Scheduled step-2 background tasks for user {user_id} "
+                            f"(new={save_result.is_new_analysis}, url_changed={save_result.website_url_changed})"
+                        )
+                    elif website_url:
+                        logger.info(
+                            f"[onboarding:website_change] Skipped step-2 task reschedule for user {user_id} "
+                            "(website URL unchanged)"
+                        )
 
                     # Save email digest preferences from onboarding step
                     try:
