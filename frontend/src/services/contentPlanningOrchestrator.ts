@@ -1,4 +1,4 @@
-import { contentPlanningApi } from './contentPlanningApi';
+import { contentPlanningApi, SSESource } from './contentPlanningApi';
 
 export interface ServiceStatus {
   name: string;
@@ -27,7 +27,7 @@ export class ContentPlanningOrchestrator {
   private onProgressUpdate?: (statuses: ServiceStatus[]) => void;
   private onDataUpdate?: (data: Partial<DashboardData>) => void;
   private latestDashboardData: DashboardData | null = null;
-  private activeEventSources: EventSource[] = [];
+  private activeEventSources: SSESource[] = [];
 
   constructor() {
     this.initializeServiceStatuses();
@@ -82,6 +82,28 @@ export class ContentPlanningOrchestrator {
   }
 
   public async loadDashboardData(): Promise<DashboardData & { cleanup: () => void }> {
+    // Re-entrancy guard: React StrictMode mounts effects twice in dev, and
+    // fast navigations can overlap calls. Every call RESETS all service
+    // statuses below, which restarts the "Dashboard Loading" overlay
+    // mid-flight and leaves the previous run's SSE streams orphaned.
+    // Concurrent callers share the in-flight load instead.
+    if (this.loadInFlight) {
+      return this.loadInFlight;
+    }
+    const promise = this.doLoadDashboardData();
+    this.loadInFlight = promise;
+    try {
+      return await promise;
+    } finally {
+      if (this.loadInFlight === promise) {
+        this.loadInFlight = null;
+      }
+    }
+  }
+
+  private loadInFlight: Promise<DashboardData & { cleanup: () => void }> | null = null;
+
+  private async doLoadDashboardData(): Promise<DashboardData & { cleanup: () => void }> {
     // Close any existing EventSource connections before starting new ones
     this.closeAllEventSources();
     

@@ -63,7 +63,10 @@ class EnhancedStrategyService:
         self.data_quality_service = DataQualityService()
 
         # Initialize performance services
-        self.caching_service = CachingService()
+        # Shared process-wide instance: construction includes a Redis probe,
+        # and this service is constructed per request — don't pay that per call.
+        from ..performance.caching import get_shared_caching_service
+        self.caching_service = get_shared_caching_service()
         self.performance_optimization_service = PerformanceOptimizationService()
         self.health_monitoring_service = HealthMonitoringService()
 

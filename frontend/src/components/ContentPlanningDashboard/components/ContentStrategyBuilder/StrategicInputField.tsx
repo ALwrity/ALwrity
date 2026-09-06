@@ -405,13 +405,17 @@ const StrategicInputField: React.FC<StrategicInputFieldProps> = ({
           />
         );
 
-      case 'select':
+      case 'select': {
         const selectConfig = config as SelectFieldConfig;
+        // AI autofill can emit values outside the option list — coerce to ''
+        // so MUI doesn't warn about an out-of-range select value.
+        const selectValue =
+          value && selectConfig.options?.includes(value) ? value : '';
         return (
           <FormControl fullWidth error={!!error} required={config.required || false}>
             <InputLabel>{config.label || fieldId}</InputLabel>
             <Select
-              value={value || ''}
+              value={selectValue}
               onChange={(e) => handleChange(e.target.value)}
               label={config.label || fieldId}
               endAdornment={
@@ -428,6 +432,7 @@ const StrategicInputField: React.FC<StrategicInputFieldProps> = ({
             </Select>
           </FormControl>
         );
+      }
 
       case 'multiselect':
         const multiSelectConfig = config as MultiSelectFieldConfig;

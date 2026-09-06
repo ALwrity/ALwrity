@@ -20,6 +20,25 @@ except ImportError:
     REDIS_AVAILABLE = False
     logger.warning("Redis not available, using in-memory caching")
 
+# Process-wide Redis-down backoff: when Redis is unreachable (e.g. dev
+# machines without a running Redis), every CachingService() construction
+# would otherwise pay the connect timeout again. After the first failure,
+# skip reconnection attempts for this window.
+_REDIS_DOWN_UNTIL = 0.0
+_REDIS_DOWN_BACKOFF_SECONDS = 60.0
+
+# Shared instance: several request paths construct caching services per
+# request; construction must be cheap after the first one.
+_shared_caching_service: Optional["CachingService"] = None
+
+
+def get_shared_caching_service() -> "CachingService":
+    """Return the process-wide CachingService singleton."""
+    global _shared_caching_service
+    if _shared_caching_service is None:
+        _shared_caching_service = CachingService()
+    return _shared_caching_service
+
 class CachingService:
     """Service for intelligent caching of content strategy data."""
 
@@ -54,37 +73,54 @@ class CachingService:
         }
 
         # Initialize Redis connection if available
+        import time as _time
+        global _REDIS_DOWN_UNTIL
+
         self.redis_available = False
         if REDIS_AVAILABLE:
-            try:
-                redis_url = os.environ.get("REDIS_URL")
-                if redis_url:
-                    self.redis_client = redis.Redis.from_url(
-                        redis_url,
-                        decode_responses=True,
-                        socket_connect_timeout=5,
-                        socket_timeout=5
-                    )
-                else:
-                    self.redis_client = redis.Redis(
-                        host=os.environ.get("REDIS_HOST", "localhost"),
-                        port=int(os.environ.get("REDIS_PORT", "6379")),
-                        db=int(os.environ.get("REDIS_DB", "0")),
-                        password=os.environ.get("REDIS_PASSWORD") or None,
-                        decode_responses=True,
-                        socket_connect_timeout=5,
-                        socket_timeout=5
-                    )
-                # Test connection
-                self.redis_client.ping()
-                self.redis_available = True
-                logger.info("Redis connection established successfully")
-            except Exception as e:
-                logger.warning(f"Redis connection failed: {str(e)}. Using in-memory cache.")
-                self.redis_available = False
+            if _time.monotonic() < _REDIS_DOWN_UNTIL:
+                # Recent connection failure — don't pay the connect timeout
+                # again on every construction.
                 self.memory_cache = {}
+            else:
+                try:
+                    redis_url = os.environ.get("REDIS_URL")
+                    if redis_url:
+                        self.redis_client = redis.Redis.from_url(
+                            redis_url,
+                            decode_responses=True,
+                            socket_connect_timeout=2,
+                            socket_timeout=2
+                        )
+                    else:
+                        self.redis_client = redis.Redis(
+                            host=os.environ.get("REDIS_HOST", "localhost"),
+                            port=int(os.environ.get("REDIS_PORT", "6379")),
+                            db=int(os.environ.get("REDIS_DB", "0")),
+                            password=os.environ.get("REDIS_PASSWORD") or None,
+                            decode_responses=True,
+                            socket_connect_timeout=2,
+                            socket_timeout=2
+                        )
+                    # Test connection
+                    self.redis_client.ping()
+                    self.redis_available = True
+                    logger.info("Redis connection established successfully")
+                except Exception as e:
+                    _REDIS_DOWN_UNTIL = _time.monotonic() + _REDIS_DOWN_BACKOFF_SECONDS
+                    logger.warning(
+                        f"Redis connection failed: {str(e)}. Using in-memory cache "
+                        f"(retrying in {_REDIS_DOWN_BACKOFF_SECONDS:.0f}s)."
+                    )
+                    self.redis_available = False
+                    self.memory_cache = {}
         else:
             logger.info("Using in-memory cache (Redis not available)")
+            self.memory_cache = {}
+
+        # Always present: even on the Redis-success path some helpers touch
+        # the in-memory dict (e.g. after a mid-request Redis error).
+        if not hasattr(self, "memory_cache"):
             self.memory_cache = {}
 
     def get_cache_key(self, cache_type: str, identifier: str, **kwargs) -> str:

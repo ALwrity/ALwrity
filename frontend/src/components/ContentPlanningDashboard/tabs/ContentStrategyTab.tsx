@@ -17,7 +17,8 @@ import StrategyIntelligenceTab from '../components/StrategyIntelligence/Strategy
 import StrategyOnboardingDialog from '../components/StrategyOnboardingDialog';
 import { StrategyData } from '../components/StrategyIntelligence/types/strategy.types';
 import { useUser } from '@clerk/clerk-react';
-import { strategyPrefill, OnboardingData, StrategyPrefillOutput } from '../../../utils/strategyPrefill';
+import { strategyPrefill, OnboardingData, StrategyPrefillInput } from '../../../utils/strategyPrefill';
+import { apiClient } from '../../../api/client';
 
 const ContentStrategyTab: React.FC = () => {
   const location = useLocation();
@@ -86,13 +87,19 @@ const ContentStrategyTab: React.FC = () => {
       console.log('🔄 StrategyPrefill: detected fromOnboarding flag, fetching onboarding summary');
       (async () => {
         try {
-          const res = await fetch('/api/onboarding/summary');
-          if (!res.ok) {
-            console.warn('Strategy prefill: endpoint returned', res.status);
-            return;
-          }
-          const onboardingData: any = await res.json();
-          const input = {
+          // MUST use apiClient, not raw fetch: raw fetch sends no
+          // Authorization header, so the backend's get_current_user rejects
+          // the request with 401 and prefill silently never works. The
+          // apiClient request interceptor (client.ts) attaches the Clerk
+          // token exactly like every other authenticated call.
+          //
+          // NOTE: /api/onboarding/strategy-prefill (NOT /summary) — the
+          // prefill route returns the persona/brand/keywords/competitors
+          // shape strategyPrefill maps; /summary serves the SSOT shape
+          // used by onboarding FinalStep.
+          const response = await apiClient.get('/api/onboarding/strategy-prefill');
+          const onboardingData: OnboardingData = response.data;
+          const input: StrategyPrefillInput = {
             fromOnboarding: true,
             quickInputs: {
               primary_goal: 'traffic',

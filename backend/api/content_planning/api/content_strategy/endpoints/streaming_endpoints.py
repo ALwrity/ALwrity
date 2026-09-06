@@ -7,14 +7,18 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from starlette.requests import Request
-from sqlalchemy.orm import Session
 from loguru import logger
 import json
 import asyncio
 from datetime import datetime
 
 # Import database
-from services.database import get_db_session, get_session_for_user
+# NOTE: streaming bodies must open their own per-user session via
+# get_session_for_user() inside the generator — a request-scoped session
+# dependency is closed before the stream body is generated, and the old
+# local get_db() helper (get_db_session() with no user_id) yielded None
+# and crashed on db.close() (issue #537).
+from services.database import get_session_for_user
 
 # Import authentication middleware
 from middleware.auth_middleware import get_current_user, get_current_user_with_query_token
@@ -24,20 +28,13 @@ from ....services.enhanced_strategy_service import EnhancedStrategyService
 from ....services.enhanced_strategy_db_service import EnhancedStrategyDBService
 
 # Use bounded shared cache instead of process-local unbounded dict
-from ....services.content_strategy.performance.caching import CachingService
+from ....services.content_strategy.performance.caching import get_shared_caching_service
 
 router = APIRouter(tags=["Strategy Streaming"])
 
-# Shared bounded cache for streaming endpoints
-streaming_cache_service = CachingService()
-
-# Helper function to get database session
-def get_db():
-    db = get_db_session()
-    try:
-        yield db
-    finally:
-        db.close()
+# Shared bounded cache for streaming endpoints (process-wide singleton —
+# construction includes a Redis probe that must not repeat per request)
+streaming_cache_service = get_shared_caching_service()
 
 async def stream_data(data_generator):
     """Helper function to stream data as Server-Sent Events.
@@ -61,51 +58,63 @@ async def stream_data(data_generator):
 async def stream_enhanced_strategies(
     strategy_id: Optional[int] = Query(None, description="Specific strategy ID"),
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
 ):
     """Stream enhanced strategies with real-time updates."""
-    
+
     async def strategy_generator():
+        db_session = None
         try:
             clerk_user_id = str(current_user.get('id', ''))
             if not clerk_user_id:
                 yield {"type": "error", "message": "Invalid user ID in authentication token", "timestamp": datetime.utcnow().isoformat()}
                 return
-            
+
             authenticated_user_id = clerk_user_id
-            
+
             logger.info(f"🚀 Starting strategy stream for authenticated user: {authenticated_user_id}, strategy: {strategy_id}")
-            
+
+            # Open a fresh per-user session. The old request-scoped ``db``
+            # dependency yielded None (get_db_session() without a user_id
+            # returns None and crashed on db.close()), and a shared session
+            # would be closed by the time the stream body is generated.
+            db_session = get_session_for_user(authenticated_user_id)
+            if not db_session:
+                yield {"type": "error", "message": "Database unavailable", "timestamp": datetime.utcnow().isoformat()}
+                return
+
             # Send initial status
             yield {"type": "status", "message": "Starting strategy retrieval...", "timestamp": datetime.utcnow().isoformat()}
-            
-            db_service = EnhancedStrategyDBService(db)
+
+            db_service = EnhancedStrategyDBService(db_session)
             enhanced_service = EnhancedStrategyService(db_service)
-            
+
             # Send progress update
             yield {"type": "progress", "message": "Querying database...", "progress": 25}
-            
+
             # Use authenticated user_id to ensure users can only see their own strategies
-            strategies_data = await enhanced_service.get_enhanced_strategies(authenticated_user_id, strategy_id, db)
-            
+            strategies_data = await enhanced_service.get_enhanced_strategies(authenticated_user_id, strategy_id, db_session)
+
             # Send progress update
             yield {"type": "progress", "message": "Processing strategies...", "progress": 50}
-            
+
             if strategies_data.get("status") == "not_found":
                 yield {"type": "result", "status": "not_found", "data": strategies_data}
                 return
-            
+
             # Send progress update
             yield {"type": "progress", "message": "Finalizing data...", "progress": 75}
-            
+
             # Send final result
             yield {"type": "result", "status": "success", "data": strategies_data, "progress": 100}
-            
+
             logger.info(f"✅ Strategy stream completed for user: {authenticated_user_id}")
-            
+
         except Exception as e:
             logger.error(f"❌ Error in strategy stream: {str(e)}")
             yield {"type": "error", "message": str(e), "timestamp": datetime.utcnow().isoformat()}
+        finally:
+            if db_session:
+                db_session.close()
     
     return StreamingResponse(
         stream_data(strategy_generator()),
@@ -120,21 +129,29 @@ async def stream_enhanced_strategies(
 async def stream_strategic_intelligence(
     request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user_with_query_token),
-    db: Session = Depends(get_db)
 ):
     """Stream strategic intelligence data with real-time updates."""
-    
+
     async def intelligence_generator():
+        db_session = None
         try:
             clerk_user_id = str(current_user.get('id', ''))
             if not clerk_user_id:
                 yield {"type": "error", "message": "Invalid user ID in authentication token", "timestamp": datetime.utcnow().isoformat()}
                 return
-            
+
             authenticated_user_id = clerk_user_id
-            
+
             logger.info(f"🚀 Starting strategic intelligence stream for authenticated user: {authenticated_user_id}")
-            
+
+            # Open a fresh per-user session (same rationale as
+            # /stream/ai-generation-status: the old request-scoped ``db``
+            # dependency yielded None and crashed on db.close()).
+            db_session = get_session_for_user(authenticated_user_id)
+            if not db_session:
+                yield {"type": "error", "message": "Database unavailable", "timestamp": datetime.utcnow().isoformat()}
+                return
+
             # Check bounded shared cache first
             cache_key = f"strategic_intelligence_{authenticated_user_id}"
             cached_data = await streaming_cache_service.get_cached_data("strategic_intelligence", cache_key)
@@ -142,17 +159,17 @@ async def stream_strategic_intelligence(
                 logger.info(f"✅ Returning cached strategic intelligence data for user: {authenticated_user_id}")
                 yield {"type": "result", "status": "success", "data": cached_data, "progress": 100}
                 return
-            
+
             # Send initial status
             yield {"type": "status", "message": "Loading strategic intelligence...", "timestamp": datetime.utcnow().isoformat()}
-            
-            db_service = EnhancedStrategyDBService(db)
+
+            db_service = EnhancedStrategyDBService(db_session)
             enhanced_service = EnhancedStrategyService(db_service)
-            
+
             # Send progress update
             yield {"type": "progress", "message": "Retrieving strategies...", "progress": 20}
-            
-            strategies_data = await enhanced_service.get_enhanced_strategies(authenticated_user_id, None, db)
+
+            strategies_data = await enhanced_service.get_enhanced_strategies(authenticated_user_id, None, db_session)
             
             # Send progress update
             yield {"type": "progress", "message": "Analyzing market positioning...", "progress": 40}
@@ -213,7 +230,10 @@ async def stream_strategic_intelligence(
         except Exception as e:
             logger.error(f"❌ Error in strategic intelligence stream: {str(e)}")
             yield {"type": "error", "message": str(e), "timestamp": datetime.utcnow().isoformat()}
-    
+        finally:
+            if db_session:
+                db_session.close()
+
     return StreamingResponse(
         stream_data(intelligence_generator()),
         media_type="text/event-stream",
@@ -227,7 +247,6 @@ async def stream_strategic_intelligence(
 async def stream_keyword_research(
     request: Request,
     current_user: Dict[str, Any] = Depends(get_current_user_with_query_token),
-    db: Session = Depends(get_db)
 ):
     """Stream keyword research data with real-time updates."""
     

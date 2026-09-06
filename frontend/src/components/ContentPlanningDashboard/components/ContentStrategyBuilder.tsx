@@ -54,6 +54,28 @@ import CategoryDetailView from './ContentStrategyBuilder/components/CategoryDeta
 // import { CopilotSidebar } from '@copilotkit/react-ui';
 // import { useCopilotActions } from './ContentStrategyBuilder/CopilotActions';
 
+/** The 5 canonical strategy categories (matches STRATEGIC_INPUT_FIELDS
+ *  categories and categoryHelpers). Source of truth for review progress. */
+const CANONICAL_CATEGORIES = [
+  'business_context',
+  'audience_intelligence',
+  'competitive_intelligence',
+  'content_strategy',
+  'performance_analytics',
+] as const;
+
+/** Format an ISO timestamp as a compact "time ago" label. */
+const formatTimeAgo = (iso: string): string => {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '';
+  const mins = Math.floor((Date.now() - then) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+};
+
 const ContentStrategyBuilder: React.FC = () => {
   const navigate = useNavigate();
   
@@ -66,6 +88,7 @@ const ContentStrategyBuilder: React.FC = () => {
     inputDataPoints,
     personalizationData,
     confidenceScores,
+    pipelineDataQuality,
     loading,
     error,
     saving,
@@ -328,10 +351,62 @@ const ContentStrategyBuilder: React.FC = () => {
 
   // Determine if we have autofill data
   const hasAutofillData = Object.keys(autoPopulatedFields).length > 0;
+
+  // Data Quality (Phase 1a): the real pipeline assessment from the /autofill
+  // response (overall_score, 0-1 fraction), scaled to percent. Fallback when
+  // the pipeline score is unavailable: the fields-ready ratio — honest, and
+  // never a fabricated 0% when populated fields exist.
+  const dataQualityPercent = useMemo(() => {
+    const overall = pipelineDataQuality?.overall_score;
+    if (typeof overall === 'number' && overall >= 0) {
+      return Math.round(overall * 100);
+    }
+    if (completionStats.total_fields > 0) {
+      return Math.round((completionStats.filled_fields / completionStats.total_fields) * 100);
+    }
+    return 0;
+  }, [pipelineDataQuality, completionStats]);
+
+  // Phase 2: authoritative banner stats.
+  // Fields ready counts formData (what the user actually has), not the
+  // last autofill response's attribution map — that map shrinks when AI
+  // runs replace DB values, which under-reported the old chips.
+  const fieldsReady = completionStats.filled_fields;
+  const fieldsTotal = completionStats.total_fields;
+
+  // Distinct onboarding sources: dedupe per-field source labels.
+  const onboardingSources = useMemo(() => {
+    const fromSources = Object.values(dataSources).filter(Boolean);
+    if (fromSources.length > 0) {
+      return new Set(fromSources).size;
+    }
+    // Fallback: distinct sources recorded on auto-populated fields.
+    return new Set(
+      Object.values(autoPopulatedFields)
+        .map((f: any) => f?.source)
+        .filter(Boolean),
+    ).size;
+  }, [dataSources, autoPopulatedFields]);
+
+  // Category review progress, intersected with the 5 canonical categories
+  // (localStorage may hold stale entries from older category naming).
+  const reviewedValid = useMemo(
+    () => CANONICAL_CATEGORIES.filter(c => reviewedCategories.has(c)),
+    [reviewedCategories],
+  );
+  const unreviewedCategories = useMemo(
+    () => CANONICAL_CATEGORIES.filter(c => !reviewedCategories.has(c)),
+    [reviewedCategories],
+  );
+  const allCategoriesReviewed = unreviewedCategories.length === 0;
   
   // Get last autofill time from session storage - stable across renders
   const lastAutofillTimeRef = useRef<string>(sessionStorage.getItem('lastAutofillTime') || '');
-  
+  // Render-scope value for the HeaderSection "last refreshed" display.
+  // Must exist at component scope — the logging effect below used to own
+  // this name, which crashed the tree with a ReferenceError on render.
+  const lastAutofillTime = lastAutofillTimeRef.current || '';
+
   // Get data source from store
   const dataSource = Object.keys(dataSources).length > 0 ? 'Onboarding Database' : undefined;
 
@@ -341,6 +416,12 @@ const ContentStrategyBuilder: React.FC = () => {
   const inputDataPointsCount = Object.keys(inputDataPoints).length;
   const personalizationDataCount = Object.keys(personalizationData || {}).length;
   const confidenceScoresCount = Object.keys(confidenceScores).length;
+
+  // Keep the ref in sync when autofill data changes (e.g. after Database
+  // Autofill writes a new timestamp), so the display stays accurate.
+  useEffect(() => {
+    lastAutofillTimeRef.current = sessionStorage.getItem('lastAutofillTime') || '';
+  }, [autoPopulatedFieldsCount]);
 
   // Use a ref to track last logged state - prevents infinite re-renders
   const lastLoggedSignatureRef = useRef<string>('');
@@ -354,7 +435,6 @@ const ContentStrategyBuilder: React.FC = () => {
       // Only log when the data signature actually changes
       if (signature !== lastLoggedSignatureRef.current) {
         lastLoggedSignatureRef.current = signature;
-        const lastAutofillTime = lastAutofillTimeRef.current || new Date().toISOString();
         console.log('📋 StrategyBuilder: Autofill data status:', {
           hasAutofillData,
           autoPopulatedFieldsCount,
@@ -367,7 +447,7 @@ const ContentStrategyBuilder: React.FC = () => {
         });
       }
     }
-  }, [hasAutofillData, autoPopulatedFieldsCount, dataSourcesCount, inputDataPointsCount, personalizationDataCount, confidenceScoresCount, dataSource]);
+  }, [hasAutofillData, autoPopulatedFieldsCount, dataSourcesCount, inputDataPointsCount, personalizationDataCount, confidenceScoresCount, dataSource, lastAutofillTime]);
 
 
 
@@ -469,16 +549,23 @@ const ContentStrategyBuilder: React.FC = () => {
               inputDataPoints={inputDataPoints}
               personalizationData={personalizationData}
               confidenceScores={confidenceScores}
+              fieldsReady={fieldsReady}
+              fieldsTotal={fieldsTotal}
+              dataQuality={dataQualityPercent}
+              onboardingSources={onboardingSources}
+              refreshedLabel={lastAutofillTime ? formatTimeAgo(lastAutofillTime) : null}
+              reviewedCount={reviewedValid.length}
+              totalCategories={CANONICAL_CATEGORIES.length}
+              allCategoriesReviewed={allCategoriesReviewed}
+              unreviewedCategories={[...unreviewedCategories]}
               loading={loading}
-              error={error}
-                onAutofill={() => autofillStrategyFields()}
-               onRegenerateAI={() => regenerateAIFields()}
-               onContinueWithPresent={handleContinueWithPresent}
-               onScrollToReview={handleScrollToReview}
-               hasAutofillData={hasAutofillData}
-               lastAutofillTime={lastAutofillTime}
-               dataSource={dataSource}
-             />
+              onAutofill={() => autofillStrategyFields()}
+              onRegenerateAI={() => regenerateAIFields()}
+              onReviewNext={handleScrollToReview}
+              onCreateStrategy={handleCreateStrategy}
+              lastAutofillTime={lastAutofillTime}
+              dataSource={dataSource}
+            />
 
       {/* Error Alert */}
       <ErrorAlert

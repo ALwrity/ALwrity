@@ -173,6 +173,11 @@ interface StrategyBuilderStore {
   inputDataPoints: Record<string, any>; // Detailed input data points from backend
   personalizationData: Record<string, any>; // Personalization data for each field
   confidenceScores: Record<string, number>; // Confidence scores for each field
+  /** Real pipeline assessment from the onboarding data integration
+   *  (overall_score/completeness/freshness/relevance/confidence, 0-1 fractions).
+   *  Surfaced by the /autofill response; the source of truth for the
+   *  banner's Data Quality metric. */
+  pipelineDataQuality: Record<string, number> | null;
   autoPopulationBlocked: boolean;
   
   // UI State
@@ -552,6 +557,7 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
   inputDataPoints: {},
   personalizationData: {},
   confidenceScores: {},
+  pipelineDataQuality: null,
   autoPopulationBlocked: false,
   
   // UI State
@@ -741,6 +747,30 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
         if (fieldData && typeof fieldData === 'object' && 'value' in fieldData) {
           const value = fieldData.value;
 
+          // Sanitize select fields: autofill can emit out-of-option values
+          // (e.g. "Unknown" for content frequency, or a rich object for
+          // brand_voice). Storing them makes MUI selects render out-of-range
+          // and pollutes submitted data. For objects, try to extract a
+          // usable string first (communication_style / first trait / common
+          // keys); otherwise drop so the user picks a valid option.
+          const fieldDef = STRATEGIC_INPUT_FIELDS.find(f => f.id === fieldId);
+          if (fieldDef && fieldDef.type === 'select' && fieldDef.options) {
+            let candidate = value;
+            if (candidate && typeof candidate === 'object') {
+              candidate =
+                (typeof candidate.communication_style === 'string' && candidate.communication_style) ||
+                (Array.isArray(candidate.personality_traits) && typeof candidate.personality_traits[0] === 'string' && candidate.personality_traits[0]) ||
+                (typeof candidate.brand_voice === 'string' && candidate.brand_voice) ||
+                (typeof candidate.value === 'string' && candidate.value) ||
+                undefined;
+            }
+            if (typeof candidate !== 'string' || !fieldDef.options.includes(candidate)) {
+              console.warn(`⏭️ Skipping ${fieldId}: autofill value "${typeof value === 'object' ? JSON.stringify(value).slice(0, 80) : value}" is not one of`, fieldDef.options);
+              skippedFields++;
+              return;
+            }
+          }
+
           fieldValues[fieldId] = value;
           autoPopulatedFields[fieldId] = {
             source: fieldData.source || sources[fieldId] || 'autofill',
@@ -769,6 +799,9 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
         dataSources: sources,
         inputDataPoints,
         personalizationData,
+        // Real pipeline assessment (0-1 fractions) — the honest source for
+        // the banner's Data Quality metric.
+        pipelineDataQuality: (response as any).data_quality || null,
         confidenceScores,
         loading: false,
         error: null,
@@ -822,6 +855,13 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
 
         const isAIGenerated = fieldData.source === 'ai_generated';
         if (!isAIGenerated) return;
+
+        // Same select sanitization as autofillStrategyFields above.
+        const fieldDef = STRATEGIC_INPUT_FIELDS.find(f => f.id === fieldId);
+        if (fieldDef && fieldDef.type === 'select' && fieldDef.options && !fieldDef.options.includes(fieldData.value)) {
+          console.warn(`⏭️ Skipping ${fieldId}: AI value "${fieldData.value}" is not one of`, fieldDef.options);
+          return;
+        }
 
         updatedFormData[fieldId] = fieldData.value;
         updatedAutoPopulated[fieldId] = {
@@ -931,6 +971,7 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
         inputDataPoints: state.inputDataPoints,
         personalizationData: state.personalizationData,
         confidenceScores: state.confidenceScores,
+        pipelineDataQuality: state.pipelineDataQuality,
         // Don't persist loading, error, saving states
       }),
     }
