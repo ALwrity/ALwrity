@@ -5,7 +5,13 @@
 
 import { planGenerationProgressPercent } from "../utils/youtubePlanGenerationLoader";
 
-export type YouTubeCommentProgressAction = "draft" | "send" | "save" | "delete";
+export type YouTubeCommentProgressAction =
+  | "draft"
+  | "send"
+  | "save"
+  | "delete"
+  | "hide"
+  | "hideUser";
 export type YouTubeCommentParentBusyAction = Extract<
   YouTubeCommentProgressAction,
   "draft" | "send"
@@ -73,6 +79,28 @@ const COPY: Record<YouTubeCommentProgressAction, LoaderCopy> = {
       "Confirming removal...",
     ],
     steps: ["Confirm delete", "Remove on YouTube", "Confirm"],
+    hint: TYPICAL_STEPS_DISCLAIMER,
+    intervalMs: YOUTUBE_COMMENT_API_LOADER_INTERVAL_MS,
+  },
+  hide: {
+    title: "Hiding comment",
+    messages: [
+      "Confirming hide...",
+      "Updating on YouTube...",
+      "Confirming the comment is hidden...",
+    ],
+    steps: ["Confirm hide", "Update on YouTube", "Confirm"],
+    hint: TYPICAL_STEPS_DISCLAIMER,
+    intervalMs: YOUTUBE_COMMENT_API_LOADER_INTERVAL_MS,
+  },
+  hideUser: {
+    title: "Hiding user from channel",
+    messages: [
+      "Confirming hide user...",
+      "Updating on YouTube...",
+      "Confirming the user is hidden...",
+    ],
+    steps: ["Confirm hide user", "Update on YouTube", "Confirm"],
     hint: TYPICAL_STEPS_DISCLAIMER,
     intervalMs: YOUTUBE_COMMENT_API_LOADER_INTERVAL_MS,
   },

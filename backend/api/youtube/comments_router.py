@@ -42,6 +42,12 @@ class UpdateReplyRequest(BaseModel):
     token_id: Optional[int] = None
 
 
+class ModerateCommentRequest(BaseModel):
+    comment_id: str = Field(..., min_length=1)
+    ban_author: bool = False
+    token_id: Optional[int] = None
+
+
 def get_comments_service(
     oauth_service: YouTubeOAuthService = Depends(get_oauth_service),
 ) -> YouTubeCommentsService:
@@ -231,6 +237,53 @@ def delete_comment_reply(
         raise HTTPException(
             status_code=500,
             detail="Could not delete that reply. Please try again.",
+        )
+
+
+@router.post("/moderate")
+def moderate_comment(
+    body: ModerateCommentRequest,
+    user: dict = Depends(get_current_user),
+    service: YouTubeCommentsService = Depends(get_comments_service),
+):
+    user_id = user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        logger.info(
+            "[youtube_comments] Moderate route user_id={} has_comment_id={} "
+            "ban_author={} has_token_id={}",
+            user_id,
+            bool(body.comment_id),
+            bool(body.ban_author),
+            bool(body.token_id),
+        )
+        result = service.set_comment_moderation(
+            user_id=user_id,
+            comment_id=body.comment_id,
+            ban_author=body.ban_author,
+            token_id=body.token_id,
+        )
+        if not result.get("success"):
+            logger.warning(
+                "[youtube_comments] Moderate route unsuccessful user_id={} error_code={}",
+                user_id,
+                result.get("error_code"),
+            )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        fields = youtube_publish_error_log_fields(e)
+        logger.error(
+            "[youtube_comments] Moderate route failed user_id={} error_type={} http_status={}",
+            user_id,
+            fields["error_type"],
+            fields["http_status"],
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not hide that comment. Please try again.",
         )
 
 

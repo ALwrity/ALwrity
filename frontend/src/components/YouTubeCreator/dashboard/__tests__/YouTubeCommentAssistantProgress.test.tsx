@@ -34,7 +34,7 @@ describe("YouTube Comment Reply Assistant action progress", () => {
       "disabled",
       true,
     );
-    expect(screen.getByRole("button", { name: "Send (HITL)" })).toHaveProperty(
+    expect(screen.getByRole("button", { name: /^Reply$/ })).toHaveProperty(
       "disabled",
       true,
     );
@@ -59,7 +59,7 @@ describe("YouTube Comment Reply Assistant action progress", () => {
     fireEvent.change(screen.getByPlaceholderText("Draft reply…"), {
       target: { value: "Thanks for watching" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Send (HITL)" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Reply$/ }));
 
     expect(screen.getByRole("status")).toHaveTextContent("Sending reply");
     expect(screen.getByText("Loved the intro")).toBeTruthy();
@@ -178,7 +178,7 @@ describe("YouTube Comment Reply Assistant action progress", () => {
     fireEvent.change(screen.getByPlaceholderText("Draft reply…"), {
       target: { value: "Thanks for watching" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Send (HITL)" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Reply$/ }));
 
     await waitFor(() => {
       expect(screen.getByText(/Could not send that reply/i)).toBeTruthy();

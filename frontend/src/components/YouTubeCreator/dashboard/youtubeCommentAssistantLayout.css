@@ -55,6 +55,18 @@
   margin: 0;
 }
 
+.yt-comment-inbox-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.yt-comment-overflow-trigger:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .yt-comment-like-count {
   display: inline-flex;
   align-items: center;
@@ -70,4 +82,35 @@
 .yt-comment-like-count-icon {
   font-size: 0.875rem;
   color: #606060;
+}
+
+.yt-comment-actions .yt-comment-reply-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #ffffff;
+  background: linear-gradient(135deg, #CC0000 0%, #991B1B 100%);
+  box-shadow: 0 4px 15px rgba(204, 0, 0, 0.35);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.yt-comment-actions .yt-comment-reply-btn:hover:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.yt-comment-actions .yt-comment-reply-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
 }

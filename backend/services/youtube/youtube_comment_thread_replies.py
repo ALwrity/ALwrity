@@ -28,7 +28,9 @@ def optional_youtube_comment_like_count(snippet: Dict[str, Any]) -> Optional[int
     return likes
 
 
-def _author_channel_id(snippet: Dict[str, Any]) -> str:
+def youtube_comment_author_channel_id(snippet: Any) -> str:
+    if not isinstance(snippet, dict):
+        return ""
     raw = snippet.get("authorChannelId")
     if isinstance(raw, dict):
         return str(raw.get("value") or "").strip()
@@ -57,7 +59,7 @@ def map_youtube_comment_reply_items(
         if not comment_id or not text or comment_id in seen:
             continue
         seen.add(comment_id)
-        author_channel_id = _author_channel_id(snippet)
+        author_channel_id = youtube_comment_author_channel_id(snippet)
         row: Dict[str, Any] = {
             "comment_id": comment_id,
             "author": author or None,

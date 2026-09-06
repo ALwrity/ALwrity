@@ -198,6 +198,41 @@ describe("youtubeStudioApi comment assistant", () => {
     });
   });
 
+  it("hides a parent comment via POST /api/youtube/comments/moderate", async () => {
+    vi.mocked(apiClient.post).mockResolvedValueOnce({
+      data: { success: true, message: "Comment hidden." },
+    });
+
+    const result = await youtubeStudioApi.setCommentModerationStatus({
+      comment_id: "c-1",
+      ban_author: false,
+    });
+
+    expect(apiClient.post).toHaveBeenCalledWith("/api/youtube/comments/moderate", {
+      comment_id: "c-1",
+      ban_author: false,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("forwards ban_author and optional token_id on moderate", async () => {
+    vi.mocked(apiClient.post).mockResolvedValueOnce({
+      data: { success: true, message: "User hidden from the channel." },
+    });
+
+    await youtubeStudioApi.setCommentModerationStatus({
+      comment_id: "c-1",
+      ban_author: true,
+      token_id: 3,
+    });
+
+    expect(apiClient.post).toHaveBeenCalledWith("/api/youtube/comments/moderate", {
+      comment_id: "c-1",
+      ban_author: true,
+      token_id: 3,
+    });
+  });
+
   it("treats axios cancel and abort as cancelled draft requests", () => {
     expect(isYouTubeStudioRequestCanceled({ code: "ERR_CANCELED" })).toBe(true);
     expect(isYouTubeStudioRequestCanceled({ name: "AbortError" })).toBe(true);

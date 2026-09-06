@@ -32,7 +32,7 @@ describe("YouTube Comment Reply Assistant like count", () => {
     expect(screen.queryByRole("button", { name: /^Dislike$/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Heart$/i })).toBeNull();
     expect(screen.getAllByRole("button", { name: "Draft with AI" })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "Send (HITL)" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^Reply$/ })).toHaveLength(1);
   });
 
   it("omits the like count when missing or zero", async () => {

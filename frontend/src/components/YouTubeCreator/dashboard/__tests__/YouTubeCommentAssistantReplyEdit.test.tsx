@@ -42,7 +42,7 @@ describe("YouTube Comment Reply Assistant reply edit", () => {
     expect(screen.getByRole("menuitem", { name: "Edit" })).toBeTruthy();
     expect(screen.getByRole("menuitem", { name: "Delete" })).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "Draft with AI" })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "Send (HITL)" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^Reply$/ })).toHaveLength(1);
   });
 
   it("Save updates the own reply without sending a new parent reply", async () => {

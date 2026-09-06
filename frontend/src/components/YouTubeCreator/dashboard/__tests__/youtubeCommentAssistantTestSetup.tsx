@@ -19,6 +19,7 @@ vi.mock("../../../../services/youtubeStudioApi", async (importOriginal) => {
       listCommentReplies: vi.fn(),
       updateCommentReply: vi.fn(),
       deleteCommentReply: vi.fn(),
+      setCommentModerationStatus: vi.fn(),
     },
   };
 });

@@ -33,6 +33,8 @@ describe("YouTube Comment Reply Assistant layout stylesheet", () => {
     expect(layoutCss).not.toMatch(/yt-comment-video-group-work/);
     expect(layoutCss).not.toMatch(/yt-comment-overflow-menu--portal/);
     expect(layoutCss).not.toMatch(/yt-comment-like-count/);
+    expect(layoutCss).not.toMatch(/yt-comment-inbox-head/);
+    expect(layoutCss).not.toMatch(/yt-comment-reply-btn/);
 
     expect(assistantCss).toMatch(/\.yt-comment-video-group-body--split/);
     expect(assistantCss).toMatch(/\.yt-comment-video-group-context/);
@@ -42,6 +44,19 @@ describe("YouTube Comment Reply Assistant layout stylesheet", () => {
     expect(assistantCss).toMatch(/max-height:\s*min\(52vh,\s*28rem\)/);
     expect(assistantCss).toMatch(/@media \(max-width:\s*720px\)/);
     expect(assistantCss).toMatch(/\.yt-comment-like-count/);
+    expect(assistantCss).toMatch(/\.yt-comment-inbox-head/);
     expect(assistantCss).toMatch(/color:\s*#606060/);
+    expect(assistantCss).toMatch(/\.yt-comment-reply-btn/);
+    expect(assistantCss).toMatch(/\.yt-comment-reply-btn:hover:not\(:disabled\)/);
+    expect(assistantCss).toMatch(/padding:\s*8px 14px/);
+    expect(assistantCss).toMatch(/font-size:\s*0\.82rem/);
+    expect(assistantCss).toMatch(/transform:\s*scale\(0\.94\)/);
+    expect(assistantCss).toMatch(
+      /linear-gradient\(135deg,\s*#CC0000 0%,\s*#991B1B 100%\)/,
+    );
+    expect(assistantCss).toMatch(/box-shadow:\s*0 4px 15px rgba\(204, 0, 0, 0\.35\)/);
+    expect(assistantCss).toMatch(
+      /\.yt-comment-actions \.yt-comment-reply-btn:disabled/,
+    );
   });
 });

@@ -43,7 +43,7 @@ describe("YouTube Comment Reply Assistant replies expander", () => {
     expect(screen.queryByRole("button", { name: "2 replies" })).toBeNull();
     expect(mockedStudioApi.listCommentReplies).not.toHaveBeenCalled();
     expect(screen.getAllByRole("button", { name: "Draft with AI" })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "Send (HITL)" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^Reply$/ })).toHaveLength(1);
   });
 
   it("Hide replies collapses the thread without an API call", async () => {

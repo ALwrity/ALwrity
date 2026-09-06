@@ -1,6 +1,4 @@
-"""
-YouTube comment inbox + HITL reply helpers (Data API v3).
-"""
+"""YouTube comment inbox + HITL reply helpers (Data API v3)."""
 
 from __future__ import annotations
 
@@ -14,8 +12,10 @@ from services.youtube.youtube_comment_thread_replies import (
     map_youtube_comment_reply_items,
     map_youtube_thread_replies,
     optional_youtube_comment_like_count,
+    youtube_comment_author_channel_id,
 )
 from services.youtube.youtube_comment_delete import execute_youtube_comment_delete
+from services.youtube.youtube_comment_set_moderation import execute_youtube_comment_set_moderation
 from services.youtube.youtube_comment_update import execute_youtube_comment_update
 from services.youtube.youtube_comment_video_titles import (
     attach_youtube_comment_video_titles,
@@ -157,7 +157,7 @@ class YouTubeCommentsService:
             can_edit_count = 0
             for thread in threads.get("items") or []:
                 top = (thread.get("snippet") or {}).get("topLevelComment", {})
-                tsn = top.get("snippet") or {}
+                tsn = top.get("snippet") if isinstance(top.get("snippet"), dict) else {}
                 replies = map_youtube_thread_replies(thread, mine_channel_id=channel_id)
                 reply_row_count += len(replies)
                 can_edit_count += sum(1 for row in replies if row.get("can_edit"))
@@ -173,6 +173,7 @@ class YouTubeCommentsService:
                     ),
                     "can_reply": (thread.get("snippet") or {}).get("canReply", True),
                     "replies": replies,
+                    "can_hide_user": youtube_comment_author_channel_id(tsn) != channel_id,
                 }
                 likes = optional_youtube_comment_like_count(tsn)
                 if likes is not None:
@@ -335,15 +336,20 @@ class YouTubeCommentsService:
             }
 
     def update_reply(self, user_id: str, comment_id: str, text: str, token_id: Optional[int] = None) -> Dict[str, Any]:
-        """Comments.update for HITL edit of an owned reply."""
         return execute_youtube_comment_update(
             self.oauth_service, user_id, comment_id, text, token_id=token_id
         )
 
     def delete_reply(self, user_id: str, comment_id: str, token_id: Optional[int] = None) -> Dict[str, Any]:
-        """Comments.delete for HITL delete of an owned reply."""
         return execute_youtube_comment_delete(
             self.oauth_service, user_id, comment_id, token_id=token_id
+        )
+
+    def set_comment_moderation(
+        self, user_id: str, comment_id: str, ban_author: bool = False, token_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        return execute_youtube_comment_set_moderation(
+            self.oauth_service, user_id, comment_id, ban_author, token_id=token_id
         )
 
     def draft_reply(
