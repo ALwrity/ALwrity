@@ -42,7 +42,7 @@ export interface PublishWedgeProps extends GatedWedgeProps {
 
 export interface AnalysisWedgeProps extends GatedWedgeProps {
   onOpenPulse: () => void;
-  onOpenStale: () => void;
+  onOpenVideoPerformance: () => void;
   onOpenSeo: () => void;
   onOpenGaps: () => void;
   onOpenRetention: () => void;
