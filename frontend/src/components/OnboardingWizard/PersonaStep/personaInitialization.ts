@@ -1,6 +1,13 @@
 import { useCallback } from 'react';
+import { PERSONA_REQUIRES_REGENERATION_FLAG } from '../common/onboardingStorageKeys';
+import {
+  clearPersonaServerCacheStatus,
+  getPersonaServerCacheStatus,
+  setPersonaServerCacheStatus,
+} from '../PersonalizationStep/personaGenerationCache';
 
 interface PersonaInitializationProps {
+  websiteSessionKey: string;
   stepData?: {
     corePersona?: any;
     platformPersonas?: Record<string, any>;
@@ -18,10 +25,11 @@ interface PersonaInitializationProps {
   setSuccess: (message: string | null) => void;
   loadCachedPersonaData: () => boolean;
   loadServerCachedPersonaData: () => Promise<boolean>;
-  generatePersonas: () => Promise<void>;
+  generatePersonas: (force?: boolean) => Promise<void>;
 }
 
 export const usePersonaInitialization = ({
+  websiteSessionKey,
   stepData,
   setCorePersona,
   setPlatformPersonas,
@@ -38,11 +46,27 @@ export const usePersonaInitialization = ({
 }: PersonaInitializationProps) => {
   
   const initialize = useCallback(async () => {
-    console.log('PersonaStep: Initialization started');
+    console.log('PersonaStep: Initialization started', { websiteSessionKey });
 
     // Header title/description owned by Wizard.tsx (Option B: "Define Your Brand Persona").
 
-    // Check if we already have persona data from stepData (when navigating back)
+    const personaRequiresRegeneration = (() => {
+      try {
+        return sessionStorage.getItem(PERSONA_REQUIRES_REGENERATION_FLAG) === '1';
+      } catch {
+        return false;
+      }
+    })();
+
+    if (personaRequiresRegeneration) {
+      console.log(
+        'PersonaStep: Skipping stale stepData/server/local persona after website change; generating for current site'
+      );
+      await generatePersonas(true);
+      setHasCheckedCache(true);
+      return;
+    }
+
     if (stepData?.corePersona) {
       console.log('PersonaStep: Loading persona data from stepData (navigation back)');
       setCorePersona(stepData.corePersona);
@@ -58,30 +82,30 @@ export const usePersonaInitialization = ({
       return;
     }
 
-    // Check session flag to avoid redundant server cache checks
-    const serverCacheChecked = sessionStorage.getItem('persona_server_cache_checked');
+    const serverCacheStatus = getPersonaServerCacheStatus(websiteSessionKey);
     
     // Try to load from server cache first (skip if already checked this session and was 404)
     let foundCache = false;
-    if (!serverCacheChecked || serverCacheChecked !== '404') {
+    if (serverCacheStatus !== '404') {
       try {
         console.log('PersonaStep: Checking server cache');
         foundCache = await loadServerCachedPersonaData();
         if (foundCache) {
           console.log('PersonaStep: Server cache found, using it');
-          sessionStorage.setItem('persona_server_cache_checked', 'found');
+          setPersonaServerCacheStatus(websiteSessionKey, 'found');
           setHasCheckedCache(true);
           return;
         } else {
-          // Mark that we checked and got 404
-          sessionStorage.setItem('persona_server_cache_checked', '404');
+          setPersonaServerCacheStatus(websiteSessionKey, '404');
         }
       } catch (error: any) {
         console.warn('PersonaStep: Error loading server cache, trying local cache:', error);
-        sessionStorage.setItem('persona_server_cache_checked', '404');
+        setPersonaServerCacheStatus(websiteSessionKey, '404');
       }
     } else {
-      console.log('PersonaStep: Skipping server cache check (already checked this session, was 404)');
+      console.log(
+        'PersonaStep: Skipping server cache check (already checked for this website session, was 404)'
+      );
     }
 
     // Try local cache
@@ -98,6 +122,7 @@ export const usePersonaInitialization = ({
     await generatePersonas();
     setHasCheckedCache(true);
   }, [
+    websiteSessionKey,
     stepData,
     setCorePersona,
     setPlatformPersonas,
@@ -116,3 +141,5 @@ export const usePersonaInitialization = ({
     initialize
   };
 };
+
+export { clearPersonaServerCacheStatus };

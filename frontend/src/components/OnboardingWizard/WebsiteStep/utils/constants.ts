@@ -36,6 +36,11 @@ export interface WebsiteStepProps {
     websiteUrl: string;
     reason: 'reanalyze' | 'new_website' | 'start_fresh' | 'load_existing';
   }) => void | Promise<void>;
+  /** Live (pre-Continue) website session updates for wizard stepData merge. */
+  onLiveWebsiteSessionChange?: (payload: {
+    website: string;
+    analysis: any;
+  }) => void;
 }
 
 export interface AnalysisProgress {

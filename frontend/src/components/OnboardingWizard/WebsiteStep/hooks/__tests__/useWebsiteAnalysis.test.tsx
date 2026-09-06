@@ -20,6 +20,7 @@ describe('useWebsiteAnalysis hook', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   it('silently loads active session analysis on mount (silent pre-fill hydration)', async () => {
@@ -131,5 +132,64 @@ describe('useWebsiteAnalysis hook', () => {
     expect(result.current.existingAnalysis).toBeNull();
     expect(localStorage.getItem('website_url')).toBeNull();
     expect(localStorage.getItem('website_analysis_data')).toBeNull();
+  });
+
+  it('load saved analysis for a previous site clears other-site research and notifies the wizard', async () => {
+    vi.mocked(websiteUtils.fetchLastAnalysis).mockResolvedValueOnce({
+      success: false,
+    });
+    vi.mocked(websiteUtils.checkExistingAnalysis).mockResolvedValueOnce({
+      exists: true,
+      analysis: { analysis_id: 99, analysis_date: '2026-09-01' },
+    });
+    vi.mocked(websiteUtils.loadExistingAnalysis).mockResolvedValueOnce({
+      success: true,
+      analysis: {
+        id: 99,
+        website_url: 'https://www.alwrity.com',
+        writing_style: { tone: 'alwrity' },
+      },
+      domainName: 'Alwrity.com',
+    });
+
+    localStorage.setItem('website_url', 'https://www.alwrity.com');
+    localStorage.setItem('competitor_analysis_url', 'https://www.hexaurum.com');
+    localStorage.setItem('competitor_analysis_data', '{"competitors":[{"url":"old"}]}');
+    localStorage.setItem('persona_generation_data', '{"core_persona":{"name":"Hexaurum"}}');
+
+    const onLiveWebsiteSessionChange = vi.fn();
+    const { result } = renderHook(() =>
+      useWebsiteAnalysis({
+        setSuccess: mockSetSuccess,
+        setError: mockSetError,
+        setAnalysisWarning: mockSetAnalysisWarning,
+        onLiveWebsiteSessionChange,
+      })
+    );
+
+    act(() => {
+      result.current.setWebsite('https://www.alwrity.com');
+    });
+
+    await waitFor(() => {
+      expect(result.current.existingAnalysis).toEqual({
+        analysis_id: 99,
+        analysis_date: '2026-09-01',
+      });
+    }, { timeout: 500 });
+
+    await act(async () => {
+      await result.current.handleLoadExistingConfirm();
+    });
+
+    expect(localStorage.getItem('competitor_analysis_data')).toBeNull();
+    expect(localStorage.getItem('persona_generation_data')).toBeNull();
+    expect(localStorage.getItem('website_url')).toBe('https://www.alwrity.com');
+    expect(sessionStorage.getItem('persona_requires_regeneration')).toBe('1');
+    expect(onLiveWebsiteSessionChange).toHaveBeenCalledWith({
+      website: 'https://www.alwrity.com',
+      analysis: expect.objectContaining({ id: 99, website_url: 'https://www.alwrity.com' }),
+    });
+    expect(mockSetSuccess).toHaveBeenCalled();
   });
 });

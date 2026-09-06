@@ -129,5 +129,7 @@ export const prepareOnboardingData = (stepData: any) => {
     businessData: stepData?.businessData ?? null,
     researchPreferences: stepData?.researchPreferences ?? null,
     deepCompetitorAnalysis: stepData?.deepCompetitorAnalysis ?? null,
+    website: stepData?.website || stepData?.website_url || websiteAnalysis?.website_url || '',
+    website_url: stepData?.website || stepData?.website_url || websiteAnalysis?.website_url || '',
   };
 };
