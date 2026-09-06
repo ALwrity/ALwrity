@@ -3,6 +3,33 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# The frontend renders brand_voice as a SELECT with exactly these options
+# (see STRATEGIC_INPUT_FIELDS brand_voice options). The transformer must
+# emit one of them — a rich object here gets dropped by the frontend's
+# select sanitization.
+BRAND_VOICE_OPTIONS = (
+    'Professional', 'Casual', 'Friendly', 'Authoritative',
+    'Humorous', 'Inspirational', 'Educational',
+)
+
+
+def _derive_brand_voice_option(brand_voice_insights: Dict[str, Any]) -> str:
+    """Map persona brand-voice insights onto one of the frontend's
+    brand_voice select options. Falls back to 'Professional'."""
+    candidates: list = []
+    style = brand_voice_insights.get('communication_style')
+    if isinstance(style, str) and style.strip():
+        candidates.append(style.strip())
+    traits = brand_voice_insights.get('personality_traits')
+    if isinstance(traits, list):
+        candidates.extend(t.strip() for t in traits if isinstance(t, str) and t.strip())
+
+    for candidate in candidates:
+        for option in BRAND_VOICE_OPTIONS:
+            if option.lower() in candidate.lower():
+                return option
+    return 'Professional'
+
 
 def transform_to_fields(*, website: Dict[str, Any], research: Dict[str, Any], api_keys: Dict[str, Any], session: Dict[str, Any], persona: Dict[str, Any] = None, competitor: Dict[str, Any] = None, analytics: Dict[str, Any] = None) -> Dict[str, Any]:
     """Transform normalized onboarding data to frontend field map.
@@ -234,11 +261,10 @@ def transform_to_fields(*, website: Dict[str, Any], research: Dict[str, Any], ap
     if persona and persona.get('brand_voice_insights'):
         brand_voice_insights = persona['brand_voice_insights']
         fields['brand_voice'] = {
-            'value': {
-                'personality_traits': brand_voice_insights.get('personality_traits', []),
-                'communication_style': brand_voice_insights.get('communication_style', ''),
-                'key_messages': brand_voice_insights.get('key_messages', []),
-            },
+            # Must be ONE of the frontend select options — insights are
+            # mapped onto the closest option (details remain available in
+            # the personalization/transparency data).
+            'value': _derive_brand_voice_option(brand_voice_insights),
             'source': 'persona_data',
             'confidence': 0.9
         }

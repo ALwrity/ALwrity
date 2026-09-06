@@ -3,6 +3,104 @@ import { apiClient, aiApiClient } from '../api/client';
 // Runtime validation helper for API responses
 type ShapeSchema = Record<string, 'string' | 'number' | 'boolean' | 'object' | 'array' | 'undefined'>;
 
+/**
+ * Minimal SSE surface consumed by handleSSEData / the orchestrator /
+ * KeywordResearchTab. Structurally satisfied by both native EventSource
+ * and HeaderAuthEventSource below.
+ */
+export interface SSESource {
+  onmessage: ((event: MessageEvent) => void) | null;
+  onerror: ((event: Event) => void) | null;
+  close: () => void;
+}
+
+/**
+ * EventSource-compatible SSE client that authenticates via the
+ * Authorization header instead of a `?token=` query parameter.
+ *
+ * Native EventSource cannot send custom headers, which forced the Clerk
+ * JWT into the URL — leaking it into the browser console on every failed
+ * request. This client fetches the stream with the header attached and
+ * parses `data:` frames, exposing the same `onmessage` / `onerror` /
+ * `close()` surface callers already use. The backend's
+ * `get_current_user_with_query_token` accepts header auth first, so no
+ * backend change is required.
+ */
+class HeaderAuthEventSource implements SSESource {
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  private controller = new AbortController();
+  private closed = false;
+
+  constructor(url: string, token: string) {
+    this.connect(url, token);
+  }
+
+  private async connect(url: string, token: string): Promise<void> {
+    try {
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'text/event-stream' },
+        signal: this.controller.signal,
+      });
+      if (!response.ok || !response.body) {
+        throw new Error(`SSE request failed with status ${response.status}`);
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (!this.closed) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        // SSE frames are separated by a blank line.
+        let sep = buffer.indexOf('\n\n');
+        while (sep !== -1) {
+          const frame = buffer.slice(0, sep);
+          buffer = buffer.slice(sep + 2);
+          this.emitFrame(frame);
+          sep = buffer.indexOf('\n\n');
+        }
+      }
+      // Stream ended without a result/error event — surface it so the
+      // orchestrator's reconnect/timeout logic can engage.
+      this.emitError('SSE stream closed by server');
+    } catch (err: any) {
+      if (this.closed || err?.name === 'AbortError') return;
+      this.emitError(err?.message || 'SSE connection failed');
+    }
+  }
+
+  private emitFrame(frame: string): void {
+    const dataLines = frame
+      .split('\n')
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trimStart());
+    if (dataLines.length === 0 || !this.onmessage) return;
+    const payload = dataLines.join('\n');
+    try {
+      this.onmessage(new MessageEvent('message', { data: payload }));
+    } catch (err) {
+      // Handler errors must not kill the reader loop.
+      console.error('SSE handler error:', err);
+    }
+  }
+
+  private emitError(message: string): void {
+    if (!this.onerror) return;
+    try {
+      this.onerror(new Event('error'));
+    } catch (err) {
+      console.error('SSE error handler error:', err);
+    }
+  }
+
+  close(): void {
+    this.closed = true;
+    this.controller.abort();
+  }
+}
+
+
 function validateApiResponse<T>(response: T, schema: ShapeSchema, context: string): T {
   if (typeof response !== 'object' || response === null) {
     console.warn(`[validateApiResponse] ${context}: response is not an object`, response);
@@ -692,7 +790,10 @@ class ContentPlanningAPI {
   }
 
   // SSE Methods (for Orchestrator - real-time updates needed)
-  async streamStrategicIntelligence(userId?: number): Promise<EventSource> {
+  // NOTE: SSE sources authenticate via the Authorization header
+  // (HeaderAuthEventSource) — never put the JWT in the URL, it leaks into
+  // the browser console on every failed request.
+  async streamStrategicIntelligence(userId?: number): Promise<SSESource> {
     // Check if auth token is available before making request
     const { getAuthTokenGetter } = await import('../api/client');
     const tokenGetter = getAuthTokenGetter();
@@ -706,14 +807,12 @@ class ContentPlanningAPI {
       throw new Error('Authentication required. Please sign in to access content planning features.');
     }
     
-    // EventSource doesn't support custom headers, so we pass token as query parameter
-    // Backend uses JWT auth (Depends(get_current_user)), not the user_id query param.
-    const url = `${this.baseURL}/enhanced-strategies/stream/strategic-intelligence?token=${encodeURIComponent(token)}`;
-    return new EventSource(url);
+    const url = `${this.baseURL}/enhanced-strategies/stream/strategic-intelligence`;
+    return new HeaderAuthEventSource(url, token);
   }
 
   // Helper method to handle SSE data (for Orchestrator)
-  handleSSEData(eventSource: EventSource, onData: (data: any) => void, onError?: (error: any) => void, onComplete?: () => void) {
+  handleSSEData(eventSource: SSESource, onData: (data: any) => void, onError?: (error: any) => void, onComplete?: () => void) {
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
@@ -955,7 +1054,7 @@ class ContentPlanningAPI {
   }
 
   // Additional SSE Methods (for other features that need real-time updates)
-  async streamKeywordResearch(userId?: number): Promise<EventSource> {
+  async streamKeywordResearch(userId?: number): Promise<SSESource> {
     // Check if auth token is available before making request
     const { getAuthTokenGetter } = await import('../api/client');
     const tokenGetter = getAuthTokenGetter();
@@ -969,15 +1068,25 @@ class ContentPlanningAPI {
       throw new Error('Authentication required. Please sign in to access content planning features.');
     }
     
-    // EventSource doesn't support custom headers, so we pass token as query parameter
-    // Backend uses JWT auth (Depends(get_current_user)), not the user_id query param.
-    const url = `${this.baseURL}/enhanced-strategies/stream/keyword-research?token=${encodeURIComponent(token)}`;
-    return new EventSource(url);
+    const url = `${this.baseURL}/enhanced-strategies/stream/keyword-research`;
+    return new HeaderAuthEventSource(url, token);
   }
 
-  async streamAIGenerationStatus(strategyId: string | number): Promise<EventSource> {
+  async streamAIGenerationStatus(strategyId: string | number): Promise<SSESource> {
+    // This URL previously carried no credentials at all (native EventSource
+    // cannot send headers) — the endpoint rejected it with 401. Header auth
+    // fixes it.
+    const { getAuthTokenGetter } = await import('../api/client');
+    const tokenGetter = getAuthTokenGetter();
+    if (!tokenGetter) {
+      throw new Error('Authentication not ready. Please wait for sign-in to complete.');
+    }
+    const token = await tokenGetter();
+    if (!token) {
+      throw new Error('Authentication required. Please sign in to access content planning features.');
+    }
     const url = `${this.baseURL}/enhanced-strategies/stream/ai-generation-status?strategy_id=${strategyId}`;
-    return new EventSource(url);
+    return new HeaderAuthEventSource(url, token);
   }
 
   /**

@@ -86,6 +86,17 @@ const StructuredJsonField: React.FC<StructuredJsonFieldProps> = ({
     onChange(updated);
   };
 
+  // Coerce the stored value to a safe array. Autofill can emit a plain
+  // string for array-typed fields (e.g. business_objectives arriving as
+  // prose); spreading a string with `[...value]` explodes it into
+  // individual CHARACTERS — wrap the string as a single editable item
+  // instead. Non-array non-string values become an empty array.
+  const toArraySafe = (v: any): any[] => {
+    if (Array.isArray(v)) return v;
+    if (typeof v === 'string' && v.trim() !== '') return [v];
+    return [];
+  };
+
   const handleArrayItemAdd = () => {
     if (schema.type === 'array') {
       if (schema.itemType === 'object' && schema.itemFields) {
@@ -100,29 +111,29 @@ const StructuredJsonField: React.FC<StructuredJsonFieldProps> = ({
             newItem[key] = '';
           }
         });
-        onChange([...(value || []), newItem]);
+        onChange([...toArraySafe(value), newItem]);
       } else if (schema.itemType === 'string') {
-        onChange([...(value || []), '']);
+        onChange([...toArraySafe(value), '']);
       } else {
-        onChange([...(value || []), '']);
+        onChange([...toArraySafe(value), '']);
       }
     }
   };
 
   const handleArrayItemChange = (index: number, newValue: any) => {
-    const updated = [...(value || [])];
+    const updated = [...toArraySafe(value)];
     updated[index] = newValue;
     onChange(updated);
   };
 
   const handleArrayItemRemove = (index: number) => {
-    const updated = [...(value || [])];
+    const updated = [...toArraySafe(value)];
     updated.splice(index, 1);
     onChange(updated);
   };
 
   const handleObjectInArrayChange = (index: number, key: string, newValue: any) => {
-    const updated = [...(value || [])];
+    const updated = [...toArraySafe(value)];
     if (!updated[index]) {
       updated[index] = {};
     }
@@ -162,12 +173,17 @@ const StructuredJsonField: React.FC<StructuredJsonFieldProps> = ({
           />
         );
       
-      case 'select':
+      case 'select': {
+        // AI autofill can emit values outside the option list (e.g. "Unknown"
+        // for content frequency). Coerce out-of-range values to '' so MUI
+        // doesn't warn and the placeholder shows instead.
+        const selectValue =
+          fieldValue && fieldDef.options?.includes(fieldValue) ? fieldValue : '';
         return (
           <FormControl fullWidth size="small" required={fieldDef.required}>
             <InputLabel>{fieldDef.label}</InputLabel>
             <Select
-              value={fieldValue || ''}
+              value={selectValue}
               onChange={(e) => onChangeHandler(e.target.value)}
               label={fieldDef.label}
             >
@@ -185,7 +201,8 @@ const StructuredJsonField: React.FC<StructuredJsonFieldProps> = ({
             )}
           </FormControl>
         );
-      
+      }
+
       case 'multiselect':
         return (
           <Box>
@@ -270,7 +287,12 @@ const StructuredJsonField: React.FC<StructuredJsonFieldProps> = ({
   const renderArrayField = () => {
     if (schema.type !== 'array') return null;
 
-    const arrayValue = Array.isArray(value) ? value : [];
+    // Same coercion as the handlers above — a string value (autofill prose)
+    // renders as ONE editable item; a corrupted char-array is recovered by
+    // rejoining single-char items into their original string.
+    const raw = toArraySafe(value);
+    const looksLikeCharSplit = raw.length > 1 && raw.every((it) => typeof it === 'string' && it.length <= 1);
+    const arrayValue = looksLikeCharSplit ? [raw.join('')] : raw;
 
     if (schema.itemType === 'object' && schema.itemFields) {
       // Array of objects
