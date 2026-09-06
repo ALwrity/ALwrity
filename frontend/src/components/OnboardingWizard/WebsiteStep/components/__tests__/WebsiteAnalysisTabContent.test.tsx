@@ -143,6 +143,27 @@ describe('WebsiteAnalysisTabContent - Tab Layout & View Tracking', () => {
     expect(screen.getByRole('button', { name: /analyze new website/i })).toBeInTheDocument();
   });
 
+  it('shows latest-only last analyzed label in the previous analysis banner', () => {
+    render(
+      <WebsiteAnalysisTabContent
+        {...baseProps}
+        analysis={null}
+        existingAnalysis={{
+          exists: true,
+          analysis_id: 99,
+          analysis_date: '2026-08-31T00:00:00',
+          last_analyzed_at: '2026-09-06T12:00:00',
+        }}
+        viewedTabs={{ 0: false, 1: false, 2: false }}
+        setViewedTabs={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(/Previous analysis found/i)).toBeInTheDocument();
+    expect(screen.getByText(/Last analyzed on/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Completed on/i)).not.toBeInTheDocument();
+  });
+
   it('calls setViewedTabs when switching tabs', () => {
     const viewedTabs = { 0: true, 1: false, 2: false };
     const setViewedTabs = vi.fn();

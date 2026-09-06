@@ -10,6 +10,11 @@ from datetime import datetime
 import json
 from loguru import logger
 
+from api.onboarding_utils.website_analysis_latest_policy import (
+    build_check_existing_payload,
+    find_latest_completed_analysis,
+    purge_superseded_analyses,
+)
 from models.onboarding import WebsiteAnalysis, OnboardingSession
 
 
@@ -35,11 +40,10 @@ class WebsiteAnalysisService:
             Analysis ID if successful, None otherwise
         """
         try:
-            # Check if analysis already exists for this URL and session
-            existing_analysis = self.db.query(WebsiteAnalysis).filter_by(
-                session_id=session_id,
-                website_url=website_url
-            ).first()
+            # Latest-only: match by normalized site within the session
+            existing_analysis = find_latest_completed_analysis(
+                self.db, session_id, website_url
+            )
             
             if existing_analysis:
                 # Update existing analysis
@@ -93,9 +97,14 @@ class WebsiteAnalysisService:
                 existing_analysis.status = 'completed'
                 existing_analysis.error_message = None
                 existing_analysis.warning_message = analysis_data.get('warning')
+                existing_analysis.website_url = website_url
+                existing_analysis.analysis_date = datetime.utcnow()
                 existing_analysis.updated_at = datetime.utcnow()
                 
                 self.db.commit()
+                purge_superseded_analyses(
+                    self.db, session_id, website_url, keep_id=existing_analysis.id
+                )
                 logger.info(f"Updated existing analysis for URL: {website_url} (preserve_persona={preserve_persona})")
                 return existing_analysis.id
             else:
@@ -140,6 +149,9 @@ class WebsiteAnalysisService:
                 
                 self.db.add(analysis)
                 self.db.commit()
+                purge_superseded_analyses(
+                    self.db, session_id, website_url, keep_id=analysis.id
+                )
                 logger.info(f"Saved new analysis for URL: {website_url}")
                 return analysis.id
                 
@@ -180,11 +192,9 @@ class WebsiteAnalysisService:
             Analysis data dictionary or None if not found
         """
         try:
-            analysis = self.db.query(WebsiteAnalysis).filter_by(
-                session_id=session_id,
-                website_url=website_url
-            ).first()
-            
+            analysis = find_latest_completed_analysis(
+                self.db, session_id, website_url
+            )
             if analysis:
                 return analysis.to_dict()
             return None
@@ -206,7 +216,10 @@ class WebsiteAnalysisService:
         try:
             analyses = self.db.query(WebsiteAnalysis).filter_by(
                 session_id=session_id
-            ).order_by(WebsiteAnalysis.created_at.desc()).all()
+            ).order_by(
+                WebsiteAnalysis.updated_at.desc(),
+                WebsiteAnalysis.created_at.desc(),
+            ).all()
             
             return [analysis.to_dict() for analysis in analyses]
             
@@ -227,7 +240,10 @@ class WebsiteAnalysisService:
         try:
             analysis = self.db.query(WebsiteAnalysis).filter_by(
                 session_id=session_id
-            ).order_by(WebsiteAnalysis.created_at.desc()).first()
+            ).order_by(
+                WebsiteAnalysis.updated_at.desc(),
+                WebsiteAnalysis.created_at.desc(),
+            ).first()
             
             if analysis:
                 return analysis.to_dict()
@@ -250,23 +266,12 @@ class WebsiteAnalysisService:
             Analysis data if found, None otherwise
         """
         try:
-            analysis = self.db.query(WebsiteAnalysis).filter_by(
-                session_id=session_id,
-                website_url=website_url,
-                status='completed'
-            ).order_by(WebsiteAnalysis.created_at.desc()).first()
+            analysis = find_latest_completed_analysis(
+                self.db, session_id, website_url
+            )
             
             if analysis:
-                return {
-                    'exists': True,
-                    'analysis_date': analysis.analysis_date.isoformat() if analysis.analysis_date else None,
-                    'analysis_id': analysis.id,
-                    'summary': {
-                        'writing_style': analysis.writing_style,
-                        'target_audience': analysis.target_audience,
-                        'content_type': analysis.content_type
-                    }
-                }
+                return build_check_existing_payload(analysis)
             return {'exists': False}
             
         except SQLAlchemyError as e:
