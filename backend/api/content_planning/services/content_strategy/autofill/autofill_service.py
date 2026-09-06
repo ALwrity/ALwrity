@@ -164,6 +164,11 @@ class AutoFillService:
             "confidence_levels": db_result.get("confidence_levels", {}),
             "data_freshness": db_result.get("data_freshness", {}),
             "input_data_points": db_result.get("input_data_points", {}),
+            # Real pipeline assessment (completeness/freshness/relevance/
+            # confidence, 0-1 fractions with overall_score) from the
+            # onboarding data integration — surfaced so the UI shows the
+            # actual data quality instead of a fabricated 0%.
+            "data_quality": raw.get("data_quality", {}) or {},
             "meta": {
                 "ai_used": merged["ai_used"],
                 "data_source": "unified",

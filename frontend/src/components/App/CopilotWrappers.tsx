@@ -6,6 +6,23 @@ import { CopilotKitHealthProvider } from '../../contexts/CopilotKitHealthContext
 import CopilotKitDegradedBanner from '../shared/CopilotKitDegradedBanner';
 import ErrorBoundary from '../shared/ErrorBoundary';
 
+/**
+ * COPILOTKIT_ENABLED — platform-wide kill switch.
+ *
+ * CopilotKit is temporarily disabled while the content strategy flow
+ * stabilises: the provider tree's CopilotErrorBoundary was crashing the
+ * entire React tree on strategy pages (any render error inside strategy
+ * components bubbled into Copilot's boundary instead of a local one).
+ *
+ * All CopilotKit code is preserved. To re-enable, flip this to true —
+ * AuthenticatedCopilotWrapper will mount CopilotKit, the health provider
+ * and the degraded banner again, exactly as before. BlogWriter's hooks
+ * (useCopilotAction / useCopilotKitHealth) no-op safely while disabled:
+ * the health context reports "available" so no banners appear, and the
+ * action hooks are defensively cast and no-op without the provider.
+ */
+const COPILOTKIT_ENABLED = false;
+
 interface ConditionalCopilotKitProps {
   children: React.ReactNode;
 }
@@ -22,11 +39,17 @@ interface AuthenticatedCopilotWrapperProps {
 export const AuthenticatedCopilotWrapper: React.FC<AuthenticatedCopilotWrapperProps> = ({ children, apiKey }) => {
   const { isSignedIn } = useAuth();
   const location = useLocation();
-  
+
   // Only fully exclude CopilotKit when user is not signed in or on onboarding
   // Feature-limited mode (blog_writer, etc.) still needs CopilotKit providers
   // because BlogWriter uses useCopilotAction and useCopilotKitHealth hooks
   const shouldExcludeCopilotKit = !isSignedIn || location.pathname.startsWith('/onboarding');
+
+  // Kill switch takes precedence — renders children without any
+  // CopilotKit provider, boundary, or banner.
+  if (!COPILOTKIT_ENABLED || shouldExcludeCopilotKit) {
+    return <>{children}</>;
+  }
   
   if (shouldExcludeCopilotKit) {
     return <>{children}</>;

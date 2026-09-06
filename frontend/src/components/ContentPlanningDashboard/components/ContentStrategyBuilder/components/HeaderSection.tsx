@@ -1,683 +1,295 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
-  Paper,
   Box,
   Typography,
   Button,
-  Chip,
-  Alert,
-  Collapse,
   Tooltip,
-  Grid,
-  LinearProgress
+  Link,
+  CircularProgress,
 } from '@mui/material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import ScheduleIcon from '@mui/icons-material/Schedule';
-import InfoIcon from '@mui/icons-material/Info';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import DataUsageIcon from '@mui/icons-material/DataUsage';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import SecurityIcon from '@mui/icons-material/Security';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import { motion } from 'framer-motion';
 import AutofillDataTransparency from './AutofillDataTransparency';
 
+/**
+ * Compact strategy banner (Phase 2 redesign).
+ *
+ * Row 1: title + subtitle
+ * Row 2: stats strip — [Fields ready X/Y] [Data quality N%] [Sources N] [Refreshed]
+ *        + category-review progress line
+ * Row 3: actions — context-aware primary CTA, autofill secondary,
+ *        regenerate-AI text link, know-more link
+ *
+ * All numbers are real values resolved by the parent from formData /
+ * the autofill response / the review state — nothing fabricated here.
+ */
+
 interface HeaderSectionProps {
+  // Stats (authoritative, parent-resolved)
+  fieldsReady: number;
+  fieldsTotal: number;
+  /** Real pipeline data-quality percent (0-100). */
+  dataQuality: number;
+  /** Distinct onboarding sources used (deduped). */
+  onboardingSources: number;
+  /** Preformatted "time ago" label, or null when never refreshed. */
+  refreshedLabel: string | null;
+
+  // Category review progress
+  reviewedCount: number;
+  totalCategories: number;
+  allCategoriesReviewed: boolean;
+  /** Categories not yet reviewed — the primary CTA when review is pending. */
+  unreviewedCategories: string[];
+
+  // Actions
+  loading: boolean;
+  onAutofill: () => void;
+  onRegenerateAI?: () => void;
+  /** Scroll to the first unreviewed category. */
+  onReviewNext: () => void;
+  /** Create the strategy (parent gates on all-reviewed). */
+  onCreateStrategy: () => void;
+
+  // Transparency modal data
   autoPopulatedFields: any;
   dataSources: any;
   inputDataPoints: any;
   personalizationData: any;
-  confidenceScores: any;
-  loading: boolean;
-  error: string | null;
-  onAutofill: () => void;
-  onRegenerateAI?: () => void;
-  onContinueWithPresent: () => void;
-  onScrollToReview: () => void;
-  hasAutofillData: boolean;
+  confidenceScores?: any;
   lastAutofillTime?: string;
   dataSource?: string;
 }
 
 const HeaderSection: React.FC<HeaderSectionProps> = ({
+  fieldsReady,
+  fieldsTotal,
+  dataQuality,
+  onboardingSources,
+  refreshedLabel,
+  reviewedCount,
+  totalCategories,
+  allCategoriesReviewed,
+  unreviewedCategories,
+  loading,
+  onAutofill,
+  onRegenerateAI,
+  onReviewNext,
+  onCreateStrategy,
   autoPopulatedFields,
   dataSources,
   inputDataPoints,
   personalizationData,
   confidenceScores,
-  loading,
-  error,
-  onAutofill,
-  onRegenerateAI,
-  onContinueWithPresent,
-  onScrollToReview,
-  hasAutofillData,
   lastAutofillTime,
-  dataSource
+  dataSource,
 }) => {
   const [showTransparencyModal, setShowTransparencyModal] = useState(false);
-  const [showDataInfo, setShowDataInfo] = useState(false);
-  const [showNextButton, setShowNextButton] = useState(false);
-  const [showEducationalInfo, setShowEducationalInfo] = useState<Record<string, boolean>>({});
 
-  // Show next button when autofill is complete
-  useEffect(() => {
-    if (hasAutofillData && Object.keys(autoPopulatedFields).length > 0) {
-      setShowNextButton(true);
-    }
-  }, [hasAutofillData, autoPopulatedFields]);
+  const reviewPercent = totalCategories > 0
+    ? Math.round((reviewedCount / totalCategories) * 100)
+    : 0;
 
-  // Determine cache status and show appropriate buttons
-  const getCacheStatus = () => {
-    if (hasAutofillData && Object.keys(autoPopulatedFields).length > 0) {
-      return 'cached';
-    } else if (Object.keys(inputDataPoints).length > 0) {
-      return 'partial';
-    } else {
-      return 'empty';
-    }
-  };
-
-  const cacheStatus = getCacheStatus();
-
-  const formatTimeAgo = (timestamp: string) => {
-    const now = new Date();
-    const time = new Date(timestamp);
-    const diffInMinutes = Math.floor((now.getTime() - time.getTime()) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`;
-    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`;
-    return `${Math.floor(diffInMinutes / 1440)} days ago`;
-  };
-
-  // Calculate data quality score
-  const getDataQualityScore = () => {
-    const scores = Object.values(confidenceScores).filter((score): score is number => typeof score === 'number');
-    if (scores.length === 0) return 0;
-    return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-  };
-
-  // Get field count by category
-  const getFieldCountByCategory = () => {
-    const categories: Record<string, number> = {};
-    Object.keys(autoPopulatedFields).forEach(fieldId => {
-      const category = fieldId.split('_')[0] || 'other';
-      categories[category] = (categories[category] || 0) + 1;
-    });
-    return categories;
-  };
-
-  const dataQualityScore = getDataQualityScore();
-  const fieldCountByCategory = getFieldCountByCategory();
+  const qualityColor =
+    dataQuality >= 80 ? '#4caf50' : dataQuality >= 60 ? '#ff9800' : '#ef5350';
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <Paper 
-        sx={{ 
-          p: 2.5,
-          mb: 3, 
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)',
-          color: 'white',
-          borderRadius: 3,
-          position: 'relative',
-          overflow: 'hidden',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 50%, rgba(255,255,255,0.1) 100%)',
-            animation: 'shimmer 3s ease-in-out infinite',
-          },
-          boxShadow: '0 8px 32px rgba(102, 126, 234, 0.3), 0 0 0 1px rgba(255,255,255,0.1)',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(255,255,255,0.2)',
+    <Box sx={{ mb: 2 }}>
+      {/* ── Row 1: Title ─────────────────────────────────────────── */}
+      <Box sx={{ mb: 1.5 }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: '#0d47a1', lineHeight: 1.2 }}>
+          AI Content Strategy Co-pilot
+        </Typography>
+        <Typography variant="body2" sx={{ color: '#555' }}>
+          Build a comprehensive content strategy with {fieldsTotal} strategic inputs
+        </Typography>
+      </Box>
+
+      {/* ── Row 2: Compact stats strip ───────────────────────────── */}
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: 1,
+          p: 1.25,
+          mb: 1,
+          borderRadius: 2,
+          backgroundColor: 'rgba(227, 242, 253, 0.6)',
+          border: '1px solid rgba(33, 150, 243, 0.25)',
         }}
       >
-        <Box sx={{ position: 'relative', zIndex: 1 }}>
-          {/* Main Header */}
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Box sx={{ flex: 1 }}>
-            <Typography 
-              variant="h4"
-              gutterBottom 
-              sx={{ 
-                fontWeight: 'bold',
-                background: 'linear-gradient(45deg, #fff, #f0f0f0)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                textShadow: '0 0 20px rgba(255,255,255,0.5)',
-                mb: 1
-              }}
-            >
-              AI Content Strategy Co-pilot
+        {/* Fields ready X/Y */}
+        <Tooltip
+          title={`${fieldsReady} of ${fieldsTotal} strategic inputs are filled. Review each category to complete your strategy.`}
+          arrow
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.25, py: 0.5, borderRadius: 1.5, backgroundColor: '#fff' }}>
+            <AutoAwesomeIcon sx={{ fontSize: 18, color: '#1976d2' }} />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0d47a1' }}>
+              Fields ready {fieldsReady}/{fieldsTotal}
             </Typography>
-              <Typography variant="body1" sx={{ opacity: 0.9, fontSize: '0.9rem' }}>
-              Build a comprehensive content strategy with 30+ strategic inputs
-            </Typography>
-            </Box>
           </Box>
-          
-          {/* Enhanced Data Status Grid */}
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            {/* Auto-populated Fields Count */}
-            <Grid item xs={6} sm={3}>
-              <Tooltip 
-                title="Number of strategy fields automatically populated from your onboarding data. These fields are ready to use or can be edited."
-                arrow
-              >
-                <Box sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 1,
-                  p: 1.5,
-                  borderRadius: 2,
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(10px)',
-                  cursor: 'help',
-                  transition: 'all 0.2s ease',
-                  position: 'relative',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
-                  }
-                }}>
-                  <DataUsageIcon sx={{ fontSize: 24, color: 'rgba(102, 126, 234, 0.9)' }} />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1.2rem', lineHeight: 1.2 }}>
-                      {Object.keys(autoPopulatedFields).length}
-                    </Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.9, fontSize: '0.75rem', lineHeight: 1.2 }}>
-                      Fields Auto-populated
-                    </Typography>
-                  </Box>
-                  <InfoIcon 
-                    sx={{ 
-                      fontSize: 16, 
-                      color: 'rgba(255, 255, 255, 0.7)',
-                      cursor: 'pointer',
-                      '&:hover': { color: 'white' }
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowEducationalInfo(prev => ({ ...prev, fieldsCount: !prev.fieldsCount }));
-                    }}
-                  />
-                </Box>
-              </Tooltip>
-              <Collapse in={showEducationalInfo.fieldsCount}>
-                <Alert 
-                  severity="info" 
-                  sx={{ 
-                    mt: 1, 
-                    backgroundColor: 'rgba(33, 150, 243, 0.15)',
-                    border: '1px solid rgba(33, 150, 243, 0.3)',
-                    color: 'white',
-                    '& .MuiAlert-icon': { color: 'rgba(144, 202, 249, 0.9)' }
-                  }}
+        </Tooltip>
+
+        {/* Data quality (real pipeline score) */}
+        <Tooltip
+          title="Real data-quality assessment from the onboarding integration pipeline — completeness, freshness, relevance and confidence of your connected data sources. A lower score usually means some sources (e.g. Google Search Console, LinkedIn) are not connected yet."
+          arrow
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.25, py: 0.5, borderRadius: 1.5, backgroundColor: '#fff' }}>
+            <Box sx={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: qualityColor }} />
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0d47a1' }}>
+              Data quality {dataQuality}%
+            </Typography>
+          </Box>
+        </Tooltip>
+
+        {/* Onboarding sources (deduped count) */}
+        <Tooltip
+          title={`${onboardingSources} distinct onboarding data sources fed these fields (website analysis, persona, research preferences, competitors, AI…). Click "Know more" for the full breakdown.`}
+          arrow
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.25, py: 0.5, borderRadius: 1.5, backgroundColor: '#fff' }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#0d47a1' }}>
+              Sources {onboardingSources}
+            </Typography>
+          </Box>
+        </Tooltip>
+
+        {/* Refreshed */}
+        {refreshedLabel && (
+          <Tooltip
+            title={`Fields were last refreshed ${refreshedLabel}. Click "Autofill from onboarding" to pull the latest onboarding data.`}
+            arrow
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.25, py: 0.5, borderRadius: 1.5, backgroundColor: '#fff' }}>
+              <RefreshIcon sx={{ fontSize: 16, color: '#1976d2' }} />
+              <Typography variant="body2" sx={{ color: '#0d47a1' }}>
+                Refreshed {refreshedLabel}
+              </Typography>
+            </Box>
+          </Tooltip>
+        )}
+
+        {/* Know more */}
+        <Link
+          component="button"
+          type="button"
+          onClick={() => setShowTransparencyModal(true)}
+          sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.8rem', color: '#1976d2' }}
+        >
+          <VisibilityIcon sx={{ fontSize: 16 }} />
+          Know more
+        </Link>
+
+        {/* Category review progress — compact chip with circular indicator */}
+        <Tooltip
+          title={
+            allCategoriesReviewed
+              ? `All ${totalCategories} categories reviewed — you can create your strategy.`
+              : `${reviewedCount} of ${totalCategories} categories reviewed. Next up: ${unreviewedCategories[0] ? unreviewedCategories[0].split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : ''}. Click "Review Fields" below.`
+          }
+          arrow
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.75,
+              px: 1.25,
+              py: 0.5,
+              borderRadius: 1.5,
+              backgroundColor: allCategoriesReviewed ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255, 152, 0, 0.08)',
+              border: `1px solid ${allCategoriesReviewed ? 'rgba(76, 175, 80, 0.4)' : 'rgba(255, 152, 0, 0.4)'}`,
+            }}
+          >
+            {allCategoriesReviewed ? (
+              <CheckCircleIcon sx={{ fontSize: 18, color: '#4caf50' }} />
+            ) : (
+              <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CircularProgress
+                  variant="determinate"
+                  value={reviewPercent}
+                  size={18}
+                  thickness={5}
+                  sx={{ color: '#ff9800' }}
+                />
+                <Typography
+                  sx={{ position: 'absolute', fontSize: '0.42rem', fontWeight: 700, color: '#e65100', lineHeight: 1 }}
                 >
-                  <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                    <strong>What are auto-populated fields?</strong><br />
-                    These are strategy inputs automatically filled from your onboarding data, including website analysis, research preferences, and API integrations. You can review and edit any field before creating your strategy.
-                  </Typography>
-                </Alert>
-              </Collapse>
-            </Grid>
-
-            {/* Data Quality Score */}
-            <Grid item xs={6} sm={3}>
-              <Tooltip 
-                title="Overall confidence score based on data completeness and reliability. Higher scores indicate more reliable autofilled data."
-                arrow
-              >
-                <Box sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 1,
-                  p: 1.5,
-                  borderRadius: 2,
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(10px)',
-                  cursor: 'help',
-                  transition: 'all 0.2s ease',
-                  position: 'relative',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
-                  }
-                }}>
-                  <TrendingUpIcon sx={{ fontSize: 24, color: dataQualityScore >= 80 ? 'rgba(76, 175, 80, 0.9)' : dataQualityScore >= 60 ? 'rgba(255, 152, 0, 0.9)' : 'rgba(244, 67, 54, 0.9)' }} />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1.2rem', lineHeight: 1.2 }}>
-                      {dataQualityScore}%
-                    </Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.9, fontSize: '0.75rem', lineHeight: 1.2 }}>
-                      Data Quality
-                    </Typography>
-                  </Box>
-                  <InfoIcon 
-                    sx={{ 
-                      fontSize: 16, 
-                      color: 'rgba(255, 255, 255, 0.7)',
-                      cursor: 'pointer',
-                      '&:hover': { color: 'white' }
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowEducationalInfo(prev => ({ ...prev, dataQuality: !prev.dataQuality }));
-                    }}
-                  />
-                </Box>
-              </Tooltip>
-              <Collapse in={showEducationalInfo.dataQuality}>
-                <Alert 
-                  severity="info" 
-                  sx={{ 
-                    mt: 1, 
-                    backgroundColor: 'rgba(33, 150, 243, 0.15)',
-                    border: '1px solid rgba(33, 150, 243, 0.3)',
-                    color: 'white',
-                    '& .MuiAlert-icon': { color: 'rgba(144, 202, 249, 0.9)' }
-                  }}
-                >
-                  <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                    <strong>Understanding Data Quality:</strong><br />
-                    This score reflects the reliability of your autofilled data. Scores above 80% indicate high-quality data from reliable sources. Scores below 60% suggest you may want to review and manually update some fields for better accuracy.
-                  </Typography>
-                </Alert>
-              </Collapse>
-            </Grid>
-
-            {/* Last Updated */}
-            <Grid item xs={6} sm={3}>
-              <Tooltip 
-                title={lastAutofillTime 
-                  ? `Data was last refreshed ${formatTimeAgo(lastAutofillTime)}. Click Database Autofill to refresh with latest onboarding data.`
-                  : 'No data has been loaded yet. Click Database Autofill to populate fields from your onboarding data.'
-                }
-                arrow
-              >
-                <Box sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 1,
-                  p: 1.5,
-                  borderRadius: 2,
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(10px)',
-                  cursor: 'help',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                    borderColor: 'rgba(255, 255, 255, 0.3)'
-                  }
-                }}>
-                  <ScheduleIcon sx={{ fontSize: 20, color: 'rgba(255, 255, 255, 0.8)' }} />
-                  <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1.1rem', lineHeight: 1.2 }}>
-                      {lastAutofillTime ? formatTimeAgo(lastAutofillTime) : 'Never'}
-                    </Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.8, fontSize: '0.7rem', lineHeight: 1.2 }}>
-                      Last Updated
-                    </Typography>
-                  </Box>
-                </Box>
-              </Tooltip>
-            </Grid>
-
-            {/* Data Sources */}
-            <Grid item xs={6} sm={3}>
-              <Tooltip 
-                title={`${Object.keys(dataSources).length} unique data sources were used to populate your strategy fields. These include website analysis, research preferences, and API integrations from your onboarding data.`}
-                arrow
-              >
-                <Box sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 1,
-                  p: 1.5,
-                  borderRadius: 2,
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  backdropFilter: 'blur(10px)',
-                  cursor: 'help',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                    borderColor: 'rgba(255, 255, 255, 0.3)'
-                  }
-                }}>
-                  <SecurityIcon sx={{ fontSize: 20, color: 'rgba(255, 255, 255, 0.8)' }} />
-                  <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold', fontSize: '1.1rem', lineHeight: 1.2 }}>
-                      {Object.keys(dataSources).length}
-                    </Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.8, fontSize: '0.7rem', lineHeight: 1.2 }}>
-                      Data Sources
-                    </Typography>
-                  </Box>
-                </Box>
-              </Tooltip>
-            </Grid>
-          </Grid>
-
-          {/* Data Quality Progress Bar */}
-          {dataQualityScore > 0 && (
-            <Box sx={{ mb: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography variant="body2" sx={{ opacity: 0.9, fontSize: '0.8rem' }}>
-                  Data Quality Score
-                </Typography>
-                <Typography variant="body2" sx={{ opacity: 0.9, fontSize: '0.8rem', fontWeight: 'bold' }}>
-                  {dataQualityScore}%
+                  {reviewPercent}
                 </Typography>
               </Box>
-              <LinearProgress 
-                variant="determinate" 
-                value={dataQualityScore} 
-                sx={{
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                  '& .MuiLinearProgress-bar': {
-                    background: dataQualityScore >= 80 
-                      ? 'linear-gradient(90deg, #4caf50, #66bb6a)' 
-                      : dataQualityScore >= 60 
-                      ? 'linear-gradient(90deg, #ff9800, #ffb74d)' 
-                      : 'linear-gradient(90deg, #f44336, #ef5350)',
-                    borderRadius: 3
-                  }
-                }}
-              />
-            </Box>
-          )}
-            
-          {/* Enhanced Status Chips */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, flexWrap: 'wrap' }}>
-              {cacheStatus === 'cached' && (
-                <Tooltip 
-                  title={`${Object.keys(autoPopulatedFields).length} fields have been automatically populated from your onboarding data. These fields are ready to use or can be edited before creating your strategy.`}
-                  arrow
-                >
-                  <Chip
-                    icon={<CheckCircleIcon />}
-                    label={`${Object.keys(autoPopulatedFields).length} fields auto-populated`}
-                    sx={{
-                      backgroundColor: 'rgba(76, 175, 80, 0.25)',
-                      color: 'white',
-                      border: '1px solid rgba(76, 175, 80, 0.4)',
-                      '& .MuiChip-icon': { color: 'rgba(129, 199, 132, 0.9)', fontSize: '18px' },
-                      fontWeight: 600,
-                      fontSize: '0.85rem',
-                      height: '32px',
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        backgroundColor: 'rgba(76, 175, 80, 0.35)',
-                        borderColor: 'rgba(76, 175, 80, 0.5)',
-                        transform: 'translateY(-1px)',
-                        boxShadow: '0 2px 8px rgba(76, 175, 80, 0.3)'
-                      }
-                    }}
-                  />
-                </Tooltip>
-              )}
-              
-              {dataSource && (
-                <Tooltip 
-                  title={`Data source: ${dataSource}. Click to view detailed information about where your autofilled data comes from.`}
-                  arrow
-                >
-                  <Chip
-                    icon={<InfoIcon />}
-                    label={`Source: ${dataSource}`}
-                    onClick={() => setShowDataInfo(!showDataInfo)}
-                    sx={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                      color: 'white',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                      fontSize: '0.85rem',
-                      height: '32px',
-                      transition: 'all 0.2s ease',
-                      '& .MuiChip-icon': { color: 'rgba(255, 255, 255, 0.9)', fontSize: '18px' },
-                      '&:hover': {
-                        backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                        borderColor: 'rgba(255, 255, 255, 0.4)',
-                        transform: 'translateY(-1px)',
-                        boxShadow: '0 2px 8px rgba(255, 255, 255, 0.2)'
-                      }
-                    }}
-                  />
-                </Tooltip>
-              )}
-
-            {/* Category Distribution Chips */}
-            {Object.keys(fieldCountByCategory).length > 0 && (
-              <Tooltip 
-                title={`Your autofilled fields are distributed across ${Object.keys(fieldCountByCategory).length} strategic categories: Business Context, Audience Intelligence, Competitive Intelligence, Content Strategy, and Performance & Analytics.`}
-                arrow
-              >
-                <Chip
-                  icon={<AutoAwesomeIcon />}
-                  label={`${Object.keys(fieldCountByCategory).length} categories`}
-                  sx={{
-                    backgroundColor: 'rgba(156, 39, 176, 0.25)',
-                    color: 'white',
-                    border: '1px solid rgba(156, 39, 176, 0.4)',
-                    '& .MuiChip-icon': { color: 'rgba(186, 104, 200, 0.9)', fontSize: '18px' },
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    height: '32px',
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      backgroundColor: 'rgba(156, 39, 176, 0.35)',
-                      borderColor: 'rgba(156, 39, 176, 0.5)',
-                      transform: 'translateY(-1px)',
-                      boxShadow: '0 2px 8px rgba(156, 39, 176, 0.3)'
-                    }
-                  }}
-                />
-              </Tooltip>
             )}
-            </Box>
-
-            {/* Data Source Information */}
-            <Collapse in={showDataInfo}>
-              <Alert 
-                severity="info" 
-                sx={{ 
-                  mb: 2, 
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  color: 'white',
-                  '& .MuiAlert-icon': { color: 'rgba(255, 255, 255, 0.8)' }
-                }}
-              >
-                <Typography variant="body2" sx={{ mb: 1 }}>
-                  <strong>Data Source:</strong> {dataSource || 'Onboarding Database'}
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 1 }}>
-                  <strong>Input Data Points:</strong> {Object.keys(inputDataPoints).length} available
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Adaptive Monitoring:</strong> ALwrity continuously monitors databases for new data points to ensure you have the latest information.
-                </Typography>
-              </Alert>
-            </Collapse>
-
-            {/* Action Buttons - Single Autofill */}
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
-              <Tooltip 
-                title="Autofill combines your onboarding data with AI to fill all 30+ strategy fields."
-                arrow
-                placement="top"
-              >
-                <Button
-                  variant="contained"
-                  startIcon={<AutoAwesomeIcon />}
-                  onClick={onAutofill}
-                  disabled={loading}
-                  sx={{
-                    backgroundColor: 'rgba(102, 126, 234, 0.95)',
-                    color: 'white',
-                    fontWeight: 600,
-                    fontSize: '0.9rem',
-                    px: 3,
-                    py: 1.2,
-                    borderRadius: 2,
-                    textTransform: 'none',
-                    boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      backgroundColor: 'rgba(102, 126, 234, 1)',
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 6px 16px rgba(102, 126, 234, 0.5)'
-                    },
-                    '&:disabled': {
-                      backgroundColor: 'rgba(102, 126, 234, 0.5)',
-                      color: 'rgba(255, 255, 255, 0.7)'
-                    }
-                  }}
-                >
-                  {loading ? 'Processing...' : 'Autofill Strategy Fields'}
-                </Button>
-              </Tooltip>
-
-              {hasAutofillData && onRegenerateAI && (
-                <Tooltip
-                  title="Re-run AI generation to refresh AI-sourced fields. Your onboarding data and manual edits to DB-grounded fields are preserved."
-                  arrow
-                  placement="top"
-                >
-                  <Button
-                    variant="outlined"
-                    startIcon={<AutoAwesomeIcon />}
-                    onClick={onRegenerateAI}
-                    disabled={loading}
-                    sx={{
-                      color: 'rgba(255, 255, 255, 0.8)',
-                      borderColor: 'rgba(255, 255, 255, 0.3)',
-                      fontWeight: 500,
-                      fontSize: '0.8rem',
-                      px: 2,
-                      py: 1.2,
-                      borderRadius: 2,
-                      textTransform: 'none',
-                      '&:hover': {
-                        borderColor: 'rgba(255, 255, 255, 0.6)',
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                      },
-                      '&:disabled': {
-                        borderColor: 'rgba(255, 255, 255, 0.15)',
-                        color: 'rgba(255, 255, 255, 0.4)',
-                      }
-                    }}
-                  >
-                    Regenerate AI
-                  </Button>
-                </Tooltip>
-              )}
-
-              {cacheStatus === 'cached' && (
-                <Tooltip 
-                  title="Continue editing your strategy with the current autofilled values. You can review and modify any field before creating your strategy."
-                  arrow
-                  placement="top"
-                >
-                  <Button
-                    variant="contained"
-                    startIcon={<PlayArrowIcon />}
-                    onClick={onContinueWithPresent}
-                    sx={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                      color: 'white',
-                      fontWeight: 600,
-                      fontSize: '0.9rem',
-                      px: 3,
-                      py: 1.2,
-                      borderRadius: 2,
-                      textTransform: 'none',
-                      border: '1px solid rgba(255, 255, 255, 0.3)',
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        backgroundColor: 'rgba(255, 255, 255, 0.35)',
-                        borderColor: 'rgba(255, 255, 255, 0.4)',
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 4px 12px rgba(255, 255, 255, 0.2)'
-                      }
-                    }}
-                  >
-                    Continue with Present Values
-                  </Button>
-                </Tooltip>
-              )}
-
-              {/* Next Step Button - shown after autofill completion */}
-              {showNextButton && (
-                <Tooltip title="Scroll to review section and mark inputs as reviewed">
-                  <Button
-                    variant="contained"
-                    startIcon={<ArrowDownwardIcon />}
-                    onClick={onScrollToReview}
-                    sx={{
-                      background: 'linear-gradient(135deg, #4caf50 0%, #66bb6a 50%, #81c784 100%)',
-                      color: 'white',
-                      fontWeight: 600,
-                      '&:hover': {
-                        background: 'linear-gradient(135deg, #66bb6a 0%, #81c784 50%, #a5d6a7 100%)',
-                        transform: 'translateY(-1px)'
-                      },
-                      transition: 'all 0.3s ease'
-                    }}
-                  >
-                    Next: Review Strategy Inputs & Create Strategy
-                  </Button>
-                </Tooltip>
-              )}
-
-              {/* Know More Details Button - shown when autofill data exists */}
-              {hasAutofillData && Object.keys(autoPopulatedFields).length > 0 && (
-                <Tooltip title="View detailed information about autofill data sources and AI analysis">
-                  <Button
-                    variant="text"
-                    startIcon={<VisibilityIcon />}
-                    onClick={() => setShowTransparencyModal(true)}
-                    sx={{
-                      color: 'rgba(255, 255, 255, 0.8)',
-                      '&:hover': {
-                        color: 'white',
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                      }
-                    }}
-                  >
-                    Know More Details
-                  </Button>
-                </Tooltip>
-              )}
+            <Typography variant="body2" sx={{ fontWeight: 600, color: allCategoriesReviewed ? '#2e7d32' : '#e65100', fontSize: '0.8rem' }}>
+              {allCategoriesReviewed
+                ? `All ${totalCategories} categories reviewed`
+                : `${reviewedCount}/${totalCategories} reviewed — next up: ${unreviewedCategories[0] ? unreviewedCategories[0].split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : ''}`}
+            </Typography>
           </Box>
-        </Box>
-      </Paper>
+        </Tooltip>
+      </Box>
 
-      {/* Autofill Data Transparency Modal */}
+      {/* ── Row 3: Actions ───────────────────────────────────────── */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+        {allCategoriesReviewed ? (
+          <Button
+            variant="contained"
+            onClick={onCreateStrategy}
+            startIcon={<CheckCircleIcon />}
+            sx={{
+              backgroundColor: '#2e7d32',
+              '&:hover': { backgroundColor: '#1b5e20' },
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Create Strategy
+          </Button>
+        ) : (
+          <Button
+            variant="contained"
+            onClick={onReviewNext}
+            startIcon={<VisibilityIcon />}
+            sx={{
+              backgroundColor: '#1976d2',
+              '&:hover': { backgroundColor: '#1565c0' },
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Review Fields ({totalCategories - reviewedCount} remaining)
+          </Button>
+        )}
+
+        <Button
+          variant="outlined"
+          onClick={onAutofill}
+          disabled={loading}
+          startIcon={<AutoAwesomeIcon />}
+          sx={{ textTransform: 'none', fontWeight: 600 }}
+        >
+          {loading ? 'Autofilling…' : 'Autofill from onboarding'}
+        </Button>
+
+        {onRegenerateAI && (
+          <Tooltip title="Re-run AI generation for AI-sourced fields only. Your onboarding-grounded (database) fields are preserved." arrow>
+            <Link
+              component="button"
+              type="button"
+              onClick={onRegenerateAI}
+              sx={{ fontSize: '0.8rem', color: '#6b7280' }}
+            >
+              Regenerate AI fields
+            </Link>
+          </Tooltip>
+        )}
+      </Box>
+
+      {/* Transparency modal (know-more) */}
       <AutofillDataTransparency
         open={showTransparencyModal}
         onClose={() => setShowTransparencyModal(false)}
@@ -689,8 +301,8 @@ const HeaderSection: React.FC<HeaderSectionProps> = ({
         lastAutofillTime={lastAutofillTime}
         dataSource={dataSource}
       />
-    </motion.div>
+    </Box>
   );
 };
 
-export default HeaderSection; 
+export default HeaderSection;

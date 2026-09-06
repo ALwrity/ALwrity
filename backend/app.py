@@ -122,6 +122,34 @@ def _preload_sif_embeddings() -> None:
     thread.start()
 
 
+def _preload_content_strategy_imports() -> None:
+    """Pre-import the content-strategy service chain in a background thread.
+
+    The first `GET /api/content-planning/enhanced-strategies` after a backend
+    restart paid ~20-30s of lazy imports inside the request (the AI-analysis
+    chain alone costs ~6s), which kept the dashboard loading overlay up far
+    too long. Importing the chain here moves that cost to startup. Non-fatal:
+    any import error is logged and the request path will import lazily as
+    before.
+    """
+    import threading
+
+    def _warm():
+        try:
+            from api.content_planning.services.content_strategy.core.strategy_service import (
+                EnhancedStrategyService,
+            )
+            from api.content_planning.services.enhanced_strategy_db_service import (
+                EnhancedStrategyDBService,
+            )
+            logger.info("[startup] content-strategy service chain pre-loaded successfully")
+        except Exception as e:
+            logger.warning(f"[startup] content-strategy pre-load failed (non-fatal): {e}")
+
+    thread = threading.Thread(target=_warm, daemon=True, name="content-strategy-preload")
+    thread.start()
+
+
 if _is_full_mode() or _is_feature_enabled("linkedin"):
     from alwrity_utils import OnboardingManager
 
@@ -575,6 +603,11 @@ app.include_router(gif_maker_router)
 # Pre-load the SIF embedding model in a background thread so the first
 # agent search doesn't pay the 2-4s model weight loading cost.
 _preload_sif_embeddings()
+
+# Pre-import the content-strategy chain so the first dashboard request
+# doesn't pay ~20-30s of lazy imports inside the request.
+if _is_full_mode():
+    _preload_content_strategy_imports()
 
 # SEO Dashboard endpoints (skip in feature-only modes)
 if _is_full_mode():

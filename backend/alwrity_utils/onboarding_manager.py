@@ -51,6 +51,14 @@ from api.onboarding import (
 )
 from middleware.auth_middleware import get_current_user
 
+# Strategy-builder prefill endpoint — strategyPrefill-shaped persona /
+# brand / keywords / competitors data. Deliberately a SEPARATE function
+# (and route) from the SSOT /summary above, which onboarding FinalStep
+# consumes with a different response shape.
+from api.onboarding_utils.endpoints_summary import (
+    get_onboarding_summary as get_strategy_prefill_summary,
+)
+
 
 class OnboardingManager:
     """Manages all onboarding-related endpoints and functionality."""
@@ -269,6 +277,19 @@ class OnboardingManager:
                 return await get_onboarding_summary(current_user)
             except Exception as e:
                 logger.error(f"Error in onboarding_summary: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+        # Strategy-builder prefill: returns the exact persona / brand /
+        # keywords / competitors shape the frontend strategyPrefill utility
+        # maps into strategy-builder fields. Kept separate from the SSOT
+        # /summary (FinalStep) so neither consumer breaks the other.
+        @self.app.get("/api/onboarding/strategy-prefill")
+        async def strategy_prefill(current_user: dict = Depends(get_current_user)):
+            """Aggregated onboarding data for strategy builder prefill."""
+            try:
+                return await get_strategy_prefill_summary(current_user)
+            except Exception as e:
+                logger.error(f"Error in strategy_prefill: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
         @self.app.get("/api/onboarding/website-analysis")

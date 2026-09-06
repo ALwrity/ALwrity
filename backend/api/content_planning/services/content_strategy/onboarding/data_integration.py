@@ -4,9 +4,10 @@ Onboarding data integration and processing.
 """
 
 from utils.logger_utils import get_service_logger
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
+import time
 import traceback
 
 # Import database models
@@ -38,6 +39,14 @@ import os
 from services.seo_audit_lock import get_seo_audit_lock
 
 logger = get_service_logger("onboarding.data_integration")
+
+# Short-TTL cache for process_onboarding_data results, keyed by user_id.
+# See the comment inside process_onboarding_data for rationale: multiple
+# independent frontend pollers re-run the whole pipeline (8 queries + a
+# snapshot write) within seconds, and the writes stall concurrent reads
+# on the per-user SQLite database.
+_PROCESS_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_PROCESS_CACHE_TTL_SECONDS = 60.0
 
 
 class OnboardingDataIntegrationError(Exception):
@@ -318,6 +327,21 @@ class OnboardingDataIntegrationService:
             user_id: Clerk user ID (string format, e.g., 'user_xxx')
             db: Database session
         """
+        # Short-TTL cache: multiple independent pollers (dashboard task
+        # status, onboarding context, strategy prefill) hit this pipeline
+        # within seconds of each other. Each run queries 8 data sources AND
+        # writes the integrated snapshot, and the write holds the per-user
+        # SQLite lock long enough to stall concurrent reads (observed: a
+        # 24s strategies read behind 3 back-to-back runs). Caching for 60s
+        # dedupes them; onboarding data changes rarely.
+        cached = _PROCESS_CACHE.get(user_id)
+        if cached and (time.monotonic() - cached[0]) < _PROCESS_CACHE_TTL_SECONDS:
+            logger.info(
+                f"[DataIntegration] Cache hit for {user_id} "
+                f"(age {time.monotonic() - cached[0]:.1f}s) — skipping re-process"
+            )
+            return cached[1]
+
         try:
             logger.info(f"Processing onboarding data for user: {user_id}")
 
@@ -377,6 +401,9 @@ class OnboardingDataIntegrationService:
 
             # Store integrated data
             self._store_integrated_data(user_id, integrated_data, db)
+
+            # Only successful runs are cached — errors must re-run.
+            _PROCESS_CACHE[user_id] = (time.monotonic(), integrated_data)
 
             logger.info(f"Onboarding data processed successfully for user: {user_id}")
             return integrated_data

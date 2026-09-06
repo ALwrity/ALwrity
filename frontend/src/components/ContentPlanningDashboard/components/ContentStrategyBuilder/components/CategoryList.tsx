@@ -69,11 +69,16 @@ const CategoryList: React.FC<CategoryListProps> = ({
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <ListItem 
-              sx={{ 
+            <ListItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onReviewCategory(categoryId);
+              }}
+              sx={{
                 p: 1.25,
                 mb: 0.4,
                 borderRadius: 2,
+                cursor: 'pointer',
                 bgcolor: isSelected ? 'action.hover' : isNextInSequenceCategory ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
                 border: isSelected ? '2px solid' : isNextInSequenceCategory ? '1px solid' : '1px solid',
                 borderColor: isSelected ? 'primary.main' : isNextInSequenceCategory ? 'primary.main' : 'divider',
@@ -200,7 +205,10 @@ const CategoryList: React.FC<CategoryListProps> = ({
                         <CircularProgress size={14} /> : 
                         <VisibilityIcon sx={{ fontSize: 14 }} />
                     }
-                    onClick={() => onReviewCategory(categoryId)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onReviewCategory(categoryId);
+                    }}
                     disabled={isMarkingReviewed && activeCategory === categoryId}
                     sx={{ 
                       minWidth: 'auto',

@@ -1,5 +1,6 @@
-from typing import Dict, Any
+from typing import Any, Dict
 from datetime import datetime
+import json
 from loguru import logger
 from fastapi import HTTPException, Depends
 from sqlalchemy import select, desc
@@ -37,6 +38,18 @@ async def get_onboarding_summary(current_user: Dict[str, Any] = Depends(get_curr
         ).scalar_one_or_none()
 
         persona = {}
+        website = {}
+        seo = {}
+
+        # --- JSON blobs: parse defensively (columns may hold str or dict) ---
+        def _as_dict(value: Any) -> Dict[str, Any]:
+            if isinstance(value, str):
+                try:
+                    value = json.loads(value)
+                except Exception:
+                    return {}
+            return value if isinstance(value, dict) else {}
+
         if onboarding:
             persona_row = session.execute(
                 select(PersonaData)
@@ -44,76 +57,64 @@ async def get_onboarding_summary(current_user: Dict[str, Any] = Depends(get_curr
                 .order_by(desc(PersonaData.updated_at))
                 .limit(1)
             ).scalar_one_or_none()
-            if persona_row:
-                persona = {
-                    "target_audience": (persona_row.core_persona or persona_row.corePersona or persona_row.target_audience or persona_row.targetAudience),
-                    "writing_style": persona_row.writing_style,
-                    "industry": persona_row.industry,
-                    "business_size": persona_row.business_size,
-                    "goals": persona_row.goals,
-                }
 
-        # Website analysis (brand analysis for business type / industry)
-        website = {}
-        if onboarding:
             website_row = session.execute(
                 select(WebsiteAnalysis)
                 .where(WebsiteAnalysis.session_id == onboarding.id)
                 .order_by(desc(WebsiteAnalysis.updated_at))
                 .limit(1)
             ).scalar_one_or_none()
-            if website_row:
-                brand = website_row.brand_analysis or {}
-                if isinstance(brand, str):
-                    try:
-                        import json
-                        brand = json.loads(brand)
-                    except Exception:
-                        brand = {}
-                perf = website_row.performance_metrics_data  # legacy column name
-                if isinstance(perf, str):
-                    try:
-                        import json
-                        perf = json.loads(perf)
-                    except Exception:
-                        perf = {}
-                else:
-                    perf = perf or {}
-                website = {
-                    "brand_analysis": {
-                        "business_type": brand.get("business_type") or brand.get("type") or brand.get("industry"),
-                        "industry": brand.get("industry") or website_row.content_type,
-                        "company_stage": brand.get("company_stage"),
-                    },
-                    "performance_metrics": {
-                        "monthly_visitors": perf.get("monthly_visitors") or perf.get("traffic") or 0,
-                        "conversion_rate": perf.get("conversion_rate") or perf.get("conversion") or 0,
-                    },
-                }
 
-        # SEO audit (keywords, competition level, traffic potential)
-        seo = {}
-        if onboarding:
-            # The SEO audit is part of the onboarding session payload or the website analysis
-            # Try the session payload first, then fall back to the website analysis data
-            payload = onboarding.payload or {}
-            seo_audit = payload.get("seo_audit") or payload.get("seoAudit")
-            if isinstance(seo_audit, dict):
-                seo = {
-                    "keywords": seo_audit.get("keywords") or seo_audit.get("target_keywords") or [],
-                    "traffic_potential": seo_audit.get("traffic_potential") or seo_audit.get("potential_traffic") or 0,
-                    "competition_level": seo_audit.get("competition_level") or seo_audit.get("competition") or "medium",
-                }
-            else:
-                # Fallback to performance metrics as a rough proxy for traffic potential
-                perf_data = payload.get("website_analysis") or {}
-                seo = {
-                    "keywords": perf_data.get("keywords") or [],
-                    "traffic_potential": 0,
-                    "competition_level": "medium",
-                }
+            core_persona = _as_dict(persona_row.core_persona) if persona_row else {}
+            research_persona = _as_dict(persona_row.research_persona) if persona_row else {}
+            brand = _as_dict(website_row.brand_analysis) if website_row else {}
+            site_writing_style = _as_dict(website_row.writing_style) if website_row else {}
+            site_audience = _as_dict(website_row.target_audience) if website_row else {}
+            site_content_type = _as_dict(website_row.content_type) if website_row else {}
 
-        # Competitor analysis (names + strengths/weaknesses)
+            # --- Persona (PersonaData real columns: core_persona, research_persona, ...) ---
+            # research_persona.default_target_audience is a clean string; fall back to
+            # the website-crawl demographics joined into one line.
+            demographics = site_audience.get("demographics")
+            persona = {
+                "target_audience": (
+                    research_persona.get("default_target_audience")
+                    or (", ".join(demographics) if isinstance(demographics, list) and demographics else None)
+                ),
+                "writing_style": site_writing_style.get("voice") or site_writing_style.get("tone"),
+                "industry": site_audience.get("industry_focus") or research_persona.get("default_industry"),
+            }
+
+            # --- Website / brand analysis ---
+            # brand_analysis JSON has no business_type/industry keys — derive from
+            # brand_positioning / content_type / audience industry_focus. There is
+            # no performance-metrics column on WebsiteAnalysis, and the prefill
+            # mapping does not consume it — report zeros.
+            website = {
+                "brand_analysis": {
+                    "business_type": brand.get("brand_positioning") or site_content_type.get("primary_type"),
+                    "industry": site_audience.get("industry_focus") or research_persona.get("default_industry"),
+                    "company_stage": brand.get("company_stage"),
+                },
+                "performance_metrics": {
+                    "monthly_visitors": 0,
+                    "conversion_rate": 0,
+                },
+            }
+
+            # --- SEO / keywords ---
+            # The session payload has no seo_audit block; the research persona's
+            # suggested_keywords are the best keyword source for content pillars.
+            keywords = research_persona.get("suggested_keywords") or []
+            seo = {
+                "keywords": [str(k) for k in keywords[:8]] if isinstance(keywords, list) else [],
+                "traffic_potential": 0,
+                "competition_level": "medium",
+            }
+
+        # Competitor analysis (names + highlights). The model stores a single
+        # analysis_data JSON blob — there are no strengths/weaknesses columns,
+        # so derive them defensively from highlights/summary.
         competitors = []
         if onboarding:
             competitor_rows = session.execute(
@@ -122,10 +123,14 @@ async def get_onboarding_summary(current_user: Dict[str, Any] = Depends(get_curr
                 .order_by(desc(CompetitorAnalysis.analysis_date))
                 .limit(3)
             ).scalars().all()
-            competitors = [
-                {"name": row.competitor_domain or row.competitor_url, "strengths": row.strengths or [], "weaknesses": row.weaknesses or []}
-                for row in competitor_rows
-            ]
+            for row in competitor_rows:
+                analysis = _as_dict(row.analysis_data)
+                highlights = analysis.get("highlights")
+                competitors.append({
+                    "name": row.competitor_domain or row.competitor_url,
+                    "strengths": [str(h) for h in highlights][:5] if isinstance(highlights, list) else [],
+                    "weaknesses": [],
+                })
 
         return {
             "persona": persona,
