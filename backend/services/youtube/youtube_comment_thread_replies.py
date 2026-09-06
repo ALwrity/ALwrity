@@ -9,6 +9,25 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 
+def optional_youtube_comment_like_count(snippet: Dict[str, Any]) -> Optional[int]:
+    """Return snippet.likeCount as a non-negative int, or None if missing/invalid.
+
+    Does not log the total; like counts can identify a thread in production logs.
+    """
+    if not isinstance(snippet, dict):
+        return None
+    raw = snippet.get("likeCount")
+    if raw is None:
+        return None
+    try:
+        likes = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if likes < 0:
+        return None
+    return likes
+
+
 def _author_channel_id(snippet: Dict[str, Any]) -> str:
     raw = snippet.get("authorChannelId")
     if isinstance(raw, dict):
@@ -45,6 +64,9 @@ def map_youtube_comment_reply_items(
             "text": text,
             "can_edit": bool(mine and author_channel_id and mine == author_channel_id),
         }
+        likes = optional_youtube_comment_like_count(snippet)
+        if likes is not None:
+            row["like_count"] = likes
         if author_channel_id:
             row["author_channel_id"] = author_channel_id
         published_at = snippet.get("publishedAt")

@@ -54,3 +54,20 @@
   top: auto;
   margin: 0;
 }
+
+.yt-comment-like-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #606060;
+  line-height: 1.2;
+}
+
+.yt-comment-like-count-icon {
+  font-size: 0.875rem;
+  color: #606060;
+}

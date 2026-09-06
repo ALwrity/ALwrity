@@ -2,6 +2,7 @@ import React from "react";
 import type { YouTubeInboxComment } from "./youtubeCommentVideoGroups";
 import { YouTubeCommentThreadReplies } from "./YouTubeCommentThreadReplies";
 import { YouTubeCommentActionProgressPanel } from "./YouTubeCommentActionProgressPanel";
+import { YouTubeCommentLikeCount } from "./YouTubeCommentLikeCount";
 import type { YouTubeCommentParentBusyAction } from "./youtubeCommentActionLoader";
 
 export const YouTubeCommentInboxRow: React.FC<{
@@ -30,6 +31,7 @@ export const YouTubeCommentInboxRow: React.FC<{
     <div className="yt-comment-inbox-card">
       <div className="yt-comment-author">{comment.author}</div>
       <div className="yt-comment-body">{comment.text}</div>
+      <YouTubeCommentLikeCount likeCount={comment.like_count} />
       <YouTubeCommentThreadReplies
         parentId={commentId}
         replies={comment.replies}

@@ -37,14 +37,18 @@ def _reply_resource(
     author: str,
     text: str,
     published_at: str = "2026-01-02T00:00:00Z",
+    like_count: int | None = None,
 ) -> dict:
+    snippet = {
+        "authorDisplayName": author,
+        "textDisplay": text,
+        "publishedAt": published_at,
+    }
+    if like_count is not None:
+        snippet["likeCount"] = like_count
     return {
         "id": comment_id,
-        "snippet": {
-            "authorDisplayName": author,
-            "textDisplay": text,
-            "publishedAt": published_at,
-        },
+        "snippet": snippet,
     }
 
 
@@ -67,7 +71,9 @@ def _thread_with_replies() -> dict:
         },
         "replies": {
             "comments": [
-                _reply_resource(comment_id="r-1", author="Pat", text="Me too"),
+                _reply_resource(
+                    comment_id="r-1", author="Pat", text="Me too", like_count=4
+                ),
                 _reply_resource(comment_id="r-2", author="Lee", text="Same here"),
             ]
         },
@@ -119,7 +125,8 @@ class TestMapYoutubeCommentReplies:
         assert mapped[0]["comment_id"] == "r-1"
         assert mapped[0]["author"] == "Pat"
         assert mapped[0]["text"] == "Me too"
-        assert mapped[1]["comment_id"] == "r-2"
+        assert mapped[0]["like_count"] == 4
+        assert "like_count" not in mapped[1]
         assert mapped[1]["author"] == "Lee"
         joined = " ".join(row["text"] for row in mapped)
         assert "Untitled" not in joined
@@ -168,6 +175,43 @@ class TestMapYoutubeCommentReplies:
         assert mapped[0]["text"] == "From original"
         assert mapped[0]["author"] == "Pat"
 
+    def test_optional_like_count_coerces_and_rejects_invalid(self):
+        from services.youtube.youtube_comment_thread_replies import (
+            optional_youtube_comment_like_count,
+        )
+
+        assert optional_youtube_comment_like_count({"likeCount": 4}) == 4
+        assert optional_youtube_comment_like_count({"likeCount": "4"}) == 4
+        assert optional_youtube_comment_like_count({"likeCount": 0}) == 0
+        assert optional_youtube_comment_like_count({"likeCount": -1}) is None
+        assert optional_youtube_comment_like_count({"likeCount": "nope"}) is None
+        assert optional_youtube_comment_like_count({"likeCount": {}}) is None
+        assert optional_youtube_comment_like_count({}) is None
+        assert optional_youtube_comment_like_count(None) is None  # type: ignore[arg-type]
+
+    def test_maps_like_count_and_skips_invalid_like_count(self):
+        from services.youtube.youtube_comment_thread_replies import (
+            map_youtube_comment_reply_items,
+        )
+
+        mapped = map_youtube_comment_reply_items(
+            [
+                _reply_resource(
+                    comment_id="r-1", author="Pat", text="Me too", like_count=0
+                ),
+                {
+                    "id": "r-2",
+                    "snippet": {
+                        "authorDisplayName": "Lee",
+                        "textDisplay": "Same",
+                        "likeCount": "nope",
+                    },
+                },
+            ]
+        )
+        assert mapped[0]["like_count"] == 0
+        assert "like_count" not in mapped[1]
+
     def test_non_list_items_and_non_dict_thread_are_empty(self):
         from services.youtube.youtube_comment_thread_replies import (
             map_youtube_comment_reply_items,
@@ -196,6 +240,7 @@ class TestListInboxMapsThreadReplies:
         assert len(parent["replies"]) == 2
         assert parent["replies"][0]["author"] == "Pat"
         assert parent["replies"][0]["text"] == "Me too"
+        assert parent["replies"][0]["like_count"] == 4
         assert parent["total_reply_count"] == 2
         youtube.comments.return_value.list.assert_not_called()
         youtube.videos.return_value.list.assert_called_once()

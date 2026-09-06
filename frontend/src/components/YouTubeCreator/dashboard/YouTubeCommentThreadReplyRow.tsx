@@ -3,6 +3,7 @@ import { youtubeStudioApi } from "../../../services/youtubeStudioApi";
 import type { YouTubeInboxReply } from "./youtubeCommentVideoGroups";
 import { YouTubeCommentReplyOverflowMenu } from "./YouTubeCommentReplyOverflowMenu";
 import { YouTubeCommentActionProgressPanel } from "./YouTubeCommentActionProgressPanel";
+import { YouTubeCommentLikeCount } from "./YouTubeCommentLikeCount";
 
 export const YouTubeCommentThreadReplyRow: React.FC<{
   reply: YouTubeInboxReply;
@@ -184,7 +185,10 @@ export const YouTubeCommentThreadReplyRow: React.FC<{
           </div>
         </>
       ) : reply.text ? (
-        <div className="yt-comment-thread-reply-body">{reply.text}</div>
+        <>
+          <div className="yt-comment-thread-reply-body">{reply.text}</div>
+          <YouTubeCommentLikeCount likeCount={reply.like_count} />
+        </>
       ) : null}
     </div>
   );

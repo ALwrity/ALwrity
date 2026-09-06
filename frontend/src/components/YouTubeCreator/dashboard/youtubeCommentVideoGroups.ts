@@ -14,6 +14,7 @@ export type YouTubeInboxReply = {
   text?: string;
   published_at?: string;
   can_edit?: boolean;
+  like_count?: number;
 };
 
 export type YouTubeInboxComment = {
@@ -24,6 +25,7 @@ export type YouTubeInboxComment = {
   text?: string;
   replies?: YouTubeInboxReply[];
   total_reply_count?: number;
+  like_count?: number;
 };
 
 export type YouTubeCommentVideoGroupModel = {
@@ -38,6 +40,20 @@ export function youtubeCommentCountLabel(count: number): string {
 
 export function youtubeCommentReplyCountLabel(count: number): string {
   return count === 1 ? "1 reply" : `${count} replies`;
+}
+
+export function youtubeCommentVisibleLikeCount(
+  likeCount: unknown,
+): number | null {
+  const raw = Number(likeCount);
+  if (!Number.isFinite(raw) || raw < 1) {
+    return null;
+  }
+  return Math.floor(raw);
+}
+
+export function youtubeCommentLikeCountLabel(count: number): string {
+  return count === 1 ? "1 like" : `${count} likes`;
 }
 
 function youtubeCommentVideoGroupKey(comment: YouTubeInboxComment): string {
