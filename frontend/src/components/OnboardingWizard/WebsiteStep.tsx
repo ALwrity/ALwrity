@@ -57,6 +57,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   setSuccess: propSetSuccess,
   isConnectStepCompleted = false,
   onWebsiteAnalysisChanged,
+  onLiveWebsiteSessionChange,
 }) => {
   const [error, setError] = useState<string | null>(null);
   const [internalSuccess, setInternalSuccess] = useState<string | null>(null);
@@ -101,6 +102,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
     setError,
     setAnalysisWarning,
     onWebsiteAnalysisChanged,
+    onLiveWebsiteSessionChange,
   });
 
   const connectStepFullyUnlocked = isConnectStepFullyUnlocked(

@@ -4,6 +4,7 @@ import {
   prepareOnboardingData,
   PersonaGenerationRequest
 } from '../../../api/personaApi';
+import { clearPersonaServerCacheStatus } from '../PersonalizationStep/personaGenerationCache';
 
 interface PersonaGenerationProps {
   onboardingData: any;
@@ -42,7 +43,7 @@ export const usePersonaGeneration = ({
     setShowPreview(false);
     
     // Clear session cache flag since we're generating fresh
-    sessionStorage.removeItem('persona_server_cache_checked');
+    clearPersonaServerCacheStatus();
 
     try {
       // Start async persona generation

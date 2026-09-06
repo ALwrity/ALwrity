@@ -40,8 +40,13 @@ import {
   setCommittedStep1WebsiteUrl,
   stripDownstreamStepData,
 } from './utils/onboardingWebsiteReset';
-import { mergeBackendStepsIntoStepData } from './utils/wizardStepDataSync';
 import { invalidateDownstreamOnboardingSteps } from '../../api/onboarding';
+import {
+  applyLiveWebsiteSessionToStepData,
+  mergeOnboardingSeedIntoStepData,
+  readLiveWebsiteAnalysisFromStorage,
+  readLiveWebsiteUrlFromStorage,
+} from './common/wizardLiveWebsiteSession';
 
 
 // Set to true in dev to restore verbose per-action tracing
@@ -369,6 +374,18 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     }
   }, [activeStep, refresh, resetOptimisticProgressFloor]);
 
+  const handleLiveWebsiteSessionChange = useCallback(
+    (payload: { website: string; analysis: any }) => {
+      setStepData((prev: any) =>
+        applyLiveWebsiteSessionToStepData(prev, {
+          website: payload.website,
+          analysis: payload.analysis,
+        })
+      );
+    },
+    []
+  );
+
   // Seed stepData from OnboardingContext when data loads
   useEffect(() => {
     if (!data?.onboarding?.steps) return;
@@ -378,9 +395,25 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     // Merge step payload data from backend.
     // Renumbered: 1=Connect, 2=Research, 3=Personalization (frontend 0,1,2).
     if (onboarding.steps && Array.isArray(onboarding.steps)) {
-      setStepData((prev: any) => mergeBackendStepsIntoStepData(onboarding.steps, prev));
-
       const step1Data = getBackendStep(onboarding.steps, 0);
+      const step2Data = getBackendStep(onboarding.steps, 1);
+      const step3Data = getBackendStep(onboarding.steps, 2);
+      const liveWebsiteUrl = readLiveWebsiteUrlFromStorage();
+      const liveAnalysis = readLiveWebsiteAnalysisFromStorage();
+
+      setStepData((prev: any) =>
+        mergeOnboardingSeedIntoStepData(
+          prev,
+          {
+            connect: step1Data?.data || null,
+            research: step2Data?.data || null,
+            personalization: step3Data?.data || null,
+          },
+          liveWebsiteUrl,
+          liveAnalysis
+        )
+      );
+
       if (step1Data?.data) {
         const d = step1Data.data;
         const committedWebsite = d.website || d.website_url;
@@ -840,6 +873,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         setSuccess={setSuccessMessage}
         isConnectStepCompleted={isConnectStepOfficiallyComplete}
         onWebsiteAnalysisChanged={handleWebsiteAnalysisChanged}
+        onLiveWebsiteSessionChange={handleLiveWebsiteSessionChange}
       />
     );
 

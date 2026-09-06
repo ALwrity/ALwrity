@@ -2,7 +2,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Competitor } from '../WebsiteStep/components';
 import type { ContentPillarData } from './ContentPillarsSection';
 import { aiApiClient, longRunningApiClient } from '../../../api/client';
-import { normalizeWebsiteUrl } from '../utils/onboardingWebsiteReset';
+import {
+  ONBOARDING_STORAGE_KEYS,
+  resolveCurrentWebsiteSessionKey,
+} from '../common/onboardingStorageKeys';
+import { normalizeOnboardingUrl } from '../common/onboardingSessionKey';
 
 interface UseCompetitorDiscoveryProps {
   userUrl: string;
@@ -61,18 +65,23 @@ export function useCompetitorDiscovery({
 
   const loadCachedAnalysis = useCallback((): boolean => {
     try {
-      const cachedData = localStorage.getItem('competitor_analysis_data');
-      const cachedUrl = localStorage.getItem('competitor_analysis_url') || '';
-      const cacheTimestamp = localStorage.getItem('competitor_analysis_timestamp');
+      const cachedData = localStorage.getItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData);
+      const cachedUrl = localStorage.getItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisUrl) || '';
+      const cacheTimestamp = localStorage.getItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisTimestamp);
+      const cachedSessionKey = localStorage.getItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisSessionKey);
 
-      const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
+      const finalUserUrl = userUrl || localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteUrl) || '';
+      const currentSessionKey = resolveCurrentWebsiteSessionKey(finalUserUrl);
 
-      const normalizeUrl = (url: string) => {
-        if (!url) return '';
-        return url.trim().toLowerCase().replace(/\/$/, '').replace(/^https?:\/\//, '').replace(/^www\./, '');
-      };
+      if (cachedSessionKey && cachedSessionKey !== currentSessionKey) {
+        return false;
+      }
 
-      if (cachedData && normalizeUrl(cachedUrl) === normalizeUrl(finalUserUrl) && cacheTimestamp) {
+      if (
+        cachedData &&
+        normalizeOnboardingUrl(cachedUrl) === normalizeOnboardingUrl(finalUserUrl) &&
+        cacheTimestamp
+      ) {
         const cacheAge = Date.now() - parseInt(cacheTimestamp);
         const cacheValidDuration = 24 * 60 * 60 * 1000;
 
@@ -89,9 +98,10 @@ export function useCompetitorDiscovery({
             setUsingCachedData(true);
             return true;
           } else {
-            localStorage.removeItem('competitor_analysis_data');
-            localStorage.removeItem('competitor_analysis_url');
-            localStorage.removeItem('competitor_analysis_timestamp');
+            localStorage.removeItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData);
+            localStorage.removeItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisUrl);
+            localStorage.removeItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisTimestamp);
+            localStorage.removeItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisSessionKey);
           }
         }
       }
@@ -104,24 +114,28 @@ export function useCompetitorDiscovery({
 
   const updateCacheWithSitemapAnalysis = useCallback((sitemapResult: any) => {
     try {
-      const cachedData = localStorage.getItem('competitor_analysis_data');
+      const cachedData = localStorage.getItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData);
       if (cachedData) {
         const parsedData = JSON.parse(cachedData);
         parsedData.sitemap_analysis = sitemapResult;
-        localStorage.setItem('competitor_analysis_data', JSON.stringify(parsedData));
+        localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData, JSON.stringify(parsedData));
       } else {
         // Create the cache entry so future mounts have the sitemap data
         // even if competitor_analysis_data was never written.
-        const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
-        localStorage.setItem('competitor_analysis_data', JSON.stringify({
+        const finalUserUrl = userUrl || localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteUrl) || '';
+        localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData, JSON.stringify({
           competitors: [],
           social_media_accounts: {},
           research_summary: null,
           sitemap_analysis: sitemapResult,
           content_pillars: null,
         }));
-        localStorage.setItem('competitor_analysis_url', finalUserUrl);
-        localStorage.setItem('competitor_analysis_timestamp', Date.now().toString());
+        localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisUrl, finalUserUrl);
+        localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisTimestamp, Date.now().toString());
+        localStorage.setItem(
+          ONBOARDING_STORAGE_KEYS.competitorAnalysisSessionKey,
+          resolveCurrentWebsiteSessionKey(finalUserUrl)
+        );
       }
     } catch (err) {
       console.warn('Failed to update cache with sitemap analysis:', err);
@@ -190,7 +204,7 @@ export function useCompetitorDiscovery({
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       const propUserUrl = userUrl || '';
-      const localStorageUrl = localStorage.getItem('website_url') || '';
+      const localStorageUrl = localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteUrl) || '';
       const onboardingContextUrl = (window as any).onboardingContext?.websiteUrl || '';
       const finalUserUrl = propUserUrl || localStorageUrl || onboardingContextUrl || '';
 
@@ -239,13 +253,17 @@ export function useCompetitorDiscovery({
         });
 
         try {
-          localStorage.setItem('competitor_analysis_data', JSON.stringify({
+          localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData, JSON.stringify({
             ...analysisData,
             social_media_accounts: mergedAccounts,
             content_pillars: result.content_pillars || null,
           }));
-          localStorage.setItem('competitor_analysis_url', finalUserUrl);
-          localStorage.setItem('competitor_analysis_timestamp', Date.now().toString());
+          localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisUrl, finalUserUrl);
+          localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisTimestamp, Date.now().toString());
+          localStorage.setItem(
+            ONBOARDING_STORAGE_KEYS.competitorAnalysisSessionKey,
+            resolveCurrentWebsiteSessionKey(finalUserUrl)
+          );
         } catch (cacheErr) {
           console.warn('Failed to cache competitor analysis:', cacheErr);
         }
@@ -270,7 +288,7 @@ export function useCompetitorDiscovery({
     setError(null);
 
     try {
-      const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
+      const finalUserUrl = userUrl || localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteUrl) || '';
       if (!finalUserUrl || finalUserUrl.trim() === '') {
         throw new Error('No website URL available for content pillar discovery.');
       }
@@ -294,11 +312,11 @@ export function useCompetitorDiscovery({
       }
 
       try {
-        const cachedData = localStorage.getItem('competitor_analysis_data');
+        const cachedData = localStorage.getItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData);
         if (cachedData) {
           const parsedData = JSON.parse(cachedData);
           parsedData.content_pillars = payload;
-          localStorage.setItem('competitor_analysis_data', JSON.stringify(parsedData));
+          localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData, JSON.stringify(parsedData));
         }
       } catch (cacheErr) {
         console.warn('Failed to update cache with content pillars:', cacheErr);
@@ -332,7 +350,7 @@ export function useCompetitorDiscovery({
         setSocialMediaAccounts(mergeCrawlSocialMedia(initialData.social_media_accounts));
       }
 
-      const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
+      const finalUserUrl = userUrl || localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteUrl) || '';
       const initialWebsiteUrl =
         initialData?.website ||
         initialData?.website_url ||
@@ -340,7 +358,7 @@ export function useCompetitorDiscovery({
         '';
       const backendMatchesCurrentWebsite =
         !initialWebsiteUrl ||
-        normalizeWebsiteUrl(initialWebsiteUrl) === normalizeWebsiteUrl(finalUserUrl);
+        normalizeOnboardingUrl(initialWebsiteUrl) === normalizeOnboardingUrl(finalUserUrl);
 
       // 1. Check for backend competitors data (SSOT) — only when URL matches
       if (initialData?.competitors?.length > 0 && backendMatchesCurrentWebsite) {
@@ -358,10 +376,14 @@ export function useCompetitorDiscovery({
             sitemap_analysis: initialData.sitemapAnalysis || null,
             content_pillars: initialData.content_pillars || null
           };
-          const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
-          localStorage.setItem('competitor_analysis_data', JSON.stringify(analysisData));
-          localStorage.setItem('competitor_analysis_url', finalUserUrl);
-          localStorage.setItem('competitor_analysis_timestamp', Date.now().toString());
+          const finalUserUrl = userUrl || localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteUrl) || '';
+          localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData, JSON.stringify(analysisData));
+          localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisUrl, finalUserUrl);
+          localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisTimestamp, Date.now().toString());
+          localStorage.setItem(
+            ONBOARDING_STORAGE_KEYS.competitorAnalysisSessionKey,
+            resolveCurrentWebsiteSessionKey(finalUserUrl)
+          );
         } catch (e) {
           console.warn('Failed to prime cache from backend data', e);
         }

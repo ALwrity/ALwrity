@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import type { StyleAnalysis } from '../components/UnifiedAnalysisContainer/types';
-import { 
+import {
   AnalysisProgress,
   ExistingAnalysis,
-  INITIAL_PROGRESS_STEPS
+  INITIAL_PROGRESS_STEPS,
 } from '../utils/constants';
 import {
   fixUrlFormat,
@@ -11,13 +11,21 @@ import {
   loadExistingAnalysis,
   performAnalysis,
   fetchLastAnalysis,
-  extractDomainName
+  extractDomainName,
 } from '../utils/websiteUtils';
 import {
   getStoredWebsiteUrl,
   markDownstreamDirty,
-  shouldInvalidateDownstream,
 } from '../../utils/onboardingWebsiteReset';
+import {
+  clearDownstreamForWebsiteChange,
+  ONBOARDING_STORAGE_KEYS,
+  syncWebsiteAnalysisStorage,
+} from '../../common/onboardingStorageKeys';
+import {
+  resolveLoadedAnalysisWebsiteUrl,
+  stageTypedWebsiteUrl,
+} from '../../common/wizardLiveWebsiteSession';
 
 interface UseWebsiteAnalysisProps {
   setSuccess: (msg: string | null) => void;
@@ -27,6 +35,10 @@ interface UseWebsiteAnalysisProps {
     websiteUrl: string;
     reason: 'reanalyze' | 'new_website' | 'start_fresh' | 'load_existing';
   }) => void | Promise<void>;
+  onLiveWebsiteSessionChange?: (payload: {
+    website: string;
+    analysis: StyleAnalysis | null;
+  }) => void;
 }
 
 export function useWebsiteAnalysis({
@@ -34,6 +46,7 @@ export function useWebsiteAnalysis({
   setError,
   setAnalysisWarning,
   onWebsiteAnalysisChanged,
+  onLiveWebsiteSessionChange,
 }: UseWebsiteAnalysisProps) {
   const [website, setWebsite] = useState('');
   const [loading, setLoading] = useState(false);
@@ -45,7 +58,18 @@ export function useWebsiteAnalysis({
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [progress, setProgress] = useState<AnalysisProgress[]>(INITIAL_PROGRESS_STEPS);
   const urlWasPreFilledRef = useRef(false);
+  const userChangedUrlRef = useRef(false);
   const lastCommittedAnalysisUrlRef = useRef<string>(getStoredWebsiteUrl());
+
+  const notifyLiveWebsiteSession = (
+    nextWebsite: string,
+    nextAnalysis: StyleAnalysis | null
+  ) => {
+    onLiveWebsiteSessionChange?.({
+      website: nextWebsite,
+      analysis: nextAnalysis,
+    });
+  };
 
   const notifyWebsiteAnalysisChanged = async (
     websiteUrl: string,
@@ -60,16 +84,39 @@ export function useWebsiteAnalysis({
     }
   };
 
+  const persistWebsiteSession = async (
+    websiteUrl: string,
+    nextAnalysis: StyleAnalysis | null,
+    reason: 'reanalyze' | 'new_website' | 'start_fresh' | 'load_existing'
+  ) => {
+    const { didInvalidateDownstream } = syncWebsiteAnalysisStorage(websiteUrl, nextAnalysis);
+    notifyLiveWebsiteSession(websiteUrl, nextAnalysis);
+
+    if (
+      didInvalidateDownstream ||
+      reason === 'reanalyze' ||
+      reason === 'start_fresh' ||
+      reason === 'new_website'
+    ) {
+      await notifyWebsiteAnalysisChanged(websiteUrl, reason);
+    }
+  };
+
   // A. Load active analysis from previous session silently on mount (Auto-hydration)
   useEffect(() => {
+    let cancelled = false;
     const loadLastAnalysis = async () => {
       console.log('[useWebsiteAnalysis] Checking for active session on mount...');
       try {
         const result = await fetchLastAnalysis();
+        if (cancelled || userChangedUrlRef.current) {
+          console.log('[useWebsiteAnalysis] Ignoring stale last-analysis hydration');
+          return;
+        }
         if (result.success) {
           if (result.website) {
             setWebsite(result.website);
-            urlWasPreFilledRef.current = true; // Mark as pre-filled to bypass inline alert checks
+            urlWasPreFilledRef.current = true;
           }
           if (result.analysis) {
             setAnalysis(result.analysis);
@@ -86,6 +133,9 @@ export function useWebsiteAnalysis({
       }
     };
     loadLastAnalysis();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // B. Handle typing URL: reset checking states, clear mismatched active dashboards
@@ -96,28 +146,23 @@ export function useWebsiteAnalysis({
         urlWasPreFilledRef.current = false;
         return;
       }
+      userChangedUrlRef.current = true;
       setHasCheckedExisting(false);
       setExistingAnalysis(null);
 
-      const previousUrl = lastCommittedAnalysisUrlRef.current || getStoredWebsiteUrl();
-      const nextUrl = fixUrlFormat(website) || website;
-      if (
-        analysis &&
-        shouldInvalidateDownstream({
-          previousUrl,
-          nextUrl,
-        })
-      ) {
-        void notifyWebsiteAnalysisChanged(nextUrl, 'new_website');
-      }
-
-      // Clear mismatched old content to prevent confusing UI while typing
       setAnalysis(null);
       setCrawlResult(null);
       setDomainName('');
       setError(null);
       setSuccess(null);
       setAnalysisWarning(null);
+
+      const fixedUrl = fixUrlFormat(website);
+      if (stageTypedWebsiteUrl(fixedUrl || website)) {
+        console.log('[useWebsiteAnalysis] URL changed while typing — clearing downstream caches');
+        clearDownstreamForWebsiteChange({ preserveActiveStep: true });
+        notifyLiveWebsiteSession(fixedUrl || website, null);
+      }
     }
   }, [website, setError, setSuccess, setAnalysisWarning]);
 
@@ -151,7 +196,7 @@ export function useWebsiteAnalysis({
     setProgress(prev => {
       const existing = prev.find(p => p.step === step);
       if (existing) {
-        return prev.map(p => 
+        return prev.map(p =>
           p.step === step ? { ...p, message, subMessage: subMessage || p.subMessage, completed: true } : p
         );
       }
@@ -168,17 +213,22 @@ export function useWebsiteAnalysis({
     try {
       const result = await loadExistingAnalysis(existingAnalysis.analysis_id, website);
       if (result.success && result.analysis) {
-        setDomainName(result.domainName || extractDomainName(website));
+        const bound = resolveLoadedAnalysisWebsiteUrl(
+          fixUrlFormat(website) || website,
+          result.analysis
+        );
+        if (bound.error || !bound.url) {
+          setError(bound.error || 'Failed to load previous analysis. Please trigger a new one.');
+          return;
+        }
+
+        setDomainName(result.domainName || extractDomainName(bound.url));
         setAnalysis(result.analysis);
         setCrawlResult(result.crawlResult);
         setAnalysisWarning(result.warning || null);
         setSuccess('Previous analysis loaded successfully!');
 
-        // Sync to local storage for downstream steps
-        const fixedUrl = fixUrlFormat(website) || website;
-        localStorage.setItem('website_url', fixedUrl);
-        localStorage.setItem('website_analysis_data', JSON.stringify(result.analysis));
-        await notifyWebsiteAnalysisChanged(fixedUrl, 'load_existing');
+        await persistWebsiteSession(bound.url, result.analysis, 'load_existing');
       } else {
         setError('Failed to load previous analysis. Please trigger a new one.');
       }
@@ -206,35 +256,32 @@ export function useWebsiteAnalysis({
     setLoading(true);
 
     try {
-      // 1. Double check database first to prevent duplicate LLM/crawler API waste
       if (!isExplicitReanalyze) {
         console.log('[useWebsiteAnalysis] Pre-analysis guard checking URL:', fixedUrl);
         const result = await checkExistingAnalysis(fixedUrl);
         if (result.exists && result.analysis) {
           console.log('[useWebsiteAnalysis] Intercepted request: loaded existing to save API calls.');
           setExistingAnalysis(result.analysis);
-          
+
           const loadResult = await loadExistingAnalysis(result.analysis.analysis_id, fixedUrl);
-          if (loadResult.success) {
-            setDomainName(loadResult.domainName || extractDomainName(fixedUrl));
+          if (loadResult.success && loadResult.analysis) {
+            const bound = resolveLoadedAnalysisWebsiteUrl(fixedUrl, loadResult.analysis);
+            if (bound.error || !bound.url) {
+              setError(bound.error || 'Failed to load existing analysis database record.');
+              setLoading(false);
+              return;
+            }
+
+            setDomainName(loadResult.domainName || extractDomainName(bound.url));
             setAnalysis(loadResult.analysis);
             setCrawlResult(loadResult.crawlResult);
             setSuccess('We found and loaded your previous analysis to save you time and API resources!');
-            
-            localStorage.setItem('website_url', fixedUrl);
-            localStorage.setItem('website_analysis_data', JSON.stringify(loadResult.analysis));
-            if (
-              isExplicitReanalyze ||
-              shouldInvalidateDownstream({
-                previousUrl: lastCommittedAnalysisUrlRef.current || getStoredWebsiteUrl(),
-                nextUrl: fixedUrl,
-              })
-            ) {
-              await notifyWebsiteAnalysisChanged(
-                fixedUrl,
-                isExplicitReanalyze ? 'reanalyze' : 'load_existing'
-              );
-            }
+
+            await persistWebsiteSession(
+              bound.url,
+              loadResult.analysis,
+              'load_existing'
+            );
           } else {
             setError('Failed to load existing analysis database record.');
           }
@@ -243,7 +290,6 @@ export function useWebsiteAnalysis({
         }
       }
 
-      // 2. Real crawler + analysis execution (for new URLs or explicit Re-Analyze requests)
       console.log('[useWebsiteAnalysis] Triggering fresh crawl & LLM brand voice analysis...');
       setAnalysis(null);
       setCrawlResult(null);
@@ -257,10 +303,9 @@ export function useWebsiteAnalysis({
         setCrawlResult(analysisResult.crawlResult);
         setAnalysisWarning(analysisResult.warning || null);
 
-        localStorage.setItem('website_url', fixedUrl);
-        localStorage.setItem('website_analysis_data', JSON.stringify(analysisResult.analysis));
-        await notifyWebsiteAnalysisChanged(
+        await persistWebsiteSession(
           fixedUrl,
+          analysisResult.analysis,
           isExplicitReanalyze ? 'reanalyze' : 'new_website'
         );
 
@@ -294,9 +339,16 @@ export function useWebsiteAnalysis({
     setAnalysisWarning(null);
     setHasCheckedExisting(false);
     urlWasPreFilledRef.current = false;
+    userChangedUrlRef.current = true;
 
-    localStorage.removeItem('website_url');
-    localStorage.removeItem('website_analysis_data');
+    clearDownstreamForWebsiteChange({ preserveActiveStep: true });
+    notifyLiveWebsiteSession('', null);
+    try {
+      localStorage.removeItem(ONBOARDING_STORAGE_KEYS.websiteUrl);
+      localStorage.removeItem(ONBOARDING_STORAGE_KEYS.websiteAnalysisData);
+    } catch (err) {
+      console.warn('[useWebsiteAnalysis] Failed to clear website storage on Start Fresh:', err);
+    }
     lastCommittedAnalysisUrlRef.current = '';
     void notifyWebsiteAnalysisChanged('', 'start_fresh');
     setProgress(prev => prev.map(p => ({ ...p, completed: false })));
