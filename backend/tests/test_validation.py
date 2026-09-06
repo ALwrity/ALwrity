@@ -14,6 +14,21 @@ def test_step1_connect_validates_website_url():
     assert "Invalid website URL format" in validate_step_data(1, {"website": "not-a-url"})
 
 
+def test_step1_linkedin_accepts_integrations_without_website():
+    assert (
+        validate_step_data(
+            1,
+            {
+                "onboarding_type": "linkedin",
+                "integrations": {"connectedPlatforms": ["linkedin"]},
+            },
+        )
+        == []
+    )
+    assert "LinkedIn connection is required" in validate_step_data(
+        1, {"onboarding_type": "linkedin", "integrations": {"connectedPlatforms": []}}
+    )
+
 def test_step2_research_validates_research_fields():
     assert validate_step_data(2, {"competitors": ["https://a.com"]}) == []
     assert validate_step_data(2, {"researchSummary": "x"}) == []

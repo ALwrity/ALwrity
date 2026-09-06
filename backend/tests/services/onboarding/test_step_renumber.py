@@ -210,8 +210,12 @@ class TestWebsiteStrategyDispatch:
 
     @pytest.fixture
     def mock_svc(self):
+        from api.onboarding_utils.website_change_invalidation import WebsiteAnalysisSaveResult
+
         svc = MagicMock()
-        svc._save_website_analysis = MagicMock(return_value=True)
+        svc._save_website_analysis = MagicMock(
+            return_value=WebsiteAnalysisSaveResult(success=True, is_new_analysis=True)
+        )
         svc._save_research_preferences = MagicMock(return_value=True)
         svc._save_persona_data = MagicMock(return_value=True)
         svc._save_competitor_analysis = MagicMock()

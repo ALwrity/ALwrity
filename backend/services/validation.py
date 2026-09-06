@@ -298,13 +298,23 @@ def validate_step_data(step_number: int, data: Dict[str, Any]) -> List[str]:
     
     logger.info(f"[validate_step_data] Validating step {step_number} with data: {data}")
     
-    if step_number == 1:  # Connect Platforms (website)
-        # Accept both 'website' and 'website_url' for backwards compatibility
-        website_url = data.get('website') or data.get('website_url') if data else None
-        if not website_url:
-            errors.append("Website URL is required")
-        elif not validate_website_url(website_url):
-            errors.append("Invalid website URL format")
+    if step_number == 1:  # Connect Platforms
+        onboarding_type = (data or {}).get("onboarding_type") or "website"
+        if onboarding_type == "linkedin":
+            integrations = (data or {}).get("integrations") or {}
+            connected = integrations.get("connectedPlatforms") or []
+            if "linkedin" not in connected:
+                errors.append("LinkedIn connection is required")
+        else:
+            # Accept both 'website' and 'website_url' for backwards compatibility
+            website_url = data.get('website') or data.get('website_url') if data else None
+            if not website_url:
+                integrations = (data or {}).get("integrations") or {}
+                connected = integrations.get("connectedPlatforms") or []
+                if "linkedin" not in connected:
+                    errors.append("Website URL is required")
+            elif not validate_website_url(website_url):
+                errors.append("Invalid website URL format")
     
     elif step_number == 2:  # Research
         # Validate that research data is present (competitors, research summary, or sitemap analysis)

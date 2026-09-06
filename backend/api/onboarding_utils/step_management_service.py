@@ -14,6 +14,11 @@ from api.content_planning.services.content_strategy.onboarding import Onboarding
 from services.database import get_db
 from models.onboarding import OnboardingSession, WebsiteAnalysis, ResearchPreferences, PersonaData, CompetitorAnalysis, PlatformIntegration
 from services.intelligence.agent_flat_context import AgentFlatContextStore
+from api.onboarding_utils.website_change_invalidation import (
+    WebsiteAnalysisSaveResult,
+    invalidate_session_downstream_research,
+    website_urls_differ,
+)
 
 class StepManagementService:
     """Service for handling onboarding step management."""
@@ -52,7 +57,11 @@ class StepManagementService:
 
         return session
 
-    def _save_website_analysis(self, user_id: str, analysis_data: Dict[str, Any], db: Session) -> bool:
+    def _invalidate_downstream_for_website_change(self, session_id: int, db: Session) -> dict:
+        """Remove research artifacts tied to a previous website URL."""
+        return invalidate_session_downstream_research(session_id, db)
+
+    def _save_website_analysis(self, user_id: str, analysis_data: Dict[str, Any], db: Session) -> WebsiteAnalysisSaveResult:
         """Save website analysis directly to database."""
         try:
             session = self._get_or_create_session(user_id, db)
@@ -110,6 +119,20 @@ class StepManagementService:
             existing_analysis = db.query(WebsiteAnalysis).filter(
                 WebsiteAnalysis.session_id == session.id
             ).first()
+
+            new_website_url = normalized.get('website_url') or ''
+            is_new_analysis = existing_analysis is None
+            website_url_changed = False
+
+            if existing_analysis and new_website_url:
+                old_website_url = existing_analysis.website_url or ''
+                website_url_changed = website_urls_differ(old_website_url, new_website_url)
+                if website_url_changed:
+                    logger.info(
+                        f"[onboarding:website_change] Website URL changed for user {user_id}: "
+                        f"{old_website_url!r} -> {new_website_url!r}"
+                    )
+                    self._invalidate_downstream_for_website_change(session.id, db)
             
             if existing_analysis:
                 for key, value in filtered_data.items():
@@ -156,7 +179,11 @@ class StepManagementService:
             except Exception as flat_err:
                 logger.warning(f"Failed to persist step 2 flat context for user {user_id}: {flat_err}")
 
-            return True
+            return WebsiteAnalysisSaveResult(
+                success=True,
+                website_url_changed=website_url_changed,
+                is_new_analysis=is_new_analysis,
+            )
         except Exception as e:
             logger.error(f"Error saving website analysis for user {user_id}: {e}")
             db.rollback()
