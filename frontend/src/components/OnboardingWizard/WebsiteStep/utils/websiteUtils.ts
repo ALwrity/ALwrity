@@ -4,6 +4,7 @@
  */
 
 import { apiClient, longRunningApiClient } from '../../../../api/client';
+import { mapCheckExistingResponse } from './websiteAnalysisDisplay';
 
 /**
  * Fixes URL format by adding protocol if missing and ensuring proper format
@@ -78,9 +79,13 @@ export const checkExistingAnalysis = async (url: string): Promise<{
     
     if (result.exists) {
       console.log('WebsiteStep: Existing analysis found:', result);
+      const mapped = mapCheckExistingResponse(result);
+      if (!mapped) {
+        return { exists: false, error: 'Existing analysis payload was incomplete.' };
+      }
       return {
         exists: true,
-        analysis: result
+        analysis: mapped,
       };
     } else {
       console.log('WebsiteStep: No existing analysis found');
@@ -118,6 +123,7 @@ export const buildAnalysisDisplayModel = (row: any): any => {
     seo_audit: row.seo_audit,
     sitemap_analysis: row.crawl_result?.sitemap_analysis,
     recommended_settings: row.recommended_settings,
+    website_url: row.website_url,
 
     // Extract guidelines from style_guidelines object
     guidelines: row.style_guidelines?.guidelines,
@@ -154,8 +160,10 @@ export const loadExistingAnalysis = async (analysisId: number, website: string):
     const result = response.data;
     
     if (result.success && result.analysis) {
-      const extractedDomain = extractDomainName(website);
       const comprehensiveAnalysis = buildAnalysisDisplayModel(result.analysis);
+      const extractedDomain = extractDomainName(
+        comprehensiveAnalysis.website_url || website
+      );
       
       return {
         success: true,

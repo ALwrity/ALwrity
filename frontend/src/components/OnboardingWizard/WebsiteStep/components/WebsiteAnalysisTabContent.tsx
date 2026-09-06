@@ -18,6 +18,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import LightbulbOutlinedIcon from '@mui/icons-material/LightbulbOutlined';
 import { extractDomainName } from '../utils/websiteUtils';
+import { formatLastAnalyzedLabel } from '../utils/websiteAnalysisDisplay';
 // Extracted components
 import { StyleAnalysis } from './UnifiedAnalysisContainer/types';
 import UnifiedAnalysisContainer from './UnifiedAnalysisContainer/index';
@@ -144,7 +145,7 @@ const WebsiteAnalysisTabContent: React.FC<WebsiteAnalysisTabContentProps> = ({
                 Previous analysis found for <strong>{extractDomainName(website)}</strong>
               </Typography>
               <Typography variant="caption" sx={{ color: '#475569' }}>
-                Completed on {existingAnalysis.analysis_date ? new Date(existingAnalysis.analysis_date).toLocaleDateString() : 'a previous session'}
+                {formatLastAnalyzedLabel(existingAnalysis)}
               </Typography>
             </Box>
           </Box>

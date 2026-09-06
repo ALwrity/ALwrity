@@ -23,6 +23,10 @@ export interface WebsiteStepProps {
   email?: string;
   backgroundTasks?: BackgroundTasksState | null;
   onViewBackgroundResults?: (taskKey: string) => void;
+  onLiveWebsiteSessionChange?: (payload: {
+    website: string;
+    analysis: any;
+  }) => void;
   success?: string | null;
   setSuccess?: (msg: string | null) => void;
   /** True when Connect Platforms step is officially completed in the wizard. */
@@ -44,6 +48,8 @@ export interface AnalysisProgress {
 export interface ExistingAnalysis {
   exists: boolean;
   analysis_date?: string;
+  updated_at?: string;
+  last_analyzed_at?: string;
   analysis_id?: number;
   summary?: {
     writing_style?: any;
