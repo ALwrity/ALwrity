@@ -37,7 +37,7 @@ describe("YouTube Comment Reply Assistant parent moderate", () => {
     expect(screen.queryByRole("button", { name: /^Dislike$/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Heart$/i })).toBeNull();
     expect(screen.getAllByRole("button", { name: "Draft with AI" })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "Send (HITL)" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^Reply$/ })).toHaveLength(1);
   });
 
   it("Hide comment asks for confirmation and Cancel does not call the API", async () => {
@@ -62,7 +62,7 @@ describe("YouTube Comment Reply Assistant parent moderate", () => {
     expect(mockedStudioApi.setCommentModerationStatus).not.toHaveBeenCalled();
     expect(mockedStudioApi.deleteCommentReply).not.toHaveBeenCalled();
     expect(screen.getAllByRole("button", { name: "Draft with AI" })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "Send (HITL)" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^Reply$/ })).toHaveLength(1);
   });
 
   it("confirm Hide comment drops the parent without delete or send", async () => {

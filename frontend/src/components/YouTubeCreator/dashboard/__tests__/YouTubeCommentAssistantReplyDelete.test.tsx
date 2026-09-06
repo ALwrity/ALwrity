@@ -39,7 +39,7 @@ describe("YouTube Comment Reply Assistant reply delete", () => {
     expect(screen.queryByText("Delete this reply?")).toBeNull();
     expect(mockedStudioApi.deleteCommentReply).not.toHaveBeenCalled();
     expect(screen.getAllByRole("button", { name: "Draft with AI" })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "Send (HITL)" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^Reply$/ })).toHaveLength(1);
   });
 
   it("confirm Delete removes the reply without sending a parent reply", async () => {
@@ -67,7 +67,7 @@ describe("YouTube Comment Reply Assistant reply delete", () => {
     expect(mockedStudioApi.getCommentInbox.mock.calls.length).toBe(1);
     expect(screen.getByText("Loved the intro")).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "Draft with AI" })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "Send (HITL)" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /^Reply$/ })).toHaveLength(1);
     expect(screen.queryByText("Replies")).toBeNull();
   });
 

@@ -108,7 +108,7 @@ describe("YouTube Comment Reply Assistant draft and send", () => {
     expect(screen.queryByText(/status code 502/i)).toBeNull();
   });
 
-  it("Send (HITL) posts the edited draft under the parent comment id", async () => {
+  it("Reply posts the edited draft under the parent comment id", async () => {
     mockedStudioApi.sendCommentReply.mockResolvedValueOnce({
       success: true,
       comment_id: "reply-9",
@@ -117,12 +117,19 @@ describe("YouTube Comment Reply Assistant draft and send", () => {
     renderAssistant();
     await waitFor(() => expect(screen.getByText("Sam")).toBeTruthy());
 
-    const send = screen.getByRole("button", { name: "Send (HITL)" });
+    const send = screen.getByRole("button", { name: /^Reply$/ });
     expect(send).toHaveProperty("disabled", true);
+    expect(send.className).toBe("yt-comment-reply-btn");
+    expect(send.className).not.toContain("yt-hub-connect-btn");
+    expect(send.closest("[title]")).toHaveAttribute(
+      "title",
+      "reply comment on youtube",
+    );
 
     fireEvent.change(screen.getByPlaceholderText("Draft reply…"), {
       target: { value: "Thanks for watching" },
     });
+    expect(send).toHaveProperty("disabled", false);
     fireEvent.click(send);
 
     await waitFor(() => {
@@ -137,7 +144,7 @@ describe("YouTube Comment Reply Assistant draft and send", () => {
     expect(mockedStudioApi.getCommentInbox.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("shows Send (HITL) unsuccessful insert message from the API", async () => {
+  it("shows Reply unsuccessful insert message from the API", async () => {
     mockedStudioApi.sendCommentReply.mockResolvedValueOnce({
       success: false,
       error_code: "operationNotSupported",
@@ -148,7 +155,7 @@ describe("YouTube Comment Reply Assistant draft and send", () => {
     fireEvent.change(screen.getByPlaceholderText("Draft reply…"), {
       target: { value: "Thanks for watching" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Send (HITL)" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Reply$/ }));
 
     await waitFor(() => {
       expect(
@@ -167,7 +174,7 @@ describe("YouTube Comment Reply Assistant draft and send", () => {
     fireEvent.change(screen.getByPlaceholderText("Draft reply…"), {
       target: { value: "Thanks for watching" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Send (HITL)" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Reply$/ }));
 
     await waitFor(() => {
       expect(screen.getByText(/Could not send that reply/i)).toBeTruthy();

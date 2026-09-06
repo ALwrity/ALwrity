@@ -31,6 +31,7 @@ export const YouTubeCommentInboxRow: React.FC<{
   const canCancelDraft =
     Boolean(commentId) && (busyAction === "draft" || Boolean(draftText.trim()));
   const canHideUser = comment.can_hide_user !== false;
+  const sendDisabled = busy || !draftText.trim() || !commentId;
   return (
     <YouTubeCommentParentModerate
       commentId={commentId}
@@ -82,14 +83,16 @@ export const YouTubeCommentInboxRow: React.FC<{
             >
               Draft with AI
             </button>
-            <button
-              type="button"
-              className="yt-rail-btn yt-rail-btn--primary"
-              disabled={busy || !draftText.trim() || !commentId}
-              onClick={onSend}
-            >
-              Send (HITL)
-            </button>
+            <span title="reply comment on youtube">
+              <button
+                type="button"
+                className="yt-comment-reply-btn"
+                disabled={sendDisabled}
+                onClick={onSend}
+              >
+                Reply
+              </button>
+            </span>
           </div>
         </div>
       )}

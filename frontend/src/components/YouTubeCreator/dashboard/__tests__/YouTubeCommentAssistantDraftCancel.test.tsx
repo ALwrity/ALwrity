@@ -40,7 +40,7 @@ describe("YouTube Comment Reply Assistant draft cancel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(screen.getByPlaceholderText("Draft reply…")).toHaveValue("");
-    expect(screen.getByRole("button", { name: "Send (HITL)" })).toHaveProperty(
+    expect(screen.getByRole("button", { name: /^Reply$/ })).toHaveProperty(
       "disabled",
       true,
     );
@@ -129,7 +129,7 @@ describe("YouTube Comment Reply Assistant draft cancel", () => {
     fireEvent.change(screen.getByPlaceholderText("Draft reply…"), {
       target: { value: "Thanks for watching" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Send (HITL)" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Reply$/ }));
 
     expect(screen.getByRole("button", { name: "Cancel" })).toHaveProperty("disabled", true);
 
