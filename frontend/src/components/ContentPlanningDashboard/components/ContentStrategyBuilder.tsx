@@ -1,3 +1,4 @@
+import { devLog } from '../../../utils/devLogger';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -28,6 +29,8 @@ import { useAutoPopulation } from './ContentStrategyBuilder/hooks/useAutoPopulat
 import { useModalManagement } from './ContentStrategyBuilder/hooks/useModalManagement';
 // Removed: useAIRefresh (autofill unified into store's autofillStrategyFields)
 import { useEventHandlers } from './ContentStrategyBuilder/hooks/useEventHandlers';
+import { canProceedWithCreation } from './ContentStrategyBuilder/utils/reviewGate';
+import { getCategoryName } from './ContentStrategyBuilder/utils/categoryHelpers';
 import { useStrategyCreation } from './ContentStrategyBuilder/hooks/useStrategyCreation';
 
 // CopilotKit disabled (Phase 5 follow-up): actions preserved for future
@@ -118,6 +121,9 @@ const ContentStrategyBuilder: React.FC = () => {
     setTransparencyModalOpen,
     setTransparencyGenerationProgress: setStoreGenerationProgress,
     setCurrentPhase,
+    // Phase E #22: the backend's real step (1..8) for the modal's phase label.
+    generationStep: storeGenerationStep,
+    setGenerationStep,
     setEducationalContent: setStoreEducationalContent,
     addTransparencyMessage,
     clearTransparencyMessages,
@@ -253,7 +259,7 @@ const ContentStrategyBuilder: React.FC = () => {
   useEffect(() => {
     const savedModalState = sessionStorage.getItem('showEnterpriseModal');
     if (savedModalState === 'true') {
-      console.log('🎯 Restoring enterprise modal state from sessionStorage');
+      devLog.log('🎯 Restoring enterprise modal state from sessionStorage');
       setShowEnterpriseModal(true);
     }
   }, []);
@@ -273,8 +279,17 @@ const ContentStrategyBuilder: React.FC = () => {
     };
   }, [showEnterpriseModal]);
 
+  // Phase C #19/#43: which operation the current error banner belongs to, so
+  // the ErrorAlert Retry button re-runs the RIGHT operation (generation
+  // failures get a generation retry, autofill failures keep autofill retry).
+  const [errorSource, setErrorSource] = useState<'autofill' | 'generation'>('autofill');
+  const handleGenerationError = (msg: string) => {
+    setErrorSource('generation');
+    setError(msg);
+  };
+
   // Use strategy creation hook first
-  const { originalHandleCreateStrategy, handleSaveStrategy } = useStrategyCreation({
+  const { originalHandleCreateStrategy, handleSaveStrategy, cancelGeneration } = useStrategyCreation({
     formData,
     error,
     currentStrategy,
@@ -289,7 +304,10 @@ const ContentStrategyBuilder: React.FC = () => {
     getCompletionStats,
     generateAIRecommendations: (strategyId: string) => generateAIRecommendations(strategyId),
     createEnhancedStrategy,
-    contentPlanningApi
+    contentPlanningApi,
+    // Phase E #22: track the backend's real step for the modal's phase label.
+    setCurrentStep: setGenerationStep,
+    onGenerationError: handleGenerationError
   });
 
   const {
@@ -341,12 +359,6 @@ const ContentStrategyBuilder: React.FC = () => {
         block: 'start' 
       });
     }
-  };
-
-  // Handle continue with present values
-  const handleContinueWithPresent = () => {
-    console.log('🎯 Continuing with present autofilled values');
-    // This will show the next button and allow user to proceed
   };
 
   // Determine if we have autofill data
@@ -435,7 +447,7 @@ const ContentStrategyBuilder: React.FC = () => {
       // Only log when the data signature actually changes
       if (signature !== lastLoggedSignatureRef.current) {
         lastLoggedSignatureRef.current = signature;
-        console.log('📋 StrategyBuilder: Autofill data status:', {
+        devLog.log('📋 StrategyBuilder: Autofill data status:', {
           hasAutofillData,
           autoPopulatedFieldsCount,
           dataSourcesCount,
@@ -453,42 +465,58 @@ const ContentStrategyBuilder: React.FC = () => {
 
   // Enhanced handleCreateStrategy to show enterprise modal
   const handleCreateStrategy = () => {
-    console.log('🎯 handleCreateStrategy called');
-    console.log('🎯 completionStats.category_completion:', completionStats.category_completion);
-    console.log('🎯 reviewedCategories:', reviewedCategories);
-    console.log('🎯 Current showEnterpriseModal state:', showEnterpriseModal);
-    console.log('🎯 Current aiGenerating state:', aiGenerating);
-    
+    // Phase I #32: value-free summaries only — categories COUNTED, never
+    // dumped (the review-gate banner already names the missing ones above).
+    devLog.log('🎯 handleCreateStrategy called');
+    devLog.log(`🎯 ${Object.keys(completionStats.category_completion || {}).length} completion categories tracked`);
+    devLog.log(`🎯 ${reviewedCategories.size} of ${CANONICAL_CATEGORIES.length} categories reviewed`);
+    devLog.log('🎯 Current showEnterpriseModal state:', showEnterpriseModal);
+    devLog.log('🎯 Current aiGenerating state:', aiGenerating);
+
     // Prevent multiple calls
     if (aiGenerating) {
-      console.log('🎯 Already generating, skipping duplicate call');
+      devLog.log('🎯 Already generating, skipping duplicate call');
       return;
     }
-    
-    // Check if all categories are reviewed
-    const allCategoriesReviewed = Object.keys(completionStats.category_completion).every(
-      category => Array.from(reviewedCategories).includes(category)
+
+    // Review gate (#40): block creation until every canonical category is
+    // reviewed. Missing review surfaces an actionable error and scrolls to
+    // the review section instead of silently creating an ungrounded strategy.
+    const { canProceed, unreviewed } = canProceedWithCreation(
+      reviewedCategories,
+      CANONICAL_CATEGORIES
     );
+    devLog.log('🎯 reviewGate.canProceed:', canProceed);
 
-    console.log('🎯 allCategoriesReviewed:', allCategoriesReviewed);
-
-    if (allCategoriesReviewed) {
-      // Show enterprise modal instead of creating strategy immediately
-      console.log('🎯 Showing enterprise modal - setting to true');
-      setShowEnterpriseModal(true);
-      
-      // Add debugging to confirm modal state change
-      setTimeout(() => {
-        console.log('🎯 Enterprise modal state after setShowEnterpriseModal(true):', showEnterpriseModal);
-      }, 0);
-      
-      // Return early to prevent calling originalHandleCreateStrategy
+    if (!canProceed) {
+      devLog.log(`🎯 Blocking creation - ${unreviewed.length} categories unreviewed`);
+      const missing = unreviewed.map(getCategoryName).join(', ');
+      setError(`Please review all sections before generating your strategy. Unreviewed: ${missing}`);
+      handleScrollToReview();
       return;
-    } else {
-      // If not all categories reviewed, proceed with original logic
-      console.log('🎯 Not all categories reviewed, proceeding with original logic');
-      originalHandleCreateStrategy();
     }
+
+    // Show enterprise modal instead of creating strategy immediately
+    devLog.log('🎯 Showing enterprise modal - setting to true');
+    setShowEnterpriseModal(true);
+
+    // Return early to prevent calling originalHandleCreateStrategy
+    return;
+  };
+
+  // Phase C #43: re-run generation after a failure. Clears the error banner
+  // and restores the autofill default so a later autofill failure shows the
+  // right retry action again.
+  const retryGeneration = () => {
+    setError(null);
+    setErrorSource('autofill');
+    handleCreateStrategy();
+  };
+
+  // Phase C #43: autofill failures keep their own retry action.
+  const retryAutofill = () => {
+    setErrorSource('autofill');
+    autofillStrategyFields();
   };
 
 
@@ -499,7 +527,7 @@ const ContentStrategyBuilder: React.FC = () => {
   useEffect(() => {
     // Only set default category once when component mounts and we have categories
     if (hasSetDefaultCategory.current) {
-      console.log('🔍 Default category useEffect: SKIPPED - already set default');
+      devLog.log('🔍 Default category useEffect: SKIPPED - already set default');
       return;
     }
     
@@ -514,7 +542,7 @@ const ContentStrategyBuilder: React.FC = () => {
   useEffect(() => {
     // If modal was unexpectedly closed, log it
     if (!showEnterpriseModal && aiGenerating) {
-      console.warn('Enterprise modal closed while AI is generating');
+      devLog.warn('Enterprise modal closed while AI is generating');
     }
   }, [showEnterpriseModal, aiGenerating]);
 
@@ -570,7 +598,7 @@ const ContentStrategyBuilder: React.FC = () => {
       {/* Error Alert */}
       <ErrorAlert
         error={error}
-        onRetry={() => autofillStrategyFields()}
+        onRetry={errorSource === 'generation' ? retryGeneration : retryAutofill}
         onShowDataSourceTransparency={() => setShowDataSourceTransparency(true)}
       />
 
@@ -636,6 +664,9 @@ const ContentStrategyBuilder: React.FC = () => {
                 reviewedCategories={reviewedCategories}
                 isMarkingReviewed={isMarkingReviewed}
                 showEducationalInfo={showEducationalInfo}
+                // Phase E #42: optimistic UI — fields go read-only while AI
+                // generates so users cannot edit beneath a running generation.
+                disabledInputs={aiGenerating}
                 STRATEGIC_INPUT_FIELDS={STRATEGIC_INPUT_FIELDS}
                 onUpdateFormField={updateFormField}
                 onValidateFormField={validateFormField}
@@ -643,7 +674,7 @@ const ContentStrategyBuilder: React.FC = () => {
                 onViewDataSource={(fieldId) => {
                   // If a specific field is provided, show field-specific data source info
                   if (fieldId) {
-                    console.log('🎯 Viewing data source for field:', fieldId);
+                    devLog.log('🎯 Viewing data source for field:', fieldId);
                     // For now, just open the general data source transparency modal
                     // In the future, this could open a field-specific modal
                     setShowDataSourceTransparency(true);
@@ -697,6 +728,10 @@ const ContentStrategyBuilder: React.FC = () => {
       <EducationalModal
         open={showEducationalModal}
         onClose={() => setShowEducationalModal(false)}
+        // Phase E #22: the backend's real step (1..8) drives the phase label.
+        currentStep={storeGenerationStep}
+        // Phase E #41: Cancel aborts the in-flight polling loop.
+        onCancel={cancelGeneration}
                 educationalContent={storeEducationalContent}      
         generationProgress={storeGenerationProgress}
         onReviewStrategy={() => {

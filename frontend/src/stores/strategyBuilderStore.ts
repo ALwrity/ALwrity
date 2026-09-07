@@ -196,6 +196,13 @@ interface StrategyBuilderStore {
   updateFormField: (fieldId: string, value: any) => void;
   validateFormField: (fieldId: string) => boolean;
   validateAllFields: () => boolean;
+
+  /**
+   * Phase C #24: labels of the required fields that are still empty, so
+   * validation errors can tell the user exactly WHAT to fill in instead of
+   * a generic "fill required fields" banner.
+   */
+  getMissingRequiredFields: () => string[];
   resetForm: () => void;
   setFormData: (data: Record<string, any>) => void;
   setFormErrors: (errors: Record<string, string>) => void;
@@ -548,6 +555,11 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
   currentStrategy: null,
   
   // Form State
+  // Phase D #13: formData must NEVER carry a strategy `id` — this object
+  // holds the 30 strategy-builder form inputs only. A DB strategy row's
+  // `id` belongs to `strategies`/`currentStrategy`; injecting it here made
+  // submissions ship a meaningless form-state id (and once confused the
+  // console with a misleading "FormData ID" log).
   formData: {},
   formErrors: {},
   
@@ -667,13 +679,28 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
     set({ formErrors: errors });
     return allValid;
   },
+
+  getMissingRequiredFields: () => {
+    const formData = get().formData;
+    return STRATEGIC_INPUT_FIELDS
+      .filter(field =>
+        field.required &&
+        (!formData[field.id] || (Array.isArray(formData[field.id]) && formData[field.id].length === 0))
+      )
+      .map(field => field.label);
+  },
   
   resetForm: () => {
     set({ formData: {}, formErrors: {} });
   },
   
   setFormData: (data) => {
-    set({ formData: data });
+    // #13: strip a stale/injected `id` defensively — formData holds form
+    // INPUTS only; a strategy id arriving here (e.g. a caller spreading a
+    // DB row) is meaningless and must not persist (localStorage rehydration
+    // would keep it alive across sessions).
+    const { id: _ignoredFormStateId, ...sanitized } = data;
+    set({ formData: sanitized });
   },
   
   setFormErrors: (errors) => {

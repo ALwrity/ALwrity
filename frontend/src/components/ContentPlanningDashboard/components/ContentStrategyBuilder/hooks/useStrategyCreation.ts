@@ -16,6 +16,10 @@ interface UseStrategyCreationProps {
   generateAIRecommendations: (strategyId: string) => Promise<void>;
   createEnhancedStrategy: (data: any) => Promise<any>;
   contentPlanningApi: any;
+  /** Phase E #22: tracks the backend's real step on every poll. */
+  setCurrentStep?: (step: number) => void;
+  /** Phase C #19/#43: forwarded to the ActionButtons hook for the retry CTA. */
+  onGenerationError?: (message: string) => void;
 }
 
 export const useStrategyCreation = ({
@@ -33,10 +37,12 @@ export const useStrategyCreation = ({
   getCompletionStats,
   generateAIRecommendations,
   createEnhancedStrategy,
-  contentPlanningApi
+  contentPlanningApi,
+  setCurrentStep,
+  onGenerationError
 }: UseStrategyCreationProps) => {
   // Use ActionButtons business logic hook
-  const { handleCreateStrategy: originalHandleCreateStrategy, handleSaveStrategy } = useActionButtonsBusinessLogic({
+  const { handleCreateStrategy: originalHandleCreateStrategy, handleSaveStrategy, cancelGeneration } = useActionButtonsBusinessLogic({
     formData,
     error,
     currentStrategy,
@@ -51,11 +57,19 @@ export const useStrategyCreation = ({
     getCompletionStats,
     generateAIRecommendations,
     createEnhancedStrategy,
-    contentPlanningApi
+    contentPlanningApi,
+    setCurrentStep,
+    onGenerationError
   });
 
   return {
-    originalHandleCreateStrategy: () => originalHandleCreateStrategy(),
-    handleSaveStrategy: () => handleSaveStrategy()
+    // #29: return the hook's functions directly (NOT wrapped in arrows) so
+    // their references stay stable across renders. Wrapping created a fresh
+    // function identity every render, which broke downstream ref/effect
+    // deps (e.g. useModalManagement's originalHandleCreateStrategyRef sync).
+    originalHandleCreateStrategy,
+    handleSaveStrategy,
+    // Phase E #41: the modal's Cancel button aborts the in-flight poll.
+    cancelGeneration
   };
 };

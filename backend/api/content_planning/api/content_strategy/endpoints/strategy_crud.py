@@ -27,7 +27,8 @@ from models.enhanced_strategy_models import EnhancedContentStrategy
 from ....utils.error_handlers import ContentPlanningErrorHandler
 from ....utils.response_builders import ResponseBuilder
 from ....utils.constants import ERROR_MESSAGES, SUCCESS_MESSAGES
-from ....utils.data_parsers import parse_strategy_data
+from ....utils.data_parsers import parse_strategy_data, validate_strategy_fields
+from ....utils.rate_limiter import enforce_rate_limit, CREATE_STRATEGY_LIMITS
 
 # Fields on EnhancedContentStrategy that callers are allowed to set
 # via PUT /strategies/{id}. The previous setattr loop accepted any
@@ -80,12 +81,28 @@ async def create_enhanced_strategy(
                 status_code=401,
                 detail="Invalid user ID in authentication token"
             )
-        
+
+        # Phase G #33: server-side rate limit — the client-side aiGenerating
+        # guard is trivially bypassable via devtools.
+        enforce_rate_limit('strategy_create', clerk_user_id, CREATE_STRATEGY_LIMITS)
+
         logger.info(f"Creating enhanced strategy: {strategy_data.get('name', 'Unknown')} for user: {clerk_user_id}")
-        
+
         # Override user_id from request body with authenticated user_id (security)
         strategy_data['user_id'] = clerk_user_id
-        
+
+        # Phase G #31: same mass-assignment protection as PUT — drop every
+        # key outside the whitelist (id, created_at, arbitrary client state,
+        # spoofed ownership values) and surface what was dropped in warnings.
+        allowed_create_fields = ALLOWED_UPDATE_FIELDS | {'user_id'}
+        dropped_fields = sorted(
+            key for key in strategy_data if key not in allowed_create_fields
+        )
+        strategy_data = {
+            key: value for key, value in strategy_data.items()
+            if key in allowed_create_fields
+        }
+
         # Validate required fields
         required_fields = ['name']
         for field in required_fields:
@@ -94,9 +111,30 @@ async def create_enhanced_strategy(
                     status_code=400,
                     detail=f"Missing required field: {field}"
                 )
-        
+
+        # Phase C #5: type-validate the 30 canonical strategy-builder fields
+        # BEFORE coercion, so structurally wrong payloads fail fast with a 422
+        # naming the offending fields instead of silently saving nulls.
+        validation_errors, validation_warnings = validate_strategy_fields(strategy_data)
+        if validation_errors:
+            raise HTTPException(
+                status_code=422,
+                detail="Invalid strategy fields: " + "; ".join(validation_errors),
+            )
+
         # Parse and validate strategy data using shared utilities
         cleaned_data, warnings = parse_strategy_data(strategy_data)
+
+        # Surface field-level validation warnings (coercions, unknown keys)
+        warnings.update(validation_warnings)
+
+        # Phase G #31: report the whitelist-dropped keys so clients can see
+        # what was rejected instead of it disappearing silently.
+        if dropped_fields:
+            warnings.setdefault(
+                'unknown_fields',
+                'Ignored unrecognized fields: ' + ', '.join(dropped_fields),
+            )
         
         # Log warnings if any
         if warnings:
@@ -126,7 +164,11 @@ async def create_enhanced_strategy(
         raise
     except Exception as e:
         logger.error(f"Error creating enhanced strategy: {str(e)}")
-        return ContentPlanningErrorHandler.handle_general_error(e, "create_enhanced_strategy")
+        # Phase C #20: RAISE the HTTPException — returning it made FastAPI
+        # serialize the exception object as a 200 response with a
+        # {status_code, detail, headers} body, a shape no client could
+        # interpret as an error.
+        raise ContentPlanningErrorHandler.handle_general_error(e, "create_enhanced_strategy")
 
 @router.get("/")
 async def get_enhanced_strategies(
@@ -168,7 +210,7 @@ async def get_enhanced_strategies(
         
     except Exception as e:
         logger.error(f"Error getting enhanced strategies: {str(e)}")
-        return ContentPlanningErrorHandler.handle_general_error(e, "get_enhanced_strategies")
+        raise ContentPlanningErrorHandler.handle_general_error(e, "get_enhanced_strategies")
 
 @router.get("/{strategy_id}")
 async def get_enhanced_strategy_by_id(
@@ -219,7 +261,7 @@ async def get_enhanced_strategy_by_id(
         raise
     except Exception as e:
         logger.error(f"Error getting enhanced strategy by ID: {str(e)}")
-        return ContentPlanningErrorHandler.handle_general_error(e, "get_enhanced_strategy_by_id")
+        raise ContentPlanningErrorHandler.handle_general_error(e, "get_enhanced_strategy_by_id")
 
 @router.put("/{strategy_id}")
 async def update_enhanced_strategy(
@@ -289,7 +331,7 @@ async def update_enhanced_strategy(
         raise
     except Exception as e:
         logger.error(f"Error updating enhanced strategy: {str(e)}")
-        return ContentPlanningErrorHandler.handle_general_error(e, "update_enhanced_strategy")
+        raise ContentPlanningErrorHandler.handle_general_error(e, "update_enhanced_strategy")
 
 @router.delete("/{strategy_id}")
 async def delete_enhanced_strategy(
@@ -343,4 +385,5 @@ async def delete_enhanced_strategy(
         raise
     except Exception as e:
         logger.error(f"Error deleting enhanced strategy: {str(e)}")
-        return ContentPlanningErrorHandler.handle_general_error(e, "delete_enhanced_strategy") 
+        raise ContentPlanningErrorHandler.handle_general_error(e, "delete_enhanced_strategy") 
+
