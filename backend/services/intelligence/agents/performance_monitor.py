@@ -99,6 +99,17 @@ class OptimizationRecommendation:
             expires = datetime.utcnow().timestamp() + (7 * 24 * 60 * 60)
             self.expires_at = datetime.fromtimestamp(expires).isoformat()
 
+
+@dataclass
+class TierPolicyConfig:
+    """Structured policy for anomaly tiers and remediation controls"""
+    tier: int
+    trigger_metrics: List[str]
+    thresholds: Dict[str, float]
+    max_iterations: int
+    lock_criteria: Dict[str, Any]
+
+
 class AgentPerformanceMonitor:
     """Main performance monitoring system for agents"""
     
@@ -108,6 +119,32 @@ class AgentPerformanceMonitor:
         self.agent_snapshots: Dict[str, AgentPerformanceSnapshot] = {}
         self.recommendations: List[OptimizationRecommendation] = []
         self.performance_history: deque = deque(maxlen=1000)  # Keep last 1000 data points
+        self.systemic_alerts: List[Dict[str, Any]] = []
+
+        # Structured tier policy config
+        self.tier_policy_config: Dict[int, TierPolicyConfig] = {
+            1: TierPolicyConfig(
+                tier=1,
+                trigger_metrics=["success_rate", "efficiency_score", "response_time"],
+                thresholds={"success_rate": 0.80, "efficiency_score": 0.65, "response_time": 45.0},
+                max_iterations=3,
+                lock_criteria={"min_confidence": 0.85, "consecutive_failures": 6}
+            ),
+            2: TierPolicyConfig(
+                tier=2,
+                trigger_metrics=["success_rate", "efficiency_score", "response_time", "market_impact"],
+                thresholds={"success_rate": 0.70, "efficiency_score": 0.50, "response_time": 60.0, "market_impact": 0.35},
+                max_iterations=2,
+                lock_criteria={"min_confidence": 0.75, "consecutive_failures": 4}
+            ),
+            3: TierPolicyConfig(
+                tier=3,
+                trigger_metrics=["success_rate", "efficiency_score", "response_time", "market_impact"],
+                thresholds={"success_rate": 0.55, "efficiency_score": 0.35, "response_time": 90.0, "market_impact": 0.25},
+                max_iterations=1,
+                lock_criteria={"min_confidence": 0.65, "consecutive_failures": 3}
+            )
+        }
         
         # Performance thresholds and targets
         self.performance_targets = {
@@ -513,6 +550,54 @@ class AgentPerformanceMonitor:
         }
         return priority_weights.get(priority, 0)
     
+    def _build_recommended_action_payload(self, agent_id: str, snapshot: AgentPerformanceSnapshot) -> Dict[str, Any]:
+        """Build recommended action payload including tier and confidence."""
+        tier = 1
+        if (snapshot.success_rate <= self.tier_policy_config[3].thresholds["success_rate"] or
+            snapshot.efficiency_score <= self.tier_policy_config[3].thresholds["efficiency_score"] or
+            snapshot.average_response_time >= self.tier_policy_config[3].thresholds["response_time"] or
+            snapshot.market_impact_score <= self.tier_policy_config[3].thresholds["market_impact"]):
+            tier = 3
+        elif (snapshot.success_rate <= self.tier_policy_config[2].thresholds["success_rate"] or
+              snapshot.efficiency_score <= self.tier_policy_config[2].thresholds["efficiency_score"] or
+              snapshot.average_response_time >= self.tier_policy_config[2].thresholds["response_time"] or
+              snapshot.market_impact_score <= self.tier_policy_config[2].thresholds["market_impact"]):
+            tier = 2
+
+        confidence = round(max(0.0, min(1.0, 1.0 - abs(0.75 - self._calculate_health_score(snapshot)))) , 2)
+        policy = self.tier_policy_config[tier]
+
+        return {
+            "agent_id": agent_id,
+            "tier": tier,
+            "confidence": confidence,
+            "max_iterations": policy.max_iterations,
+            "lock_criteria": policy.lock_criteria,
+            "trigger_metrics": policy.trigger_metrics
+        }
+
+    def _route_tier3_systemic_alert(self, action_payload: Dict[str, Any], alerts: List[Dict[str, Any]]) -> None:
+        """Route Tier 3 systemic anomalies to alerting subsystem with diagnostic brief."""
+        diagnostic_brief = {
+            "type": "systemic_anomaly",
+            "severity": "critical",
+            "tier": 3,
+            "confidence": action_payload.get("confidence", 0.0),
+            "agent_id": action_payload.get("agent_id"),
+            "timestamp": datetime.utcnow().isoformat(),
+            "diagnostic_brief": {
+                "trigger_metrics": action_payload.get("trigger_metrics", []),
+                "alerts": alerts,
+                "max_iterations": action_payload.get("max_iterations"),
+                "lock_criteria": action_payload.get("lock_criteria", {})
+            }
+        }
+        self.systemic_alerts.append(diagnostic_brief)
+        if len(self.systemic_alerts) > 200:
+            self.systemic_alerts = self.systemic_alerts[-200:]
+        logger.critical(f"[ALERTING_SUBSYSTEM] Tier 3 systemic anomaly routed: {json.dumps(diagnostic_brief)}")
+
+
     async def get_performance_alerts(self, agent_id: str) -> List[Dict[str, Any]]:
         """Get performance alerts for an agent"""
         alerts = []
@@ -574,6 +659,13 @@ class AgentPerformanceMonitor:
                     "timestamp": datetime.utcnow().isoformat()
                 })
             
+            action_payload = self._build_recommended_action_payload(agent_id, snapshot)
+            if action_payload["tier"] == 3:
+                self._route_tier3_systemic_alert(action_payload, alerts)
+
+            for alert in alerts:
+                alert["recommended_action"] = action_payload
+
             return alerts
             
         except Exception as e:
