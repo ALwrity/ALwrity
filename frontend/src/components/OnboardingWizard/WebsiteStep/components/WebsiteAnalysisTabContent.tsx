@@ -10,6 +10,7 @@ import {
   Tab,
   Card,
   CardContent,
+  CircularProgress,
 } from '@mui/material';
 import HistoryIcon from '@mui/icons-material/History';
 import LinkIcon from '@mui/icons-material/Link';
@@ -63,6 +64,8 @@ interface WebsiteAnalysisTabContentProps {
   viewedTabs: Record<number, boolean>;
   setViewedTabs: React.Dispatch<React.SetStateAction<Record<number, boolean>>>;
   dashboardFirstMode?: boolean;
+  showInlineUrlBar?: boolean;
+  showDashboardLoadingShell?: boolean;
   suppressDashboardScroll?: boolean;
 }
 
@@ -90,6 +93,8 @@ const WebsiteAnalysisTabContent: React.FC<WebsiteAnalysisTabContentProps> = ({
   viewedTabs,
   setViewedTabs,
   dashboardFirstMode = false,
+  showInlineUrlBar = true,
+  showDashboardLoadingShell = false,
   suppressDashboardScroll = false,
 }) => {
   const analyticsPlatforms = ['gsc', 'bing'];
@@ -110,7 +115,7 @@ const WebsiteAnalysisTabContent: React.FC<WebsiteAnalysisTabContentProps> = ({
 
   const setupSection = (
     <Box data-testid="website-setup-section">
-      {!dashboardFirstMode && (
+      {showInlineUrlBar && (
         <WebsiteUrlActionBar
           website={website}
           setWebsite={setWebsite}
@@ -366,9 +371,30 @@ const WebsiteAnalysisTabContent: React.FC<WebsiteAnalysisTabContentProps> = ({
     </Box>
   ) : null;
 
+  const dashboardLoadingShell = showDashboardLoadingShell ? (
+    <Box
+      data-testid="unified-folder-tab-dashboard-loading"
+      sx={{
+        ...folderTabDashboardSpacingSx(true),
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 1.5,
+        minHeight: 220,
+        py: 4,
+      }}
+    >
+      <CircularProgress size={32} sx={{ color: '#6366F1' }} />
+      <Typography variant="body2" sx={{ color: '#64748B', fontWeight: 500 }}>
+        Loading your brand dashboard…
+      </Typography>
+    </Box>
+  ) : null;
+
   return (
     <>
-      {dashboardFirstMode && dashboardSection}
+      {dashboardFirstMode && (dashboardSection || dashboardLoadingShell)}
       {setupSection}
       {!dashboardFirstMode && dashboardSection}
 

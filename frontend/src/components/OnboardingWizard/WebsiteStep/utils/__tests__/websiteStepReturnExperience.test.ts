@@ -3,6 +3,7 @@ import {
   ALL_FOLDER_TABS_VIEWED,
   isConnectStepFullyUnlocked,
   isWebsiteStepValidForContinue,
+  resolveConnectStepPresentation,
   resolveViewedTabsForReturn,
   shouldShowFolderTabExploreHint,
 } from '../websiteStepReturnExperience';
@@ -75,5 +76,54 @@ describe('websiteStepReturnExperience', () => {
   it('hides explore hint when all folder tabs are marked viewed', () => {
     expect(shouldShowFolderTabExploreHint({ 0: true, 1: true, 2: true })).toBe(false);
     expect(shouldShowFolderTabExploreHint({ 0: true, 1: false, 2: false })).toBe(true);
+  });
+
+  it('shows URL input during start-fresh session', () => {
+    expect(
+      resolveConnectStepPresentation({
+        hasWebsiteAnalysis: false,
+        isConnectStepCompleted: true,
+        isStartFreshSession: true,
+        isHydratingAnalysis: false,
+      })
+    ).toEqual({
+      showWhereShouldIBegin: true,
+      dashboardFirstMode: false,
+      showInlineUrlBar: true,
+      showUrlHoverPanel: false,
+      showDashboardLoadingShell: false,
+    });
+  });
+
+  it('hides Where should I begin while returning user hydrates analysis', () => {
+    expect(
+      resolveConnectStepPresentation({
+        hasWebsiteAnalysis: false,
+        isConnectStepCompleted: true,
+        isStartFreshSession: false,
+        isHydratingAnalysis: true,
+      })
+    ).toMatchObject({
+      showWhereShouldIBegin: false,
+      dashboardFirstMode: true,
+      showDashboardLoadingShell: true,
+      showUrlHoverPanel: false,
+    });
+  });
+
+  it('uses dashboard-first layout with hover URL panel when analysis exists', () => {
+    expect(
+      resolveConnectStepPresentation({
+        hasWebsiteAnalysis: true,
+        isConnectStepCompleted: true,
+        isStartFreshSession: false,
+        isHydratingAnalysis: false,
+      })
+    ).toMatchObject({
+      showWhereShouldIBegin: false,
+      dashboardFirstMode: true,
+      showInlineUrlBar: false,
+      showUrlHoverPanel: true,
+    });
   });
 });

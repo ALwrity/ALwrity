@@ -21,37 +21,36 @@ class TestBackendStepCount:
     @staticmethod
     def _build_steps_data(completion_data, status):
         """Replicate the step-building logic from endpoints_core.py."""
+        from api.onboarding_utils.onboarding_init_step_status import (
+            build_step_status_entry,
+            has_persona_data,
+            has_website_analysis_data,
+        )
+
         steps_data = []
         for step_num in range(1, 5):  # Steps 1-4
-            step_completed = False
             step_data = None
-
             if step_num == 1:
                 website = completion_data.get('website_analysis') or {}
-                step_completed = bool(website.get('website_url') or website.get('writing_style'))
-                if step_completed:
-                    step_data = website
+                if has_website_analysis_data(website):
+                    step_data = dict(website)
             elif step_num == 2:
                 research = completion_data.get('research_preferences') or {}
-                step_completed = bool(research.get('research_depth') or research.get('content_types'))
-                if step_completed:
+                if research.get('research_depth') or research.get('content_types') or research.get('competitors'):
                     step_data = dict(research)
             elif step_num == 3:
                 persona = completion_data.get('persona_data') or {}
-                step_completed = bool(
-                    persona.get('corePersona') or persona.get('core_persona') or
-                    persona.get('platformPersonas') or persona.get('platform_personas')
-                )
-                if step_completed:
-                    step_data = persona
+                if has_persona_data(persona):
+                    step_data = dict(persona)
             elif step_num == 4:
-                step_completed = status.get('is_completed', False)
+                step_data = None
 
+            entry = build_step_status_entry(step_num, status, step_data=step_data)
             steps_data.append({
-                "step_number": step_num,
-                "status": "completed" if step_completed else "pending",
-                "has_data": step_data is not None,
-                "data": step_data
+                "step_number": entry["step_number"],
+                "status": entry["status"],
+                "has_data": entry["has_data"],
+                "data": entry["data"],
             })
 
         return steps_data
@@ -77,19 +76,43 @@ class TestBackendStepCount:
 
     def test_step1_completed_with_website_url(self):
         data = {"website_analysis": {"website_url": "https://example.com"}}
-        steps = self._build_steps_data(data, {"is_completed": False})
+        status = {"is_completed": False, "current_step": 2, "completion_percentage": 25.0}
+        steps = self._build_steps_data(data, status)
         assert steps[0]["status"] == "completed"
+        assert steps[0]["has_data"] is True
+
+    def test_step1_pending_when_analysis_exists_but_not_officially_complete(self):
+        data = {"website_analysis": {"website_url": "https://example.com"}}
+        status = {"is_completed": False, "current_step": 1, "completion_percentage": 0.0}
+        steps = self._build_steps_data(data, status)
+        assert steps[0]["status"] == "pending"
         assert steps[0]["has_data"] is True
 
     def test_step2_completed_with_research(self):
         data = {"research_preferences": {"research_depth": "basic"}}
-        steps = self._build_steps_data(data, {"is_completed": False})
+        status = {"is_completed": False, "current_step": 3, "completion_percentage": 50.0}
+        steps = self._build_steps_data(data, status)
         assert steps[1]["status"] == "completed"
+
+    def test_step2_pending_when_research_data_exists_but_not_officially_complete(self):
+        data = {"research_preferences": {"research_depth": "basic"}}
+        status = {"is_completed": False, "current_step": 2, "completion_percentage": 25.0}
+        steps = self._build_steps_data(data, status)
+        assert steps[1]["status"] == "pending"
+        assert steps[1]["has_data"] is True
 
     def test_step3_completed_with_persona(self):
         data = {"persona_data": {"corePersona": {"name": "test"}}}
-        steps = self._build_steps_data(data, {"is_completed": False})
+        status = {"is_completed": False, "current_step": 4, "completion_percentage": 75.0}
+        steps = self._build_steps_data(data, status)
         assert steps[2]["status"] == "completed"
+
+    def test_step3_pending_when_persona_exists_but_not_officially_complete(self):
+        data = {"persona_data": {"corePersona": {"name": "test"}}}
+        status = {"is_completed": False, "current_step": 3, "completion_percentage": 50.0}
+        steps = self._build_steps_data(data, status)
+        assert steps[2]["status"] == "pending"
+        assert steps[2]["has_data"] is True
 
     def test_step4_completed_when_onboarding_complete(self):
         steps = self._build_steps_data({}, {"is_completed": True})

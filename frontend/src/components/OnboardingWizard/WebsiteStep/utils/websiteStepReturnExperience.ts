@@ -10,6 +10,71 @@ export function shouldShowDashboardFirst(hasAnalysis: boolean): boolean {
   return hasAnalysis;
 }
 
+export interface ConnectStepPresentation {
+  showWhereShouldIBegin: boolean;
+  dashboardFirstMode: boolean;
+  showInlineUrlBar: boolean;
+  showUrlHoverPanel: boolean;
+  showDashboardLoadingShell: boolean;
+}
+
+/**
+ * Resolve Connect step layout to avoid start-fresh re-hydration flashes and
+ * returning-user "Where should I begin?" flicker while analysis loads.
+ */
+export function resolveConnectStepPresentation(params: {
+  hasWebsiteAnalysis: boolean;
+  isConnectStepCompleted: boolean;
+  isStartFreshSession: boolean;
+  isHydratingAnalysis: boolean;
+}): ConnectStepPresentation {
+  const {
+    hasWebsiteAnalysis,
+    isConnectStepCompleted,
+    isStartFreshSession,
+    isHydratingAnalysis,
+  } = params;
+
+  if (isStartFreshSession) {
+    return {
+      showWhereShouldIBegin: true,
+      dashboardFirstMode: false,
+      showInlineUrlBar: true,
+      showUrlHoverPanel: false,
+      showDashboardLoadingShell: false,
+    };
+  }
+
+  if (hasWebsiteAnalysis) {
+    return {
+      showWhereShouldIBegin: false,
+      dashboardFirstMode: true,
+      showInlineUrlBar: false,
+      showUrlHoverPanel: true,
+      showDashboardLoadingShell: false,
+    };
+  }
+
+  if (isConnectStepCompleted) {
+    const stillLoading = isHydratingAnalysis;
+    return {
+      showWhereShouldIBegin: false,
+      dashboardFirstMode: true,
+      showInlineUrlBar: !stillLoading,
+      showUrlHoverPanel: false,
+      showDashboardLoadingShell: stillLoading,
+    };
+  }
+
+  return {
+    showWhereShouldIBegin: true,
+    dashboardFirstMode: false,
+    showInlineUrlBar: true,
+    showUrlHoverPanel: false,
+    showDashboardLoadingShell: false,
+  };
+}
+
 /**
  * Folder tabs are fully unlocked when Connect Platforms is officially complete
  * (Wizard already accounts for downstream re-analyse lock via isConnectStepCompleted).

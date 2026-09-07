@@ -26,10 +26,10 @@ import { STEP0_NAV_TITLE } from './WebsiteStep/constants/websiteStepLayout';
 import {
   ALL_FOLDER_TABS_VIEWED,
   isConnectStepFullyUnlocked,
+  resolveConnectStepPresentation,
   resolveViewedTabsForReturn,
-  shouldShowDashboardFirst,
 } from './WebsiteStep/utils/websiteStepReturnExperience';
-import { DEFAULT_VIEWED_TABS } from './utils/onboardingWebsiteReset';
+import { DEFAULT_VIEWED_TABS, isWebsiteStartFreshSession } from './utils/onboardingWebsiteReset';
 
 // Constants and interfaces
 import {
@@ -97,6 +97,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
     handleAnalyze,
     handleLoadExistingConfirm,
     handleStartFresh,
+    isHydratingAnalysis,
   } = useWebsiteAnalysis({
     setSuccess,
     setError,
@@ -175,7 +176,18 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   }, [onDataReady, website, domainName, analysis, crawlResult, useAnalysisForGenAI, integrationData, connectedPlatforms, email, emailDigestOptIn, userTimezone]);
 
   const hasWebsiteAnalysis = !!(website.trim() && analysis);
-  const showDashboardFirst = shouldShowDashboardFirst(hasWebsiteAnalysis);
+  const connectPresentation = resolveConnectStepPresentation({
+    hasWebsiteAnalysis,
+    isConnectStepCompleted,
+    isStartFreshSession: isWebsiteStartFreshSession(),
+    isHydratingAnalysis,
+  });
+
+  const handleStartFreshSession = () => {
+    setHasUserInteracted(false);
+    setViewedTabs(DEFAULT_VIEWED_TABS);
+    handleStartFresh();
+  };
 
   return (
     <Box sx={{ 
@@ -192,7 +204,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
       }
     }}>
       {/* Header Title — hidden when returning with completed analysis */}
-      {!showDashboardFirst && <WebsiteStepHeader />}
+      {connectPresentation.showWhereShouldIBegin && <WebsiteStepHeader />}
 
       {/* Tab Bar */}
       <OnboardingTabBar
@@ -205,7 +217,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
         linkedinConnected={linkedinConnected}
         youtubeConnected={youtubeConnected}
         hasInput={hasUserInteracted || linkedinConnected || youtubeConnected || hasWebsiteAnalysis}
-        showWebsiteUrlHoverPanel={showDashboardFirst}
+        showWebsiteUrlHoverPanel={connectPresentation.showUrlHoverPanel}
         website={website}
         setWebsite={(url) => {
           setWebsite(url);
@@ -215,7 +227,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
         }}
         websiteLoading={loading}
         onAnalyze={handleAnalyze}
-        onAnalyzeNewWebsite={handleStartFresh}
+        onAnalyzeNewWebsite={handleStartFreshSession}
         backgroundTasks={backgroundTasks || null}
         onViewResults={onViewBackgroundResults}
       />
@@ -261,11 +273,13 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
           setConnectedPlatforms={setConnectedPlatforms}
           existingAnalysis={existingAnalysis}
           handleLoadExistingConfirm={handleLoadExistingConfirm}
-          handleStartFresh={handleStartFresh}
+          handleStartFresh={handleStartFreshSession}
           viewedTabs={viewedTabs}
           setViewedTabs={setViewedTabs}
-          dashboardFirstMode={showDashboardFirst}
-          suppressDashboardScroll={showDashboardFirst}
+          dashboardFirstMode={connectPresentation.dashboardFirstMode}
+          showInlineUrlBar={connectPresentation.showInlineUrlBar}
+          showDashboardLoadingShell={connectPresentation.showDashboardLoadingShell}
+          suppressDashboardScroll={connectPresentation.dashboardFirstMode}
         />
       )}
 

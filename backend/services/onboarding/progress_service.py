@@ -12,6 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from services.database import SessionLocal, get_session_for_user
 from models.onboarding import OnboardingSession
+from services.onboarding.progress_utils import compute_effective_progress
 
 
 class OnboardingProgressService:
@@ -76,16 +77,19 @@ class OnboardingProgressService:
                         "onboarding_type": "website"
                     }
 
-                # If progress was never calculated (existing users before renumber),
-                # compute it from the step number and persist it.
-                progress = session.progress or 0.0
-                if session.current_step > 0 and progress == 0.0:
-                    progress = min(100.0, round((session.current_step / 4) * 100))
+                # Migrate legacy rows where progress was never persisted.
+                progress = compute_effective_progress(
+                    session.current_step or 0,
+                    session.progress or 0.0,
+                )
+                if (session.progress or 0.0) == 0.0 and progress > 0.0:
                     try:
                         session.progress = progress
                         db.commit()
-                    except Exception:
-                        pass
+                    except Exception as migrate_err:
+                        logger.warning(
+                            f"Could not persist migrated progress for user {user_id}: {migrate_err}"
+                        )
 
                 is_completed = (session.current_step >= 5) or (session.progress >= 100.0)
 

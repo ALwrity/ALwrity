@@ -2,15 +2,18 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   applyDownstreamDirtyProgressOverride,
   clearDownstreamLocalCaches,
+  clearOnboardingWizardLocalState,
   getCommittedStep1WebsiteUrl,
   hasWebsiteChangedFromCommitted,
   isDownstreamDirty,
+  isWebsiteStartFreshSession,
   markDownstreamDirty,
   normalizeWebsiteUrl,
   ONBOARDING_DOWNSTREAM_DIRTY_KEY,
   ONBOARDING_STEP1_WEBSITE_KEY,
   setCommittedStep1WebsiteUrl,
   shouldInvalidateDownstream,
+  shouldNotifyWebsiteAnalysisChanged,
   stripDownstreamStepData,
 } from '../onboardingWebsiteReset';
 
@@ -70,6 +73,14 @@ describe('onboardingWebsiteReset', () => {
     expect(isDownstreamDirty()).toBe(false);
   });
 
+  it('detects start-fresh session when downstream is dirty and live URL is cleared', () => {
+    markDownstreamDirty();
+    expect(isWebsiteStartFreshSession()).toBe(true);
+
+    localStorage.setItem('website_url', 'https://brand-a.com');
+    expect(isWebsiteStartFreshSession()).toBe(false);
+  });
+
   it('decides when downstream invalidation is required', () => {
     expect(
       shouldInvalidateDownstream({
@@ -122,5 +133,51 @@ describe('onboardingWebsiteReset', () => {
   it('uses stable storage keys', () => {
     expect(ONBOARDING_STEP1_WEBSITE_KEY).toBe('onboarding_step1_website_url');
     expect(ONBOARDING_DOWNSTREAM_DIRTY_KEY).toBe('onboarding_downstream_dirty');
+  });
+
+  it('clearOnboardingWizardLocalState removes committed step1 URL and dirty flag', () => {
+    localStorage.setItem(ONBOARDING_STEP1_WEBSITE_KEY, 'brand-a.com');
+    localStorage.setItem(ONBOARDING_DOWNSTREAM_DIRTY_KEY, 'true');
+    localStorage.setItem('website_url', 'https://brand-a.com');
+
+    clearOnboardingWizardLocalState('test_reset');
+
+    expect(localStorage.getItem(ONBOARDING_STEP1_WEBSITE_KEY)).toBeNull();
+    expect(localStorage.getItem(ONBOARDING_DOWNSTREAM_DIRTY_KEY)).toBeNull();
+    expect(localStorage.getItem('website_url')).toBeNull();
+  });
+
+  it('does not notify wizard invalidation on first new_website after reset', () => {
+    expect(
+      shouldNotifyWebsiteAnalysisChanged({
+        reason: 'new_website',
+        didInvalidateDownstream: false,
+      })
+    ).toBe(false);
+  });
+
+  it('notifies wizard invalidation on new_website when connect step was committed', () => {
+    setCommittedStep1WebsiteUrl('https://brand-a.com');
+    expect(
+      shouldNotifyWebsiteAnalysisChanged({
+        reason: 'new_website',
+        didInvalidateDownstream: false,
+      })
+    ).toBe(true);
+  });
+
+  it('always notifies on reanalyze and start_fresh', () => {
+    expect(
+      shouldNotifyWebsiteAnalysisChanged({
+        reason: 'reanalyze',
+        didInvalidateDownstream: false,
+      })
+    ).toBe(true);
+    expect(
+      shouldNotifyWebsiteAnalysisChanged({
+        reason: 'start_fresh',
+        didInvalidateDownstream: false,
+      })
+    ).toBe(true);
   });
 });
