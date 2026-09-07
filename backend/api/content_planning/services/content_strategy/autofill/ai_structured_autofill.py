@@ -499,7 +499,7 @@ Generate the complete JSON with all 30 fields personalized for {website_url}:
         # Log context summary for debugging
         logger.info("AIStructuredAutofillService: context summary | user=%s", user_id)
         logger.info("  - Website analysis exists: %s", bool(context_summary.get('user_profile', {}).get('website_url')))
-        logger.info("  - Research config: %s", context_summary.get('research_config', {}).get('research_depth', 'None'))
+        logger.info("  - Research config present: %s", bool(context_summary.get('research_config', {}).get('research_depth')))
         logger.info("  - API capabilities: %s", len(context_summary.get('api_capabilities', {}).get('providers', [])))
         logger.info("  - Content analysis: %s", bool(context_summary.get('content_analysis')))
         logger.info("  - Audience insights: %s", bool(context_summary.get('audience_insights')))
