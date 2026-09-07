@@ -3,7 +3,6 @@ import {
   Box, 
   Paper,
   Fade,
-  Slide,
   useTheme,
   useMediaQuery,
   IconButton,
@@ -15,12 +14,6 @@ import { getCurrentStep, setCurrentStep } from '../../api/onboarding';
 import { apiClient } from '../../api/client';
 import { useOnboarding } from '../../contexts/OnboardingContext';
 import { useUser } from '@clerk/clerk-react';
-import WebsiteStep from './WebsiteStep';
-import LinkedInConnectStep from './LinkedInConnectStep';
-import CompetitorAnalysisStep from './CompetitorAnalysisStep';
-import LinkedInResearchStep from './LinkedInResearchStep';
-import PersonalizationStep from './PersonalizationStep';
-import FinalStep from './FinalStep';
 import { WizardHeader } from './common/WizardHeader';
 import { WizardStepper } from './common/WizardStepper';
 import { WizardRetryBar } from './common/WizardRetryBar';
@@ -47,7 +40,6 @@ import {
   applyDownstreamDirtyProgressOverride,
   clearDownstreamDirtyFlag,
   clearDownstreamLocalCaches,
-  normalizeWebsiteUrl,
   setCommittedStep1WebsiteUrl,
   stripDownstreamStepData,
 } from './utils/onboardingWebsiteReset';
@@ -58,6 +50,10 @@ import {
   readLiveWebsiteAnalysisFromStorage,
   readLiveWebsiteUrlFromStorage,
 } from './common/wizardLiveWebsiteSession';
+import {
+  resolveCurrentWebsiteSessionKey,
+} from './common/onboardingStorageKeys';
+import { WizardStepContent } from './Wizard/WizardStepContent';
 
 
 // Set to true in dev to restore verbose per-action tracing
@@ -825,6 +821,25 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     selectedPlatforms: stepData?.selectedPlatforms
   }), [stepData?.corePersona, stepData?.platformPersonas, stepData?.qualityMetrics, stepData?.selectedPlatforms]);
 
+  const websiteSessionKey = useMemo(
+    () =>
+      resolveCurrentWebsiteSessionKey(
+        stepData?.website || stepData?.website_url || readLiveWebsiteUrlFromStorage(),
+        stepData?.analysis ?? null
+      ),
+    [stepData?.website, stepData?.website_url, stepData?.analysis]
+  );
+
+  const backendConnectWebsite = useMemo(() => {
+    const step1 = data?.onboarding?.steps?.find((s: any) => s.step_number === 1);
+    return String(step1?.data?.website || step1?.data?.website_url || '').trim();
+  }, [data?.onboarding?.steps]);
+
+  const backendResearchData = useMemo(() => {
+    const step2 = data?.onboarding?.steps?.find((s: any) => s.step_number === 2);
+    return (step2?.data as Record<string, unknown> | undefined) || null;
+  }, [data?.onboarding?.steps]);
+
   const handleStepDataChange = useCallback((data: any) => {
     trace('Wizard: handleStepDataChange:', data ? Object.keys(data) : 'empty');
     setStepData((prev: any) => ({
@@ -833,84 +848,38 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     }));
   }, []);
 
-  const renderStepContent = (step: number) => {
-    // Step 0 branches by onboarding type: WebsiteStep for website, LinkedInConnectStep for linkedin
-    const step0Component = onboardingType === 'linkedin' ? (
-      <LinkedInConnectStep
-        key="linkedin-connect"
-        onContinue={handleNext}
-        updateHeaderContent={updateHeaderContent}
-        onValidationChange={onStep0Valid}
-        onDataReady={handleWebsiteDataReady}
-      />
-    ) : (
-      <WebsiteStep
-        key="website"
-        onContinue={handleNext}
-        updateHeaderContent={updateHeaderContent}
-        onValidationChange={onStep0Valid}
-        onDataReady={handleWebsiteDataReady}
-        email={email}
-        backgroundTasks={backgroundTasks}
-        onViewBackgroundResults={handleViewBackgroundResults}
-        success={successMessage}
-        setSuccess={setSuccessMessage}
-        isConnectStepCompleted={isConnectStepOfficiallyComplete}
-        onWebsiteAnalysisChanged={handleWebsiteAnalysisChanged}
-        onLiveWebsiteSessionChange={handleLiveWebsiteSessionChange}
-      />
-    );
-
-    const resolvedWebsiteUrl =
-      (typeof window !== 'undefined' ? localStorage.getItem('website_url') : null) ||
-      stepData?.website ||
-      stepData?.website_url ||
-      'unknown';
-
-    const researchStepKey = normalizeWebsiteUrl(resolvedWebsiteUrl);
-
-    const stepComponents = [
-      step0Component,
-      // Step 1 branches by onboarding type: CompetitorAnalysisStep for website, LinkedInResearchStep for linkedin
-      onboardingType === 'linkedin' ? (
-        <LinkedInResearchStep
-          key="linkedin-research"
-          onContinue={handleNext}
-          updateHeaderContent={updateHeaderContent}
-          onValidationChange={onStep1Valid}
-          onDataReady={handleCompetitorDataReady}
-        />
-      ) : (
-        <CompetitorAnalysisStep 
-          key={`research-${researchStepKey}`} 
-          onContinue={handleNext} 
-          onBack={handleBack}
-          userUrl={resolvedWebsiteUrl === 'unknown' ? '' : resolvedWebsiteUrl}
-          industryContext={stepData?.industryContext}
-          initialData={stepData}
-          onDataReady={handleCompetitorDataReady}
-        />
-      ),
-      <PersonalizationStep 
-        key={`personalization-${researchStepKey}`}
-        onContinue={handleNext} 
-        onValidationChange={onStep2Valid}
-        onDataChange={handleStepDataChange}
-        onboardingType={onboardingType}
-        onboardingData={personaOnboardingData}
-        stepData={personaStepData}
-      />,
-      <FinalStep key="final" onContinue={handleComplete} updateHeaderContent={updateHeaderContent} onboardingType={onboardingType} />
-    ];
-
-    return (
-      <Slide direction={direction} in={true} mountOnEnter unmountOnExit key={`step-${step}`}>
-        <Box sx={{ minHeight: 'auto', display: 'flex', flexDirection: 'column' }}>
-          {stepComponents[step]}
-        </Box>
-      </Slide>
-    );
-  };
+  const renderStepContent = (step: number) => (
+    <WizardStepContent
+      step={step}
+      direction={direction}
+      onboardingType={onboardingType}
+      websiteSessionKey={websiteSessionKey}
+      stepData={stepData}
+      email={email}
+      backgroundTasks={backgroundTasks}
+      successMessage={successMessage}
+      setSuccessMessage={setSuccessMessage}
+      completedFrontier={completedFrontier}
+      isConnectStepOfficiallyComplete={isConnectStepOfficiallyComplete}
+      personaOnboardingData={personaOnboardingData}
+      personaStepData={personaStepData}
+      handleNext={handleNext}
+      handleBack={handleBack}
+      handleComplete={handleComplete}
+      handleViewBackgroundResults={handleViewBackgroundResults}
+      updateHeaderContent={updateHeaderContent}
+      onStep0Valid={onStep0Valid}
+      onStep1Valid={onStep1Valid}
+      onStep2Valid={onStep2Valid}
+      handleWebsiteDataReady={handleWebsiteDataReady}
+      handleCompetitorDataReady={handleCompetitorDataReady}
+      handleStepDataChange={handleStepDataChange}
+      onWebsiteAnalysisChanged={handleWebsiteAnalysisChanged}
+      onLiveWebsiteSessionChange={handleLiveWebsiteSessionChange}
+      backendResearchData={backendResearchData}
+      backendConnectWebsite={backendConnectWebsite}
+    />
+  );
 
   // Show loading state if loading
   if (loading) {
