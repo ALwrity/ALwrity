@@ -1,56 +1,41 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { YouTubeActionModal } from "../YouTubeActionModal";
 import { youtubeStudioApi } from "../../../../services/youtubeStudioApi";
 import {
   YOUTUBE_WEDGE_MODAL_MAX_WIDTH,
   type YouTubeModalShellProps,
 } from "../youtubeWedgeModalUi";
+import {
+  pickMostViewedVideo,
+  sortChannelVideos,
+  type YouTubeVideoPerformanceRow,
+  type YouTubeVideoPerformanceSort,
+} from "../youtubeVideoPerformanceStats";
+import { YouTubeVideoPerformanceCard } from "./YouTubeVideoPerformanceCard";
+import "../youtubeVideoPerformanceLayout.css";
 
 const LOAD_FAILED = "Could not load videos. Please try again.";
-
-type ChannelVideoRow = {
-  video_id?: string;
-  title?: string;
-  view_count?: number | null;
-  like_count?: number | null;
-  comment_count?: number | null;
-  published_at?: string | null;
-};
-
-function formatCount(value: number | null | undefined): string {
-  if (typeof value !== "number" || Number.isNaN(value)) {
-    return "—";
-  }
-  return String(value);
-}
-
-function formatPublished(value: string | null | undefined): string {
-  if (!value) {
-    return "—";
-  }
-  return value.slice(0, 10);
-}
 
 export const YouTubeVideoPerformanceModal: React.FC<{
   open: boolean;
   onClose: () => void;
   shell?: YouTubeModalShellProps;
 }> = ({ open, onClose, shell }) => {
-  const [videos, setVideos] = useState<ChannelVideoRow[]>([]);
-  const [selected, setSelected] = useState<ChannelVideoRow | null>(null);
+  const [videos, setVideos] = useState<YouTubeVideoPerformanceRow[]>([]);
   const [status, setStatus] = useState<string | null>(null);
+  const [sort, setSort] = useState<YouTubeVideoPerformanceSort>("views");
 
   useEffect(() => {
     if (!open) {
       return;
     }
-    setSelected(null);
     setStatus(null);
     setVideos([]);
+    setSort("views");
     let cancelled = false;
     console.info("[YouTubeVideoPerformance] List start");
     youtubeStudioApi
-      .listChannelVideos({ max_results: 12 })
+      .listChannelVideos({ max_results: 50 })
       .then((res) => {
         if (cancelled) {
           return;
@@ -87,18 +72,25 @@ export const YouTubeVideoPerformanceModal: React.FC<{
     };
   }, [open]);
 
-  const onSelect = (video: ChannelVideoRow) => {
-    console.info("[YouTubeVideoPerformance] Video selected", {
-      hasVideoId: Boolean(video.video_id),
-    });
-    setSelected(video);
+  const sortedVideos = useMemo(
+    () => sortChannelVideos(videos, sort),
+    [videos, sort],
+  );
+  const highlight = useMemo(() => pickMostViewedVideo(videos), [videos]);
+
+  const onSort = (next: YouTubeVideoPerformanceSort) => {
+    if (next === sort) {
+      return;
+    }
+    console.info("[YouTubeVideoPerformance] Sort changed", { sort: next });
+    setSort(next);
   };
 
   return (
     <YouTubeActionModal
       open={open}
       title="Video Performance"
-      intro="Recent uploads with public view, like, and comment counts from your channel."
+      intro="Recent uploads with public views, likes, and comments. This is not watch time or click-through rate."
       onClose={onClose}
       maxWidth={shell?.maxWidth ?? YOUTUBE_WEDGE_MODAL_MAX_WIDTH}
       onBack={shell?.onBack}
@@ -107,51 +99,49 @@ export const YouTubeVideoPerformanceModal: React.FC<{
       headerLayout={shell?.headerLayout}
     >
       {status ? <p className="yt-modal-intro">{status}</p> : null}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-          maxHeight: 220,
-          overflow: "auto",
-        }}
-      >
-        {videos.map((video, index) => (
-          <button
-            key={video.video_id || `yt-perf-${index}`}
-            type="button"
-            className="yt-rail-btn"
-            style={{ justifyContent: "flex-start" }}
-            aria-pressed={selected === video}
-            onClick={() => onSelect(video)}
-          >
-            {video.title || "Untitled"}
-          </button>
-        ))}
-      </div>
-      {selected ? (
-        <div style={{ marginTop: 14 }}>
-          <div className="yt-rail-stat-row">
-            <span className="yt-rail-stat-label">Views</span>
-            <span className="yt-rail-stat-value">{formatCount(selected.view_count)}</span>
+      {videos.length > 0 ? (
+        <>
+          <div className="yt-video-performance-sort">
+            <button
+              type="button"
+              className={
+                sort === "views" ? "yt-rail-btn yt-rail-btn--primary" : "yt-rail-btn"
+              }
+              aria-pressed={sort === "views"}
+              onClick={() => onSort("views")}
+            >
+              Most views
+            </button>
+            <button
+              type="button"
+              className={
+                sort === "newest" ? "yt-rail-btn yt-rail-btn--primary" : "yt-rail-btn"
+              }
+              aria-pressed={sort === "newest"}
+              onClick={() => onSort("newest")}
+            >
+              Newest
+            </button>
           </div>
-          <div className="yt-rail-stat-row">
-            <span className="yt-rail-stat-label">Likes</span>
-            <span className="yt-rail-stat-value">{formatCount(selected.like_count)}</span>
+          {highlight ? (
+            <div className="yt-rail-panel yt-video-performance-highlight">
+              <p className="yt-video-performance-highlight__label">
+                Most views in this list
+              </p>
+              <p className="yt-video-performance-highlight__title">
+                {highlight.title || "Untitled"}
+              </p>
+            </div>
+          ) : null}
+          <div className="yt-video-performance-list yt-video-performance-list--split">
+            {sortedVideos.map((video, index) => (
+              <YouTubeVideoPerformanceCard
+                key={video.video_id || `yt-perf-${index}`}
+                video={video}
+              />
+            ))}
           </div>
-          <div className="yt-rail-stat-row">
-            <span className="yt-rail-stat-label">Comments</span>
-            <span className="yt-rail-stat-value">
-              {formatCount(selected.comment_count)}
-            </span>
-          </div>
-          <div className="yt-rail-stat-row">
-            <span className="yt-rail-stat-label">Published</span>
-            <span className="yt-rail-stat-value">
-              {formatPublished(selected.published_at)}
-            </span>
-          </div>
-        </div>
+        </>
       ) : null}
     </YouTubeActionModal>
   );

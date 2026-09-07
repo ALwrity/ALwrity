@@ -1,0 +1,167 @@
+/**
+ * Video Performance cards — Comment Reply-style context/work split.
+ * Hub chrome (rail buttons, stat rows) stays in youtube-dashboard-layout.css.
+ */
+
+.yt-video-performance-sort {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.yt-video-performance-highlight {
+  margin-bottom: 12px;
+}
+
+.yt-video-performance-highlight__label {
+  margin: 0 0 4px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #606060;
+}
+
+.yt-video-performance-highlight__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f0f0f;
+}
+
+.yt-video-performance-list {
+  gap: 12px;
+  max-height: min(52vh, 520px);
+  overflow: auto;
+}
+
+.yt-video-performance-list--split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.yt-video-performance-card {
+  text-align: left;
+  border: 1.5px solid #e5e5e5;
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.yt-video-performance-card--split {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.yt-video-performance-card__context {
+  min-width: 120px;
+  max-width: 180px;
+}
+
+.yt-video-performance-card__work {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.yt-video-performance-card__media {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f1f1f1;
+}
+
+.yt-video-performance-card__media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.yt-video-performance-card__heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.yt-video-performance-card__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #0f0f0f;
+  line-height: 1.35;
+}
+
+.yt-video-performance-card__open {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: #0f0f0f;
+  background: #f1f1f1;
+  text-decoration: none;
+  transition: transform 160ms ease;
+}
+
+.yt-video-performance-card__open-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.yt-video-performance-card__open:hover,
+.yt-video-performance-card__open:focus-visible {
+  transform: scale(1.12);
+  outline: none;
+}
+
+.yt-video-performance-card__open::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 2;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #0f0f0f;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.yt-video-performance-card__open:hover::after,
+.yt-video-performance-card__open:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 720px) {
+  .yt-video-performance-list--split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .yt-video-performance-card--split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .yt-video-performance-card__context {
+    max-width: none;
+  }
+}
