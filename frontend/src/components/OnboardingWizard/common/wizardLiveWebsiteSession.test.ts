@@ -123,6 +123,26 @@ describe('mergeOnboardingSeedIntoStepData', () => {
     expect(next.competitors).toEqual([{ url: 'https://old.com' }]);
     expect(next.corePersona).toEqual({ name: 'Hexaurum Voice' });
   });
+
+  it('skips backend connect seed during start-fresh session', () => {
+    const next = mergeOnboardingSeedIntoStepData(
+      { email: 'user@example.com' },
+      {
+        connect: { website: 'https://www.hexaurum.com', analysis: { id: 1 } },
+        research: { competitors: [{ url: 'https://old.com' }] },
+        personalization: { corePersona: { name: 'Hexaurum Voice' } },
+      },
+      '',
+      null,
+      { suppressBackendConnectSeed: true }
+    );
+
+    expect(next.website).toBeUndefined();
+    expect(next.analysis).toBeUndefined();
+    expect(next.competitors).toBeUndefined();
+    expect(next.corePersona).toBeUndefined();
+    expect(next.email).toBe('user@example.com');
+  });
 });
 
 describe('shouldMergeBackendDownstreamSteps', () => {

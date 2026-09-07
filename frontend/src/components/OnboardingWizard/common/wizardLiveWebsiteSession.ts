@@ -125,11 +125,17 @@ export interface OnboardingSeedSteps {
   personalization?: Record<string, unknown> | null;
 }
 
+export interface MergeOnboardingSeedOptions {
+  /** Skip backend connect/research/persona merge during Analyze New Website. */
+  suppressBackendConnectSeed?: boolean;
+}
+
 export function mergeOnboardingSeedIntoStepData(
   previous: Record<string, unknown> | null | undefined,
   backend: OnboardingSeedSteps,
   liveWebsiteUrl: string,
-  liveAnalysis?: Record<string, unknown> | null
+  liveAnalysis?: Record<string, unknown> | null,
+  options?: MergeOnboardingSeedOptions
 ): Record<string, unknown> {
   const connect = backend.connect || null;
   const backendWebsite = String(
@@ -139,6 +145,13 @@ export function mergeOnboardingSeedIntoStepData(
     backendWebsite,
     liveWebsiteUrl
   );
+
+  if (options?.suppressBackendConnectSeed && !liveWebsiteUrl.trim()) {
+    console.log(
+      `${LOG_PREFIX} Skipping backend connect seed during start-fresh session`
+    );
+    return { ...(previous || {}) };
+  }
 
   if (!liveMatchesBackend) {
     return applyLiveWebsiteSessionToStepData(previous, {

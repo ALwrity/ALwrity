@@ -6,6 +6,11 @@ from fastapi import HTTPException, Depends
 from middleware.auth_middleware import get_current_user
 
 from services.onboarding.progress_service import OnboardingProgressService
+from api.onboarding_utils.onboarding_init_step_status import (
+    build_step_status_entry,
+    has_persona_data,
+    has_website_analysis_data,
+)
 
 
 def health_check():
@@ -27,14 +32,10 @@ async def initialize_onboarding(current_user: Dict[str, Any] = Depends(get_curre
         # Build steps data based on database state (4 steps matching frontend)
         steps_data = []
         for step_num in range(1, 5):  # Steps 1-4 (Connect, Research, Personalization, Finish)
-            step_completed = False
-            step_data = None
-            
-            # Check if step is completed based on database data
             if step_num == 1:  # Connect Platforms
                 website = completion_data.get('website_analysis') or {}
-                step_completed = bool(website.get('website_url') or website.get('writing_style'))
-                if step_completed:
+                step_data = None
+                if has_website_analysis_data(website):
                     step_data = dict(website)
                     # Include LinkedIn profile analysis if available
                     try:
@@ -55,36 +56,36 @@ async def initialize_onboarding(current_user: Dict[str, Any] = Depends(get_curre
                     # Expose persisted sitemap analysis under the key the frontend expects
                     if not step_data.get('sitemapAnalysis') and (website.get('seo_audit') or {}).get('sitemap_analysis'):
                         step_data['sitemapAnalysis'] = website['seo_audit']['sitemap_analysis']
+                step_entry = build_step_status_entry(1, status, step_data=step_data)
             elif step_num == 2:  # Research
                 # Use the SSOT step-management endpoint to get the full Research
                 # step payload (competitors, sitemap analysis, content pillars).
-                # This ensures the frontend can restore the step from DB instead
-                # of re-running LLM calls after cache expiry.
                 from api.onboarding_utils.step_management_service import StepManagementService
                 step_service = StepManagementService()
                 step2_result = await step_service.get_step_data(2, current_user)
-                if step2_result and step2_result.get('data'):
-                    step_data = step2_result['data']
-                    step_completed = step2_result.get('status') == 'completed'
+                step_data = step2_result.get('data') if step2_result else None
+                step_entry = build_step_status_entry(2, status, step_data=step_data)
             elif step_num == 3:  # Personalization
                 persona = completion_data.get('persona_data') or {}
-                step_completed = bool(
-                    persona.get('corePersona') or persona.get('core_persona') or
-                    persona.get('platformPersonas') or persona.get('platform_personas')
-                )
-                if step_completed:
-                    step_data = persona
+                step_data = dict(persona) if has_persona_data(persona) else None
+                step_entry = build_step_status_entry(3, status, step_data=step_data)
             elif step_num == 4:  # Finish
-                step_completed = status['is_completed']
-            
+                step_entry = build_step_status_entry(
+                    4,
+                    {**status, "is_completed": status['is_completed']},
+                    step_data=None,
+                )
+            else:
+                step_entry = build_step_status_entry(step_num, status, step_data=None)
+
             steps_data.append({
-                "step_number": step_num,
+                "step_number": step_entry["step_number"],
                 "title": f"Step {step_num}",
                 "description": f"Step {step_num} description",
-                "status": "completed" if step_completed else "pending",
-                "completed_at": datetime.now().isoformat() if step_completed else None,
-                "has_data": step_data is not None,
-                "data": step_data
+                "status": step_entry["status"],
+                "completed_at": datetime.now().isoformat() if step_entry["status"] == "completed" else None,
+                "has_data": step_entry["has_data"],
+                "data": step_entry["data"],
             })
 
         # Reconciliation: if not completed but all artifacts exist, mark complete once

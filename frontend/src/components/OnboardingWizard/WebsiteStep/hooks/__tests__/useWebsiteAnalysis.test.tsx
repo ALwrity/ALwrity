@@ -134,6 +134,33 @@ describe('useWebsiteAnalysis hook', () => {
     expect(localStorage.getItem('website_analysis_data')).toBeNull();
   });
 
+  it('skips last-analysis hydration during start-fresh session after remount', async () => {
+    localStorage.setItem('onboarding_downstream_dirty', 'true');
+
+    vi.mocked(websiteUtils.fetchLastAnalysis).mockResolvedValueOnce({
+      success: true,
+      website: 'https://mysite.com',
+      analysis: { id: 42, website_url: 'https://mysite.com' },
+      domainName: 'mysite.com',
+    });
+
+    const { result } = renderHook(() =>
+      useWebsiteAnalysis({
+        setSuccess: mockSetSuccess,
+        setError: mockSetError,
+        setAnalysisWarning: mockSetAnalysisWarning,
+      })
+    );
+
+    await waitFor(() => {
+      expect(result.current.isHydratingAnalysis).toBe(false);
+    });
+
+    expect(websiteUtils.fetchLastAnalysis).not.toHaveBeenCalled();
+    expect(result.current.analysis).toBeNull();
+    expect(result.current.website).toBe('');
+  });
+
   it('load saved analysis for a previous site clears other-site research and notifies the wizard', async () => {
     vi.mocked(websiteUtils.fetchLastAnalysis).mockResolvedValueOnce({
       success: false,

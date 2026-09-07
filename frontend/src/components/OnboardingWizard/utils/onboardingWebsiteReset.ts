@@ -86,6 +86,16 @@ export function isDownstreamDirty(): boolean {
   }
 }
 
+/** True after Analyze New Website — downstream dirty and no live URL in storage. */
+export function isWebsiteStartFreshSession(): boolean {
+  if (!isDownstreamDirty()) return false;
+  try {
+    return !localStorage.getItem('website_url');
+  } catch {
+    return true;
+  }
+}
+
 export function hasWebsiteChangedFromCommitted(currentUrl: string): boolean {
   const committed = getCommittedStep1WebsiteUrl();
   if (!committed) return false;
@@ -170,4 +180,61 @@ export function clearDownstreamDirtyFlag(): void {
   } catch (err) {
     console.warn('[onboardingWebsiteReset] Failed to clear downstream dirty flag:', err);
   }
+}
+
+const WIZARD_RESET_LOCAL_KEYS = [
+  'onboarding_step_data',
+  'onboarding_active_step',
+  'onboarding_complete',
+  'primary_website',
+  'website_url',
+  'website_analysis_data',
+  'website_session_key',
+  ONBOARDING_STEP1_WEBSITE_KEY,
+  ONBOARDING_DOWNSTREAM_DIRTY_KEY,
+  ...DOWNSTREAM_CACHE_KEYS,
+] as const;
+
+export type WebsiteAnalysisChangeReason =
+  | 'reanalyze'
+  | 'new_website'
+  | 'start_fresh'
+  | 'load_existing';
+
+/**
+ * Full local wipe for account reset / clean-slate onboarding.
+ * Call onboardingCache.clearCache() separately when the cache service is available.
+ */
+export function clearOnboardingWizardLocalState(reason: string): void {
+  console.log('[onboardingWebsiteReset] Clearing wizard local state:', reason);
+  try {
+    for (const key of WIZARD_RESET_LOCAL_KEYS) {
+      localStorage.removeItem(key);
+    }
+    sessionStorage.removeItem('onboarding_init');
+    sessionStorage.removeItem('persona_server_cache_checked');
+    clearDownstreamLocalCaches();
+  } catch (err) {
+    console.warn('[onboardingWebsiteReset] Failed to clear wizard local state:', err);
+  }
+}
+
+/** Skip wizard downstream invalidation on first-ever analysis after reset. */
+export function shouldNotifyWebsiteAnalysisChanged(params: {
+  reason: WebsiteAnalysisChangeReason;
+  didInvalidateDownstream: boolean;
+}): boolean {
+  if (params.didInvalidateDownstream) {
+    return true;
+  }
+  if (params.reason === 'reanalyze' || params.reason === 'start_fresh') {
+    return true;
+  }
+  if (params.reason === 'load_existing') {
+    return !!getCommittedStep1WebsiteUrl();
+  }
+  if (params.reason === 'new_website') {
+    return !!getCommittedStep1WebsiteUrl();
+  }
+  return false;
 }

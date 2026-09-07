@@ -3,6 +3,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { apiClient, ConnectionError, NetworkError } from '../api/client';
 import { shouldSkipOnboarding } from '../utils/demoMode';
 import { isDownstreamDirty } from '../components/OnboardingWizard/utils/onboardingWebsiteReset';
+import { resetOnboardingWizardSession } from '../components/OnboardingWizard/utils/onboardingWebsiteSessionChange';
 
 /**
  * Onboarding Context
@@ -338,13 +339,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   const resetOnboarding = useCallback(() => {
     console.log('OnboardingContext: Resetting onboarding progress');
     
-    // Clear all cached data
-    sessionStorage.removeItem('onboarding_init');
-    localStorage.removeItem('onboarding_step');
-    localStorage.removeItem('alwrity_sitemap_state');
-    localStorage.removeItem('competitor_analysis_data');
-    localStorage.removeItem('competitor_analysis_url');
-    localStorage.removeItem('competitor_analysis_timestamp');
+    resetOnboardingWizardSession('context_reset');
     optimisticProgressFloorRef.current = 0;
     
     // Reset state
