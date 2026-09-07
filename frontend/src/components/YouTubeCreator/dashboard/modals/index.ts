@@ -6,6 +6,7 @@ export { RetentionModal } from "./RetentionModal";
 export { ContentGapsModal } from "./ContentGapsModal";
 export { SchedulePublishModal } from "./SchedulePublishModal";
 export { ChannelPulseModal } from "./ChannelPulseModal";
+export { YouTubeVideoPerformanceModal } from "./YouTubeVideoPerformanceModal";
 export { PlanWedgeModal } from "./PlanWedgeModal";
 export { CreateWedgeModal } from "./CreateWedgeModal";
 export { PublishWedgeModal } from "./PublishWedgeModal";

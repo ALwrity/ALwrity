@@ -223,6 +223,17 @@ export const YOUTUBE_STUDIO_OVERLAY_INVENTORY: readonly YouTubeStudioOverlayEntr
     migrationAction: "keep_leaf_hub_modal",
   },
   {
+    id: "video-performance",
+    component: "YouTubeVideoPerformanceModal",
+    sourceFile: "dashboard/modals/YouTubeVideoPerformanceModal.tsx",
+    renderKind: "custom_createPortal",
+    surface: "hub",
+    zIndexSource: "YouTubeActionModal / YT_Z_MODAL",
+    nestedUnderFullCreatorHost: false,
+    knownIssue: null,
+    migrationAction: "keep_leaf_hub_modal",
+  },
+  {
     id: "playlist-attach",
     component: "PlaylistAttachModal",
     sourceFile: "dashboard/modals/PlaylistAttachModal.tsx",
