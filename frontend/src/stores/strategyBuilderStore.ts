@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { contentPlanningApi } from '../services/contentPlanningApi';
+import { devLog } from '../utils/devLogger';
 
 // Module-level loading flags to prevent runaway autofill loops
 let autofillLoading = false;
@@ -209,6 +210,11 @@ interface StrategyBuilderStore {
   
   // Auto-Population Actions
   autofillStrategyFields: () => Promise<void>;
+  /** Force-fetch a fresh autofill from the persisted snapshot without re-running the LLM. */
+  loadCachedAutofill: () => Promise<boolean>;
+  /** Once-per-session bootstrap: hydrate from the persisted snapshot, generate only on miss. */
+  ensureAutofillForSession: () => Promise<void>;
+  hydrateAutofillPayload: (payload: any) => boolean;
   regenerateAIFields: () => Promise<void>;
   updateAutoPopulatedField: (fieldId: string, value: any, source: string) => void;
   overrideAutoPopulatedField: (fieldId: string, value: any) => void;
@@ -706,38 +712,15 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
   setFormErrors: (errors) => {
     set({ formErrors: errors });
   },
-  
-  // Auto-Population Actions
-  autofillStrategyFields: async () => {
-    // Use module-level loading flag to prevent runaway loops
-    if (autofillLoading) {
-      console.log('⏸️ Autofill skipped - already loading');
-      return;
-    }
 
-    if (get().autoPopulationBlocked) {
-      console.log('⏸️ Autofill skipped - blocked due to previous errors');
-      return;
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-    autofillLoading = true;
-    set({ loading: true, error: null });
-
+  // Shared applier: hydrates the builder from an autofill payload (fresh or restored from the persisted snapshot).
+  hydrateAutofillPayload: (response: any) => {
     try {
-      console.log('🚀 Starting autofill...');
-      const response = await contentPlanningApi.autofill();
-
-      if (!response) {
-        throw new Error('Invalid response structure from backend');
-      }
-
-      const fields = response.fields || {};
-      const sources = response.sources || {};
-      const inputDataPoints = response.input_data_points || {};
-
-      const meta = response.meta || {};
-      console.log('📊 Autofill Meta:', {
+      const fields = response?.fields || {};
+      const sources = response?.sources || {};
+      const inputDataPoints = response?.input_data_points || {};
+      const meta = response?.meta || {};
+      devLog.log('📊 Autofill Meta:', {
         aiUsed: meta.ai_used,
         dbFieldsCount: meta.db_field_count,
         aiFieldsCount: meta.ai_field_count,
@@ -748,14 +731,13 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
 
       if (Object.keys(fields).length === 0) {
         set({
-          loading: false,
           error: 'Autofill failed to produce strategy fields. Please try again.',
           autoPopulatedFields: {},
           personalizationData: {},
           dataSources: {},
           inputDataPoints: {},
         });
-        return;
+        return false;
       }
 
       const fieldValues: Record<string, any> = {};
@@ -836,6 +818,38 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
 
       sessionStorage.setItem('lastAutofillTime', new Date().toISOString());
       console.log(`✅ Autofill completed: ${processedFields} fields, ${skippedFields} skipped`);
+      return true;
+    } catch (error: any) {
+      console.error('❌ Autofill apply error:', error);
+      return false;
+    }
+  },
+
+  // Auto-Population Actions
+  autofillStrategyFields: async () => {
+    // Concurrency flag is taken BEFORE any await — the previous
+    // await-500ms-then-set-flag ordering let StrictMode's double-effect fire
+    // two POSTs (the duplicate /autofill/generate in the QA logs).
+    if (autofillLoading) {
+      console.log('⏸️ Autofill skipped - already loading');
+      return;
+    }
+
+    if (get().autoPopulationBlocked) {
+      console.log('⏸️ Autofill skipped - blocked due to previous errors');
+      return;
+    }
+    autofillLoading = true;
+    set({ loading: true, error: null });
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('🚀 Starting autofill...');
+      const response = await contentPlanningApi.autofill();
+      if (!response) {
+        throw new Error('Invalid response structure from backend');
+      }
+      get().hydrateAutofillPayload(response);
     } catch (error: any) {
       console.error('❌ Autofill error:', error);
       set({
@@ -845,6 +859,48 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
       });
     } finally {
       autofillLoading = false;
+    }
+  },
+
+  // Cache-first hydration from the per-user persisted snapshot.
+  loadCachedAutofill: async () => {
+    try {
+      const data = await contentPlanningApi.getLatestAutofill();
+      if (!data || !data.fields || Object.keys(data.fields).length === 0) {
+        console.log('📭 No persisted autofill snapshot — will generate');
+        return false;
+      }
+      console.log('💧 Hydrating strategy builder from persisted autofill snapshot');
+      return get().hydrateAutofillPayload(data);
+    } catch (error: any) {
+      console.warn('Autofill snapshot load failed; will generate', error);
+      return false;
+    }
+  },
+
+  // Cache-first bootstrap, run once per browser session: hydrate from the
+  // user's persisted snapshot; only on miss run the LLM autofill. The
+  // sessionStorage guard is set BEFORE any await so StrictMode's double
+  // effect can't run this twice (the duplicate POST in the QA logs).
+  ensureAutofillForSession: async () => {
+    if (sessionStorage.getItem('strategy_autofill_bootstrapped') === '1') {
+      console.log('⏸️ Autofill bootstrap already ran this session');
+      return;
+    }
+    sessionStorage.setItem('strategy_autofill_bootstrapped', 'true');
+
+    // User is already editing a populated form — never clobber it.
+    const filled = Object.values(get().formData).filter(
+      v => v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0)
+    ).length;
+    if (filled > 0) {
+      console.log('⏸️ Autofill skipped - form already populated');
+      return;
+    }
+
+    const hydrated = await get().loadCachedAutofill();
+    if (!hydrated) {
+      await get().autofillStrategyFields();
     }
   },
 
@@ -1004,3 +1060,6 @@ export const useStrategyBuilderStore = create<StrategyBuilderStore>()(
     }
   )
 );
+
+
+

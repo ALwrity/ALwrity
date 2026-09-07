@@ -1,43 +1,39 @@
 import { useState, useEffect } from 'react';
 
 interface UseAutoPopulationProps {
-  autoPopulateFromOnboarding: () => void;
+  /** Cache-first per-session bootstrap (hydrate from persisted snapshot, generate on miss). */
+  ensureStrategyFieldsForSession: () => Promise<void>;
   completionStats: any;
 }
 
-export const useAutoPopulation = ({ 
-  autoPopulateFromOnboarding, 
+export const useAutoPopulation = ({
+  ensureStrategyFieldsForSession,
   completionStats
 }: UseAutoPopulationProps) => {
   const [autoPopulateAttempted, setAutoPopulateAttempted] = useState(false);
-  const [isAutoPopulating, setIsAutoPopulating] = useState(false);
 
-  // Auto-populate from onboarding on first load
+  // Bootstrap once per mount. The heavy work (snapshot hydrate / autofill)
+  // is guarded inside the store action; this hook just fires it once.
   useEffect(() => {
-    if (!autoPopulateAttempted && !isAutoPopulating) {
-      console.log('🚀 useAutoPopulation: Triggering initial auto-population');
-      console.log('📊 useAutoPopulation: Current completion stats:', {
-        totalFields: completionStats?.total_fields || 0,
-        filledFields: completionStats?.filled_fields || 0,
-        completionPercentage: completionStats?.completion_percentage || 0
-      });
-      
-      setIsAutoPopulating(true);
-      autoPopulateFromOnboarding();
-      setAutoPopulateAttempted(true);
-      setIsAutoPopulating(false);
-      
-      console.log('✅ useAutoPopulation: Auto-population triggered successfully');
-    } else {
-      console.log('⏸️ useAutoPopulation: Auto-population skipped', {
-        autoPopulateAttempted,
-        isAutoPopulating
-      });
+    if (autoPopulateAttempted) {
+      devLogSkip();
+      return;
     }
-  }, [autoPopulateAttempted, isAutoPopulating, autoPopulateFromOnboarding, completionStats]);
+    setAutoPopulateAttempted(true);
+    devLogStart();
+    void ensureStrategyFieldsForSession?.();
+  }, [autoPopulateAttempted, ensureStrategyFieldsForSession]);
 
   return {
     autoPopulateAttempted,
     setAutoPopulateAttempted
   };
-}; 
+};
+
+function devLogSkip(): void {
+  console.log('⏸️ useAutoPopulation: Auto-population skipped (already attempted)');
+}
+
+function devLogStart(): void {
+  console.log('🚀 useAutoPopulation: cache-first strategy bootstrapping started');
+}

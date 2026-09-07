@@ -24,6 +24,7 @@ from .quality import calculate_quality_scores_from_raw, calculate_confidence_fro
 from .transparency import build_data_sources_map, build_input_data_points
 from .schema import validate_output
 from .ai_structured_autofill import AIStructuredAutofillService, CORE_FIELDS
+from .option_values import normalize_fields_payload
 
 
 ALL_FIELDS = set(CORE_FIELDS)
@@ -148,6 +149,11 @@ class AutoFillService:
                 merged_fields[key] = db_val
             elif ai_val and ai_val.get("value") is not None:
                 merged_fields[key] = ai_val
+
+        # Option-typed fields must carry the FRONTEND's canonical option
+        # values — anything the AI couldn't map becomes None (skipped by the
+        # builder) instead of an out-of-range select value.
+        merged_fields = normalize_fields_payload(merged_fields)
 
         db_sourced = sum(1 for v in merged_fields.values() if v.get("source", "") != "ai_generated")
         ai_sourced = sum(1 for v in merged_fields.values() if v.get("source", "") == "ai_generated")

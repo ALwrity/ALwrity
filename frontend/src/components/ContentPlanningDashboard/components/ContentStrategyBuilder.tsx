@@ -100,6 +100,7 @@ const ContentStrategyBuilder: React.FC = () => {
     validateFormField,
     validateAllFields,
     autofillStrategyFields,
+    ensureAutofillForSession,
     regenerateAIFields,
     createStrategy: createEnhancedStrategy,
     calculateCompletionPercentage,
@@ -342,7 +343,7 @@ const ContentStrategyBuilder: React.FC = () => {
 
   // Pre-fill strategy fields from onboarding data on first mount
   const { autoPopulateAttempted, setAutoPopulateAttempted } = useAutoPopulation({
-    autoPopulateFromOnboarding: autofillStrategyFields,
+    ensureStrategyFieldsForSession: ensureAutofillForSession,
     completionStats
   });
   
@@ -818,3 +819,4 @@ const ContentStrategyBuilder: React.FC = () => {
 };
 
 export default ContentStrategyBuilder; 
+

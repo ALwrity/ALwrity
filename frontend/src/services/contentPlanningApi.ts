@@ -768,6 +768,14 @@ class ContentPlanningAPI {
     });
   }
 
+  /** Persisted autofill snapshot (per-user workspace DB) for cache-first reloads; null = no snapshot. */
+  async getLatestAutofill(): Promise<any | null> {
+    return this.handleRequest(async () => {
+      const response = await apiClient.get(`${this.baseURL}/enhanced-strategies/strategies/autofill/latest`);
+      return response.data?.data || null;
+    });
+  }
+
   // Regenerate only AI-generated fields, preserving DB-grounded onboarding data
   async regenerateAIFields(): Promise<any> {
     return this.handleRequest(async () => {
