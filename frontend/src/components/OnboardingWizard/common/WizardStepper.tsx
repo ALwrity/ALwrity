@@ -8,6 +8,7 @@ import {
   useTheme
 } from '@mui/material';
 import Check from '@mui/icons-material/Check';
+import { OnboardingResumeToast } from './OnboardingResumeToast';
 
 interface WizardStepperProps {
   activeStep: number;
@@ -21,6 +22,8 @@ interface WizardStepperProps {
   }>;
   onStepClick: (stepIndex: number) => void;
   progress: number;
+  resumeToast?: string | null;
+  onDismissResumeToast?: () => void;
 }
 
 /** Setup progress ring — single pink arc + white center, with grey track underneath */
@@ -205,7 +208,9 @@ export const WizardStepper: React.FC<WizardStepperProps> = ({
   isMobile: propIsMobile,
   steps,
   onStepClick,
-  progress
+  progress,
+  resumeToast = null,
+  onDismissResumeToast,
 }) => {
   const theme = useTheme();
   // Ensure precise responsive breakpoints matching application standards
@@ -418,11 +423,32 @@ export const WizardStepper: React.FC<WizardStepperProps> = ({
             flexShrink: 0,
             display: 'flex',
             alignItems: 'center',
+            position: 'relative',
             pl: { xs: 0.75, sm: 1 },
-            mr: { xs: '18px', sm: '24px', md: '26px' }, // Shifting it left so it aligns perfectly with the help and skip gap above
+            mr: { xs: '18px', sm: '24px', md: '26px' },
           }}
         >
           <SetupProgressIcon progress={progress} tooltip={setupProgressTooltip} />
+          {resumeToast && onDismissResumeToast && (
+            <Box
+              data-testid="wizard-resume-toast-anchor"
+              data-placement="below-progress-ring-right"
+              sx={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                mt: { xs: 0.5, sm: 0.75 },
+                zIndex: 4,
+                display: 'flex',
+                justifyContent: 'flex-end',
+              }}
+            >
+              <OnboardingResumeToast
+                message={resumeToast}
+                onDismiss={onDismissResumeToast}
+              />
+            </Box>
+          )}
         </Box>
 
       </Box>

@@ -35,6 +35,7 @@ interface WizardHeaderProps {
   };
   showProgressMessage: boolean;
   progressMessage: string;
+  progressMessageIsError?: boolean;
   showHelp: boolean;
   isMobile: boolean;
   onHelpToggle: () => void;
@@ -48,6 +49,7 @@ export const WizardHeader: React.FC<WizardHeaderProps> = ({
   stepHeaderContent,
   showProgressMessage,
   progressMessage,
+  progressMessageIsError = false,
   showHelp,
   isMobile,
   onHelpToggle,
@@ -79,8 +81,8 @@ export const WizardHeader: React.FC<WizardHeaderProps> = ({
         }
       }}
     >
-      {/* Progress Message */}
-      {showProgressMessage && (
+      {/* Error / blocking messages only — success toasts render in WizardShell */}
+      {showProgressMessage && progressMessageIsError && (
         <Fade in={showProgressMessage}>
           <Box
             sx={{
@@ -88,7 +90,7 @@ export const WizardHeader: React.FC<WizardHeaderProps> = ({
               top: 0,
               left: 0,
               right: 0,
-              background: 'rgba(16, 185, 129, 0.9)',
+              background: 'rgba(239, 68, 68, 0.92)',
               color: 'white',
               p: 2,
               textAlign: 'center',

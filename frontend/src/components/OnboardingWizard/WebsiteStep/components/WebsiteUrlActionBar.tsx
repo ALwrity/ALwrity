@@ -54,6 +54,8 @@ const WebsiteUrlActionBar: React.FC<WebsiteUrlActionBarProps> = ({
         value={website}
         onChange={(e) => setWebsite(e.target.value)}
         fullWidth
+        autoComplete="url"
+        name="website-url"
         placeholder={
           isCompact
             ? website.replace(/^https?:\/\//i, '') || 'www.example.com'

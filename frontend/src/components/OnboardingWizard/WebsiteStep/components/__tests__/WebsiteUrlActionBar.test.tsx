@@ -74,6 +74,28 @@ describe('WebsiteUrlActionBar', () => {
     );
   });
 
+  it('uses url autocomplete attributes on the website field', () => {
+    render(
+      <WebsiteUrlActionBar
+        website="https://example.com"
+        setWebsite={vi.fn()}
+        loading={false}
+        hasAnalysis={false}
+        onAnalyze={vi.fn()}
+        onAnalyzeNewWebsite={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('textbox', { name: /your website url/i })).toHaveAttribute(
+      'autocomplete',
+      'url'
+    );
+    expect(screen.getByRole('textbox', { name: /your website url/i })).toHaveAttribute(
+      'name',
+      'website-url'
+    );
+  });
+
   it('calls action handlers from the URL bar buttons', () => {
     const onAnalyze = vi.fn();
     const onAnalyzeNewWebsite = vi.fn();
