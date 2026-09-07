@@ -25,6 +25,10 @@ export const useModalManagement = ({
   const isMountedRef = useRef<boolean>(true);
 
   useEffect(() => {
+    // Re-arm on EVERY effect run — React StrictMode (dev) double-invokes
+    // effects (mount → cleanup → re-mount); the cleanup must not poison the
+    // ref permanently or every deferred Proceed is "after unmount" in dev.
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };
@@ -107,3 +111,4 @@ export const useModalManagement = ({
     handleAddEnterpriseDatapoints
   };
 };
+

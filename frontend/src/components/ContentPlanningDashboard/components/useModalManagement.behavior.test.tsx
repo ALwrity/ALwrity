@@ -84,6 +84,23 @@ describe('useModalManagement — behavioral', () => {
     expect(props.originalHandleCreateStrategy).toHaveBeenCalledTimes(1);
   });
 
+  it('fires after a StrictMode simulated remount (isMountedRef must re-arm)', async () => {
+    // React StrictMode (dev) double-invokes effects: mount → cleanup → mount.
+    // A cleanup-only isMountedRef poisons the ref, dropping EVERY deferred
+    // Proceed in dev. The canonical re-arm pattern must survive the cycle.
+    const props = propsWithDefaults();
+    const { result } = renderHook(() => useModalManagement(props), {
+      wrapper: ({ children }) => React.createElement(React.StrictMode, null, children),
+    });
+
+    await act(async () => {
+      result.current.handleProceedWithCurrentStrategy();
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(props.originalHandleCreateStrategy).toHaveBeenCalledTimes(1);
+  });
+
   it('NEVER fires after unmount inside the 300ms window (#9)', async () => {
     const props = propsWithDefaults();
     const { result, unmount } = renderHook(() => useModalManagement(props));
