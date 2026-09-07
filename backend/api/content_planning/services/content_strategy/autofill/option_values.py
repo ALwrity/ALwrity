@@ -12,7 +12,7 @@ frontend only ever receives in-range values (mapped case-insensitively where
 possible; unmapped -> None).
 """
 
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 COMPETITIVE_POSITION_OPTIONS = ["Market Leader", "Challenger", "Follower", "Niche Player"]
 CONTENT_FREQUENCY_OPTIONS = ["Daily", "2-3 times per week", "Weekly", "Bi-weekly", "Monthly", "Quarterly"]
