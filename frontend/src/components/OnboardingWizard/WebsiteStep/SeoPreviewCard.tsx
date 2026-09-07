@@ -19,16 +19,20 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import { runSeoPreview, getSeoPreview, type SeoPreviewResult } from "./utils/seoPreviewApi";
+import {
+  readBackgroundSetupCache,
+  writeBackgroundSetupCache,
+} from "./backgroundSetupCache";
 
 interface SeoPreviewCardProps {
   websiteUrl: string;
+  websiteSessionKey: string;
   /** When true (default), fall back to running the preview if no persisted
    *  results exist. When false ("View Results" mode), only show persisted
    *  results and never trigger a fresh run. */
   autoRun?: boolean;
+  onResultsAvailable?: () => void;
 }
-
-const STORAGE_KEY = "seo_preview_result";
 
 const CATEGORY_LABELS: Record<string, string> = {
   meta: "Meta Tags",
@@ -69,23 +73,35 @@ function scoreLabel(s: number): string {
   return "Poor";
 }
 
-export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl, autoRun = true }) => {
+export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({
+  websiteUrl,
+  websiteSessionKey,
+  autoRun = true,
+  onResultsAvailable,
+}) => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SeoPreviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedPages, setExpandedPages] = useState<Set<number>>(new Set());
   const [autoLoaded, setAutoLoaded] = useState(false);
 
+  const applyResult = (data: SeoPreviewResult | null) => {
+    if (data?.success && data?.pages?.length) {
+      setResult(data);
+      writeBackgroundSetupCache('seoPreview', websiteSessionKey, data);
+      onResultsAvailable?.();
+      return true;
+    }
+    return false;
+  };
+
   const runPreview = async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await runSeoPreview(websiteUrl);
-      setResult(data);
       if (data.success) {
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        } catch {}
+        applyResult(data);
       } else {
         setError(data.error || "Preview failed");
       }
@@ -97,38 +113,40 @@ export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl, auto
   };
 
   useEffect(() => {
-    if (!autoLoaded && websiteUrl) {
+    setAutoLoaded(false);
+    setResult(null);
+    setError(null);
+  }, [websiteUrl, websiteSessionKey]);
+
+  useEffect(() => {
+    if (!autoLoaded && websiteUrl && websiteSessionKey) {
       setAutoLoaded(true);
 
-      // 1. Restore instantly from localStorage (survives refresh).
-      try {
-        const cached = localStorage.getItem(STORAGE_KEY);
-        if (cached) {
-          const parsed = JSON.parse(cached) as SeoPreviewResult;
-          if (parsed?.success && parsed?.pages?.length) {
-            setResult(parsed);
-            return;
-          }
-        }
-      } catch {}
+      const cached = readBackgroundSetupCache<SeoPreviewResult>('seoPreview', websiteSessionKey);
+      if (applyResult(cached)) {
+        return;
+      }
 
-      // 2. Otherwise load persisted results from the DB (no re-run, no 429s).
       getSeoPreview(websiteUrl)
         .then((data) => {
-          if (data?.success && data?.pages?.length) {
-            setResult(data);
-            try {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-            } catch {}
-          } else if (autoRun) {
-            runPreview();
+          if (applyResult(data)) {
+            return;
           }
+          if (autoRun) {
+            void runPreview();
+            return;
+          }
+          setError('No SEO preview results are available for this website yet. Run Preview first.');
         })
         .catch(() => {
-          if (autoRun) runPreview();
+          if (autoRun) {
+            void runPreview();
+            return;
+          }
+          setError('Could not load SEO preview results from the server.');
         });
     }
-  }, [websiteUrl, autoLoaded, autoRun]);
+  }, [websiteUrl, websiteSessionKey, autoLoaded, autoRun]);
 
   const togglePage = (i: number) => {
     setExpandedPages((prev) => {

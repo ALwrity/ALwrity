@@ -1,301 +1,65 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React from 'react';
 import {
   Box,
   Button,
   Typography,
   Alert,
-  Stack,
   CircularProgress,
   Backdrop,
 } from '@mui/material';
-import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import AssessmentIcon from '@mui/icons-material/Assessment';
-import { 
-  getPersonalizationConfigurationOptions,
-} from '../../api/componentLogic';
-import { getLatestBrandAvatar, getLatestVoiceClone } from '../../api/brandAssets';
-import { usePersonaPolling } from '../../hooks/usePersonaPolling';
-import { aiApiClient } from '../../api/client';
-import { savePersonaUpdate, getPersonaPlatforms, generatePlatformPersona, type PersonaPlatform } from '../../api/personaApi';
 import { type GenerationStep } from './PersonaStep/PersonaGenerationProgress';
-import { usePersonaInitialization } from './PersonaStep/personaInitialization';
-import { usePersonaGeneration } from './PersonaStep/personaGeneration';
-import { PersonaPreviewSection } from './PersonaStep/PersonaPreviewSection';
-import { PersonaLoadingState } from './PersonaStep/PersonaLoadingState';
-import { BrandAvatarStudio } from './PersonalizationStep/components/BrandAvatarStudio';
-import { VoiceAvatarPlaceholder } from './PersonalizationStep/components/VoiceAvatarPlaceholder';
 import { TestPersonaModal } from './PersonalizationStep/components/TestPersonaModal';
 import { Step4Hero } from './PersonaStep/Step4Hero';
+import { PersonalizationStepTabs } from './PersonalizationStep/PersonalizationStepTabs';
+import {
+  usePersonalizationStepController,
+  type PersonalizationStepProps,
+} from './PersonalizationStep/usePersonalizationStepController';
 
-interface PersonalizationStepProps {
-  onContinue: (data?: any) => void;
-  onValidationChange?: (isValid: boolean) => void;
-  onDataChange?: (data: any) => void;
-  onboardingType?: string;
-  onboardingData?: {
-    websiteAnalysis?: any;
-    competitorResearch?: any;
-    sitemapAnalysis?: any;
-    businessData?: any;
-    website?: string;
-  };
-  stepData?: {
-    corePersona?: any;
-    platformPersonas?: Record<string, any>;
-    qualityMetrics?: any;
-    selectedPlatforms?: string[];
-  };
-}
+const PersonalizationStep: React.FC<PersonalizationStepProps> = (props) => {
+  const {
+    activeTab,
+    generationStep,
+    isGenerating,
+    progress,
+    error,
+    success,
+    corePersona,
+    platformPersonas,
+    qualityMetrics,
+    completeness,
+    dataSufficiency,
+    showPreview,
+    configurationOptions,
+    platforms,
+    generatingPlatform,
+    generatingPlatformName,
+    brandAvatarSet,
+    voiceCloneSet,
+    avatarUrl,
+    voiceUrl,
+    showTestPersonaModal,
+    openTestDriveModal,
+    closeTestDriveModal,
+    checkAssetStatus,
+    setCorePersona,
+    setPlatformPersonas,
+    setShowPreview,
+    setSuccess,
+    setBrandAvatarSet,
+    setVoiceCloneSet,
+    setIntroVideoUrl,
+    handleRegenerate,
+    handleGenerateNow,
+    handleTabChange,
+    generatePersonas,
+    progressMessages,
+    domainName,
+  } = usePersonalizationStepController(props);
 
-interface QualityMetrics {
-  overall_score: number;
-  style_consistency: number;
-  brand_alignment: number;
-  platform_optimization: number;
-  engagement_potential: number;
-  recommendations: string[];
-}
-
-type PersonalizationTab = 'text' | 'image' | 'audio';
-
-// Merge a freshly generated platform persona into the local (localStorage) cache so
-// on-demand "Generate Now" results survive a page reload even if the server-cache
-// check is skipped for the current session.
-function persistPlatformPersonaToCache(platformId: string, persona: any) {
-  try {
-    const raw = localStorage.getItem('persona_generation_data');
-    if (!raw) return;
-    const cached = JSON.parse(raw);
-    if (cached && typeof cached === 'object') {
-      cached.platform_personas = {
-        ...(cached.platform_personas || {}),
-        [platformId]: persona,
-      };
-      cached.timestamp = new Date().toISOString();
-      localStorage.setItem('persona_generation_data', JSON.stringify(cached));
-    }
-  } catch (err) {
-    console.warn('Failed to cache platform persona:', err);
-  }
-}
-
-const PersonalizationStep: React.FC<PersonalizationStepProps> = ({ 
-  onContinue: _onContinue, 
-  onValidationChange,
-  onDataChange,
-  onboardingType,
-  onboardingData = {},
-  stepData
-}) => {
-  // Tabs State
-  const [activeTab, setActiveTab] = useState<PersonalizationTab>('text');
-
-  // AI Generation state (Ported from PersonaStep)
-  const [generationStep, setGenerationStep] = useState<string>('analyzing');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  // Persona data — seed from stepData so the first onDataChange call writes
-  // valid data instead of nulls (prevents AI re-generation on back-navigation).
-  const [corePersona, setCorePersona] = useState<any>(stepData?.corePersona ?? null);
-  const [platformPersonas, setPlatformPersonas] = useState<Record<string, any>>(stepData?.platformPersonas ?? {});
-  const [qualityMetrics, setQualityMetrics] = useState<QualityMetrics | null>(stepData?.qualityMetrics ?? null);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(stepData?.selectedPlatforms ?? ['linkedin', 'blog']);
-  // Phase 2: deterministic completeness + data-sufficiency scores.
-  // Backed by the backend's `PersonaPromptBuilder.compute_completeness` +
-  // `OnboardingDataCollector.calculate_data_sufficiency`. Optional — when
-  // absent, the merged "How we built this persona" accordion falls back
-  // to LLM-confidence-only.
-  const [completeness, setCompleteness] = useState<{
-    score?: number | null;
-    structural_score?: number | null;
-    missing?: string[] | null;
-  } | null>(null);
-  const [dataSufficiency, setDataSufficiency] = useState<number | null>(null);
-
-  // UI state
-  const [showPreview, setShowPreview] = useState(false);
-  const [, setHasCheckedCache] = useState(false);
-  const [configurationOptions, setConfigurationOptions] = useState<any>(null);
-  const [platforms, setPlatforms] = useState<PersonaPlatform[]>([]);
-  const [generatingPlatform, setGeneratingPlatform] = useState<string | null>(null);
-
-  // Asset Status State
-  const [brandAvatarSet, setBrandAvatarSet] = useState(false);
-  const [voiceCloneSet, setVoiceCloneSet] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string>('');
-  const [voiceUrl, setVoiceUrl] = useState<string>('');
-  const [introVideoUrl, setIntroVideoUrl] = useState<string>('');
-  
-  // Modal State — `hasTriggeredModal` is persisted in sessionStorage so the
-  // auto-open only fires once per browser session (avoids re-popping the
-  // modal every time the user navigates back to Step 4).
-  const TEST_DRIVE_SEEN_KEY = 'test_drive_modal_seen';
-  const [showTestPersonaModal, setShowTestPersonaModal] = useState(false);
-  const [hasTriggeredModal, setHasTriggeredModal] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem(TEST_DRIVE_SEEN_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
-
-  const openTestDriveModal = useCallback(() => {
-    setShowTestPersonaModal(true);
-  }, []);
-
-  const closeTestDriveModal = useCallback(() => {
-    setShowTestPersonaModal(false);
-    // Mark as seen so we don't auto-open again this session
-    setHasTriggeredModal(true);
-    try {
-      sessionStorage.setItem(TEST_DRIVE_SEEN_KEY, '1');
-    } catch { /* ignore */ }
-  }, []);
-
-  const checkAssetStatus = useCallback(async () => {
-    try {
-      const avatarResp = await getLatestBrandAvatar();
-      let isAvatarSet = avatarResp.success;
-      let avatarDisplayUrl = '';
-
-      if (avatarResp.success) {
-         // Prefer base64 if available (immediate), else URL
-         avatarDisplayUrl = avatarResp.image_base64 
-            ? (avatarResp.image_base64.startsWith('data:') ? avatarResp.image_base64 : `data:image/png;base64,${avatarResp.image_base64}`)
-            : avatarResp.image_url || '';
-      } else {
-        // Fallback to local storage
-        try {
-          const localAvatar = localStorage.getItem('brand_avatar_selection');
-          if (localAvatar) {
-            const parsed = JSON.parse(localAvatar);
-            if (parsed.set) {
-              isAvatarSet = true;
-              // Try to recover image from Studio storage
-              const studioImage = localStorage.getItem('brand_avatar_result');
-              if (studioImage) {
-                 avatarDisplayUrl = studioImage.startsWith('http') ? studioImage : 
-                    (studioImage.startsWith('data:') ? studioImage : `data:image/png;base64,${studioImage}`);
-              }
-            }
-          }
-        } catch (e) {}
-      }
-
-      setBrandAvatarSet(isAvatarSet);
-      if (avatarDisplayUrl) setAvatarUrl(avatarDisplayUrl);
-      
-      const voiceResp = await getLatestVoiceClone();
-      let isVoiceSet = voiceResp.success;
-      let voiceDisplayUrl = '';
-
-      if (voiceResp.success && voiceResp.preview_audio_url) {
-         voiceDisplayUrl = voiceResp.preview_audio_url;
-      } else {
-         // Fallback to local storage
-         try {
-           const localVoice = localStorage.getItem('brand_voice_selection');
-           if (localVoice) {
-             const parsed = JSON.parse(localVoice);
-             if (parsed.set) {
-               isVoiceSet = true;
-               // Try to recover audio from Studio storage
-               const studioVoice = localStorage.getItem('voice_clone_result_url');
-               if (studioVoice) {
-                  voiceDisplayUrl = studioVoice;
-               }
-             }
-           }
-         } catch (e) {}
-      }
-
-      setVoiceCloneSet(isVoiceSet);
-      if (voiceDisplayUrl) setVoiceUrl(voiceDisplayUrl);
-    } catch (e) {
-      console.error("Failed to check asset status", e);
-    }
-  }, []);
-
-  useEffect(() => {
-    checkAssetStatus();
-  }, [checkAssetStatus]);
-
-  // Sync data to parent Wizard
-  useEffect(() => {
-    if (onDataChange) {
-      const personaData = {
-        corePersona,
-        platformPersonas,
-        qualityMetrics,
-        selectedPlatforms,
-        brandAvatar: {
-          set: brandAvatarSet,
-          url: avatarUrl
-        },
-        voiceClone: {
-          set: voiceCloneSet,
-          url: voiceUrl
-        },
-        introVideo: {
-          set: !!introVideoUrl,
-          url: introVideoUrl
-        },
-        stepType: 'personalization',
-        completedAt: new Date().toISOString()
-      };
-      onDataChange(personaData);
-    }
-  }, [
-    corePersona, 
-    platformPersonas, 
-    qualityMetrics, 
-    selectedPlatforms, 
-    brandAvatarSet, 
-    avatarUrl, 
-    voiceCloneSet, 
-    voiceUrl, 
-    introVideoUrl,
-    onDataChange
-  ]);
-
-  // Debounced auto-save of persona edits to the server. Edits are also
-  // persisted on "Continue" (complete_step), but this makes them durable
-  // even if the user navigates away or refreshes without clicking through.
-  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    if (!corePersona || isGenerating) return;
-
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-    }
-
-    saveTimerRef.current = setTimeout(() => {
-      savePersonaUpdate({
-        core_persona: corePersona,
-        platform_personas: platformPersonas,
-        quality_metrics: qualityMetrics ?? {},
-        selected_platforms: selectedPlatforms,
-      }).catch((err) => {
-        // Non-blocking: a failed auto-save is surfaced only in the console.
-        // The authoritative write still happens on Continue.
-        console.warn('Persona auto-save failed:', err);
-      });
-    }, 800);
-
-    return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-      }
-    };
-  }, [corePersona, platformPersonas, qualityMetrics, selectedPlatforms, isGenerating]);
-
-  // Generation steps (Ported from PersonaStep)
   const generationSteps: GenerationStep[] = [
     {
       id: 'analyzing',
@@ -331,268 +95,6 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
     }
   ];
 
-  // Load cached persona data (Ported from PersonaStep)
-  const loadCachedPersonaData = useCallback(() => {
-    try {
-      const cachedData = localStorage.getItem('persona_generation_data');
-      if (cachedData) {
-        const parsedData = JSON.parse(cachedData);
-        const cacheTime = new Date(parsedData.timestamp);
-        const now = new Date();
-        const hoursDiff = (now.getTime() - cacheTime.getTime()) / (1000 * 60 * 60);
-        
-        if (hoursDiff < 24) {
-          setCorePersona(parsedData.core_persona);
-          setPlatformPersonas(parsedData.platform_personas);
-          setQualityMetrics(parsedData.quality_metrics);
-          setCompleteness(parsedData.completeness ?? null);
-          setDataSufficiency(
-            typeof parsedData.data_sufficiency === 'number' ? parsedData.data_sufficiency : null
-          );
-          setShowPreview(true);
-          setGenerationStep('preview');
-          setProgress(100);
-          setSuccess('Loaded your saved Brand Voice. Click "Regenerate" for a fresh analysis.');
-          return true;
-        } else {
-          localStorage.removeItem('persona_generation_data');
-        }
-      }
-    } catch (err) {
-      console.warn('Failed to load cached Brand Voice:', err);
-    }
-    return false;
-  }, []);
-
-  const loadServerCachedPersonaData = useCallback(async () => {
-    try {
-      const resp = await aiApiClient.get('/api/onboarding/step4/persona-latest');
-      if (resp.data && resp.data.success && resp.data.persona) {
-        const p = resp.data.persona;
-        setCorePersona(p.core_persona);
-        setPlatformPersonas(p.platform_personas || {});
-        setQualityMetrics(p.quality_metrics || null);
-        setCompleteness(p.completeness ?? null);
-        setDataSufficiency(typeof p.data_sufficiency === 'number' ? p.data_sufficiency : null);
-        if (Array.isArray(p.selected_platforms)) {
-          setSelectedPlatforms(p.selected_platforms);
-        }
-        setShowPreview(true);
-        setGenerationStep('preview');
-        setProgress(100);
-        try {
-          localStorage.setItem('persona_generation_data', JSON.stringify({
-            ...p,
-            timestamp: p.timestamp || new Date().toISOString(),
-          }));
-        } catch {}
-        setSuccess('Loaded your saved Brand Voice from server. Click "Regenerate" for a fresh analysis.');
-        return true;
-      }
-    } catch (e: any) {
-      if (e?.response?.status === 404) {
-        console.log('No cached persona found on server');
-      } else if (e?.response?.status === 401) {
-        throw e;
-      }
-    }
-    return false;
-  }, []);
-
-  const savePersonaDataToCache = useCallback((personaData: any) => {
-    try {
-      const cacheData = {
-        ...personaData,
-        timestamp: new Date().toISOString(),
-        selected_platforms: selectedPlatforms
-      };
-      localStorage.setItem('persona_generation_data', JSON.stringify(cacheData));
-    } catch (err) {
-      console.warn('Failed to cache persona data:', err);
-    }
-  }, [selectedPlatforms]);
-
-  const { startPolling, progressMessages } = usePersonaPolling({
-    onProgress: (message, progress) => {
-      setProgress(progress);
-      setGenerationStep(getStepFromMessage(message));
-    },
-    onComplete: (personaResult) => {
-      if (personaResult && personaResult.success) {
-        setCorePersona(personaResult.core_persona);
-        setPlatformPersonas(personaResult.platform_personas);
-        setQualityMetrics(personaResult.quality_metrics);
-        setCompleteness(personaResult.completeness ?? null);
-        setDataSufficiency(
-          typeof personaResult.data_sufficiency === 'number'
-            ? personaResult.data_sufficiency
-            : null
-        );
-        setShowPreview(true);
-        setGenerationStep('preview');
-        setProgress(100);
-        savePersonaDataToCache(personaResult);
-      }
-      setIsGenerating(false);
-    },
-    onError: (error) => {
-      setError(error);
-      setIsGenerating(false);
-    }
-  });
-
-  const { generatePersonas, getStepFromMessage } = usePersonaGeneration({
-    onboardingData,
-    selectedPlatforms,
-    setCorePersona,
-    setPlatformPersonas,
-    setQualityMetrics,
-    setShowPreview,
-    setGenerationStep,
-    setProgress,
-    setIsGenerating,
-    setError,
-    savePersonaDataToCache,
-    startPolling
-  });
-
-  const { initialize } = usePersonaInitialization({
-    stepData,
-    setCorePersona,
-    setPlatformPersonas,
-    setQualityMetrics,
-    setSelectedPlatforms,
-    setShowPreview,
-    setGenerationStep,
-    setProgress,
-    setHasCheckedCache,
-    setSuccess,
-    loadCachedPersonaData,
-    loadServerCachedPersonaData,
-    generatePersonas
-  });
-
-  const initRef = useRef(false);
-
-  useEffect(() => {
-    if (initRef.current) return;
-    initRef.current = true;
-    
-    const initSequence = async () => {
-      // Load configuration options first (lightweight)
-      try {
-        const options = await getPersonalizationConfigurationOptions();
-        setConfigurationOptions(options.options);
-      } catch (e) {
-        console.error('Failed to load configuration options:', e);
-      }
-
-      // Load the canonical persona platform list (backend registry)
-      try {
-        const platformList = await getPersonaPlatforms();
-        setPlatforms(platformList);
-      } catch (e) {
-        console.error('Failed to load persona platforms:', e);
-      }
-
-      // Then initialize persona generation (potentially heavy)
-      await initialize();
-    };
-
-    initSequence();
-  }, [initialize]);
-
-  const handleRegenerate = () => {
-    setShowPreview(false);
-    setCorePersona(null);
-    setPlatformPersonas({});
-    setQualityMetrics(null);
-    generatePersonas(true);
-  };
-
-  // On-demand generation for a single platform ("Generate Now").
-  // Blocking: the Backdrop overlay prevents interaction while the LLM call runs.
-  const handleGenerateNow = useCallback(async (platformId: string) => {
-    setError(null);
-    setGeneratingPlatform(platformId);
-
-    try {
-      const resp = await generatePlatformPersona(platformId);
-      if (resp.success && resp.persona) {
-        setPlatformPersonas((prev) => ({ ...prev, [platformId]: resp.persona }));
-        persistPlatformPersonaToCache(platformId, resp.persona);
-        setSelectedPlatforms((prev) => (prev.includes(platformId) ? prev : [...prev, platformId]));
-      } else {
-        setError(resp.message || `Failed to generate ${platformId} persona.`);
-      }
-    } catch (err: any) {
-      setError(err?.message || `Failed to generate ${platformId} persona.`);
-    } finally {
-      setGeneratingPlatform(null);
-    }
-  }, []);
-
-  const generatingPlatformName = useMemo(
-    () => platforms.find((p) => p.id === generatingPlatform)?.name || generatingPlatform || '',
-    [platforms, generatingPlatform],
-  );
-
-  // Re-fetch the latest persisted persona to pick up platform personas that were
-  // generated in the background after onboarding (e.g. Facebook/Twitter/YouTube).
-  // Only fills in *missing* platforms so it never clobbers in-progress local edits.
-  const refreshPersonaData = useCallback(async () => {
-    try {
-      const resp = await aiApiClient.get('/api/onboarding/step4/persona-latest');
-      if (resp.data?.success && resp.data?.persona) {
-        const p = resp.data.persona;
-        const serverPlatforms = p.platform_personas || {};
-        setPlatformPersonas((prev) => {
-          const next = { ...prev };
-          for (const [pid, pp] of Object.entries(serverPlatforms)) {
-            if (!next[pid]) {
-              next[pid] = pp;
-            }
-          }
-          return next;
-        });
-        if (Array.isArray(p.selected_platforms)) {
-          setSelectedPlatforms((prev) => Array.from(new Set([...prev, ...p.selected_platforms])));
-        }
-      }
-    } catch (e) {
-      // Non-critical: background generation status refresh is best-effort.
-    }
-  }, []);
-
-  const handleTabChange = useCallback((tab: PersonalizationTab) => {
-    setActiveTab(tab);
-    if (tab === 'text') {
-      refreshPersonaData();
-    }
-  }, [refreshPersonaData]);
-
-  useEffect(() => {
-    const hasValidData = !!(corePersona && platformPersonas && Object.keys(platformPersonas).length > 0 && qualityMetrics);
-    // LinkedIn onboarding only requires the text persona; website onboarding
-    // also requires brand avatar and voice clone.
-    const isLinkedIn = onboardingType === 'linkedin';
-    const isComplete = !isGenerating && hasValidData && generationStep === 'preview' &&
-      (isLinkedIn || (brandAvatarSet && voiceCloneSet));
-    
-    if (onValidationChange) {
-      onValidationChange(isComplete);
-    }
-
-    // Trigger Test Persona Modal when all requirements are met (only once per session)
-    if (isComplete && !hasTriggeredModal && !showTestPersonaModal) {
-        setHasTriggeredModal(true);
-        try {
-          sessionStorage.setItem(TEST_DRIVE_SEEN_KEY, '1');
-        } catch { /* ignore */ }
-        setShowTestPersonaModal(true);
-    }
-  }, [corePersona, platformPersonas, qualityMetrics, isGenerating, generationStep, onValidationChange, brandAvatarSet, voiceCloneSet, hasTriggeredModal, showTestPersonaModal]);
-
   if (!configurationOptions) {
     return (
       <Box sx={{ py: 4, textAlign: 'center' }}>
@@ -604,28 +106,11 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
     );
   }
 
-  const websiteUrl =
-    onboardingData?.websiteAnalysis?.website_url ||
-    onboardingData?.websiteAnalysis?.website ||
-    onboardingData?.website ||
-    '';
-  let domainName: string | undefined;
-  try {
-    const normalizedUrl = websiteUrl && !/^https?:\/\//i.test(websiteUrl) ? `https://${websiteUrl}` : websiteUrl;
-    const hostname = normalizedUrl ? new URL(normalizedUrl).hostname : '';
-    domainName = hostname ? hostname.replace(/^www\./i, '') : undefined;
-  } catch {
-    domainName = undefined;
-  }
-
   return (
     <Box sx={{
       transition: 'background-color 0.3s ease',
       bgcolor: 'transparent',
     }}>
-      {/* Step 4 Hero — explainer card at top of step. Now contains the tab switcher
-          (clickable source tiles) and the inline completion bar with progress +
-          Regenerate + All-set buttons. The standalone tab row is gone. */}
       <Step4Hero
         activeTab={activeTab}
         onTabChange={handleTabChange}
@@ -637,63 +122,40 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
         onTestDrive={openTestDriveModal}
       />
 
-      <Box sx={{ minHeight: 400 }}>
-        {activeTab === 'text' && (
-          <Box>
-            <PersonaLoadingState
-              showPreview={showPreview}
-              isGenerating={isGenerating}
-              corePersona={corePersona}
-              progress={progress}
-              generationStep={generationStep}
-              generationSteps={generationSteps}
-              progressMessages={progressMessages}
-              error={error}
-              pollingError={null}
-              success={success}
-              handleRegenerate={handleRegenerate}
-              generatePersonas={generatePersonas}
-              setShowPreview={setShowPreview}
-              setSuccess={setSuccess}
-            />
+      <PersonalizationStepTabs
+        activeTab={activeTab}
+        showPreview={showPreview}
+        isGenerating={isGenerating}
+        corePersona={corePersona}
+        progress={progress}
+        generationStep={generationStep}
+        generationSteps={generationSteps}
+        progressMessages={progressMessages}
+        error={error}
+        success={success}
+        platformPersonas={platformPersonas}
+        qualityMetrics={qualityMetrics}
+        platforms={platforms}
+        completeness={completeness}
+        dataSufficiency={dataSufficiency}
+        domainName={domainName}
+        setCorePersona={setCorePersona}
+        setPlatformPersonas={setPlatformPersonas}
+        handleRegenerate={handleRegenerate}
+        generatePersonas={generatePersonas}
+        setShowPreview={setShowPreview}
+        setSuccess={setSuccess}
+        onGenerateNow={handleGenerateNow}
+        onAvatarSet={() => {
+          setBrandAvatarSet(true);
+          checkAssetStatus();
+        }}
+        onVoiceSet={() => {
+          setVoiceCloneSet(true);
+          checkAssetStatus();
+        }}
+      />
 
-            <PersonaPreviewSection
-              showPreview={showPreview}
-              corePersona={corePersona}
-              platformPersonas={platformPersonas}
-              qualityMetrics={qualityMetrics}
-              platforms={platforms}
-              setCorePersona={setCorePersona}
-              setPlatformPersonas={setPlatformPersonas}
-              onGenerateNow={handleGenerateNow}
-              completeness={completeness}
-              data_sufficiency={dataSufficiency}
-            />
-          </Box>
-        )}
-
-        {activeTab === 'image' && (
-          <BrandAvatarStudio 
-            domainName={domainName} 
-            onAvatarSet={() => {
-              setBrandAvatarSet(true);
-              checkAssetStatus();
-            }} 
-          />
-        )}
-
-        {activeTab === 'audio' && (
-          <VoiceAvatarPlaceholder 
-            domainName={domainName} 
-            onVoiceSet={() => {
-              setVoiceCloneSet(true);
-              checkAssetStatus();
-            }} 
-          />
-        )}
-      </Box>
-
-      {/* Inline error/success — friendly, with retry on errors */}
       {(error || success) && (
         <Box sx={{ mt: 2 }}>
           {error && (
@@ -726,7 +188,6 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
         </Box>
       )}
 
-      {/* Test Persona Modal */}
       <TestPersonaModal
         open={showTestPersonaModal}
         onClose={closeTestDriveModal}
@@ -738,7 +199,6 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
         onVideoGenerated={(url) => setIntroVideoUrl(url || '')}
       />
 
-      {/* Blocking overlay while generating a platform persona on demand */}
       <Backdrop
         open={!!generatingPlatform}
         sx={{ zIndex: (theme) => theme.zIndex.modal + 1, color: '#fff', flexDirection: 'column', gap: 2 }}
