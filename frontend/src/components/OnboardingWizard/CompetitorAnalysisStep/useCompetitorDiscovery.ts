@@ -6,7 +6,15 @@ import {
   ONBOARDING_STORAGE_KEYS,
   resolveCurrentWebsiteSessionKey,
 } from '../common/onboardingStorageKeys';
-import { normalizeOnboardingUrl } from '../common/onboardingSessionKey';
+import {
+  isCompetitorCacheValid,
+  readCompetitorCacheSessionKey,
+  writeCompetitorCacheSessionKey,
+} from './competitorDiscoveryCache';
+import {
+  canTrustBackendResearchData,
+  mapDbCompetitorsToUi,
+} from './competitorResearchRestore';
 
 interface UseCompetitorDiscoveryProps {
   userUrl: string;
@@ -14,6 +22,7 @@ interface UseCompetitorDiscoveryProps {
   initialData: any;
   sitemapAnalysis: any;
   mergeCrawlSocialMedia: (exaData: Record<string, any>) => Record<string, any>;
+  researchStepCompleted?: boolean;
 }
 
 interface UseCompetitorDiscoveryReturn {
@@ -45,6 +54,7 @@ export function useCompetitorDiscovery({
   initialData,
   sitemapAnalysis,
   mergeCrawlSocialMedia,
+  researchStepCompleted = false,
 }: UseCompetitorDiscoveryProps): UseCompetitorDiscoveryReturn {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -63,51 +73,110 @@ export function useCompetitorDiscovery({
   const initializationStarted = useRef(false);
   const crawlSocialMediaRef = useRef<Record<string, string>>({});
 
+  const canTrustInitialResearchData = useCallback((): boolean => {
+    const liveUrl = localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteUrl) || '';
+    return canTrustBackendResearchData({
+      initialData,
+      userUrl,
+      liveWebsiteUrl: liveUrl,
+    });
+  }, [initialData, userUrl]);
+
+  const applyPersistedResearchState = useCallback(
+    (payload: {
+      competitors?: Competitor[];
+      social_media_accounts?: Record<string, unknown>;
+      research_summary?: unknown;
+      researchSummary?: unknown;
+      content_pillars?: ContentPillarData | null;
+      sitemap_analysis?: unknown;
+    }) => {
+      const comps = payload.competitors || [];
+      if (comps.length > 0) {
+        setCompetitors(comps);
+      }
+      if (payload.social_media_accounts) {
+        setSocialMediaAccounts(mergeCrawlSocialMedia(payload.social_media_accounts));
+      }
+      const summary = payload.researchSummary || payload.research_summary;
+      if (summary) {
+        setResearchSummary(summary);
+      }
+      if (payload.content_pillars) {
+        setContentPillars(payload.content_pillars);
+      }
+      setUsingCachedData(true);
+    },
+    [mergeCrawlSocialMedia]
+  );
+
+  const persistCompetitorCache = useCallback(
+    (finalUserUrl: string, analysisData: Record<string, unknown>) => {
+      const sessionKey = resolveCurrentWebsiteSessionKey(finalUserUrl);
+      try {
+        localStorage.setItem(
+          ONBOARDING_STORAGE_KEYS.competitorAnalysisData,
+          JSON.stringify(analysisData)
+        );
+        localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisUrl, finalUserUrl);
+        localStorage.setItem(
+          ONBOARDING_STORAGE_KEYS.competitorAnalysisTimestamp,
+          Date.now().toString()
+        );
+        writeCompetitorCacheSessionKey(sessionKey);
+      } catch (cacheErr) {
+        console.warn('[useCompetitorDiscovery] Failed to cache competitor analysis:', cacheErr);
+      }
+    },
+    []
+  );
+
   const loadCachedAnalysis = useCallback((): boolean => {
     try {
       const cachedData = localStorage.getItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData);
       const cachedUrl = localStorage.getItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisUrl) || '';
-      const cacheTimestamp = localStorage.getItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisTimestamp);
-      const cachedSessionKey = localStorage.getItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisSessionKey);
+      const cacheTimestamp = localStorage.getItem(
+        ONBOARDING_STORAGE_KEYS.competitorAnalysisTimestamp
+      );
+      const cachedSessionKey = readCompetitorCacheSessionKey();
 
-      const finalUserUrl = userUrl || localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteUrl) || '';
+      const finalUserUrl =
+        userUrl || localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteUrl) || '';
       const currentSessionKey = resolveCurrentWebsiteSessionKey(finalUserUrl);
 
-      if (cachedSessionKey && cachedSessionKey !== currentSessionKey) {
+      if (
+        !cachedData ||
+        !isCompetitorCacheValid({
+          cachedUrl,
+          cachedSessionKey,
+          currentSessionKey,
+          userUrl: finalUserUrl,
+          cacheTimestamp,
+        })
+      ) {
         return false;
       }
 
-      if (
-        cachedData &&
-        normalizeOnboardingUrl(cachedUrl) === normalizeOnboardingUrl(finalUserUrl) &&
-        cacheTimestamp
-      ) {
-        const cacheAge = Date.now() - parseInt(cacheTimestamp);
-        const cacheValidDuration = 24 * 60 * 60 * 1000;
+      const parsedData = JSON.parse(cachedData);
+      const hasCompetitors = (parsedData.competitors || []).length > 0;
+      const hasResearch = !!parsedData.research_summary;
 
-        if (cacheAge < cacheValidDuration) {
-          const parsedData = JSON.parse(cachedData);
-          const hasCompetitors = (parsedData.competitors || []).length > 0;
-          const hasResearch = !!parsedData.research_summary;
-
-          if (hasCompetitors || hasResearch) {
-            setCompetitors(parsedData.competitors || []);
-            setSocialMediaAccounts(parsedData.social_media_accounts || {});
-            setResearchSummary(parsedData.research_summary || null);
-            setContentPillars(parsedData.content_pillars || null);
-            setUsingCachedData(true);
-            return true;
-          } else {
-            localStorage.removeItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData);
-            localStorage.removeItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisUrl);
-            localStorage.removeItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisTimestamp);
-            localStorage.removeItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisSessionKey);
-          }
-        }
+      if (hasCompetitors || hasResearch) {
+        setCompetitors(parsedData.competitors || []);
+        setSocialMediaAccounts(parsedData.social_media_accounts || {});
+        setResearchSummary(parsedData.research_summary || null);
+        setContentPillars(parsedData.content_pillars || null);
+        setUsingCachedData(true);
+        return true;
       }
+
+      localStorage.removeItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData);
+      localStorage.removeItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisUrl);
+      localStorage.removeItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisTimestamp);
+      localStorage.removeItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisSessionKey);
       return false;
     } catch (err) {
-      console.error('Error loading cached analysis:', err);
+      console.error('[useCompetitorDiscovery] Error loading cached analysis:', err);
       return false;
     }
   }, [userUrl]);
@@ -115,32 +184,80 @@ export function useCompetitorDiscovery({
   const updateCacheWithSitemapAnalysis = useCallback((sitemapResult: any) => {
     try {
       const cachedData = localStorage.getItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData);
+      const finalUserUrl =
+        userUrl || localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteUrl) || '';
+      const sessionKey = resolveCurrentWebsiteSessionKey(finalUserUrl);
+
       if (cachedData) {
         const parsedData = JSON.parse(cachedData);
         parsedData.sitemap_analysis = sitemapResult;
-        localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData, JSON.stringify(parsedData));
+        localStorage.setItem(
+          ONBOARDING_STORAGE_KEYS.competitorAnalysisData,
+          JSON.stringify(parsedData)
+        );
       } else {
-        // Create the cache entry so future mounts have the sitemap data
-        // even if competitor_analysis_data was never written.
-        const finalUserUrl = userUrl || localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteUrl) || '';
-        localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData, JSON.stringify({
+        persistCompetitorCache(finalUserUrl, {
           competitors: [],
           social_media_accounts: {},
           research_summary: null,
           sitemap_analysis: sitemapResult,
           content_pillars: null,
-        }));
-        localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisUrl, finalUserUrl);
-        localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisTimestamp, Date.now().toString());
-        localStorage.setItem(
-          ONBOARDING_STORAGE_KEYS.competitorAnalysisSessionKey,
-          resolveCurrentWebsiteSessionKey(finalUserUrl)
-        );
+        });
       }
+      writeCompetitorCacheSessionKey(sessionKey);
     } catch (err) {
-      console.warn('Failed to update cache with sitemap analysis:', err);
+      console.warn('[useCompetitorDiscovery] Failed to update cache with sitemap analysis:', err);
     }
-  }, [userUrl]);
+  }, [userUrl, persistCompetitorCache]);
+
+  const loadPersistedCompetitorsFromDatabase = useCallback(async (): Promise<boolean> => {
+    const finalUserUrl =
+      userUrl || localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteUrl) || '';
+    if (!finalUserUrl.trim()) {
+      return false;
+    }
+
+    try {
+      const dbResult = await longRunningApiClient.get('/api/onboarding/competitor-analysis');
+      const records = dbResult?.data?.competitors;
+      if (!Array.isArray(records) || records.length === 0) {
+        return false;
+      }
+
+      const comps = mapDbCompetitorsToUi(records);
+      applyPersistedResearchState({
+        competitors: comps,
+        social_media_accounts: initialData?.social_media_accounts,
+        researchSummary: initialData?.researchSummary,
+        content_pillars: initialData?.content_pillars || null,
+        sitemap_analysis: initialData?.sitemapAnalysis,
+      });
+
+      persistCompetitorCache(finalUserUrl, {
+        competitors: comps,
+        social_media_accounts: initialData?.social_media_accounts || {},
+        social_media_citations: initialData?.social_media_citations || [],
+        research_summary: initialData?.researchSummary || null,
+        sitemap_analysis: initialData?.sitemapAnalysis || sitemapAnalysis || null,
+        content_pillars: initialData?.content_pillars || null,
+      });
+
+      console.log(
+        '[useCompetitorDiscovery] Restored persisted competitor research from database',
+        { count: comps.length }
+      );
+      return true;
+    } catch (err) {
+      console.warn('[useCompetitorDiscovery] Failed to restore competitors from database:', err);
+      return false;
+    }
+  }, [
+    applyPersistedResearchState,
+    initialData,
+    persistCompetitorCache,
+    sitemapAnalysis,
+    userUrl,
+  ]);
 
   const startCompetitorDiscovery = useCallback(async (force = false) => {
     if (!force && loadCachedAnalysis()) {
@@ -148,33 +265,9 @@ export function useCompetitorDiscovery({
     }
 
     if (!force) {
-      try {
-        const dbResult = await longRunningApiClient.get('/api/onboarding/competitor-analysis');
-        if (dbResult?.data?.competitors?.length > 0) {
-          const comps = dbResult.data.competitors.map((c: any) => {
-            const ad = c.analysis_data && typeof c.analysis_data === 'object' ? c.analysis_data : {};
-            return {
-              url: c.url || c.competitor_url || '',
-              domain: c.domain || c.competitor_domain || '',
-              title: ad.title || c.title || c.url || '',
-              summary: ad.summary || '',
-              relevance_score: ad.relevance_score ?? 0.8,
-              highlights: ad.highlights || [],
-              favicon: ad.favicon ?? null,
-              image: ad.image ?? null,
-              published_date: ad.published_date ?? null,
-              author: ad.author ?? null,
-              subpages: ad.subpages || [],
-              competitive_insights: ad.competitive_analysis || ad.competitive_insights || { business_model: '', target_audience: '' },
-              content_insights: ad.content_insights || { content_focus: '', content_quality: '' },
-              market_positioning: ad.market_positioning || {},
-            };
-          });
-          setCompetitors(comps);
-          setUsingCachedData(true);
-        }
-      } catch {
-        // DB check failed — proceed with fresh API call
+      const restoredFromDb = await loadPersistedCompetitorsFromDatabase();
+      if (restoredFromDb) {
+        return;
       }
     }
 
@@ -208,7 +301,9 @@ export function useCompetitorDiscovery({
       const onboardingContextUrl = (window as any).onboardingContext?.websiteUrl || '';
       const finalUserUrl = propUserUrl || localStorageUrl || onboardingContextUrl || '';
 
-      const localStorageAnalysis = localStorage.getItem('website_analysis_data');
+      const localStorageAnalysis = localStorage.getItem(
+        ONBOARDING_STORAGE_KEYS.websiteAnalysisData
+      );
       let websiteAnalysisData = null;
       if (localStorageAnalysis) {
         try { websiteAnalysisData = JSON.parse(localStorageAnalysis); } catch (e) {}
@@ -252,21 +347,11 @@ export function useCompetitorDiscovery({
           timestamp: new Date().toISOString(),
         });
 
-        try {
-          localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData, JSON.stringify({
-            ...analysisData,
-            social_media_accounts: mergedAccounts,
-            content_pillars: result.content_pillars || null,
-          }));
-          localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisUrl, finalUserUrl);
-          localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisTimestamp, Date.now().toString());
-          localStorage.setItem(
-            ONBOARDING_STORAGE_KEYS.competitorAnalysisSessionKey,
-            resolveCurrentWebsiteSessionKey(finalUserUrl)
-          );
-        } catch (cacheErr) {
-          console.warn('Failed to cache competitor analysis:', cacheErr);
-        }
+        persistCompetitorCache(finalUserUrl, {
+          ...analysisData,
+          social_media_accounts: mergedAccounts,
+          content_pillars: result.content_pillars || null,
+        });
 
         setShowProgressModal(false);
         setIsAnalyzing(false);
@@ -281,7 +366,7 @@ export function useCompetitorDiscovery({
       setIsLoadingPillars(false);
       setShowProgressModal(false);
     }
-  }, [userUrl, industryContext, loadCachedAnalysis, sitemapAnalysis, mergeCrawlSocialMedia]);
+  }, [userUrl, industryContext, loadCachedAnalysis, loadPersistedCompetitorsFromDatabase, sitemapAnalysis, mergeCrawlSocialMedia, persistCompetitorCache]);
 
   const refreshContentPillars = useCallback(async () => {
     setIsLoadingPillars(true);
@@ -316,7 +401,10 @@ export function useCompetitorDiscovery({
         if (cachedData) {
           const parsedData = JSON.parse(cachedData);
           parsedData.content_pillars = payload;
-          localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData, JSON.stringify(parsedData));
+          localStorage.setItem(
+            ONBOARDING_STORAGE_KEYS.competitorAnalysisData,
+            JSON.stringify(parsedData)
+          );
         }
       } catch (cacheErr) {
         console.warn('Failed to update cache with content pillars:', cacheErr);
@@ -350,43 +438,23 @@ export function useCompetitorDiscovery({
         setSocialMediaAccounts(mergeCrawlSocialMedia(initialData.social_media_accounts));
       }
 
-      const finalUserUrl = userUrl || localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteUrl) || '';
-      const initialWebsiteUrl =
-        initialData?.website ||
-        initialData?.website_url ||
-        initialData?.userUrl ||
-        '';
-      const backendMatchesCurrentWebsite =
-        !initialWebsiteUrl ||
-        normalizeOnboardingUrl(initialWebsiteUrl) === normalizeOnboardingUrl(finalUserUrl);
-
-      // 1. Check for backend competitors data (SSOT) — only when URL matches
-      if (initialData?.competitors?.length > 0 && backendMatchesCurrentWebsite) {
+      // 1. Check for backend competitors data when it matches the current website session
+      if (canTrustInitialResearchData()) {
         setCompetitors(initialData.competitors);
         if (initialData.researchSummary) setResearchSummary(initialData.researchSummary);
         setContentPillars(initialData.content_pillars || null);
         setUsingCachedData(true);
 
-        try {
-          const analysisData = {
-            competitors: initialData.competitors || [],
-            social_media_accounts: initialData.social_media_accounts || {},
-            social_media_citations: initialData.social_media_citations || [],
-            research_summary: initialData.researchSummary || null,
-            sitemap_analysis: initialData.sitemapAnalysis || null,
-            content_pillars: initialData.content_pillars || null
-          };
-          const finalUserUrl = userUrl || localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteUrl) || '';
-          localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisData, JSON.stringify(analysisData));
-          localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisUrl, finalUserUrl);
-          localStorage.setItem(ONBOARDING_STORAGE_KEYS.competitorAnalysisTimestamp, Date.now().toString());
-          localStorage.setItem(
-            ONBOARDING_STORAGE_KEYS.competitorAnalysisSessionKey,
-            resolveCurrentWebsiteSessionKey(finalUserUrl)
-          );
-        } catch (e) {
-          console.warn('Failed to prime cache from backend data', e);
-        }
+        const finalUserUrl =
+          userUrl || localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteUrl) || '';
+        persistCompetitorCache(finalUserUrl, {
+          competitors: initialData.competitors || [],
+          social_media_accounts: initialData.social_media_accounts || {},
+          social_media_citations: initialData.social_media_citations || [],
+          research_summary: initialData.researchSummary || null,
+          sitemap_analysis: initialData.sitemapAnalysis || null,
+          content_pillars: initialData.content_pillars || null,
+        });
 
         // Self-heal: only when the DB has *no* pillars at all (e.g. a legacy
         // session). A persisted "failed" state is left visible with its Retry
@@ -399,24 +467,44 @@ export function useCompetitorDiscovery({
         return;
       }
 
-      if (initialData?.competitors?.length > 0 && !backendMatchesCurrentWebsite) {
-        console.warn(
-          '[useCompetitorDiscovery] Ignoring stale backend competitors for mismatched website URL',
-          { initialWebsiteUrl, finalUserUrl }
-        );
-      }
-
       // 2. Try to load from cache
       const cacheLoaded = loadCachedAnalysis();
 
-      // 3. If no cache found, run fresh analysis
+      // 3. Restore from database for completed research steps / cleared local caches
       if (!cacheLoaded) {
-        await startCompetitorDiscovery(false);
+        const dbLoaded = await loadPersistedCompetitorsFromDatabase();
+        if (dbLoaded) {
+          return;
+        }
+      } else {
+        return;
       }
+
+      // 4. Completed research should not silently re-run expensive discovery
+      if (researchStepCompleted) {
+        console.warn(
+          '[useCompetitorDiscovery] Research step is completed but no persisted research was found. Use Run Fresh Analysis to regenerate.'
+        );
+        return;
+      }
+
+      // 5. First-time research only
+      await startCompetitorDiscovery(false);
     };
 
     initialize();
-  }, [initialData, loadCachedAnalysis, startCompetitorDiscovery, mergeCrawlSocialMedia, refreshContentPillars]);
+  }, [
+    initialData,
+    loadCachedAnalysis,
+    loadPersistedCompetitorsFromDatabase,
+    startCompetitorDiscovery,
+    mergeCrawlSocialMedia,
+    refreshContentPillars,
+    canTrustInitialResearchData,
+    persistCompetitorCache,
+    userUrl,
+    researchStepCompleted,
+  ]);
 
   return {
     competitors,
