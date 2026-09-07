@@ -100,6 +100,8 @@ const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
   reviewedCategories,
   isMarkingReviewed,
   showEducationalInfo,
+  // Phase E #42: read-only while AI generates (optimistic UI).
+  disabledInputs = false,
   STRATEGIC_INPUT_FIELDS,
   onUpdateFormField,
   onValidateFormField,
@@ -199,6 +201,7 @@ const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({
                     confidenceLevel={confidenceScores[field.id] || (autoPopulatedFields[field.id] ? 0.8 : undefined)}
                     dataQuality={autoPopulatedFields[field.id] ? 'High Quality' : undefined}
                     personalizationData={personalizationData[field.id]}
+                    disabled={disabledInputs}
                     onChange={(value: any) => onUpdateFormField(field.id, value)}
                     onValidate={() => onValidateFormField(field.id)}
                     onShowTooltip={() => onShowTooltip(field.id)}

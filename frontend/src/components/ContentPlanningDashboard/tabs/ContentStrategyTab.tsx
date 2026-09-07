@@ -286,10 +286,20 @@ const ContentStrategyTab: React.FC = () => {
 
   const handleConfirmStrategy = async () => {
     try {
-      // In a real implementation, you would update the strategy status in the database
+      // Resolve the strategy being confirmed: the one surfaced in the dialog
+      // (currentStrategy), falling back to the newest strategy in the store.
+      const candidates = Array.isArray(strategies)
+        ? strategies
+        : (strategies as any)?.strategies ?? [];
+      const target = currentStrategy ?? candidates[0] ?? null;
+      const strategyId = target?.id != null ? Number(target.id) : null;
+
+      if (strategyId) {
+        await contentPlanningApi.activateStrategy(strategyId);
+      }
       setShowOnboarding(false);
-      
-      // Reload strategies to get updated data
+
+      // Reload strategies to reflect the now-active state
       await loadStrategies();
     } catch (error) {
       console.error('Error activating strategy:', error);

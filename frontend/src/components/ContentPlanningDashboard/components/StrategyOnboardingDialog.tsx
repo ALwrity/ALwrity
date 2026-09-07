@@ -391,7 +391,7 @@ const StrategyOnboardingDialog: React.FC<StrategyOnboardingDialogProps> = ({
                     onClick={onCreateNewStrategy}
                     startIcon={<AddIcon />}
                   >
-                    Create New
+                    Open Strategy Builder
                   </Button>
                 </Grid>
               </Grid>
@@ -418,7 +418,7 @@ const StrategyOnboardingDialog: React.FC<StrategyOnboardingDialogProps> = ({
                       transition: 'all 0.3s ease'
                     }}
                   >
-                    Create Strategy with AI
+                    Open Strategy Builder
                   </Button>
                 </Grid>
                 <Grid item xs={12} md={6}>

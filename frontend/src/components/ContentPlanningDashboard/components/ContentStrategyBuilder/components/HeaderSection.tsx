@@ -247,7 +247,7 @@ const HeaderSection: React.FC<HeaderSectionProps> = ({
               fontWeight: 600,
             }}
           >
-            Create Strategy
+            Create Strategy with AI
           </Button>
         ) : (
           <Button

@@ -17,6 +17,10 @@ export interface EducationalModalProps {
   onClose: () => void;
   educationalContent: EducationalContent | null;
   generationProgress: number;
+  /** Phase E #22: the backend's real step (1..8) — replaces progress/10 derivation. */
+  currentStep?: number;
+  /** Phase E #41: aborts the in-flight polling loop (a cancel is not an error). */
+  onCancel?: () => void;
   onReviewStrategy?: () => void;
 }
 
@@ -30,6 +34,8 @@ export interface CategoryDetailViewProps {
   inputDataPoints: Record<string, any>;
   personalizationData: Record<string, any>;
   completionStats: any;
+  /** Phase E #42: fields read-only while AI generation runs. */
+  disabledInputs?: boolean;
   reviewedCategories: Set<string>;
   isMarkingReviewed: boolean;
   showEducationalInfo: string | null;
@@ -80,6 +86,10 @@ export interface ActionButtonsBusinessLogicProps {
   generateAIRecommendations: (strategyId: string) => Promise<void>;
   createEnhancedStrategy: (strategyData: any) => Promise<any>;
   contentPlanningApi: any;
+  /** Phase E #22: tracks the backend's real step (1..8) on every poll. */
+  setCurrentStep?: (step: number) => void;
+  /** Phase C #19/#43: fired on every generation-failure path so the builder can offer a Retry CTA. */
+  onGenerationError?: (message: string) => void;
 }
 
 // Strategy Generation Types

@@ -94,6 +94,7 @@ from middleware.auth_middleware import get_current_user
 from ....utils.error_handlers import ContentPlanningErrorHandler
 from ....utils.response_builders import ResponseBuilder
 from ....utils.constants import ERROR_MESSAGES, SUCCESS_MESSAGES
+from ....utils.rate_limiter import enforce_rate_limit, GENERATE_STRATEGY_LIMITS
 
 router = APIRouter(tags=["AI Strategy Generation"])
 
@@ -742,26 +743,48 @@ async def generate_comprehensive_strategy_polling(
     saving. In hard mode a genuine grounding failure marks the task "failed"
     with a grounding_violations list instead of saving/serving it; soft mode
     (default) annotates the strategy metadata only.
+
+    Phase-fix: ``form_data`` (the user's 30 strategy-builder fields) is now
+    read from the request and threaded into ``context`` so the AI generator
+    can adapt its output to what the user actually typed instead of guessing
+    from onboarding data alone.
     """
     try:
         # Extract parameters from request body
         user_id = current_user.get('id')
         strategy_name = request.get("strategy_name")
         config = request.get("config", {})
-        
+        form_data = request.get("form_data") or {}
+
+        # Phase G #33: each successful start spawns 5 AI component
+        # generations + DB writes in a background task — the client-side
+        # aiGenerating guard is not a substitute for a server-side cap.
+        enforce_rate_limit(
+            'strategy_generate', str(user_id or 'anonymous'), GENERATE_STRATEGY_LIMITS
+        )
+
+        if form_data and not isinstance(form_data, dict):
+            raise HTTPException(
+                status_code=400,
+                detail="form_data must be an object/dict",
+            )
+
         logger.info(f"🚀 Starting polling-based AI strategy generation for user: {user_id}")
-        
+
         # Get user context and onboarding data
         db_service = EnhancedStrategyDBService(db)
         enhanced_service = EnhancedStrategyService(db_service)
-        
+
         # Get onboarding data for context
         onboarding_data = await enhanced_service._get_onboarding_data(user_id)
         _validate_strategy_context(onboarding_data)
-                
-        # Build context for AI generation
+
+        # Build context for AI generation. form_data carries the user's
+        # 30 strategy-builder inputs; downstream AI components merge them
+        # with onboarding data to produce tailored output.
         context = {
                     "onboarding_data": onboarding_data,
+                    "form_data": form_data,
                     "user_id": user_id,
                     "generation_config": config or {}
         }
@@ -826,133 +849,28 @@ async def generate_comprehensive_strategy_polling(
         async def generate_strategy_background():
             try:
                 logger.info(f"🔄 Starting background strategy generation for task: {task_id}")
-                
-                # Step 1: Get user context
-                generate_comprehensive_strategy_polling._task_status[task_id].update({
-                    "step": 1,
-                    "progress": 10,
-                    "message": "Getting user context...",
-                    "educational_content": EducationalContentManager.get_step_content(1)
-                })
-                
-                # Step 2: Generate base strategy fields
-                generate_comprehensive_strategy_polling._task_status[task_id].update({
-                    "step": 2,
-                    "progress": 20,
-                    "message": "Generating base strategy fields...",
-                    "educational_content": EducationalContentManager.get_step_content(2)
-                })
-                
-                # Step 3: Generate strategic insights
-                generate_comprehensive_strategy_polling._task_status[task_id].update({
-                    "step": 3,
-                    "progress": 30,
-                    "message": "Generating strategic insights...",
-                    "educational_content": EducationalContentManager.get_step_content(3)
-                })
-                
-                strategic_insights = await strategy_generator._generate_strategic_insights({}, context)
-                
-                generate_comprehensive_strategy_polling._task_status[task_id].update({
-                    "step": 3,
-                    "progress": 35,
-                    "message": "Strategic insights generated successfully",
-                    "educational_content": EducationalContentManager.get_step_completion_content(3, strategic_insights)
-                })
-                
-                # Step 4: Generate competitive analysis
-                generate_comprehensive_strategy_polling._task_status[task_id].update({
-                    "step": 4,
-                    "progress": 40,
-                    "message": "Generating competitive analysis...",
-                    "educational_content": EducationalContentManager.get_step_content(4)
-                })
-                
-                competitive_analysis = await strategy_generator._generate_competitive_analysis({}, context)
-                
-                generate_comprehensive_strategy_polling._task_status[task_id].update({
-                    "step": 4,
-                    "progress": 45,
-                    "message": "Competitive analysis generated successfully",
-                    "educational_content": EducationalContentManager.get_step_completion_content(4, competitive_analysis)
-                })
-                
-                # Step 5: Generate performance predictions
-                generate_comprehensive_strategy_polling._task_status[task_id].update({
-                    "step": 5,
-                    "progress": 50,
-                    "message": "Generating performance predictions...",
-                    "educational_content": EducationalContentManager.get_step_content(5)
-                })
-                
-                performance_predictions = await strategy_generator._generate_performance_predictions({}, context)
-                
-                generate_comprehensive_strategy_polling._task_status[task_id].update({
-                    "step": 5,
-                    "progress": 55,
-                    "message": "Performance predictions generated successfully",
-                    "educational_content": EducationalContentManager.get_step_completion_content(5, performance_predictions)
-                })
-                
-                # Step 6: Generate implementation roadmap
-                generate_comprehensive_strategy_polling._task_status[task_id].update({
-                    "step": 6,
-                    "progress": 60,
-                    "message": "Generating implementation roadmap...",
-                    "educational_content": EducationalContentManager.get_step_content(6)
-                })
-                
-                implementation_roadmap = await strategy_generator._generate_implementation_roadmap({}, context)
-                
-                generate_comprehensive_strategy_polling._task_status[task_id].update({
-                    "step": 6,
-                    "progress": 65,
-                    "message": "Implementation roadmap generated successfully",
-                    "educational_content": EducationalContentManager.get_step_completion_content(6, implementation_roadmap)
-                })
-                
-                # Step 7: Generate risk assessment
-                generate_comprehensive_strategy_polling._task_status[task_id].update({
-                    "step": 7,
-                    "progress": 70,
-                    "message": "Generating risk assessment...",
-                    "educational_content": EducationalContentManager.get_step_content(7)
-                })
-                
-                risk_assessment = await strategy_generator._generate_risk_assessment({}, context)
-                
-                generate_comprehensive_strategy_polling._task_status[task_id].update({
-                    "step": 7,
-                    "progress": 75,
-                    "message": "Risk assessment generated successfully",
-                    "educational_content": EducationalContentManager.get_step_completion_content(7, risk_assessment)
-                })
-                
-                # Step 8: Compile comprehensive strategy
-                generate_comprehensive_strategy_polling._task_status[task_id].update({
-                    "step": 8,
-                    "progress": 80,
-                    "message": "Compiling comprehensive strategy...",
-                    "educational_content": EducationalContentManager.get_step_content(8)
-                })
-                
-                # Compile the comprehensive strategy (NO CONTENT CALENDAR)
-                comprehensive_strategy = {
-                    "strategic_insights": strategic_insights,
-                    "competitive_analysis": competitive_analysis,
-                    "performance_predictions": performance_predictions,
-                    "implementation_roadmap": implementation_roadmap,
-                    "risk_assessment": risk_assessment,
-                    "metadata": {
-                        "ai_generated": True,
-                        "comprehensive": True,
-                        "generation_timestamp": datetime.utcnow().isoformat(),
-                        "user_id": user_id,
-                        "strategy_name": strategy_name or "Enhanced Content Strategy",
-                        "content_calendar_ready": False  # Indicates calendar needs to be generated separately
-                    }
-                }
-                
+
+                # Step-wise UX is driven by the generator's progress_callback:
+                # each emission refreshes task step/progress/message and swaps
+                # the educational-modal content for the current phase.
+                def _emit_status(step: int, progress: int, message: str) -> None:
+                    generate_comprehensive_strategy_polling._task_status[task_id].update({
+                        "step": step,
+                        "progress": progress,
+                        "message": message,
+                        "educational_content": EducationalContentManager.get_step_content(step)
+                    })
+
+                # Delegate to the shared generator. It runs the autofill base,
+                # the five AI components, and its own soft grounding validation,
+                # with form_data (threaded into context) overlaying autofill.
+                comprehensive_strategy = await strategy_generator.generate_comprehensive_strategy(
+                    user_id=user_id,
+                    context=context,
+                    strategy_name=strategy_name,
+                    progress_callback=_emit_status
+                )
+
                 # Quality gate: validate strategy is grounded in real onboarding data.
                 # In hard mode the helper raises HTTPException(422) on genuine
                 # grounding failures; convert that into a failed task status.
@@ -971,15 +889,15 @@ async def generate_comprehensive_strategy_polling(
                         "failed_at": datetime.utcnow().isoformat()
                     })
                     return
-                
+
                 # Step 8: Complete
                 completion_content = EducationalContentManager.get_step_content(8)
                 completion_content = EducationalContentManager.update_completion_summary(
                     completion_content, 
                     {
-                        "performance_predictions": performance_predictions,
-                        "implementation_roadmap": implementation_roadmap,
-                        "risk_assessment": risk_assessment
+                        "performance_predictions": comprehensive_strategy.get("performance_predictions") or {},
+                        "implementation_roadmap": comprehensive_strategy.get("implementation_roadmap") or {},
+                        "risk_assessment": comprehensive_strategy.get("risk_assessment") or {}
                     }
                 )
                 
@@ -1024,7 +942,7 @@ async def generate_comprehensive_strategy_polling(
                     logger.info(f"💾 Strategy saved to database with ID: {enhanced_strategy.id}")
                     
                     # Update the comprehensive strategy with the database ID
-                    comprehensive_strategy["metadata"]["strategy_id"] = enhanced_strategy.id
+                    comprehensive_strategy.setdefault("strategy_metadata", {})["strategy_id"] = enhanced_strategy.id
                     
                 except Exception as db_error:
                     logger.error(f"❌ Error saving strategy to database: {str(db_error)}")
@@ -1073,6 +991,11 @@ async def generate_comprehensive_strategy_polling(
             }
         )
         
+    except HTTPException:
+        # Phase G #33: client-error statuses (429 rate limit, 400 form_data,
+        # 409 context validation) must reach the client with their real code —
+        # the general handler below would steamroll them into a 500.
+        raise
     except Exception as e:
         logger.error(f"❌ Error starting polling-based strategy generation: {str(e)}")
         raise ContentPlanningErrorHandler.handle_general_error(e, "generate_comprehensive_strategy_polling")

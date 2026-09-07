@@ -7,8 +7,9 @@ from datetime import datetime
 from services.database import get_session_for_user
 from middleware.auth_middleware import get_current_user
 from sqlalchemy import desc
-from models.content_strategy_state_models import StrategyWizardState, ActiveStrategy
+from models.content_strategy_state_models import StrategyWizardState
 from models.enhanced_strategy_models import EnhancedContentStrategy
+from models.monitoring_models import StrategyActivationStatus
 from ....utils.error_handlers import ContentPlanningErrorHandler
 from ....utils.response_builders import ResponseBuilder
 
@@ -16,7 +17,7 @@ router = APIRouter(tags=["Strategy Wizard"])
 
 
 def get_db(current_user: Dict[str, Any] = Depends(get_current_user)):
-    """Get a DB session for the authenticated user."""
+    """Get a per-user DB session for the authenticated user's workspace."""
     user_id = str(current_user.get("id"))
     if not user_id:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -27,6 +28,18 @@ def get_db(current_user: Dict[str, Any] = Depends(get_current_user)):
         yield db
     finally:
         db.close()
+
+
+def _as_int_user_id(user_id) -> Optional[int]:
+    """Coerce a user id to the numeric shape used by ``strategy_activation_status``.
+
+    Mirrors ``api/onboarding_utils/endpoints_tasks._has_active_strategy``: the
+    activation rows store integer user ids; non-numeric ids degrade to None.
+    """
+    try:
+        return int(user_id)
+    except (TypeError, ValueError):
+        return None
 
 
 @router.get("/wizard/state")
@@ -176,9 +189,10 @@ async def get_latest_strategy(
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Get the latest strategy for the authenticated user."""
+    """Get the latest strategy and its activation status for the authenticated user."""
     try:
         user_id = str(current_user.get("id"))
+        uid = _as_int_user_id(user_id)
 
         strategy = db.query(EnhancedContentStrategy).filter(
             EnhancedContentStrategy.user_id == user_id
@@ -190,16 +204,21 @@ async def get_latest_strategy(
                 data=None
             )
 
-        active = db.query(ActiveStrategy).filter(
-            ActiveStrategy.user_id == user_id
-        ).first()
+        active_strategy_id = None
+        if uid is not None:
+            active = db.query(StrategyActivationStatus).filter(
+                StrategyActivationStatus.user_id == uid,
+                StrategyActivationStatus.status == "active",
+            ).order_by(desc(StrategyActivationStatus.activation_date)).first()
+            if active:
+                active_strategy_id = active.strategy_id
 
         return ResponseBuilder.create_success_response(
             message="Latest strategy retrieved",
             data={
                 "strategy": strategy.to_dict(),
-                "is_active": active is not None and active.strategy_id == strategy.id,
-                "active_strategy_id": active.strategy_id if active else None,
+                "is_active": active_strategy_id is not None and active_strategy_id == strategy.id,
+                "active_strategy_id": active_strategy_id,
             }
         )
 
@@ -216,13 +235,25 @@ async def activate_strategy(
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Activate a strategy for the authenticated user (only one active at a time)."""
+    """Activate a strategy by writing the single source of truth
+    (``strategy_activation_status``, status ``'active'``).
+
+    Idempotent: re-activating an already-active strategy only refreshes
+    ``last_updated``. Follows the existing additive semantics used by
+    ``strategy_service.activate_strategy`` — the current active strategy is the
+    one with the latest ``activation_date`` (as read by ``ActiveStrategyService``
+    and onboarding's ``_has_active_strategy``).
+    """
     try:
         user_id = str(current_user.get("id"))
 
         strategy_id = payload.get("strategy_id")
         if not strategy_id:
             raise HTTPException(status_code=400, detail="strategy_id required")
+
+        uid = _as_int_user_id(user_id)
+        if uid is None:
+            raise HTTPException(status_code=400, detail="User ID must be numeric for strategy activation")
 
         strategy = db.query(EnhancedContentStrategy).filter(
             EnhancedContentStrategy.id == strategy_id
@@ -234,26 +265,44 @@ async def activate_strategy(
         if str(strategy.user_id) != user_id:
             raise HTTPException(status_code=403, detail="Not authorized to activate this strategy")
 
-        existing = db.query(ActiveStrategy).filter(
-            ActiveStrategy.user_id == user_id
+        now = datetime.utcnow()
+        existing = db.query(StrategyActivationStatus).filter(
+            StrategyActivationStatus.user_id == uid,
+            StrategyActivationStatus.strategy_id == strategy_id,
         ).first()
 
-        if existing:
-            existing.strategy_id = strategy_id
-            existing.activated_at = datetime.utcnow()
-        else:
-            existing = ActiveStrategy(user_id=user_id, strategy_id=strategy_id)
+        if not existing:
+            existing = StrategyActivationStatus(
+                user_id=uid,
+                strategy_id=strategy_id,
+                activation_date=now,
+                status="active",
+                last_updated=now,
+            )
             db.add(existing)
+        elif existing.status != "active":
+            existing.status = "active"
+            existing.activation_date = now
+            existing.last_updated = now
+        else:
+            existing.last_updated = now
 
         db.commit()
         db.refresh(existing)
+
+        try:
+            from services.active_strategy_service import ActiveStrategyService
+            await ActiveStrategyService(db_session=db).clear_cache(uid)
+        except Exception as cache_error:
+            logger.debug(f"Could not clear active strategy cache: {cache_error}")
 
         return ResponseBuilder.create_success_response(
             message="Strategy activated",
             data={
                 "strategy_id": strategy_id,
                 "strategy": strategy.to_dict(),
-                "activated_at": existing.activated_at.isoformat() if existing.activated_at else None,
+                "activated_at": existing.activation_date.isoformat() if existing.activation_date else None,
+                "status": existing.status,
             }
         )
 
@@ -270,13 +319,22 @@ async def get_active_strategy(
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Get the currently active strategy for the authenticated user."""
+    """Get the currently active strategy (latest ``activation_date``, status
+    ``'active'``) for the authenticated user — read from the same SSOT rows."""
     try:
         user_id = str(current_user.get("id"))
+        uid = _as_int_user_id(user_id)
 
-        active = db.query(ActiveStrategy).filter(
-            ActiveStrategy.user_id == user_id
-        ).first()
+        if uid is None:
+            return ResponseBuilder.create_success_response(
+                message="No active strategy",
+                data=None
+            )
+
+        active = db.query(StrategyActivationStatus).filter(
+            StrategyActivationStatus.user_id == uid,
+            StrategyActivationStatus.status == "active",
+        ).order_by(desc(StrategyActivationStatus.activation_date)).first()
 
         if not active:
             return ResponseBuilder.create_success_response(
@@ -298,7 +356,7 @@ async def get_active_strategy(
             message="Active strategy retrieved",
             data={
                 "strategy": strategy.to_dict(),
-                "activated_at": active.activated_at.isoformat() if active.activated_at else None,
+                "activated_at": active.activation_date.isoformat() if active.activation_date else None,
             }
         )
 

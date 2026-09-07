@@ -23,13 +23,14 @@ test_component_methods_accept_user_id_kwarg).
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from datetime import datetime
 from dataclasses import dataclass
 
 from services.ai_service_manager import AIServiceManager, AIServiceType
 from services.intelligence.agents.quality_gates import validate_strategy_grounding
 from ..autofill.ai_structured_autofill import AIStructuredAutofillService
+from .prompt_builder import UserIntelligenceFormatter
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,8 @@ class AIStrategyGenerator:
         self, 
         user_id: int, 
         context: Dict[str, Any],
-        strategy_name: Optional[str] = None
+        strategy_name: Optional[str] = None,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None
     ) -> Dict[str, Any]:
         """
         Generate a comprehensive content strategy using AI.
@@ -77,6 +79,8 @@ class AIStrategyGenerator:
             user_id: User ID for personalization
             context: User context and onboarding data
             strategy_name: Optional custom strategy name
+            progress_callback: Optional (step, progress, message) hook so callers
+                (e.g. the polling endpoint) can surface phase-level progress.
             
         Returns:
             Comprehensive strategy with all components (EXCLUDING content calendar)
@@ -91,34 +95,52 @@ class AIStrategyGenerator:
             failed_components = []
             
             # Step 1: Generate base strategy fields (using existing autofill system)
+            self._emit_progress(progress_callback, 1, 10, "Getting user context...")
+            self._emit_progress(progress_callback, 2, 20, "Generating base strategy fields...")
             base_strategy = await self._generate_base_strategy_fields(user_id, context)
             
             # Step 2: Generate strategic insights and recommendations
+            self._emit_progress(progress_callback, 3, 30, "Generating strategic insights...")
             strategic_insights = await self._generate_strategic_insights(base_strategy, context, user_id=user_id)
             if strategic_insights.get("ai_generation_failed"):
                 failed_components.append("strategic_insights")
+            else:
+                self._emit_progress(progress_callback, 3, 35, "Strategic insights generated successfully")
             
             # Step 3: Generate competitive analysis
+            self._emit_progress(progress_callback, 4, 40, "Generating competitive analysis...")
             competitive_analysis = await self._generate_competitive_analysis(base_strategy, context, user_id=user_id)
             if competitive_analysis.get("ai_generation_failed"):
                 failed_components.append("competitive_analysis")
+            else:
+                self._emit_progress(progress_callback, 4, 45, "Competitive analysis generated successfully")
             
             # Step 4: Generate performance predictions
+            self._emit_progress(progress_callback, 5, 50, "Generating performance predictions...")
             performance_predictions = await self._generate_performance_predictions(base_strategy, context, user_id=user_id)
             if performance_predictions.get("ai_generation_failed"):
                 failed_components.append("performance_predictions")
+            else:
+                self._emit_progress(progress_callback, 5, 55, "Performance predictions generated successfully")
             
             # Step 5: Generate implementation roadmap
+            self._emit_progress(progress_callback, 6, 60, "Generating implementation roadmap...")
             implementation_roadmap = await self._generate_implementation_roadmap(base_strategy, context, user_id=user_id)
             if implementation_roadmap.get("ai_generation_failed"):
                 failed_components.append("implementation_roadmap")
+            else:
+                self._emit_progress(progress_callback, 6, 65, "Implementation roadmap generated successfully")
             
             # Step 6: Generate risk assessment
+            self._emit_progress(progress_callback, 7, 70, "Generating risk assessment...")
             risk_assessment = await self._generate_risk_assessment(base_strategy, context, user_id=user_id)
             if risk_assessment.get("ai_generation_failed"):
                 failed_components.append("risk_assessment")
+            else:
+                self._emit_progress(progress_callback, 7, 75, "Risk assessment generated successfully")
             
             # Step 7: Compile comprehensive strategy (NO CONTENT CALENDAR)
+            self._emit_progress(progress_callback, 8, 80, "Compiling comprehensive strategy...")
             # Resolve the configured LLM provider/model for accurate metadata.
             # GPT_PROVIDER pattern — see services/llm_providers/tenant_provider_config.py
             # and services/llm_providers/main_text_generation.py.
@@ -182,6 +204,24 @@ class AIStrategyGenerator:
             self.logger.error(f"❌ Error generating comprehensive strategy: {str(e)}")
             raise RuntimeError(f"Failed to generate comprehensive strategy: {str(e)}")
 
+    def _emit_progress(
+        self,
+        progress_callback: Optional[Callable[[int, int, str], None]],
+        step: int,
+        progress: int,
+        message: str,
+    ) -> None:
+        """Best-effort progress emission; a failing callback must not break generation."""
+        if progress_callback is None:
+            return
+        try:
+            progress_callback(step, progress, message)
+        except Exception:
+            self.logger.warning(
+                f"⚠️ progress_callback failed at step {step} ({message}) — continuing",
+                exc_info=True,
+            )
+
     def _validate_grounding(self, strategy_data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Validate the generated strategy is grounded in onboarding data (soft gate).
 
@@ -213,6 +253,16 @@ class AIStrategyGenerator:
             self.logger.error(f"❌ Grounding validation error (non-blocking): {str(e)}")
             return {"passed": True, "score": 0.0, "status": "error", "error": str(e)}
 
+    def _build_user_intelligence_prompt(self, context: Dict[str, Any]) -> str:
+        """Render the user's form_data + key onboarding signals as a clean,
+        natural-language briefing for the LLM prompts (see prompt_builder.py).
+
+        Reading like a briefing (not a raw JSON blob) lets the model actually
+        personalize against what the user typed instead of treating it as
+        opaque structured noise.
+        """
+        return UserIntelligenceFormatter.build_briefing(context)
+
     async def _generate_base_strategy_fields(
         self, 
         user_id: int, 
@@ -228,6 +278,14 @@ class AIStrategyGenerator:
             # Extract the fields from autofill result
             base_strategy = autofill_result.get("fields", {})
             
+            # Overlay the user's own form data so their edits win over autofill.
+            # context['form_data'] is threaded from the polling endpoint; falling
+            # back to onboarding mapping keeps data grounded in the user's input.
+            form_data = context.get("form_data") or {}
+            for key, value in form_data.items():
+                if value is not None and value != "":
+                    base_strategy[key] = value
+            
             # Add generation metadata
             base_strategy["generation_metadata"] = {
                 "generated_by": "ai_autofill_system",
@@ -240,7 +298,19 @@ class AIStrategyGenerator:
             
         except Exception as e:
             self.logger.error(f"Error generating base strategy fields: {str(e)}")
-            raise
+            # Autofill failure is non-fatal: fall back to an empty base and let
+            # the downstream grounding gate decide the outcome instead of
+            # crashing the whole job with a generic error (the grounding gate
+            # must own grounding judgment, not the autofill step).
+            return {
+                "generation_metadata": {
+                    "generated_by": "fallback",
+                    "success_rate": 0,
+                    "personalized": False,
+                    "data_sources": [],
+                    "autofill_error": str(e)
+                }
+            }
 
     async def _generate_strategic_insights(self, base_strategy: Dict[str, Any], context: Dict[str, Any], user_id: Optional[int] = None, ai_manager: Optional[Any] = None) -> Dict[str, Any]:
         """Generate strategic insights using AI."""
@@ -255,8 +325,8 @@ class AIStrategyGenerator:
             prompt = f"""
             Generate comprehensive strategic insights for content strategy based on the following context:
             
-            CONTEXT:
-            {json.dumps(context, indent=2)}
+            USER & BUSINESS INTELLIGENCE:
+            {self._build_user_intelligence_prompt(context)}
             
             BASE STRATEGY:
             {json.dumps(base_strategy, indent=2)}
@@ -339,8 +409,8 @@ class AIStrategyGenerator:
             prompt = f"""
             Generate comprehensive competitive analysis for content strategy based on the following context:
             
-            CONTEXT:
-            {json.dumps(context, indent=2)}
+            USER & BUSINESS INTELLIGENCE:
+            {self._build_user_intelligence_prompt(context)}
             
             BASE STRATEGY:
             {json.dumps(base_strategy, indent=2)}
@@ -427,8 +497,8 @@ class AIStrategyGenerator:
             prompt = f"""
             Generate comprehensive content calendar for content strategy based on the following context:
             
-            CONTEXT:
-            {json.dumps(context, indent=2)}
+            USER & BUSINESS INTELLIGENCE:
+            {self._build_user_intelligence_prompt(context)}
             
             BASE STRATEGY:
             {json.dumps(base_strategy, indent=2)}
@@ -544,8 +614,8 @@ class AIStrategyGenerator:
             prompt = f"""
             Generate comprehensive performance predictions for content strategy based on the following context:
             
-            CONTEXT:
-            {json.dumps(context, indent=2)}
+            USER & BUSINESS INTELLIGENCE:
+            {self._build_user_intelligence_prompt(context)}
             
             BASE STRATEGY:
             {json.dumps(base_strategy, indent=2)}
@@ -641,8 +711,8 @@ class AIStrategyGenerator:
             prompt = f"""
             Generate comprehensive implementation roadmap for content strategy based on the following context:
             
-            CONTEXT:
-            {json.dumps(context, indent=2)}
+            USER & BUSINESS INTELLIGENCE:
+            {self._build_user_intelligence_prompt(context)}
             
             BASE STRATEGY:
             {json.dumps(base_strategy, indent=2)}
@@ -751,8 +821,8 @@ class AIStrategyGenerator:
             prompt = f"""
             Generate comprehensive risk assessment for content strategy based on the following context:
             
-            CONTEXT:
-            {json.dumps(context, indent=2)}
+            USER & BUSINESS INTELLIGENCE:
+            {self._build_user_intelligence_prompt(context)}
             
             BASE STRATEGY:
             {json.dumps(base_strategy, indent=2)}
@@ -898,129 +968,6 @@ class AIStrategyGenerator:
                 "failure_reason": str(e)
             }
 
-    def _build_strategic_insights_prompt(self, base_strategy: Dict[str, Any], context: Dict[str, Any]) -> str:
-        """Build prompt for strategic insights generation."""
-        return f"""
-        As an expert content strategy consultant with 15+ years of experience, analyze this content strategy and provide strategic insights:
-
-        STRATEGY CONTEXT:
-        {json.dumps(base_strategy, indent=2)}
-
-        USER CONTEXT:
-        {json.dumps(context, indent=2)}
-
-        Provide comprehensive strategic insights covering:
-        1. Key insights about the strategy's strengths and opportunities
-        2. Strategic recommendations with priority levels
-        3. Identified opportunity areas for growth
-        4. Competitive advantages to leverage
-
-        Focus on actionable, data-driven insights that will drive content strategy success.
-        """
-
-    def _build_competitive_analysis_prompt(self, base_strategy: Dict[str, Any], context: Dict[str, Any]) -> str:
-        """Build prompt for competitive analysis generation."""
-        return f"""
-        As a competitive intelligence expert, analyze the competitive landscape for this content strategy:
-
-        STRATEGY CONTEXT:
-        {json.dumps(base_strategy, indent=2)}
-
-        USER CONTEXT:
-        {json.dumps(context, indent=2)}
-
-        Provide comprehensive competitive analysis covering:
-        1. Competitive landscape analysis with key players
-        2. Positioning strategy and differentiation factors
-        3. Market gaps and opportunities
-        4. Competitive advantages and unique value propositions
-
-        Focus on actionable competitive intelligence that will inform strategic positioning.
-        """
-
-    def _build_content_calendar_prompt(self, base_strategy: Dict[str, Any], context: Dict[str, Any]) -> str:
-        """Build prompt for content calendar generation."""
-        return f"""
-        As a content strategy expert, create a comprehensive content calendar for this strategy:
-
-        STRATEGY CONTEXT:
-        {json.dumps(base_strategy, indent=2)}
-
-        USER CONTEXT:
-        {json.dumps(context, indent=2)}
-
-        Generate a {self.config.max_content_pieces}-piece content calendar covering {self.config.timeline_months} months including:
-        1. Diverse content pieces (blog posts, social media, videos, etc.)
-        2. Publishing schedule with optimal timing
-        3. Content mix distribution
-        4. Topic clusters and content pillars
-        5. Target audience alignment
-
-        Ensure content aligns with business objectives and audience preferences.
-        """
-
-    def _build_performance_predictions_prompt(self, base_strategy: Dict[str, Any], context: Dict[str, Any]) -> str:
-        """Build prompt for performance predictions generation."""
-        return f"""
-        As a data-driven content strategist, predict performance outcomes for this content strategy:
-
-        STRATEGY CONTEXT:
-        {json.dumps(base_strategy, indent=2)}
-
-        USER CONTEXT:
-        {json.dumps(context, indent=2)}
-
-        Provide realistic performance predictions covering:
-        1. Traffic growth projections (3, 6, 12 months)
-        2. Engagement metrics predictions
-        3. Conversion and lead generation forecasts
-        4. ROI estimates and success probability
-        5. Key performance indicators with targets
-
-        Base predictions on industry benchmarks and strategy characteristics.
-        """
-
-    def _build_implementation_roadmap_prompt(self, base_strategy: Dict[str, Any], context: Dict[str, Any]) -> str:
-        """Build prompt for implementation roadmap generation."""
-        return f"""
-        As a project management expert, create an implementation roadmap for this content strategy:
-
-        STRATEGY CONTEXT:
-        {json.dumps(base_strategy, indent=2)}
-
-        USER CONTEXT:
-        {json.dumps(context, indent=2)}
-
-        Create a detailed implementation roadmap covering:
-        1. Phased implementation approach
-        2. Resource requirements and budget allocation
-        3. Timeline with milestones and deliverables
-        4. Critical path and dependencies
-        5. Success metrics and evaluation criteria
-
-        Ensure roadmap is realistic and achievable given available resources.
-        """
-
-    def _build_risk_assessment_prompt(self, base_strategy: Dict[str, Any], context: Dict[str, Any]) -> str:
-        """Build prompt for risk assessment generation."""
-        return f"""
-        As a risk management expert, assess potential risks for this content strategy:
-
-        STRATEGY CONTEXT:
-        {json.dumps(base_strategy, indent=2)}
-
-        USER CONTEXT:
-        {json.dumps(context, indent=2)}
-
-        Provide comprehensive risk assessment covering:
-        1. Identified risks with probability and impact
-        2. Risk categorization (market, operational, competitive, resource)
-        3. Mitigation strategies for each risk
-        4. Contingency plans for high-impact scenarios
-        5. Overall risk level assessment
-
-        Focus on practical risk mitigation strategies.
-        """
 
     def _transform_ai_response_to_frontend_format(self, ai_response: Dict[str, Any], response_type: str) -> Dict[str, Any]:
         """

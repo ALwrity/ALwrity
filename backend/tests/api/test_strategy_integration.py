@@ -1352,10 +1352,16 @@ class TestGroundingEnforcementMode:
             async def _noop(base, ctx, **kwargs):
                 return {}
 
-            with patch.object(AIStrategyGenerator, "_generate_competitive_analysis", side_effect=_noop), \
+            with patch(
+                "api.content_planning.services.content_strategy.autofill.ai_structured_autofill.AIStructuredAutofillService.generate_autofill_fields",
+                new_callable=AsyncMock,
+            ) as mock_autofill, \
+                 patch.object(AIStrategyGenerator, "_generate_competitive_analysis", side_effect=_noop), \
                  patch.object(AIStrategyGenerator, "_generate_performance_predictions", side_effect=_noop), \
                  patch.object(AIStrategyGenerator, "_generate_implementation_roadmap", side_effect=_noop), \
                  patch.object(AIStrategyGenerator, "_generate_risk_assessment", side_effect=_noop):
+
+                mock_autofill.return_value = {"fields": {}, "success_rate": 0}
 
                 response = await generate_comprehensive_strategy_polling(
                     request={"strategy_name": "Poll Test"},

@@ -1,4 +1,11 @@
 import { useEffect, useRef } from 'react';
+import { devLog } from '../../../../../utils/devLogger';
+
+// Phase F #28: the modal transition delay is now ONE documented constant
+// instead of two arbitrary magic numbers (300ms/200ms). Rationale: enough
+// time for the MUI dialog's closing animation to finish before the next
+// action fires, so the transition doesn't stutter or look clipped.
+const MODAL_TRANSITION_DELAY_MS = 300;
 
 interface UseModalManagementProps {
   aiGenerating: boolean;
@@ -6,13 +13,23 @@ interface UseModalManagementProps {
   setShowEnterpriseModal: (show: boolean) => void;
 }
 
-export const useModalManagement = ({ 
-  aiGenerating, 
+export const useModalManagement = ({
+  aiGenerating,
   originalHandleCreateStrategy,
-  setShowEnterpriseModal 
+  setShowEnterpriseModal
 }: UseModalManagementProps) => {
   const originalHandleCreateStrategyRef = useRef<(() => Promise<void>) | null>(null);
-  
+  // #9: guard the deferred (setTimeout) handlers — if the component unmounts /
+  // navigates within the delay window, the create must NOT fire (would be a
+  // setState-after-unmount + a "phantom" strategy generation).
+  const isMountedRef = useRef<boolean>(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Update ref when originalHandleCreateStrategy changes
   useEffect(() => {
     if (originalHandleCreateStrategy) {
@@ -20,46 +37,47 @@ export const useModalManagement = ({
     }
   }, [originalHandleCreateStrategy]);
 
-  // Monitor aiGenerating state for debugging
-  useEffect(() => {
-    // Removed verbose logging for cleaner console
-  }, [aiGenerating]);
+  // Phase F #27: the empty "Monitor aiGenerating for debugging" useEffect
+  // (whose body was gutted long ago) is gone — dead effects still subscribe
+  // to their deps on every render for nothing.
 
   // Handle proceed with current strategy (30 fields)
   const handleProceedWithCurrentStrategy = async () => {
     setShowEnterpriseModal(false);
     sessionStorage.removeItem('showEnterpriseModal'); // Clear sessionStorage
-    
-    // Add a small delay to ensure modal closes properly before showing educational modal
+
+    // Wait for the dialog's close animation before proceeding.
     setTimeout(async () => {
       try {
+        if (!isMountedRef.current) return;
         // Ensure we're not already generating
         if (!aiGenerating && originalHandleCreateStrategyRef.current) {
           await originalHandleCreateStrategyRef.current();
         }
       } catch (error) {
-        console.error('Error in handleProceedWithCurrentStrategy:', error);
+        devLog.error('Error in handleProceedWithCurrentStrategy:', error);
       }
-    }, 300); // Increased delay to ensure modal closes completely
+    }, MODAL_TRANSITION_DELAY_MS);
   };
 
   // Handle add enterprise datapoints (coming soon)
   const handleAddEnterpriseDatapoints = async () => {
     setShowEnterpriseModal(false);
     sessionStorage.removeItem('showEnterpriseModal'); // Clear sessionStorage
-    
+
     // For now, just proceed with current strategy
     // In Phase 2, this will enable enterprise datapoints
     setTimeout(async () => {
       try {
+        if (!isMountedRef.current) return;
         // Ensure we're not already generating
         if (!aiGenerating && originalHandleCreateStrategyRef.current) {
           await originalHandleCreateStrategyRef.current();
         }
       } catch (error) {
-        console.error('Error in handleAddEnterpriseDatapoints:', error);
+        devLog.error('Error in handleAddEnterpriseDatapoints:', error);
       }
-    }, 200); // Increased delay to ensure modal closes completely
+    }, MODAL_TRANSITION_DELAY_MS);
   };
 
   return {

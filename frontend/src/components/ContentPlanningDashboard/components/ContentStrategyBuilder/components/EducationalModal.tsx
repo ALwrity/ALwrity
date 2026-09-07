@@ -30,6 +30,8 @@ const EducationalModal: React.FC<EducationalModalProps> = ({
   onClose,
   educationalContent,
   generationProgress,
+  currentStep,
+  onCancel,
   onReviewStrategy
 }) => {
   // Note: Removed debug logging to prevent infinite re-renders
@@ -102,7 +104,12 @@ const EducationalModal: React.FC<EducationalModalProps> = ({
                       Progress: {generationProgress}%
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                      Step {Math.ceil(generationProgress / 10)} of 8 • {Math.ceil((100 - generationProgress) / 10)} steps remaining
+                      {/* Phase E #22: the backend's REAL step is the single source of
+                          progress truth — progress/10 mislabeled phases. Before the
+                          first poll lands we say so honestly instead of inventing a step. */}
+                      {currentStep !== undefined && currentStep > 0
+                        ? `Step ${currentStep} of 8 • ${Math.max(8 - currentStep, 0)} steps remaining`
+                        : 'Initializing — waiting for the first progress update…'}
                     </Typography>
                   </Box>
                   <Box sx={{ textAlign: 'right' }}>
@@ -523,11 +530,18 @@ const EducationalModal: React.FC<EducationalModalProps> = ({
         )}
       </DialogContent>
       
-      <DialogActions sx={{ 
-        p: 3, 
+      <DialogActions sx={{
+        p: 3,
         pt: 0,
-        justifyContent: 'center'
+        justifyContent: 'center',
+        flexDirection: 'column',
+        gap: 2
       }}>
+        {generationProgress >= 100 && (
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+            Your strategy is ready. Click Next to review it and create your content calendar.
+          </Typography>
+        )}
         {generationProgress >= 100 ? (
           // Show "Next: Review Strategy and Create Calendar" button when generation is complete
           <Button
@@ -552,25 +566,44 @@ const EducationalModal: React.FC<EducationalModalProps> = ({
             Next: Review Strategy and Create Calendar
           </Button>
         ) : (
-          // Show "Close" button during generation
-          <Button
-            variant="outlined"
-            onClick={onClose}
-            sx={{ 
-              borderRadius: 2,
-              px: 4,
-              py: 1.5,
-              fontWeight: 600,
-              borderColor: 'rgba(102, 126, 234, 0.3)',
-              color: '#667eea',
-              '&:hover': {
-                borderColor: '#667eea',
-                backgroundColor: 'rgba(102, 126, 234, 0.05)'
-              }
-            }}
-          >
-            Close
-          </Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            {/* Phase E #41: Cancel STOPS the generation (aborts the poll loop)
+                — the old Close button only hid the modal while polling ran on. */}
+            {onCancel && (
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={onCancel}
+                sx={{
+                  borderRadius: 2,
+                  px: 3,
+                  py: 1.5,
+                  fontWeight: 600
+                }}
+              >
+                Cancel Generation
+              </Button>
+            )}
+            {/* Show "Close" button during generation */}
+            <Button
+              variant="outlined"
+              onClick={onClose}
+              sx={{
+                borderRadius: 2,
+                px: 4,
+                py: 1.5,
+                fontWeight: 600,
+                borderColor: 'rgba(102, 126, 234, 0.3)',
+                color: '#667eea',
+                '&:hover': {
+                  borderColor: '#667eea',
+                  backgroundColor: 'rgba(102, 126, 234, 0.05)'
+                }
+              }}
+            >
+              Close
+            </Button>
+          </Box>
         )}
       </DialogActions>
     </Dialog>
