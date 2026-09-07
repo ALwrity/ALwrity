@@ -92,6 +92,8 @@ export const useActionButtonsBusinessLogic = ({
       setLatestGeneratedStrategy(null);
       devLog.log('🧹 Cleared previous cached strategy for new generation');
 
+      // QA breadcrumb: proves the deferred Proceed actually reached the hook.
+      devLog.log('🧪 handleCreateStrategy (hook) entered');
       devLog.log('Starting strategy creation...');
 
       // Always use the polling-based strategy generation for consistency

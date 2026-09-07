@@ -70,7 +70,7 @@ describe('useModalManagement — behavioral', () => {
     expect(latestHandler).toHaveBeenCalledTimes(1);
   });
 
-  it('refuses to fire when aiGenerating is true', async () => {
+  it('still fires when aiGenerating was captured true — the hook owns concurrency, not this layer', async () => {
     const props = propsWithDefaults({ aiGenerating: true });
     const { result } = renderHook(() => useModalManagement(props));
 
@@ -79,7 +79,9 @@ describe('useModalManagement — behavioral', () => {
       await vi.advanceTimersByTimeAsync(300);
     });
 
-    expect(props.originalHandleCreateStrategy).not.toHaveBeenCalled();
+    // The stale-closure gate was removed: isGeneratingRef inside the
+    // ActionButtons hook is the single source of in-flight protection.
+    expect(props.originalHandleCreateStrategy).toHaveBeenCalledTimes(1);
   });
 
   it('NEVER fires after unmount inside the 300ms window (#9)', async () => {
