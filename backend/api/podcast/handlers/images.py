@@ -16,6 +16,7 @@ from middleware.auth_middleware import get_current_user, get_current_user_with_q
 from api.story_writer.utils.auth import require_authenticated_user
 from services.llm_providers.main_image_generation import generate_image, generate_character_image
 from utils.asset_tracker import save_asset_to_library
+from models.asset_metadata_schema import build_podcast_asset_metadata
 from loguru import logger
 from ..constants import get_podcast_media_dir
 from ..models import PodcastImageRequest, PodcastImageResponse
@@ -417,11 +418,12 @@ async def generate_podcast_scene_image(
                 tags=["podcast", "scene", request.scene_id],
                 provider=result.provider,
                 model=result.model,
-                asset_metadata={
-                    "scene_id": request.scene_id,
-                    "scene_title": request.scene_title,
-                    "status": "completed",
-                },
+                asset_metadata=build_podcast_asset_metadata(
+                    asset_role="podcast_scene_image",
+                    project_id=request.project_id,
+                    origin="podcast.images.generate",
+                    extras={"scene_id": request.scene_id, "scene_title": request.scene_title},
+                ),
             )
         except Exception as e:
             logger.warning(f"[Podcast] Failed to save image asset: {e}")

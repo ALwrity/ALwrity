@@ -18,6 +18,7 @@ from api.story_writer.utils.auth import require_authenticated_user
 from services.llm_providers.main_image_generation import generate_image
 from services.llm_providers.main_image_editing import edit_image
 from utils.asset_tracker import save_asset_to_library
+from models.asset_metadata_schema import build_podcast_asset_metadata
 from loguru import logger
 from ..constants import get_podcast_media_dir, PODCAST_AVATARS_SUBDIR
 from ..presenter_personas import choose_persona_id, get_persona
@@ -111,11 +112,11 @@ async def upload_podcast_avatar(
                     title=f"Podcast Presenter Avatar - {project_id}",
                     description="Podcast presenter avatar image",
                     tags=["podcast", "avatar", project_id],
-                    asset_metadata={
-                        "project_id": project_id,
-                        "type": "presenter_avatar",
-                        "status": "completed",
-                    },
+                    asset_metadata=build_podcast_asset_metadata(
+                        asset_role="presenter_avatar",
+                        project_id=project_id,
+                        origin="podcast.avatar.upload",
+                    ),
                 )
             except Exception as e:
                 logger.warning(f"[Podcast] Failed to save avatar asset (non-fatal): {e}")
@@ -223,12 +224,12 @@ async def make_avatar_presentable(
                     tags=["podcast", "avatar", "presenter", "transformed", project_id],
                     provider=result.provider,
                     model=result.model,
-                    asset_metadata={
-                        "project_id": project_id,
-                        "type": "transformed_presenter",
-                        "original_avatar_url": avatar_url,
-                        "status": "completed",
-                    },
+                    asset_metadata=build_podcast_asset_metadata(
+                        asset_role="transformed_presenter",
+                        project_id=project_id,
+                        origin="podcast.avatar.make_presentable",
+                        extras={"original_avatar_url": avatar_url},
+                    ),
                 )
             except Exception as e:
                 logger.warning(f"[Podcast] Failed to save transformed avatar asset: {e}")
@@ -404,14 +405,12 @@ async def generate_podcast_presenters(
                         tags=["podcast", "avatar", "presenter", project_id],
                         provider=result.provider,
                         model=result.model,
-                        asset_metadata={
-                            "project_id": project_id,
-                            "speaker_number": i + 1,
-                            "type": "generated_presenter",
-                            "status": "completed",
-                        "persona_id": selected_persona_id,
-                        "seed": seed,
-                        },
+                        asset_metadata=build_podcast_asset_metadata(
+                            asset_role="generated_presenter",
+                            project_id=project_id,
+                            origin="podcast.avatar.generate",
+                            extras={"speaker_number": i + 1, "persona_id": selected_persona_id, "seed": seed},
+                        ),
                     )
                 except Exception as e:
                     logger.warning(f"[Podcast] Failed to save presenter asset: {e}")
