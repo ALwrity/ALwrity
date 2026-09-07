@@ -61,6 +61,8 @@ interface StrategicInputFieldProps {
   onViewDataSource?: () => void; // Add callback for viewing data source
   accentColorKey?: 'primary' | 'secondary' | 'success' | 'warning' | 'info' | 'error';
   isCompact?: boolean;
+  /** Phase E #42: read-only gate while AI generation runs. */
+  disabled?: boolean;
 }
 
 // Define proper types for field configurations
@@ -106,7 +108,8 @@ const StrategicInputField: React.FC<StrategicInputFieldProps> = ({
   onShowTooltip,
   onViewDataSource,
   accentColorKey = 'primary',
-  isCompact = false
+  isCompact = false,
+  disabled = false
 }) => {
   // Since getTooltipData is not in strategyBuilderStore, we'll create a simple implementation
   const getTooltipData = (fieldId: string) => {
@@ -732,7 +735,12 @@ const StrategicInputField: React.FC<StrategicInputFieldProps> = ({
       }
     }}>
       {/* Field input - Enhanced styling */}
-      <Box sx={{ 
+      <Box sx={{
+        // Phase E #42: while AI generates, the field is read-only — one gate
+        // on the input container covers every input type the field renders,
+        // with a visual cue so the disabled state is obvious.
+        opacity: disabled ? 0.55 : 1,
+        pointerEvents: disabled ? 'none' : 'auto',
         '& .MuiTextField-root, & .MuiFormControl-root': {
           '& .MuiInputBase-root': {
             borderRadius: 1,

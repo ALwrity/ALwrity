@@ -124,6 +124,12 @@ interface EnhancedStrategyStore {
   transparencyModalOpen: boolean;
   transparencyGenerationProgress: number;
   currentPhase: string;
+  // Phase E #22: the backend's REAL numeric step (1..8) streamed on every
+  // poll — the single source for the modal's "Step X of 8" label (the old
+  // Math.ceil(progress / 10) derivation mislabeled phases). Deliberately
+  // named generation* — the store's currentStep already means the
+  // progressive-disclosure wizard step.
+  generationStep: number;
   educationalContent: any;
   transparencyMessages: string[];
   transparencyGenerating: boolean;
@@ -162,6 +168,7 @@ interface EnhancedStrategyStore {
   setTransparencyModalOpen: (open: boolean) => void;
   setTransparencyGenerationProgress: (progress: number) => void;
   setCurrentPhase: (phase: string) => void;
+  setGenerationStep: (step: number) => void;
   setEducationalContent: (content: any) => void;
   addTransparencyMessage: (message: string) => void;
   clearTransparencyMessages: () => void;
@@ -194,6 +201,7 @@ export const useEnhancedStrategyStore = create<EnhancedStrategyStore>((set, get)
   transparencyModalOpen: false,
   transparencyGenerationProgress: 0,
   currentPhase: '',
+  generationStep: 0,
   educationalContent: null,
   transparencyMessages: [],
   transparencyGenerating: false,
@@ -344,6 +352,7 @@ export const useEnhancedStrategyStore = create<EnhancedStrategyStore>((set, get)
   setTransparencyGenerationProgress: (progress: number) => set({ transparencyGenerationProgress: progress }),
   
   setCurrentPhase: (phase: string) => set({ currentPhase: phase }),
+  setGenerationStep: (step: number) => set({ generationStep: step }),
   
   setEducationalContent: (content: any) => set({ educationalContent: content }),
   

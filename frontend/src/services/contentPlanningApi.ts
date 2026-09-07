@@ -1,4 +1,6 @@
+import { devLog } from '../utils/devLogger';
 import { apiClient, aiApiClient } from '../api/client';
+import { ApiError, classifyApiError } from './apiError';
 
 // Runtime validation helper for API responses
 type ShapeSchema = Record<string, 'string' | 'number' | 'boolean' | 'object' | 'array' | 'undefined'>;
@@ -81,7 +83,7 @@ class HeaderAuthEventSource implements SSESource {
       this.onmessage(new MessageEvent('message', { data: payload }));
     } catch (err) {
       // Handler errors must not kill the reader loop.
-      console.error('SSE handler error:', err);
+      devLog.error('SSE handler error:', err);
     }
   }
 
@@ -90,7 +92,7 @@ class HeaderAuthEventSource implements SSESource {
     try {
       this.onerror(new Event('error'));
     } catch (err) {
-      console.error('SSE error handler error:', err);
+      devLog.error('SSE error handler error:', err);
     }
   }
 
@@ -103,14 +105,14 @@ class HeaderAuthEventSource implements SSESource {
 
 function validateApiResponse<T>(response: T, schema: ShapeSchema, context: string): T {
   if (typeof response !== 'object' || response === null) {
-    console.warn(`[validateApiResponse] ${context}: response is not an object`, response);
+    devLog.warn(`[validateApiResponse] ${context}: response is not an object`, response);
     return response;
   }
   for (const [field, expectedType] of Object.entries(schema)) {
     const value = (response as any)[field];
     const actualType = Array.isArray(value) ? 'array' : typeof value;
     if (actualType === 'undefined' && expectedType !== 'undefined') {
-      console.warn(`[validateApiResponse] ${context}: missing field "${field}" (expected ${expectedType})`);
+      devLog.warn(`[validateApiResponse] ${context}: missing field "${field}" (expected ${expectedType})`);
     }
   }
   return response;
@@ -480,29 +482,35 @@ class ContentPlanningAPI {
     try {
       return await request();
     } catch (error: any) {
-      console.error('API Error:', error);
-      
-      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-        if (isAI) {
-          throw new Error('AI analysis is taking longer than expected. This is normal for complex AI operations. Please wait a moment and try again.');
-        } else {
-          throw new Error('Request timed out. Please check your connection and try again.');
-        }
-      } else if (error.response) {
-        // Server responded with error status
-        const message = error.response.data?.detail || error.response.data?.message || 'API request failed';
-        throw new Error(message);
-      } else if (error.request) {
-        // Request was made but no response received
-        if (isAI) {
-          throw new Error('AI service is not responding. The AI analysis may be in progress. Please wait and try again.');
-        } else {
-          throw new Error('No response from server. Please check your connection.');
-        }
-      } else {
-        // Something else happened
-        throw new Error('An unexpected error occurred.');
+      devLog.error('API Error:', error);
+
+      // Phase C #17: rethrow classified ApiError as-is so callers can
+      // differentiate network/timeout/auth/validation/rate_limit/server.
+      if (error instanceof ApiError) throw error;
+
+      // Phase C #17: classify every failure into a typed ApiError. The
+      // friendly isAI-specific copy for AI endpoints is preserved.
+      const apiErr = classifyApiError(error);
+      if (apiErr.kind === 'timeout') {
+        throw new ApiError(
+          isAI
+            ? 'AI analysis is taking longer than expected. This is normal for complex AI operations. Please wait a moment and try again.'
+            : 'Request timed out. Please check your connection and try again.',
+          'timeout',
+        );
       }
+      if (apiErr.kind === 'network') {
+        throw new ApiError(
+          isAI
+            ? 'AI service is not responding. The AI analysis may be in progress. Please wait and try again.'
+            : 'No response from server. Please check your connection.',
+          'network',
+        );
+      }
+      if (apiErr.kind === 'unknown') {
+        throw new ApiError('An unexpected error occurred.', 'unknown');
+      }
+      throw apiErr;
     }
   }
 
@@ -554,7 +562,7 @@ class ContentPlanningAPI {
         if (error.response?.status === 429 && attempt < maxRetries) {
           // Rate limit hit, wait and retry
           const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
-          console.log(`🚫 Rate limit hit for AI analytics, waiting ${delay}ms before retry ${attempt + 1}/${maxRetries}`);
+          devLog.log(`🚫 Rate limit hit for AI analytics, waiting ${delay}ms before retry ${attempt + 1}/${maxRetries}`);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
@@ -573,7 +581,7 @@ class ContentPlanningAPI {
       const response = await apiClient.get(`${this.baseURL}/ai-analytics/`, { params });
       return response.data;
     } catch (error) {
-      console.error('Error getting AI analytics with refresh:', error);
+      devLog.error('Error getting AI analytics with refresh:', error);
       return { insights: [], recommendations: [], total_insights: 0, total_recommendations: 0 };
     }
   }
@@ -587,7 +595,7 @@ class ContentPlanningAPI {
       const response = await apiClient.get(`${this.baseURL}/gap-analysis/`, { params });
       return response.data;
     } catch (error) {
-      console.error('Error getting gap analyses with refresh:', error);
+      devLog.error('Error getting gap analyses with refresh:', error);
       return { gap_analyses: [], total_gaps: 0 };
     }
   }
@@ -719,6 +727,16 @@ class ContentPlanningAPI {
     });
   }
 
+  // Strategy Wizard — activate a strategy by writing strategy_activation_status
+  async activateStrategy(strategyId: number): Promise<any> {
+    return this.handleRequest(async () => {
+      const response = await apiClient.post(`${this.baseURL}/enhanced-strategies/strategy/activate`, {
+        strategy_id: strategyId,
+      });
+      return response.data?.data || response.data;
+    });
+  }
+
   // Clear enhanced strategy streaming/cache for a user (best-effort refresh)
   // Note: Endpoint gets user_id from authentication, query params are ignored
   async clearEnhancedCache(userId?: number): Promise<any> {
@@ -824,13 +842,13 @@ class ContentPlanningAPI {
           onComplete?.();
         }
       } catch (error) {
-        console.error('Error parsing SSE data:', error);
+        devLog.error('Error parsing SSE data:', error);
         onError?.(error);
       }
     };
 
     eventSource.onerror = (error) => {
-      console.error('SSE Error:', error);
+      devLog.error('SSE Error:', error);
       // Phase 5: Don't immediately close - let the caller handle reconnection
       // The orchestrator's hard timeout will prevent indefinite hanging
       onError?.(error);
@@ -869,13 +887,13 @@ class ContentPlanningAPI {
             onComplete?.();
           }
         } catch (error) {
-          console.error('Error parsing SSE data:', error);
+          devLog.error('Error parsing SSE data:', error);
           onError?.(error);
         }
       };
 
       es.onerror = (error) => {
-        console.error(`SSE Error (attempt ${retryCount + 1}/${maxRetries + 1}):`, error);
+        devLog.error(`SSE Error (attempt ${retryCount + 1}/${maxRetries + 1}):`, error);
         
         if (isCleanedUp) {
           return;
@@ -884,14 +902,14 @@ class ContentPlanningAPI {
         if (retryCount < maxRetries) {
           retryCount++;
           const delay = baseDelay * Math.pow(2, retryCount - 1);
-          console.log(`Reconnecting in ${delay}ms...`);
+          devLog.log(`Reconnecting in ${delay}ms...`);
           setTimeout(() => {
             if (!isCleanedUp) {
               eventSource = connect();
             }
           }, delay);
         } else {
-          console.error('Max SSE reconnection attempts reached');
+          devLog.error('Max SSE reconnection attempts reached');
           onError?.(error);
           es.close();
         }
@@ -936,7 +954,7 @@ class ContentPlanningAPI {
         if (error.response?.status === 429 && attempt < maxRetries) {
           // Rate limit hit, wait and retry
           const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
-          console.log(`🚫 Rate limit hit, waiting ${delay}ms before retry ${attempt + 1}/${maxRetries}`);
+          devLog.log(`🚫 Rate limit hit, waiting ${delay}ms before retry ${attempt + 1}/${maxRetries}`);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
@@ -945,11 +963,12 @@ class ContentPlanningAPI {
     }
   }
 
-  async startStrategyGenerationPolling(userId: number, strategyName: string): Promise<any> {
+  async startStrategyGenerationPolling(userId: number, strategyName: string, formData?: Record<string, any>): Promise<any> {
     return this.handleRequest(async () => {
       const response = await apiClient.post(`${this.baseURL}/enhanced-strategies/ai-generation/generate-comprehensive-strategy-polling`, {
         user_id: userId,
         strategy_name: strategyName,
+        form_data: formData || {},
         config: {
           include_competitive_analysis: true,
           include_content_calendar: true,
@@ -970,27 +989,52 @@ class ContentPlanningAPI {
     onComplete: (strategy: any) => void,
     onError: (error: string) => void,
     interval: number = 5000,
-    maxAttempts: number = 72
+    maxAttempts: number = 72,
+    signal?: AbortSignal,
+    retryOptions?: { maxRetries?: number; baseDelayMs?: number }
   ): Promise<void> {
     let attempts = 0;
-    
+    let stopped = false;
+    let pollTimer: ReturnType<typeof setTimeout> | undefined;
+    // Phase C #18/#43: bounded retries with exponential backoff for
+    // TRANSIENT (retryable) failures only — one flaky request must not kill
+    // a 6-minute generation. Transport retries do not burn attempt budget.
+    const maxRetries = retryOptions?.maxRetries ?? 3;
+    const baseDelayMs = retryOptions?.baseDelayMs ?? 2000;
+    let consecutiveFailures = 0;
+    const stop = () => {
+      stopped = true;
+      if (pollTimer) clearTimeout(pollTimer);
+    };
+    if (signal) {
+      if (signal.aborted) {
+        stop();
+        return;
+      }
+      signal.addEventListener('abort', stop);
+    }
+
     const poll = async () => {
+      if (stopped) return;
       try {
         attempts++;
-        console.log(`🔄 Polling attempt ${attempts}/${maxAttempts} for task ${taskId}`);
+        devLog.log(`🔄 Polling attempt ${attempts}/${maxAttempts} for task ${taskId}`);
         
         const response = await apiClient.get(`${this.baseURL}/enhanced-strategies/ai-generation/strategy-generation-status/${taskId}`);
         const responseData = response.data;
-        
-        console.log('📊 Polling response:', responseData);
+
+        // A successful transport round-trip resets the failure streak.
+        consecutiveFailures = 0;
+
+        devLog.log('📊 Polling response:', responseData);
         
         // Extract the actual task status from the response data
         const taskStatus = responseData?.data || responseData;
-        console.log('📊 Task status:', taskStatus);
-        console.log('📊 Task status type:', typeof taskStatus);
-        console.log('📊 Task status keys:', Object.keys(taskStatus || {}));
+        devLog.log('📊 Task status:', taskStatus);
+        devLog.log('📊 Task status type:', typeof taskStatus);
+        devLog.log('📊 Task status keys:', Object.keys(taskStatus || {}));
         
-        console.log('📊 Task status check:', {
+        devLog.log('📊 Task status check:', {
           status: taskStatus.status,
           progress: taskStatus.progress,
           hasStrategy: !!taskStatus.strategy,
@@ -999,39 +1043,45 @@ class ContentPlanningAPI {
           message: taskStatus.message
         });
 
-        console.log('🔍 Checking completion conditions:');
-        console.log('  - taskStatus.status:', taskStatus.status);
-        console.log('  - taskStatus.progress:', taskStatus.progress);
-        console.log('  - hasStrategy:', !!taskStatus.strategy);
-        console.log('  - status === "completed":', taskStatus.status === 'completed');
-        console.log('  - hasStrategy condition:', !!taskStatus.strategy);
-        console.log('  - Both conditions met:', taskStatus.status === 'completed' && !!taskStatus.strategy);
+        devLog.log('🔍 Checking completion conditions:');
+        devLog.log('  - taskStatus.status:', taskStatus.status);
+        devLog.log('  - taskStatus.progress:', taskStatus.progress);
+        devLog.log('  - hasStrategy:', !!taskStatus.strategy);
+        devLog.log('  - status === "completed":', taskStatus.status === 'completed');
+        devLog.log('  - hasStrategy condition:', !!taskStatus.strategy);
+        devLog.log('  - Both conditions met:', taskStatus.status === 'completed' && !!taskStatus.strategy);
+
+        if (stopped) return;
 
         if (taskStatus.status === 'completed' && taskStatus.strategy) {
-          console.log('✅ Strategy generation completed!');
-          console.log('📊 Final completion data:', {
+          devLog.log('✅ Strategy generation completed!');
+          devLog.log('📊 Final completion data:', {
             status: taskStatus.status,
             progress: taskStatus.progress,
             step: taskStatus.step,
             hasStrategy: !!taskStatus.strategy,
             strategyKeys: taskStatus.strategy ? Object.keys(taskStatus.strategy) : []
           });
+          stop();
           onComplete(taskStatus.strategy);
           return;
         } else if (taskStatus.status === 'failed' || taskStatus.error) {
-          console.error('❌ Strategy generation failed:', taskStatus.error);
+          devLog.error('❌ Strategy generation failed:', taskStatus.error);
+          stop();
           onError(taskStatus.error || 'Strategy generation failed');
           return;
         } else {
           // Update progress for any non-completed, non-failed status
-          console.log('📊 Updating progress for status:', taskStatus.status);
+          devLog.log('📊 Updating progress for status:', taskStatus.status);
           onProgress(responseData); // Pass the full response to maintain structure
           
           // Continue polling if we haven't exceeded max attempts
           if (attempts < maxAttempts) {
-            setTimeout(poll, interval);
+            if (stopped) return;
+            pollTimer = setTimeout(poll, interval);
           } else {
-            console.error('⏰ Polling timeout reached');
+            devLog.error('⏰ Polling timeout reached');
+            stop();
             onError('Strategy generation timed out. Please try again.');
           }
         }
@@ -1039,13 +1089,34 @@ class ContentPlanningAPI {
         // Additional check: If progress is 100% but status is not 'completed', 
         // we should still call onComplete to ensure the modal shows completion
         if (taskStatus.progress >= 100 && taskStatus.strategy && taskStatus.status !== 'failed') {
-          console.log('🎯 Progress is 100% with strategy available - calling onComplete');
+          devLog.log('🎯 Progress is 100% with strategy available - calling onComplete');
+          stop();
           onComplete(taskStatus.strategy);
           return;
         }
       } catch (error: any) {
-        console.error('❌ Polling error:', error);
-        onError(error.message || 'Polling failed');
+        devLog.error('❌ Polling error:', error);
+        if (stopped) return;
+
+        // Phase C #18/#43: retry transient failures with exponential backoff
+        // (2s → 4s → 8s, capped at 30s) instead of giving up on the first
+        // flaky request. Permanent failures (auth/validation) and exhausted
+        // retries surface immediately via onError.
+        const apiErr = classifyApiError(error);
+        if (apiErr.retryable && consecutiveFailures < maxRetries) {
+          consecutiveFailures++;
+          attempts--; // transport failure: don't consume the attempt budget
+          const delay = Math.min(baseDelayMs * 2 ** (consecutiveFailures - 1), 30000);
+          devLog.warn(
+            `🔁 Poll attempt failed (${apiErr.kind}); retrying in ${delay}ms ` +
+            `(retry ${consecutiveFailures}/${maxRetries})`
+          );
+          pollTimer = setTimeout(poll, delay);
+          return;
+        }
+
+        stop();
+        onError(apiErr.message || 'Polling failed');
       }
     };
     

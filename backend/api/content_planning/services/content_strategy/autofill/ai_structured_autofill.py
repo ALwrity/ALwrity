@@ -338,7 +338,7 @@ class AIStructuredAutofillService:
         
         # Extract specific personalization data
         website_url = user_profile.get('website_url', 'your website')
-        writing_tone = content_analysis.get('writing_style', {}).get('tone', 'professional')
+        writing_tone = content_analysis.get('writing_style', {}).get('tone') or 'professional'
         target_demographics = audience_insights.get('demographics', ['professionals'])
         industry_focus = audience_insights.get('industry_focus', 'general')
         expertise_level = audience_insights.get('expertise_level', 'intermediate')
@@ -614,7 +614,8 @@ Generate the complete JSON with all 30 fields personalized for {website_url}:
                 result = await self.ai.execute_structured_json_call(
                     service_type=AIServiceType.STRATEGIC_INTELLIGENCE,
                     prompt=prompt,
-                    schema=schema
+                    schema=schema,
+                    user_id=user_id
                 )
                 last_result = result
                 
@@ -780,7 +781,7 @@ Generate the complete JSON with all 30 fields personalized for {website_url}:
         ai_recommendations = context_summary.get('ai_recommendations', {})
         
         website_url = user_profile.get('website_url', 'your website')
-        writing_tone = content_analysis.get('writing_style', {}).get('tone', 'professional')
+        writing_tone = content_analysis.get('writing_style', {}).get('tone') or 'professional'
         industry_focus = audience_insights.get('industry_focus', 'general')
         expertise_level = audience_insights.get('expertise_level', 'intermediate')
         
