@@ -6,6 +6,13 @@ from datetime import datetime
 
 import asyncio
 from services.llm_providers.main_text_generation import llm_text_gen
+from .option_values import (
+    COMPETITIVE_POSITION_OPTIONS,
+    CONTENT_FREQUENCY_OPTIONS,
+    BRAND_VOICE_OPTIONS,
+    IMPLEMENTATION_TIMELINE_OPTIONS,
+    normalize_fields_payload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,12 +49,15 @@ ARRAY_FIELDS = {
     'preferred_formats', 'top_competitors', 'market_gaps', 'industry_trends', 'traffic_sources'
 }
 
-# Select field options mapping for value normalization
+# Select field options mapping for value normalization.
+# MUST mirror the frontend STRATEGIC_INPUT_FIELDS options — the previous
+# backend lists ("Leader"/"Niche"/"Emerging", "Innovative") were out-of-range
+# values the frontend select fields silently dropped.
 SELECT_FIELD_OPTIONS = {
-    'implementation_timeline': ['3 months', '6 months', '1 year', '2 years', 'Ongoing'],
-    'competitive_position': ['Leader', 'Challenger', 'Niche', 'Emerging'],
-    'content_frequency': ['Daily', 'Weekly', 'Bi-weekly', 'Monthly', 'Quarterly'],
-    'brand_voice': ['Professional', 'Casual', 'Friendly', 'Authoritative', 'Innovative']
+    'implementation_timeline': IMPLEMENTATION_TIMELINE_OPTIONS,
+    'competitive_position': COMPETITIVE_POSITION_OPTIONS,
+    'content_frequency': CONTENT_FREQUENCY_OPTIONS,
+    'brand_voice': BRAND_VOICE_OPTIONS,
 }
 
 class AIStructuredAutofillService:
