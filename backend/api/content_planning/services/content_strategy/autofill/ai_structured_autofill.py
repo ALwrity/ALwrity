@@ -4,7 +4,8 @@ import traceback
 from typing import Any, Dict, List
 from datetime import datetime
 
-from services.ai_service_manager import AIServiceManager, AIServiceType
+import asyncio
+from services.llm_providers.main_text_generation import llm_text_gen
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +54,28 @@ class AIStructuredAutofillService:
     """Generate the complete Strategy Builder fields strictly from AI using onboarding context only."""
 
     def __init__(self) -> None:
-        self.ai = AIServiceManager()
         self.max_retries = 2  # Maximum retry attempts for malformed JSON
+
+    @staticmethod
+    async def _call_llm(prompt: str, schema: Dict[str, Any], user_id: Any) -> Dict[str, Any]:
+        """Structured JSON call through the COMMON LLM infra (llm_text_gen) —
+        NOT the legacy per-service AI gateway, whose 45-second wait_for cap
+        kills calls on providers needing 45-165s. Wraps the raw dict as
+        {"data": ..., "success": True} for the downstream unwrap."""
+        def _run():
+            return llm_text_gen(
+                prompt=prompt,
+                json_struct=schema,
+                user_id=str(user_id) if user_id else None,
+                system_prompt=(
+                    "You are grounding a content strategy strictly in the supplied "
+                    "onboarding and website-analysis context. Fill every field from "
+                    "that data only — no invented businesses, competitors, or metrics."
+                ),
+            )
+
+        result = await asyncio.get_event_loop().run_in_executor(None, _run)
+        return {"data": result, "success": True}
 
     def _build_context_summary(self, context: Dict[str, Any]) -> Dict[str, Any]:
         # Unwrap nested onboarding data if present (strategy generator nests sources
@@ -347,8 +368,10 @@ class AIStructuredAutofillService:
         available_services = api_capabilities.get('available_services', [])
         
         # Build personalized context description
+        # Defensive: an empty context has no stored website URL yet.
+        website_display = str(website_url or "the user's website").upper()
         personalization_context = f"""
-PERSONALIZED CONTEXT FOR {website_url.upper()}:
+PERSONALIZED CONTEXT FOR {website_display}:
 
 🎯 YOUR BUSINESS PROFILE:
 - Website: {website_url}
@@ -611,8 +634,7 @@ Generate the complete JSON with all 30 fields personalized for {website_url}:
         for attempt in range(self.max_retries + 1):
             try:
                 logger.info(f"AI structured call attempt {attempt + 1}/{self.max_retries + 1} | user=%s", user_id)
-                result = await self.ai.execute_structured_json_call(
-                    service_type=AIServiceType.STRATEGIC_INTELLIGENCE,
+                result = await self._call_llm(
                     prompt=prompt,
                     schema=schema,
                     user_id=user_id
@@ -795,7 +817,7 @@ Generate the complete JSON with all 30 fields personalized for {website_url}:
             'market_share': f"Market position analysis for {industry_focus} industry",
             'competitive_position': f"Competitive analysis for {industry_focus} market",
             'performance_metrics': f"Current performance data from {website_url} analysis",
-            'content_preferences': f"Formats preferred by {', '.join(audience_insights.get('demographics', ['professionals']))} audience",
+            'content_preferences': f"Formats preferred by {', '.join(audience_insights.get('demographics') or ['professionals'])} audience",
             'consumption_patterns': f"Patterns for {expertise_level} level audience in {industry_focus}",
             'audience_pain_points': f"Specific challenges for {industry_focus} professionals",
             'buying_journey': f"Customer journey mapped for {industry_focus} industry",

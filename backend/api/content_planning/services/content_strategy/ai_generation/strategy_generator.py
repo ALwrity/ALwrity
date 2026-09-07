@@ -21,18 +21,44 @@ tests/api/test_strategy_integration.py::TestStrategyGeneratorGrounding::
 test_component_methods_accept_user_id_kwarg).
 """
 
+import asyncio
 import json
 import logging
 from typing import Any, Callable, Dict, List, Optional
 from datetime import datetime
 from dataclasses import dataclass
 
-from services.ai_service_manager import AIServiceManager, AIServiceType
 from services.intelligence.agents.quality_gates import validate_strategy_grounding
+from services.llm_providers.main_text_generation import llm_text_gen
 from ..autofill.ai_structured_autofill import AIStructuredAutofillService
 from .prompt_builder import UserIntelligenceFormatter
 
 logger = logging.getLogger(__name__)
+
+# Shared PERSONALIZATION RUBRIC for every strategy component prompt
+# (strategy-quality-audit.md QA-2). Passed as the llm_text_gen system prompt:
+# the model receives the user's data — it must be TOLD to use it and not fall
+# back to generic template advice.
+STRATEGY_SYSTEM_PROMPT = """You are a senior content strategy consultant working one-on \
+-one with a small-business owner whose inputs are provided in the prompt.
+
+NON-NEGOTIABLE RULES:
+1. Hyper-personalization: ground every recommendation in the user's actual
+   inputs — their business objectives, target metrics/kPIs, budget, team size,
+   timeline, brand voice, audience, pain points, and stated competitors.
+2. Reference the user's competitors BY NAME wherever a competitive claim is
+   made; never invent competitor names.
+3. Respect their constraints: never recommend a cadence, channel mix, or budget
+   their team size/content budget/baseline metrics cannot sustain.
+4. Anti-genericity: no filler. Every insight, gap, prediction, roadmap step,
+   and risk must connect to the user's data, or their stated goals/pain points.
+   Skip anything you cannot support from the provided data.
+5. Digital-marketing value: frame recommendations in terms a marketer acts on —
+   traffic, leads, engagement, conversions, keyword topical authority, and
+   realistic effort-to-impact, not vague consultant language.
+6. Data integrity: do not fabricate numbers the user's data does not support;
+   label estimates as estimates.
+"""
 
 @dataclass
 class StrategyGenerationConfig:
@@ -61,7 +87,6 @@ class AIStrategyGenerator:
     def __init__(self, config: Optional[StrategyGenerationConfig] = None):
         """Initialize the AI strategy generator."""
         self.config = config or StrategyGenerationConfig()
-        self.ai_manager = AIServiceManager()
         self.autofill_service = AIStructuredAutofillService()
         self.logger = logger
 
@@ -263,6 +288,33 @@ class AIStrategyGenerator:
         """
         return UserIntelligenceFormatter.build_briefing(context)
 
+    async def _call_llm_structured(
+        self,
+        prompt: str,
+        schema: Dict[str, Any],
+        user_id: Optional[int],
+        system_prompt: Optional[str] = STRATEGY_SYSTEM_PROMPT,
+    ) -> Dict[str, Any]:
+        """Run a structured JSON LLM call through the COMMON LLM infra
+        (services.llm_providers.main_text_generation.llm_text_gen).
+
+        Replaces the legacy per-service AI gateway path, whose 45-second
+        asyncio.wait_for cap killed every call on providers that legitimately
+        need 45-165s (while the executor thread kept running and spending).
+        Follows the modern codebase pattern: llm_text_gen in run_in_executor;
+        provider latency governs.
+        """
+        def _run():
+            return llm_text_gen(
+                prompt=prompt,
+                json_struct=schema,
+                user_id=str(user_id) if user_id else None,
+                system_prompt=system_prompt,
+            )
+
+        result = await asyncio.get_event_loop().run_in_executor(None, _run)
+        return {"data": result}
+
     async def _generate_base_strategy_fields(
         self, 
         user_id: int, 
@@ -317,11 +369,6 @@ class AIStrategyGenerator:
         try:
             logger.info("🧠 Generating strategic insights...")
             
-            # Use provided AI manager or create default one
-            if ai_manager is None:
-                from services.ai_service_manager import AIServiceManager
-                ai_manager = AIServiceManager()
-            
             prompt = f"""
             Generate comprehensive strategic insights for content strategy based on the following context:
             
@@ -362,9 +409,8 @@ class AIStrategyGenerator:
                 }
             }
             
-            response = await ai_manager.execute_structured_json_call(
-                AIServiceType.STRATEGIC_INTELLIGENCE, 
-                prompt, 
+            response = await self._call_llm_structured(
+                prompt,
                 schema,
                 user_id=str(user_id) if user_id else None
             )
@@ -400,11 +446,6 @@ class AIStrategyGenerator:
         """Generate competitive analysis using AI."""
         try:
             logger.info("🔍 Generating competitive analysis...")
-            
-            # Use provided AI manager or create default one
-            if ai_manager is None:
-                from services.ai_service_manager import AIServiceManager
-                ai_manager = AIServiceManager()
             
             prompt = f"""
             Generate comprehensive competitive analysis for content strategy based on the following context:
@@ -447,9 +488,8 @@ class AIStrategyGenerator:
                 }
             }
             
-            response = await ai_manager.execute_structured_json_call(
-                AIServiceType.MARKET_POSITION_ANALYSIS, 
-                prompt, 
+            response = await self._call_llm_structured(
+                prompt,
                 schema,
                 user_id=str(user_id) if user_id else None
             )
@@ -488,11 +528,6 @@ class AIStrategyGenerator:
         """Generate content calendar using AI."""
         try:
             logger.info("📅 Generating content calendar...")
-            
-            # Use provided AI manager or create default one
-            if ai_manager is None:
-                from services.ai_service_manager import AIServiceManager
-                ai_manager = AIServiceManager()
             
             prompt = f"""
             Generate comprehensive content calendar for content strategy based on the following context:
@@ -584,9 +619,8 @@ class AIStrategyGenerator:
                 }
             }
             
-            response = await ai_manager.execute_structured_json_call(
-                AIServiceType.CONTENT_SCHEDULE_GENERATION, 
-                prompt, 
+            response = await self._call_llm_structured(
+                prompt,
                 schema,
                 user_id=str(user_id) if user_id else None
             )
@@ -605,11 +639,6 @@ class AIStrategyGenerator:
         """Generate performance predictions using AI."""
         try:
             logger.info("📊 Generating performance predictions...")
-            
-            # Use provided AI manager or create default one
-            if ai_manager is None:
-                from services.ai_service_manager import AIServiceManager
-                ai_manager = AIServiceManager()
             
             prompt = f"""
             Generate comprehensive performance predictions for content strategy based on the following context:
@@ -668,9 +697,8 @@ class AIStrategyGenerator:
                 }
             }
             
-            response = await ai_manager.execute_structured_json_call(
-                AIServiceType.PERFORMANCE_PREDICTION, 
-                prompt, 
+            response = await self._call_llm_structured(
+                prompt,
                 schema,
                 user_id=str(user_id) if user_id else None
             )
@@ -702,11 +730,6 @@ class AIStrategyGenerator:
         """Generate implementation roadmap using AI."""
         try:
             logger.info("🗺️ Generating implementation roadmap...")
-            
-            # Use provided AI manager or create default one
-            if ai_manager is None:
-                from services.ai_service_manager import AIServiceManager
-                ai_manager = AIServiceManager()
             
             prompt = f"""
             Generate comprehensive implementation roadmap for content strategy based on the following context:
@@ -775,9 +798,8 @@ class AIStrategyGenerator:
                 }
             }
             
-            response = await ai_manager.execute_structured_json_call(
-                AIServiceType.STRATEGIC_INTELLIGENCE, 
-                prompt, 
+            response = await self._call_llm_structured(
+                prompt,
                 schema,
                 user_id=str(user_id) if user_id else None
             )
@@ -812,11 +834,6 @@ class AIStrategyGenerator:
         """Generate risk assessment using AI."""
         try:
             logger.info("⚠️ Generating risk assessment...")
-            
-            # Use provided AI manager or create default one
-            if ai_manager is None:
-                from services.ai_service_manager import AIServiceManager
-                ai_manager = AIServiceManager()
             
             prompt = f"""
             Generate comprehensive risk assessment for content strategy based on the following context:
@@ -927,9 +944,8 @@ class AIStrategyGenerator:
                 }
             }
             
-            response = await ai_manager.execute_structured_json_call(
-                AIServiceType.STRATEGIC_INTELLIGENCE, 
-                prompt, 
+            response = await self._call_llm_structured(
+                prompt,
                 schema,
                 user_id=str(user_id) if user_id else None
             )
@@ -1294,3 +1310,5 @@ class AIStrategyGenerator:
 
         self.logger.info(f"🔍 Final transformed risk assessment: {json.dumps(transformed, indent=2)}")
         return transformed 
+
+

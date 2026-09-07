@@ -249,7 +249,7 @@ export const useActionButtonsBusinessLogic = ({
             setShowEducationalModal(false); // Only close on error
           },
           5000, // 5 second polling interval for faster updates
-          72, // 6 minutes max (72 * 5 seconds)
+          120, // 10 minutes max (120 * 5 s) — slow providers legitimately need ~6+ min
           // Phase E #41: cancellation signal — the modal's Cancel button
           // aborts this so the loop stops within one poll cycle.
           pollAbortRef.current?.signal,
