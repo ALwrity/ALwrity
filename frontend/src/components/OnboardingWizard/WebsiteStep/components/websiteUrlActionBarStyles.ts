@@ -5,6 +5,7 @@ import {
   RE_ANALYZE_BUTTON_GRADIENT,
   RE_ANALYZE_BUTTON_HOVER_GRADIENT,
 } from '../../common/onboardingButtonStyles';
+import { URL_INPUT_AUTOFILL_OVERRIDES } from './websiteUrlAutofillStyles';
 
 export const analyzeButtonSx: SxProps<Theme> = {
   borderRadius: '10px',
@@ -75,6 +76,7 @@ export const analyzeNewWebsiteButtonSx: SxProps<Theme> = {
 /** Compact hover-popover URL field — smaller controls with buttons inside the input. */
 export const hoverCompactUrlFieldSx = (hasSecondaryAction: boolean): SxProps<Theme> => ({
   width: '100%',
+  ...URL_INPUT_AUTOFILL_OVERRIDES,
   '& .MuiOutlinedInput-root': {
     borderRadius: 2.5,
     bgcolor: '#F8FAFC',
@@ -126,6 +128,7 @@ export const urlFieldSx = (
     ? hoverCompactUrlFieldSx(hasSecondaryAction)
     : {
         width: '100%',
+        ...URL_INPUT_AUTOFILL_OVERRIDES,
         '& .MuiOutlinedInput-root': {
           borderRadius: 3,
           bgcolor: '#F8FAFC',
