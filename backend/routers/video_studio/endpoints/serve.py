@@ -40,29 +40,25 @@ async def serve_video_studio_video(
         video_studio_videos_dir = base_dir / "video_studio_videos"
         video_path = video_studio_videos_dir / user_id / video_filename
         
-        # Security: Ensure path is within video_studio_videos directory
+        # Security: Resolve and ensure path is within video_studio_videos directory
         try:
-            resolved_path = video_path.resolve()
             resolved_base = video_studio_videos_dir.resolve()
-            if not str(resolved_path).startswith(str(resolved_base)):
-                raise HTTPException(
-                    status_code=403,
-                    detail="Invalid video path"
-                )
+            resolved_path = video_path.resolve()
+            resolved_path.relative_to(resolved_base)
         except (OSError, ValueError) as e:
             logger.error(f"[VideoStudio] Path resolution error: {e}")
             raise HTTPException(status_code=403, detail="Invalid video path")
         
         # Check if file exists
-        if not video_path.exists() or not video_path.is_file():
+        if not resolved_path.exists() or not resolved_path.is_file():
             raise HTTPException(
                 status_code=404,
                 detail=f"Video not found: {video_filename}"
             )
         
-        logger.info(f"[VideoStudio] Serving video: {video_path}")
+        logger.info(f"[VideoStudio] Serving video: {resolved_path}")
         return FileResponse(
-            path=str(video_path),
+            path=str(resolved_path),
             media_type="video/mp4",
             filename=video_filename,
         )
