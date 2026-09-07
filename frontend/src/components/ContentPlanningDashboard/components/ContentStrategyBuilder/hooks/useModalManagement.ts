@@ -14,7 +14,7 @@ interface UseModalManagementProps {
 }
 
 export const useModalManagement = ({
-  aiGenerating,
+  aiGenerating: _aiGenerating, // no longer gates the deferred dispatch (isGeneratingRef owns concurrency)
   originalHandleCreateStrategy,
   setShowEnterpriseModal
 }: UseModalManagementProps) => {
@@ -43,17 +43,32 @@ export const useModalManagement = ({
 
   // Handle proceed with current strategy (30 fields)
   const handleProceedWithCurrentStrategy = async () => {
+    // Phase QA (2026-09): breadcrumb every branch — the Proceed click going
+    // silent (modal closes, generation never starts, no logs) was only
+    // diagnosable from the missing hook logs. Also: the old double-gate
+    // (!aiGenerating && handler) silently swallowed the click when the
+    // captured aiGenerating went stale — the ActionButtons hook already
+    // owns concurrency via isGeneratingRef, so this layer only checks the
+    // handler's presence.
+    devLog.log('⏭️ Enterprise modal: Proceed clicked');
     setShowEnterpriseModal(false);
     sessionStorage.removeItem('showEnterpriseModal'); // Clear sessionStorage
 
     // Wait for the dialog's close animation before proceeding.
     setTimeout(async () => {
       try {
-        if (!isMountedRef.current) return;
-        // Ensure we're not already generating
-        if (!aiGenerating && originalHandleCreateStrategyRef.current) {
-          await originalHandleCreateStrategyRef.current();
+        const handler = originalHandleCreateStrategyRef.current;
+        if (!isMountedRef.current) {
+          devLog.warn('⏭️ Proceed deferred fired after unmount — dropped');
+          return;
         }
+        if (!handler) {
+          devLog.error('❌ Proceed: no creation handler wired to useModalManagement');
+          return;
+        }
+        devLog.log(`▶️ Proceedings deferred (${MODAL_TRANSITION_DELAY_MS}ms) — invoking creation handler`);
+        await handler();
+        devLog.log('✅ Deferred creation handler returned');
       } catch (error) {
         devLog.error('Error in handleProceedWithCurrentStrategy:', error);
       }
@@ -62,6 +77,7 @@ export const useModalManagement = ({
 
   // Handle add enterprise datapoints (coming soon)
   const handleAddEnterpriseDatapoints = async () => {
+    devLog.log('⏱️ Enterprise modal: Add Enterprise Datapoints clicked');
     setShowEnterpriseModal(false);
     sessionStorage.removeItem('showEnterpriseModal'); // Clear sessionStorage
 
@@ -69,11 +85,17 @@ export const useModalManagement = ({
     // In Phase 2, this will enable enterprise datapoints
     setTimeout(async () => {
       try {
-        if (!isMountedRef.current) return;
-        // Ensure we're not already generating
-        if (!aiGenerating && originalHandleCreateStrategyRef.current) {
-          await originalHandleCreateStrategyRef.current();
+        const handler = originalHandleCreateStrategyRef.current;
+        if (!isMountedRef.current) {
+          devLog.warn('⏭️ Datapoints deferred fired after unmount — dropped');
+          return;
         }
+        if (!handler) {
+          devLog.error('❌ Datapoints: no creation handler wired to useModalManagement');
+          return;
+        }
+        devLog.log('▶️ Datapoints deferred — invoking creation handler');
+        await handler();
       } catch (error) {
         devLog.error('Error in handleAddEnterpriseDatapoints:', error);
       }

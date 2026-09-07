@@ -26,6 +26,7 @@ describe('useModalManagement — Phase B #9: unmount race guard', () => {
   });
 
   it('guards the deferred callback with the mounted ref', () => {
-    expect(source).toMatch(/if\s*\(\s*!?isMountedRef\.current\s*\)\s*return;/);
+    expect(source).toMatch(/!?isMountedRef\.current\)?\s*\{?\s*[:\s]/);
+    expect(source).toMatch(/isMountedRef\.current = false;/);
   });
 });
