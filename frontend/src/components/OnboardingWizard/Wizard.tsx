@@ -31,6 +31,17 @@ import {
   getOnboardingProgressState,
   progressPercentAfterStepComplete,
 } from './common/onboardingProgressState';
+import {
+  getStepValidationMessage,
+  isStepDataValid as isWizardStepDataValid,
+  resolveStepValidationData,
+} from './common/wizardStepValidation';
+import {
+  buildConnectStepSnapshot,
+  getConnectPayloadForGuard,
+  shouldBlockProgressNavigation,
+  type ConnectStepSnapshot,
+} from './common/wizardStepNavigationGuard';
 import { STEP0_NAV_TITLE } from './WebsiteStep/constants/websiteStepLayout';
 import {
   applyDownstreamDirtyProgressOverride,
@@ -190,45 +201,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     }
   }, [activeStep, furthestAccessibleStep]);
 
-  // Step validation function
-  const isStepDataValid = useCallback((step: number, data: any): boolean => {
-    trace(`Wizard: Validating step ${step} with data:`, data);
-    
-    switch (step) {
-      case 0: // Website Analysis — website URL or LinkedIn connection is sufficient
-        if (onboardingType === 'linkedin') {
-          return !!(data?.integrations?.connectedPlatforms?.includes('linkedin'));
-        }
-        return !!(data && (data.website || data.website_url || data?.integrations?.connectedPlatforms?.includes('linkedin')));
-      
-      case 1: // Competitor Analysis / LinkedIn Research
-        if (onboardingType === 'linkedin') {
-          return !!(data && (data.research_depth || data.content_types || data.growth_summary));
-        }
-        return !!(data && (data.competitors || data.researchSummary || data.sitemapAnalysis));
-      
-      case 2: // Persona Generation
-        const hasValidPersonaData = data &&
-                                  data.corePersona &&
-                                  data.platformPersonas &&
-                                  Object.keys(data.platformPersonas).length > 0 &&
-                                  data.qualityMetrics;
-        // Website path requires brand avatar + voice clone; LinkedIn path only needs persona
-        if (onboardingType === 'linkedin') {
-          return !!hasValidPersonaData;
-        }
-        const hasBrandAvatar = data?.brandAvatar?.set;
-        const hasVoiceClone = data?.voiceClone?.set;
-        return !!hasValidPersonaData && !!hasBrandAvatar && !!hasVoiceClone;
-      
-      case 3: // Final Step
-        return true;
-      
-      default:
-        return false;
-    }
-  }, []);
-  
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -236,6 +208,17 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   const stepDataRef = useRef(stepData);
   const competitorDataCollectorRef = useRef(competitorDataCollector);
   const websiteDataCollectorRef = useRef<(() => any) | null>(null);
+  const lastCommittedConnectRef = useRef<ConnectStepSnapshot | null>(null);
+
+  const commitConnectStepSnapshot = useCallback(
+    (payload: unknown) => {
+      const snapshot = buildConnectStepSnapshot(onboardingType, payload);
+      if (snapshot) {
+        lastCommittedConnectRef.current = snapshot;
+      }
+    },
+    [onboardingType]
+  );
   
   // Keep refs in sync with state
   useEffect(() => {
@@ -255,36 +238,19 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       return;
     }
 
-    // For step 0 (Website) and step 2 (Persona), use the step validation state if available
-    if ((activeStep === 0 || activeStep === 2) && stepValidationStates[activeStep] !== undefined) {
-      setIsCurrentStepValid(stepValidationStates[activeStep]);
-      return;
-    }
-    
-    // For other steps, use the existing validation logic
-    let dataToValidate = stepData;
-    if (activeStep === 1 && competitorDataCollector) {
-      dataToValidate = competitorDataCollector;
-    }
-    
-    const isValid = isStepDataValid(activeStep, dataToValidate);
-    setIsCurrentStepValid(isValid);
+    const dataToValidate = resolveStepValidationData({
+      activeStep,
+      stepData,
+      competitorDataCollector,
+      stepValidationStates,
+    });
 
-    // Set validation message
-    if (activeStep === 2) {
-      if (!isValid) {
-        const pData = dataToValidate || {};
-        if (!pData.corePersona) setValidationMessage('Please generate your Brand Identity (Text) first.');
-        else if (onboardingType !== 'linkedin' && !pData.brandAvatar?.set) setValidationMessage('Please generate your Brand Avatar.');
-        else if (onboardingType !== 'linkedin' && !pData.voiceClone?.set) setValidationMessage('Please generate your Voice Clone.');
-        else setValidationMessage('Complete all personalization steps to continue.');
-      } else {
-        setValidationMessage('');
-      }
-    } else {
-      setValidationMessage('');
-    }
-  }, [activeStep, stepData, isStepDataValid, competitorDataCollector, stepValidationStates, isConnectStepOfficiallyComplete]);
+    const isValid = isWizardStepDataValid(activeStep, dataToValidate, onboardingType);
+    setIsCurrentStepValid(isValid);
+    setValidationMessage(
+      getStepValidationMessage(activeStep, dataToValidate, onboardingType, isValid)
+    );
+  }, [activeStep, stepData, competitorDataCollector, stepValidationStates, isConnectStepOfficiallyComplete, onboardingType]);
   
   // Handle validation changes from individual steps
   const handleStepValidationChange = useCallback((step: number, isValid: boolean) => {
@@ -420,6 +386,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         if (committedWebsite && step1Data.status === 'completed') {
           setCommittedStep1WebsiteUrl(committedWebsite);
           setDownstreamLocked(false);
+          commitConnectStepSnapshot(step1Data.data);
         }
       }
     }
@@ -441,7 +408,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     if (onboarding.steps) {
       localStorage.setItem('onboarding_active_step', String(computedStep));
     }
-  }, [data, currentStep, steps.length, furthestAccessibleStep]);
+  }, [data, currentStep, steps.length, furthestAccessibleStep, commitConnectStepSnapshot]);
 
   const handleNext = useCallback(async (rawStepData?: any) => {
     const isLinkedIn = onboardingType === 'linkedin';
@@ -665,6 +632,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         if (committedUrl) {
           setCommittedStep1WebsiteUrl(committedUrl);
           setDownstreamLocked(false);
+          commitConnectStepSnapshot(currentStepData);
         }
       }
     }
@@ -740,13 +708,29 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   }, [activeStep]);
 
   const handleStepClick = (stepIndex: number) => {
-    if (stepIndex <= furthestAccessibleStep) {
-      setDirection(stepIndex > activeStep ? 'right' : 'left');
-      setActiveStep(stepIndex);
-      try {
-        localStorage.setItem('onboarding_active_step', String(stepIndex));
-      } catch (_e) {}
+    const blockResult = shouldBlockProgressNavigation(stepIndex, {
+      onboardingType,
+      completedFrontier,
+      furthestAccessibleStep,
+      lastCommitted: lastCommittedConnectRef.current,
+      currentConnectPayload: getConnectPayloadForGuard(
+        websiteDataCollectorRef.current,
+        stepDataRef.current
+      ),
+    });
+
+    if (blockResult.blocked) {
+      setShowProgressMessage(true);
+      setProgressMessage(blockResult.message);
+      setTimeout(() => setShowProgressMessage(false), 4000);
+      return;
     }
+
+    setDirection(stepIndex > activeStep ? 'right' : 'left');
+    setActiveStep(stepIndex);
+    try {
+      localStorage.setItem('onboarding_active_step', String(stepIndex));
+    } catch (_e) {}
   };
 
   // "View Results" from the background-tasks banner: navigate back to the
