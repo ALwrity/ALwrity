@@ -39,6 +39,11 @@ describe("YouTube Video Analytics layout stylesheet", () => {
     expect(overviewCss).toMatch(/repeat\(3,/);
     expect(overviewCss).toMatch(/@media \(max-width:\s*720px\)/);
     expect(overviewCss).toMatch(/#ff0000/);
+    expect(overviewCss).toMatch(/yt-video-analytics-overview__card--active/);
+    expect(overviewCss).toMatch(/yt-video-analytics-overview__axis/);
+    expect(overviewCss).toMatch(/yt-video-analytics-overview__panel/);
+    expect(overviewCss).toMatch(/border-radius:\s*14px/);
+    expect(hubCss).not.toMatch(/yt-video-analytics-overview__panel/);
   });
 
   it("keeps the date menu sheet out of hub layout", () => {

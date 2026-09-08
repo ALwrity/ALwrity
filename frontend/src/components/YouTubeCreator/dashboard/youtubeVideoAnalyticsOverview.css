@@ -12,6 +12,14 @@
   line-height: 1.35;
 }
 
+.yt-video-analytics-overview__panel {
+  margin-bottom: 20px;
+  padding: 16px 16px 8px;
+  border: 1px solid #e5e5e5;
+  border-radius: 14px;
+  background: #fff;
+}
+
 .yt-video-analytics-overview__cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -24,6 +32,19 @@
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  margin: 0;
+  padding: 0 0 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.yt-video-analytics-overview__card--active {
+  border-bottom-color: #ff0000;
 }
 
 .yt-video-analytics-overview__card .yt-rail-stat-value {
@@ -36,11 +57,19 @@
   font-size: 12px;
 }
 
+.yt-video-analytics-overview__chart-wrap {
+  position: relative;
+  margin: 4px 0 0;
+}
+
+.yt-video-analytics-overview__axis--x {
+  font-size: 10px;
+}
+
 .yt-video-analytics-overview__chart {
   display: block;
   width: 100%;
   height: auto;
-  margin: 8px 0 20px;
   background: #fff;
 }
 
@@ -48,6 +77,39 @@
   fill: none;
   stroke: #ff0000;
   stroke-width: 2;
+}
+
+.yt-video-analytics-overview__grid {
+  stroke: #e5e5e5;
+  stroke-width: 1;
+}
+
+.yt-video-analytics-overview__axis {
+  fill: #606060;
+  font-size: 10px;
+}
+
+.yt-video-analytics-overview__tooltip {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f0f0f;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.yt-video-analytics-overview__tooltip span {
+  display: block;
+}
+
+.yt-video-analytics-overview__tooltip span:last-child {
+  color: #ff0000;
+  font-weight: 600;
 }
 
 .yt-video-analytics-overview__section-title {

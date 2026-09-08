@@ -85,7 +85,10 @@ class TestYouTubeAnalyticsOverview:
             start_date = kwargs.get("startDate")
             if dims == "day":
                 mock.execute.return_value = {
-                    "rows": [[end.isoformat(), 27], [start.isoformat(), 5]],
+                    "rows": [
+                        [end.isoformat(), 27, 12, 1, 0],
+                        [start.isoformat(), 5, 6, 0, 0],
+                    ],
                 }
             elif dims == "video":
                 mock.execute.return_value = {"rows": []}
@@ -115,6 +118,8 @@ class TestYouTubeAnalyticsOverview:
         assert result["previous"]["views"] == 62
         assert result["views_by_day"][0]["date"] == start.isoformat()
         assert result["views_by_day"][0]["views"] == 5
+        assert result["views_by_day"][0]["watch_hours"] == 0.1
+        assert result["views_by_day"][0]["subscribers_net"] == 0
         query_kwargs = [
             call.kwargs for call in analytics.reports.return_value.query.call_args_list
         ]
@@ -126,7 +131,9 @@ class TestYouTubeAnalyticsOverview:
         assert start.isoformat() in window_starts
         assert prev_start.isoformat() in window_starts
         day_q = next(k for k in query_kwargs if k.get("dimensions") == "day")
-        assert day_q["metrics"] == "views"
+        assert day_q["metrics"] == (
+            "views,estimatedMinutesWatched,subscribersGained,subscribersLost"
+        )
         assert day_q["endDate"] == end.isoformat()
         assert prev_end == start - timedelta(days=1)
         assert "subscribersGained" in next(

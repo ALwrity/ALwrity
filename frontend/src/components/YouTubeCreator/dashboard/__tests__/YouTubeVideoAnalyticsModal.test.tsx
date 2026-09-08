@@ -5,7 +5,7 @@ import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { YouTubeVideoAnalyticsModal } from "../modals/YouTubeVideoAnalyticsModal";
 import { youtubeStudioApi } from "../../../../services/youtubeStudioApi";
-import { viewsPolylinePoints } from "../youtubeVideoAnalyticsChart";
+import { metricPolylinePoints } from "../youtubeVideoAnalyticsChartScale";
 import {
   analyticsMonthOptions,
   monthLabel,
@@ -41,8 +41,8 @@ const OVERVIEW_OK = {
     subscribers_net: 1,
   },
   views_by_day: [
-    { date: "2026-08-10", views: 0 },
-    { date: "2026-09-04", views: 27 },
+    { date: "2026-08-10", views: 0, watch_hours: 0, subscribers_net: 0 },
+    { date: "2026-09-04", views: 27, watch_hours: 0.3, subscribers_net: 2 },
   ],
   top_videos: [
     {
@@ -99,11 +99,12 @@ describe("YouTubeVideoAnalyticsModal", () => {
     expect(screen.getByText("How to start")).toBeTruthy();
     expect(screen.getByText("Latest upload")).toBeTruthy();
     expect(screen.getByRole("img", { name: "Daily views" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /see more/i })).toBeNull();
     const polyline = document.querySelector(
       ".yt-video-analytics-overview__chart polyline",
     );
     expect(polyline?.getAttribute("points")).toBe(
-      viewsPolylinePoints(OVERVIEW_OK.views_by_day, 320, 96),
+      metricPolylinePoints(OVERVIEW_OK.views_by_day, "views", 320, 96, 0),
     );
     expect(mockedStudioApi.getChannelOverview).toHaveBeenCalledWith({
       window: "last_28",

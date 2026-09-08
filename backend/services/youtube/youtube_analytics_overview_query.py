@@ -14,7 +14,9 @@ CHANNEL_WINDOW_METRICS = (
     "views,estimatedMinutesWatched,averageViewDuration,"
     "subscribersGained,subscribersLost"
 )
-DAY_VIEWS_METRICS = "views"
+DAY_SERIES_METRICS = (
+    "views,estimatedMinutesWatched,subscribersGained,subscribersLost"
+)
 VIDEO_TOP_METRICS_WITH_PERCENT = (
     "views,averageViewDuration,averageViewPercentage"
 )
@@ -103,7 +105,18 @@ def parse_views_by_day(report: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]
         day = str(row[0] or "").strip()
         if not day:
             continue
-        points.append({"date": day, "views": optional_num(row[1])})
+        minutes = optional_num(row[2] if len(row) > 2 else None)
+        points.append(
+            {
+                "date": day,
+                "views": optional_num(row[1]),
+                "watch_hours": watch_hours_from_minutes(minutes),
+                "subscribers_net": subscribers_net(
+                    optional_num(row[3] if len(row) > 3 else None),
+                    optional_num(row[4] if len(row) > 4 else None),
+                ),
+            }
+        )
     points.sort(key=lambda item: item["date"])
     return points
 
@@ -149,9 +162,10 @@ def execute_channel_window(analytics, start: date, end: date) -> Dict[str, Any]:
 
 def execute_views_by_day(analytics, start: date, end: date) -> Dict[str, Any]:
     logger.info(
-        "YouTube channel overview day query start={} end={}",
+        "YouTube channel overview day query start={} end={} metric_count={}",
         start.isoformat(),
         end.isoformat(),
+        len(DAY_SERIES_METRICS.split(",")),
     )
     return (
         analytics.reports()
@@ -160,7 +174,7 @@ def execute_views_by_day(analytics, start: date, end: date) -> Dict[str, Any]:
             startDate=start.isoformat(),
             endDate=end.isoformat(),
             dimensions="day",
-            metrics=DAY_VIEWS_METRICS,
+            metrics=DAY_SERIES_METRICS,
         )
         .execute()
     )
