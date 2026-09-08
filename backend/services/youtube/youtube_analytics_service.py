@@ -21,12 +21,15 @@ from services.youtube.youtube_analytics_overview_query import (
     execute_channel_window,
     execute_top_videos,
     execute_views_by_day,
-    overview_window_bounds,
     parse_video_metric_rows,
     parse_views_by_day,
     parse_window_totals,
-    previous_window_bounds,
     window_payload,
+)
+from services.youtube.youtube_analytics_overview_window import (
+    OverviewWindowError,
+    lifetime_bounds,
+    resolve_overview_query,
 )
 
 
@@ -148,12 +151,35 @@ class YouTubeAnalyticsService:
     def get_channel_overview(
         self,
         user_id: str,
-        days: int = 28,
+        days: Optional[int] = None,
         token_id: Optional[int] = None,
+        window: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
     ) -> Dict[str, Any]:
         """Channel Overview for Video Analytics: window totals, chart, top and latest."""
-        window_days = max(1, min(int(days), 90))
-        logger.info("YouTube channel overview start days={}", window_days)
+        today = date.today()
+        logger.info(
+            "YouTube channel overview start window={} has_days={} has_dates={}",
+            window,
+            days is not None,
+            start_date is not None and end_date is not None,
+        )
+        try:
+            resolved = resolve_overview_query(
+                window=window,
+                days=days,
+                start_date=start_date,
+                end_date=end_date,
+                today=today,
+            )
+        except OverviewWindowError as exc:
+            logger.warning(
+                "YouTube channel overview window rejected code={}",
+                exc.error_code,
+            )
+            raise
+
         try:
             creds = self.oauth_service.get_valid_credentials(user_id, token_id)
             if not creds:
@@ -178,13 +204,31 @@ class YouTubeAnalyticsService:
                     "message": "No YouTube channel found for this account.",
                 }
 
+            snippet = items[0].get("snippet") or {}
+            published_at = snippet.get("publishedAt")
             uploads_playlist = (
                 (items[0].get("contentDetails") or {})
                 .get("relatedPlaylists", {})
                 .get("uploads")
             )
-            start, end = overview_window_bounds(window_days)
-            prev_start, prev_end = previous_window_bounds(start, window_days)
+            if resolved.get("needs_published_at"):
+                try:
+                    start, end = lifetime_bounds(published_at, today)
+                except OverviewWindowError as exc:
+                    logger.warning("YouTube channel overview lifetime unavailable")
+                    return {
+                        "success": False,
+                        "error_code": exc.error_code,
+                        "message": exc.message,
+                    }
+                prev_start = None
+                prev_end = None
+            else:
+                start = resolved["start"]
+                end = resolved["end"]
+                prev_start = resolved.get("prev_start")
+                prev_end = resolved.get("prev_end")
+
             analytics = build(
                 "youtubeAnalytics", "v2", credentials=creds, cache_discovery=False
             )
@@ -202,19 +246,29 @@ class YouTubeAnalyticsService:
                 }
 
             current = window_payload(parse_window_totals(current_report))
-            previous = self._overview_previous_window(analytics, prev_start, prev_end)
+            previous = None
+            if resolved.get("compare") and prev_start and prev_end:
+                previous = self._overview_previous_window(
+                    analytics, prev_start, prev_end
+                )
             views_by_day = self._overview_views_by_day(analytics, start, end)
             top_videos = self._overview_top_videos(analytics, youtube, start, end)
             latest_videos = self._overview_latest_videos(youtube, uploads_playlist)
             logger.info(
-                "YouTube channel overview complete day_points={} top_count={} latest_count={}",
+                "YouTube channel overview complete kind={} day_points={} top_count={} latest_count={}",
+                resolved.get("kind"),
                 len(views_by_day),
                 len(top_videos),
                 len(latest_videos),
             )
             return {
                 "success": True,
-                "window_days": window_days,
+                "window_kind": resolved.get("kind"),
+                "window_days": resolved.get("window_days"),
+                "start_date": start.isoformat(),
+                "end_date": end.isoformat(),
+                "compare": bool(resolved.get("compare")),
+                "published_at": published_at,
                 "current": current,
                 "previous": previous,
                 "views_by_day": views_by_day,
@@ -222,6 +276,8 @@ class YouTubeAnalyticsService:
                 "latest_videos": latest_videos,
                 "message": "Channel overview loaded.",
             }
+        except OverviewWindowError:
+            raise
         except Exception as exc:
             logger.warning(
                 "YouTube channel overview failed kind={}",

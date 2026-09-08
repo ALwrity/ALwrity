@@ -5,7 +5,7 @@ Used only by YouTubeAnalyticsService. Not a second API client.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
@@ -27,17 +27,15 @@ def analytics_error_kind(exc: BaseException) -> str:
 
 
 def overview_window_bounds(days: int) -> Tuple[date, date]:
-    end = date.today()
-    span = max(1, min(int(days), 90))
-    start = end - timedelta(days=span)
-    return start, end
+    from services.youtube.youtube_analytics_overview_window import rolling_bounds
+
+    return rolling_bounds(days, date.today())
 
 
 def previous_window_bounds(current_start: date, days: int) -> Tuple[date, date]:
-    span = max(1, min(int(days), 90))
-    prev_end = current_start - timedelta(days=1)
-    prev_start = prev_end - timedelta(days=span)
-    return prev_start, prev_end
+    from services.youtube.youtube_analytics_overview_window import previous_rolling_bounds
+
+    return previous_rolling_bounds(current_start, days)
 
 
 def optional_num(value: Any) -> Optional[float]:

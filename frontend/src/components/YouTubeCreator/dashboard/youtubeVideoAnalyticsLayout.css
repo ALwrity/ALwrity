@@ -73,38 +73,6 @@
   border-top: 5px solid #0f0f0f;
 }
 
-.yt-video-analytics-date__menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% - 6px);
-  z-index: 2;
-  min-width: 160px;
-  margin: 0;
-  padding: 6px 0;
-  list-style: none;
-  background: #fff;
-  border: 1px solid #e5e5e5;
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(15, 15, 15, 0.08);
-}
-
-.yt-video-analytics-date__option {
-  display: block;
-  width: 100%;
-  padding: 8px 14px;
-  border: 0;
-  background: transparent;
-  color: #0f0f0f;
-  font: inherit;
-  font-size: 14px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.yt-video-analytics-date__option[aria-selected="true"] {
-  font-weight: 600;
-}
-
 .yt-video-analytics-panel {
   color: #606060;
   font-size: 14px;
@@ -120,10 +88,5 @@
 
   .yt-video-analytics-date__button {
     text-align: left;
-  }
-
-  .yt-video-analytics-date__menu {
-    left: 0;
-    right: auto;
   }
 }

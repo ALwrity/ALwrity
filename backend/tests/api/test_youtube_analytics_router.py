@@ -95,14 +95,65 @@ class TestYouTubeAnalyticsRouter:
         resp = client.get("/api/youtube/analytics/overview")
         assert resp.status_code in (401, 403)
 
-    def test_overview_rejects_days_outside_pulse_window(self):
+    def test_overview_rejects_days_outside_supported_window(self):
         service = MagicMock()
         client = youtube_studio_client({get_analytics_service: lambda: service})
         too_low = client.get("/api/youtube/analytics/overview?days=0")
-        too_high = client.get("/api/youtube/analytics/overview?days=91")
+        too_high = client.get("/api/youtube/analytics/overview?days=366")
         assert too_low.status_code == 422
         assert too_high.status_code == 422
         service.get_channel_overview.assert_not_called()
+
+    def test_overview_allows_days_365_while_pulse_stays_90(self):
+        service = MagicMock()
+        service.get_channel_overview.return_value = {"success": True}
+        client = youtube_studio_client({get_analytics_service: lambda: service})
+        overview = client.get("/api/youtube/analytics/overview?days=365")
+        pulse = client.get("/api/youtube/analytics/pulse?days=365")
+        ninety_one = client.get("/api/youtube/analytics/overview?days=91")
+        assert overview.status_code == 200
+        assert ninety_one.status_code == 200
+        assert pulse.status_code == 422
+        service.get_channel_overview.assert_called()
+
+    def test_overview_rejects_mixed_days_and_custom_dates(self):
+        service = MagicMock()
+        client = youtube_studio_client({get_analytics_service: lambda: service})
+        resp = client.get(
+            "/api/youtube/analytics/overview?days=28&start_date=2026-08-01&end_date=2026-08-31"
+        )
+        assert resp.status_code == 422
+        service.get_channel_overview.assert_not_called()
+
+    def test_overview_rejects_future_custom_end(self):
+        service = MagicMock()
+        client = youtube_studio_client({get_analytics_service: lambda: service})
+        resp = client.get(
+            "/api/youtube/analytics/overview?window=calendar&start_date=2099-01-01&end_date=2099-01-31"
+        )
+        assert resp.status_code == 422
+        service.get_channel_overview.assert_not_called()
+
+    def test_overview_forwards_calendar_and_lifetime_windows(self):
+        from datetime import date, timedelta
+
+        service = MagicMock()
+        service.get_channel_overview.return_value = {"success": True}
+        client = youtube_studio_client({get_analytics_service: lambda: service})
+        today = date.today()
+        start = today - timedelta(days=10)
+        calendar = client.get(
+            f"/api/youtube/analytics/overview?window=calendar"
+            f"&start_date={start.isoformat()}&end_date={today.isoformat()}"
+        )
+        lifetime = client.get("/api/youtube/analytics/overview?window=lifetime")
+        assert calendar.status_code == 200
+        assert lifetime.status_code == 200
+        calendar_kwargs = service.get_channel_overview.call_args_list[0].kwargs
+        assert calendar_kwargs["window"] == "calendar"
+        assert calendar_kwargs["start_date"] == start
+        assert calendar_kwargs["end_date"] == today
+        assert service.get_channel_overview.call_args_list[1].kwargs["window"] == "lifetime"
 
     def test_overview_returns_service_payload_without_fake_views(self):
         service = MagicMock()

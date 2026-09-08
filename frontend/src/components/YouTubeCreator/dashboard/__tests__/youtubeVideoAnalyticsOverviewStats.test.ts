@@ -16,6 +16,12 @@ describe("youtubeVideoAnalyticsOverviewStats", () => {
     expect(formatOverviewHeadline(null, 28)).toBe(
       "Views for this period are unavailable.",
     );
+    expect(formatOverviewHeadline(71, { kind: "lifetime" })).toBe(
+      "Your channel got 71 views since you started.",
+    );
+    expect(formatOverviewHeadline(71, { kind: "year", year: 2026 })).toBe(
+      "Your channel got 71 views in 2026.",
+    );
   });
 
   it("formats watch hours and signed subscriber net", () => {
@@ -32,6 +38,10 @@ describe("youtubeVideoAnalyticsOverviewStats", () => {
     );
     expect(previousPeriodChangeLabel(10, 0, 7)).toBe("+10 vs previous 7 days");
     expect(previousPeriodChangeLabel(null, 10, 28)).toBe("—");
+    expect(previousPeriodChangeLabel(71, 10, { mode: "none" })).toBe("—");
+    expect(previousPeriodChangeLabel(71, 10, { mode: "period" })).toBe(
+      "610% more than previous period",
+    );
   });
 
   it("formats duration and optional percentage", () => {

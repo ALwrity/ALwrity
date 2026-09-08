@@ -1,5 +1,6 @@
 """YouTube Analytics / Channel Pulse API."""
 
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -7,6 +8,10 @@ from loguru import logger
 
 from middleware.auth_middleware import get_current_user
 from services.youtube.youtube_analytics_service import YouTubeAnalyticsService
+from services.youtube.youtube_analytics_overview_window import (
+    OverviewWindowError,
+    resolve_overview_query,
+)
 from services.youtube.youtube_oauth_service import YouTubeOAuthService
 from .oauth_router import get_oauth_service
 
@@ -55,7 +60,10 @@ def get_retention_summary(
 
 @router.get("/overview")
 def get_channel_overview(
-    days: int = Query(28, ge=1, le=90),
+    days: Optional[int] = Query(None, ge=1, le=365),
+    window: Optional[str] = Query(None),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
     token_id: Optional[int] = Query(None),
     user: dict = Depends(get_current_user),
     service: YouTubeAnalyticsService = Depends(get_analytics_service),
@@ -64,11 +72,27 @@ def get_channel_overview(
     if not user_id:
         raise HTTPException(status_code=401, detail="Authentication required")
     try:
+        resolve_overview_query(
+            window=window,
+            days=days,
+            start_date=start_date,
+            end_date=end_date,
+            today=date.today(),
+        )
         return service.get_channel_overview(
             user_id,
             days=days,
             token_id=token_id,
+            window=window,
+            start_date=start_date,
+            end_date=end_date,
         )
+    except OverviewWindowError as exc:
+        logger.warning(
+            "YouTube channel overview route rejected code={}",
+            exc.error_code,
+        )
+        raise HTTPException(status_code=422, detail=exc.message)
     except Exception as exc:
         logger.warning(
             "YouTube channel overview route error kind={}",

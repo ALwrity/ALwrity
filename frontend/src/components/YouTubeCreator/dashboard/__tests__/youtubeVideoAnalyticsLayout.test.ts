@@ -40,4 +40,18 @@ describe("YouTube Video Analytics layout stylesheet", () => {
     expect(overviewCss).toMatch(/@media \(max-width:\s*720px\)/);
     expect(overviewCss).toMatch(/#ff0000/);
   });
+
+  it("keeps the date menu sheet out of hub layout", () => {
+    const dateMenuCss = fs.readFileSync(
+      path.join(dashboardDir, "youtubeVideoAnalyticsDateMenu.css"),
+      "utf8",
+    );
+    expect(hubCss).not.toMatch(/yt-video-analytics-date__menu/);
+    expect(dateMenuCss).toMatch(/\.yt-video-analytics-date__menu/);
+    expect(dateMenuCss).toMatch(/#f1f1f1/);
+    expect(dateMenuCss).toMatch(/max-height:\s*280px/);
+    expect(dateMenuCss).toMatch(/yt-video-analytics-date__menu--custom/);
+    expect(dateMenuCss).toMatch(/input\[type=["']date["']\]/);
+    expect(dateMenuCss).toMatch(/yt-video-analytics-date__custom-actions/);
+  });
 });
