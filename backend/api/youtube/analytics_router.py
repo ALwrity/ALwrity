@@ -51,3 +51,30 @@ def get_retention_summary(
     except Exception as e:
         logger.error(f"YouTube retention route error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/overview")
+def get_channel_overview(
+    days: int = Query(28, ge=1, le=90),
+    token_id: Optional[int] = Query(None),
+    user: dict = Depends(get_current_user),
+    service: YouTubeAnalyticsService = Depends(get_analytics_service),
+):
+    user_id = user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        return service.get_channel_overview(
+            user_id,
+            days=days,
+            token_id=token_id,
+        )
+    except Exception as exc:
+        logger.warning(
+            "YouTube channel overview route error kind={}",
+            type(exc).__name__,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Channel overview request failed.",
+        )

@@ -8,6 +8,7 @@ import { AnalysisWedgeModal } from "../modals/AnalysisWedgeModal";
 function renderAnalysis(overrides: {
   connected?: boolean;
   onOpenVideoPerformance?: () => void;
+  onOpenVideoAnalytics?: () => void;
   onOpenPulse?: () => void;
   onOpenSeo?: () => void;
   onOpenGaps?: () => void;
@@ -15,6 +16,7 @@ function renderAnalysis(overrides: {
   onRequestConnect?: () => void;
 } = {}) {
   const onOpenVideoPerformance = overrides.onOpenVideoPerformance ?? vi.fn();
+  const onOpenVideoAnalytics = overrides.onOpenVideoAnalytics ?? vi.fn();
   const onOpenPulse = overrides.onOpenPulse ?? vi.fn();
   const onOpenSeo = overrides.onOpenSeo ?? vi.fn();
   const onOpenGaps = overrides.onOpenGaps ?? vi.fn();
@@ -29,6 +31,7 @@ function renderAnalysis(overrides: {
       onRequestConnect={onRequestConnect}
       onOpenPulse={onOpenPulse}
       onOpenVideoPerformance={onOpenVideoPerformance}
+      onOpenVideoAnalytics={onOpenVideoAnalytics}
       onOpenSeo={onOpenSeo}
       onOpenGaps={onOpenGaps}
       onOpenRetention={onOpenRetention}
@@ -36,6 +39,7 @@ function renderAnalysis(overrides: {
   );
   return {
     onOpenVideoPerformance,
+    onOpenVideoAnalytics,
     onOpenPulse,
     onOpenSeo,
     onOpenGaps,
@@ -78,6 +82,7 @@ describe("AnalysisWedgeModal Video Performance tile", () => {
     expect(handlers.onOpenSeo).not.toHaveBeenCalled();
     expect(handlers.onOpenGaps).not.toHaveBeenCalled();
     expect(handlers.onOpenRetention).not.toHaveBeenCalled();
+    expect(handlers.onOpenVideoAnalytics).not.toHaveBeenCalled();
   });
 
   it("describes recent uploads with view and like signals", () => {

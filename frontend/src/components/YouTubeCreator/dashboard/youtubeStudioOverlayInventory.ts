@@ -2,7 +2,10 @@
  * YouTube Studio overlay ownership map + migration checklist.
  *
  * Phase 5: overlay contract tests + z-index guardrail. Hub main stays unisolated.
+ * Extra leaf rows live in youtube-named satellite files so this stays under 500 lines.
  */
+
+import { YOUTUBE_VIDEO_ANALYTICS_OVERLAY_ENTRIES } from "./youtubeVideoAnalyticsOverlayInventory";
 
 export type YouTubeOverlayRenderKind =
   | "in_tree"
@@ -233,6 +236,7 @@ export const YOUTUBE_STUDIO_OVERLAY_INVENTORY: readonly YouTubeStudioOverlayEntr
     knownIssue: null,
     migrationAction: "keep_leaf_hub_modal",
   },
+  ...YOUTUBE_VIDEO_ANALYTICS_OVERLAY_ENTRIES,
   {
     id: "playlist-attach",
     component: "PlaylistAttachModal",

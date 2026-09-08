@@ -26,6 +26,32 @@ export const youtubeStudioApi = {
     return response.data;
   },
 
+  async getChannelOverview(params?: { days?: number; token_id?: number }) {
+    const days = params?.days;
+    console.info("[youtubeStudioApi] channel overview start", { days });
+    try {
+      const response = await apiClient.get(`${API_BASE}/analytics/overview`, { params });
+      console.info("[youtubeStudioApi] channel overview complete", {
+        success: Boolean(response.data?.success),
+        dayCount: Array.isArray(response.data?.views_by_day)
+          ? response.data.views_by_day.length
+          : 0,
+        topCount: Array.isArray(response.data?.top_videos)
+          ? response.data.top_videos.length
+          : 0,
+        latestCount: Array.isArray(response.data?.latest_videos)
+          ? response.data.latest_videos.length
+          : 0,
+      });
+      return response.data;
+    } catch (overviewError) {
+      console.error("[youtubeStudioApi] channel overview failed", {
+        errorName: overviewError instanceof Error ? overviewError.name : "Error",
+      });
+      throw overviewError;
+    }
+  },
+
   async getCommentInbox(params?: { max_results?: number; token_id?: number }) {
     console.info("[youtubeStudioApi] comment inbox start", {
       maxResults: params?.max_results,

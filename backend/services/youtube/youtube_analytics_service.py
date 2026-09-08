@@ -14,6 +14,20 @@ from googleapiclient.discovery import build
 from loguru import logger
 
 from services.youtube.youtube_oauth_service import YouTubeOAuthService
+from services.youtube.youtube_analytics_overview_query import (
+    VIDEO_TOP_METRICS,
+    VIDEO_TOP_METRICS_WITH_PERCENT,
+    analytics_error_kind,
+    execute_channel_window,
+    execute_top_videos,
+    execute_views_by_day,
+    overview_window_bounds,
+    parse_video_metric_rows,
+    parse_views_by_day,
+    parse_window_totals,
+    previous_window_bounds,
+    window_payload,
+)
 
 
 class YouTubeAnalyticsService:
@@ -130,6 +144,219 @@ class YouTubeAnalyticsService:
             "top_videos": pulse.get("top_videos") or [],
             "message": "Retention summary ready.",
         }
+
+    def get_channel_overview(
+        self,
+        user_id: str,
+        days: int = 28,
+        token_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Channel Overview for Video Analytics: window totals, chart, top and latest."""
+        window_days = max(1, min(int(days), 90))
+        logger.info("YouTube channel overview start days={}", window_days)
+        try:
+            creds = self.oauth_service.get_valid_credentials(user_id, token_id)
+            if not creds:
+                logger.warning("YouTube channel overview not connected")
+                return {
+                    "success": False,
+                    "error_code": "not_connected",
+                    "message": "Connect YouTube to load channel overview.",
+                }
+
+            youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
+            channel = youtube.channels().list(
+                part="snippet,statistics,contentDetails",
+                mine=True,
+            ).execute()
+            items = channel.get("items") or []
+            if not items:
+                logger.warning("YouTube channel overview no channel")
+                return {
+                    "success": False,
+                    "error_code": "no_channel",
+                    "message": "No YouTube channel found for this account.",
+                }
+
+            uploads_playlist = (
+                (items[0].get("contentDetails") or {})
+                .get("relatedPlaylists", {})
+                .get("uploads")
+            )
+            start, end = overview_window_bounds(window_days)
+            prev_start, prev_end = previous_window_bounds(start, window_days)
+            analytics = build(
+                "youtubeAnalytics", "v2", credentials=creds, cache_discovery=False
+            )
+            try:
+                current_report = execute_channel_window(analytics, start, end)
+            except Exception as exc:
+                logger.warning(
+                    "YouTube channel overview window unavailable kind={}",
+                    analytics_error_kind(exc),
+                )
+                return {
+                    "success": False,
+                    "error_code": "analytics_unavailable",
+                    "message": "Channel overview is unavailable for this window.",
+                }
+
+            current = window_payload(parse_window_totals(current_report))
+            previous = self._overview_previous_window(analytics, prev_start, prev_end)
+            views_by_day = self._overview_views_by_day(analytics, start, end)
+            top_videos = self._overview_top_videos(analytics, youtube, start, end)
+            latest_videos = self._overview_latest_videos(youtube, uploads_playlist)
+            logger.info(
+                "YouTube channel overview complete day_points={} top_count={} latest_count={}",
+                len(views_by_day),
+                len(top_videos),
+                len(latest_videos),
+            )
+            return {
+                "success": True,
+                "window_days": window_days,
+                "current": current,
+                "previous": previous,
+                "views_by_day": views_by_day,
+                "top_videos": top_videos,
+                "latest_videos": latest_videos,
+                "message": "Channel overview loaded.",
+            }
+        except Exception as exc:
+            logger.warning(
+                "YouTube channel overview failed kind={}",
+                analytics_error_kind(exc),
+            )
+            return {
+                "success": False,
+                "error_code": "analytics_unavailable",
+                "message": "Channel overview is unavailable for this window.",
+            }
+
+    def _overview_previous_window(self, analytics, start: date, end: date) -> Optional[Dict[str, Any]]:
+        try:
+            report = execute_channel_window(analytics, start, end)
+            return window_payload(parse_window_totals(report))
+        except Exception as exc:
+            logger.warning(
+                "YouTube channel overview previous window skipped kind={}",
+                analytics_error_kind(exc),
+            )
+            return None
+
+    def _overview_views_by_day(self, analytics, start: date, end: date) -> List[Dict[str, Any]]:
+        try:
+            report = execute_views_by_day(analytics, start, end)
+            return parse_views_by_day(report)
+        except Exception as exc:
+            logger.warning(
+                "YouTube channel overview day series skipped kind={}",
+                analytics_error_kind(exc),
+            )
+            return []
+
+    def _overview_top_videos(
+        self,
+        analytics,
+        youtube,
+        start: date,
+        end: date,
+    ) -> List[Dict[str, Any]]:
+        try:
+            try:
+                report = execute_top_videos(
+                    analytics, start, end, VIDEO_TOP_METRICS_WITH_PERCENT
+                )
+            except Exception as exc:
+                logger.warning(
+                    "YouTube channel overview percentage metric skipped kind={}",
+                    analytics_error_kind(exc),
+                )
+                report = execute_top_videos(analytics, start, end, VIDEO_TOP_METRICS)
+            rows = parse_video_metric_rows(report)
+            return self._join_top_video_snippets(youtube, rows)
+        except Exception as exc:
+            logger.warning(
+                "YouTube channel overview top videos skipped kind={}",
+                analytics_error_kind(exc),
+            )
+            return []
+
+    def _join_top_video_snippets(
+        self,
+        youtube,
+        rows: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        ids = [row["video_id"] for row in rows if row.get("video_id")]
+        if not ids:
+            return []
+        try:
+            listed = (
+                youtube.videos()
+                .list(part="snippet", id=",".join(ids))
+                .execute()
+            )
+        except Exception as exc:
+            logger.warning(
+                "YouTube channel overview top snippets skipped kind={}",
+                analytics_error_kind(exc),
+            )
+            return []
+        by_id: Dict[str, Dict[str, Any]] = {}
+        for item in listed.get("items") or []:
+            video_id = str(item.get("id") or "").strip()
+            snippet = item.get("snippet") or {}
+            if not video_id:
+                continue
+            thumbs = snippet.get("thumbnails") or {}
+            by_id[video_id] = {
+                "title": snippet.get("title"),
+                "published_at": snippet.get("publishedAt"),
+                "thumbnail": (
+                    (thumbs.get("medium") or thumbs.get("default") or {}).get("url")
+                ),
+            }
+        joined: List[Dict[str, Any]] = []
+        for row in rows:
+            extra = by_id.get(row["video_id"])
+            if not extra:
+                continue
+            joined.append({**row, **extra})
+        return joined
+
+    def _overview_latest_videos(
+        self,
+        youtube,
+        uploads_playlist: Optional[str],
+    ) -> List[Dict[str, Any]]:
+        latest = self._list_recent_uploads(youtube, uploads_playlist, max_results=2)
+        ids = [row.get("video_id") for row in latest if row.get("video_id")]
+        if not ids:
+            return latest
+        try:
+            listed = (
+                youtube.videos()
+                .list(part="statistics", id=",".join(ids))
+                .execute()
+            )
+        except Exception as exc:
+            logger.warning(
+                "YouTube channel overview latest stats skipped kind={}",
+                analytics_error_kind(exc),
+            )
+            for row in latest:
+                row["view_count"] = None
+                row["like_count"] = None
+            return latest
+        stats_by_id = {
+            str(item.get("id") or ""): item.get("statistics") or {}
+            for item in listed.get("items") or []
+        }
+        for row in latest:
+            stats = stats_by_id.get(str(row.get("video_id") or "")) or {}
+            row["view_count"] = _int(stats.get("viewCount"))
+            row["like_count"] = _int(stats.get("likeCount"))
+        return latest
 
     def _query_analytics_window(
         self,

@@ -11,6 +11,7 @@ export const AnalysisWedgeModal: React.FC<AnalysisWedgeProps> = ({
   onRequestConnect,
   onOpenPulse,
   onOpenVideoPerformance,
+  onOpenVideoAnalytics,
   onOpenSeo,
   onOpenGaps,
   onOpenRetention,
@@ -44,6 +45,20 @@ export const AnalysisWedgeModal: React.FC<AnalysisWedgeProps> = ({
             connected,
             "video_performance",
             onOpenVideoPerformance,
+            onRequestConnect,
+          )
+        }
+      />
+      <YouTubeToolTile
+        icon="📉"
+        accent="#ff0000"
+        title="Video Analytics"
+        description="Overview, Reach, Engagement, and Audience for your videos."
+        onClick={() =>
+          resolveOAuthTileClick(
+            connected,
+            "video_analytics",
+            onOpenVideoAnalytics,
             onRequestConnect,
           )
         }
