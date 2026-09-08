@@ -6,19 +6,21 @@ import {
   type YouTubeModalShellProps,
 } from "../youtubeWedgeModalUi";
 import {
-  YOUTUBE_VIDEO_ANALYTICS_DEFAULT_PRESET,
   YOUTUBE_VIDEO_ANALYTICS_DEFAULT_TAB,
-  YOUTUBE_VIDEO_ANALYTICS_PRESETS,
   YOUTUBE_VIDEO_ANALYTICS_TABS,
   YOUTUBE_VIDEO_ANALYTICS_WINDOW_UNSUPPORTED,
   emptyAnalyticsPanelCopy,
-  formatAnalyticsDateRange,
-  formatAnalyticsPresetLabel,
   nextAnalyticsTab,
-  overviewDaysForPreset,
-  type YouTubeVideoAnalyticsPresetId,
   type YouTubeVideoAnalyticsTabId,
 } from "../youtubeVideoAnalyticsUi";
+import {
+  YOUTUBE_ANALYTICS_DEFAULT_SELECTION,
+  formatSelectionRange,
+  selectionLabel,
+  toOverviewRequest,
+  type YouTubeAnalyticsDateSelection,
+} from "../youtubeVideoAnalyticsDateRange";
+import { YouTubeVideoAnalyticsDateMenu } from "./YouTubeVideoAnalyticsDateMenu";
 import {
   YouTubeVideoAnalyticsOverview,
   type YouTubeChannelOverviewPayload,
@@ -35,28 +37,27 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
   const [tab, setTab] = useState<YouTubeVideoAnalyticsTabId>(
     YOUTUBE_VIDEO_ANALYTICS_DEFAULT_TAB,
   );
-  const [preset, setPreset] = useState<YouTubeVideoAnalyticsPresetId>(
-    YOUTUBE_VIDEO_ANALYTICS_DEFAULT_PRESET,
+  const [selection, setSelection] = useState<YouTubeAnalyticsDateSelection>(
+    YOUTUBE_ANALYTICS_DEFAULT_SELECTION,
   );
   const [dateMenuOpen, setDateMenuOpen] = useState(false);
   const [overviewPayload, setOverviewPayload] =
     useState<YouTubeChannelOverviewPayload | null>(null);
   const [overviewStatus, setOverviewStatus] = useState<string | null>(null);
   const today = useMemo(() => new Date(), [open]);
-  const rangeLabel = formatAnalyticsDateRange(preset, today);
-  const presetLabel = formatAnalyticsPresetLabel(preset);
-  const overviewDays = overviewDaysForPreset(preset);
+  const rangeLabel = formatSelectionRange(selection, today);
+  const presetLabel = selectionLabel(selection);
 
   useEffect(() => {
     if (!open) {
       return;
     }
     setTab(YOUTUBE_VIDEO_ANALYTICS_DEFAULT_TAB);
-    setPreset(YOUTUBE_VIDEO_ANALYTICS_DEFAULT_PRESET);
+    setSelection(YOUTUBE_ANALYTICS_DEFAULT_SELECTION);
     setDateMenuOpen(false);
     console.info("[YouTubeVideoAnalytics] Open", {
       tab: YOUTUBE_VIDEO_ANALYTICS_DEFAULT_TAB,
-      preset: YOUTUBE_VIDEO_ANALYTICS_DEFAULT_PRESET,
+      preset: YOUTUBE_ANALYTICS_DEFAULT_SELECTION.id,
     });
   }, [open]);
 
@@ -64,8 +65,8 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
     if (!open || tab !== "overview") {
       return;
     }
-    const days = overviewDaysForPreset(preset);
-    if (days == null) {
+    const params = toOverviewRequest(selection, today);
+    if (!params) {
       setOverviewPayload(null);
       setOverviewStatus(YOUTUBE_VIDEO_ANALYTICS_WINDOW_UNSUPPORTED);
       console.info("[YouTubeVideoAnalytics] Overview skipped", {
@@ -76,9 +77,14 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
     let cancelled = false;
     setOverviewPayload(null);
     setOverviewStatus("Loading channel overview.");
-    console.info("[YouTubeVideoAnalytics] Overview start", { days });
+    console.info("[YouTubeVideoAnalytics] Overview start", {
+      window: params.window,
+      days: params.days,
+      hasStartDate: Boolean(params.start_date),
+      hasEndDate: Boolean(params.end_date),
+    });
     youtubeStudioApi
-      .getChannelOverview({ days })
+      .getChannelOverview(params)
       .then((payload: YouTubeChannelOverviewPayload) => {
         if (cancelled) {
           return;
@@ -86,14 +92,14 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
         if (!payload?.success) {
           console.warn("[YouTubeVideoAnalytics] Overview unsuccessful", {
             errorCode: payload?.error_code || "unavailable",
-            days,
+            window: params.window,
           });
           setOverviewPayload(payload || null);
           setOverviewStatus(payload?.message || OVERVIEW_LOAD_FAILED);
           return;
         }
         console.info("[YouTubeVideoAnalytics] Overview complete", {
-          days,
+          window: params.window,
           dayCount: Array.isArray(payload.views_by_day) ? payload.views_by_day.length : 0,
           topCount: Array.isArray(payload.top_videos) ? payload.top_videos.length : 0,
           latestCount: Array.isArray(payload.latest_videos)
@@ -109,7 +115,7 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
         }
         console.error("[YouTubeVideoAnalytics] Overview failed", {
           errorName: loadError instanceof Error ? loadError.name : "Error",
-          days,
+          window: params.window,
         });
         setOverviewPayload(null);
         setOverviewStatus(OVERVIEW_LOAD_FAILED);
@@ -117,7 +123,7 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
     return () => {
       cancelled = true;
     };
-  }, [open, tab, preset]);
+  }, [open, tab, selection, today]);
 
   const onSelectTab = (next: YouTubeVideoAnalyticsTabId) => {
     if (next === tab) {
@@ -127,9 +133,12 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
     setTab(next);
   };
 
-  const onSelectPreset = (next: YouTubeVideoAnalyticsPresetId) => {
-    console.info("[YouTubeVideoAnalytics] Range changed", { preset: next });
-    setPreset(next);
+  const onSelectRange = (next: YouTubeAnalyticsDateSelection) => {
+    console.info("[YouTubeVideoAnalytics] Range changed", {
+      preset: next.id,
+      type: next.type,
+    });
+    setSelection(next);
     setDateMenuOpen(false);
   };
 
@@ -204,21 +213,17 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
             <span className="yt-video-analytics-date__preset">{presetLabel}</span>
           </button>
           {dateMenuOpen ? (
-            <ul className="yt-video-analytics-date__menu" role="listbox" aria-label="Date range">
-              {YOUTUBE_VIDEO_ANALYTICS_PRESETS.map((item) => (
-                <li key={item.id} role="presentation">
-                  <button
-                    type="button"
-                    role="option"
-                    className="yt-video-analytics-date__option"
-                    aria-selected={item.id === preset}
-                    onClick={() => onSelectPreset(item.id)}
-                  >
-                    {item.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <YouTubeVideoAnalyticsDateMenu
+              selection={selection}
+              today={today}
+              onSelect={onSelectRange}
+              onCancel={() => {
+                console.info("[YouTubeVideoAnalytics] Date menu closed", {
+                  reason: "custom_cancel",
+                });
+                setDateMenuOpen(false);
+              }}
+            />
           ) : null}
         </div>
       </div>
@@ -230,8 +235,8 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
       >
         {tab === "overview" ? (
           <YouTubeVideoAnalyticsOverview
-            key={String(overviewDays)}
-            days={overviewDays ?? 28}
+            key={selection.id}
+            selection={selection}
             payload={overviewPayload}
             status={overviewStatus}
           />

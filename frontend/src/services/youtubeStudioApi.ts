@@ -26,9 +26,20 @@ export const youtubeStudioApi = {
     return response.data;
   },
 
-  async getChannelOverview(params?: { days?: number; token_id?: number }) {
+  async getChannelOverview(params?: {
+    days?: number;
+    window?: string;
+    start_date?: string;
+    end_date?: string;
+    token_id?: number;
+  }) {
     const days = params?.days;
-    console.info("[youtubeStudioApi] channel overview start", { days });
+    console.info("[youtubeStudioApi] channel overview start", {
+      days,
+      window: params?.window,
+      hasStartDate: Boolean(params?.start_date),
+      hasEndDate: Boolean(params?.end_date),
+    });
     try {
       const response = await apiClient.get(`${API_BASE}/analytics/overview`, { params });
       console.info("[youtubeStudioApi] channel overview complete", {

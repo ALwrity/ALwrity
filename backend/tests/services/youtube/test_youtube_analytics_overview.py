@@ -370,3 +370,112 @@ class TestYouTubeAnalyticsOverview:
         assert result["latest_videos"][0]["title"] == "Animation Video Generation Test"
         assert result["latest_videos"][0]["view_count"] == 15
         assert result["latest_videos"][0]["like_count"] == 2
+
+    def test_lifetime_uses_published_at_without_previous_or_2005(self):
+        youtube = MagicMock()
+        youtube.channels.return_value.list.return_value.execute.return_value = {
+            "items": [
+                {
+                    "id": "UC123",
+                    "snippet": {
+                        "title": "Test",
+                        "publishedAt": "2024-03-15T12:00:00Z",
+                        "thumbnails": {},
+                    },
+                    "statistics": {},
+                    "contentDetails": {"relatedPlaylists": {"uploads": "UU123"}},
+                }
+            ],
+        }
+        youtube.playlistItems.return_value.list.return_value.execute.return_value = {
+            "items": [],
+        }
+        analytics = MagicMock()
+
+        def _query(**kwargs):
+            mock = MagicMock()
+            mock.execute.return_value = {"rows": [[10, 1, 1, 0, 0]]}
+            if kwargs.get("dimensions") in {"day", "video"}:
+                mock.execute.return_value = {"rows": []}
+            return mock
+
+        analytics.reports.return_value.query.side_effect = _query
+
+        def _build(api, version, **kwargs):
+            if api == "youtubeAnalytics":
+                return analytics
+            return youtube
+
+        with patch("services.youtube.youtube_analytics_service.build", side_effect=_build):
+            result = _service(_connected_oauth()).get_channel_overview(
+                USER_ID,
+                window="lifetime",
+            )
+
+        assert result["success"] is True
+        assert result["start_date"] == "2024-03-15"
+        assert result["previous"] is None
+        assert result["compare"] is False
+        assert not result["start_date"].startswith("2005")
+        undimensioned = [
+            call.kwargs
+            for call in analytics.reports.return_value.query.call_args_list
+            if not call.kwargs.get("dimensions")
+        ]
+        assert len(undimensioned) == 1
+
+    def test_lifetime_without_published_at_is_unavailable(self):
+        youtube = MagicMock()
+        _channel_ok(youtube)
+        with patch("services.youtube.youtube_analytics_service.build", return_value=youtube):
+            result = _service(_connected_oauth()).get_channel_overview(
+                USER_ID,
+                window="lifetime",
+            )
+        assert result["success"] is False
+        assert result["error_code"] == "analytics_unavailable"
+        assert result.get("current") is None
+
+    def test_days_365_queries_matching_previous_window(self):
+        from services.youtube.youtube_analytics_overview_window import (
+            previous_rolling_bounds,
+            rolling_bounds,
+        )
+
+        youtube = MagicMock()
+        _channel_ok(youtube)
+        youtube.playlistItems.return_value.list.return_value.execute.return_value = {
+            "items": [],
+        }
+        analytics = MagicMock()
+        start, end = rolling_bounds(365, date.today())
+        prev_start, prev_end = previous_rolling_bounds(start, 365)
+
+        def _query(**kwargs):
+            mock = MagicMock()
+            mock.execute.return_value = {"rows": [[1, 1, 1, 0, 0]]}
+            if kwargs.get("dimensions") in {"day", "video"}:
+                mock.execute.return_value = {"rows": []}
+            return mock
+
+        analytics.reports.return_value.query.side_effect = _query
+
+        def _build(api, version, **kwargs):
+            if api == "youtubeAnalytics":
+                return analytics
+            return youtube
+
+        with patch("services.youtube.youtube_analytics_service.build", side_effect=_build):
+            result = _service(_connected_oauth()).get_channel_overview(USER_ID, days=365)
+
+        assert result["success"] is True
+        assert result["window_days"] == 365
+        starts = {
+            call.kwargs["startDate"]
+            for call in analytics.reports.return_value.query.call_args_list
+            if not call.kwargs.get("dimensions")
+        }
+        assert start.isoformat() in starts
+        assert prev_start.isoformat() in starts
+        assert end.isoformat() == result["end_date"]
+        assert prev_end == start - timedelta(days=1)

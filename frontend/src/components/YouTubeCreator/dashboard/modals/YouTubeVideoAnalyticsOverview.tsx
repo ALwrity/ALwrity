@@ -7,14 +7,18 @@ import {
   formatViewPercentage,
   formatWatchHours,
   previousPeriodChangeLabel,
+  type OverviewHeadlineWindow,
 } from "../youtubeVideoAnalyticsOverviewStats";
+import type { YouTubeAnalyticsDateSelection } from "../youtubeVideoAnalyticsDateRange";
 import "../youtubeVideoAnalyticsOverview.css";
 
 export type YouTubeChannelOverviewPayload = {
   success?: boolean;
   error_code?: string | null;
   message?: string;
-  window_days?: number;
+  compare?: boolean;
+  published_at?: string | null;
+  window_kind?: string | null;
   current?: {
     views?: number | null;
     watch_hours?: number | null;
@@ -48,11 +52,40 @@ export type YouTubeChannelOverviewPayload = {
 const CHART_WIDTH = 320;
 const CHART_HEIGHT = 96;
 
+function headlineWindow(selection: YouTubeAnalyticsDateSelection): OverviewHeadlineWindow {
+  if (selection.type === "rolling") {
+    return { kind: "rolling", days: selection.days };
+  }
+  if (selection.type === "lifetime") {
+    return { kind: "lifetime" };
+  }
+  if (selection.type === "year") {
+    return { kind: "year", year: selection.year };
+  }
+  if (selection.type === "month") {
+    return { kind: "month", year: selection.year, month: selection.month };
+  }
+  return { kind: "custom" };
+}
+
+function comparePeriod(
+  selection: YouTubeAnalyticsDateSelection,
+  payload: YouTubeChannelOverviewPayload | null,
+): { mode: "days" | "period" | "none"; days?: number } {
+  if (selection.type === "lifetime" || payload?.compare === false) {
+    return { mode: "none" };
+  }
+  if (selection.type === "rolling") {
+    return { mode: "days", days: selection.days };
+  }
+  return { mode: "period" };
+}
+
 export const YouTubeVideoAnalyticsOverview: React.FC<{
-  days: number;
+  selection: YouTubeAnalyticsDateSelection;
   payload: YouTubeChannelOverviewPayload | null;
   status: string | null;
-}> = ({ days, payload, status }) => {
+}> = ({ selection, payload, status }) => {
   const [latestIndex, setLatestIndex] = useState(0);
   const current = payload?.current;
   const previous = payload?.previous;
@@ -62,6 +95,8 @@ export const YouTubeVideoAnalyticsOverview: React.FC<{
   const polyline = viewsPolylinePoints(daySeries, CHART_WIDTH, CHART_HEIGHT);
   const safeIndex = latest.length === 0 ? 0 : Math.min(latestIndex, latest.length - 1);
   const latestRow = latest[safeIndex];
+  const delta = comparePeriod(selection, payload);
+  const headline = headlineWindow(selection);
 
   if (status) {
     return <p className="yt-video-analytics-overview__status">{status}</p>;
@@ -83,7 +118,7 @@ export const YouTubeVideoAnalyticsOverview: React.FC<{
     <div className="yt-video-analytics-overview">
       <div className="yt-video-analytics-overview__main">
         <h3 className="yt-video-analytics-overview__headline">
-          {formatOverviewHeadline(current?.views, days)}
+          {formatOverviewHeadline(current?.views, headline)}
         </h3>
         <div className="yt-video-analytics-overview__cards">
           <div className="yt-video-analytics-overview__card">
@@ -92,7 +127,7 @@ export const YouTubeVideoAnalyticsOverview: React.FC<{
               {typeof current?.views === "number" ? current.views : "—"}
             </span>
             <span className="yt-video-analytics-overview__delta">
-              {previousPeriodChangeLabel(current?.views, previous?.views, days)}
+              {previousPeriodChangeLabel(current?.views, previous?.views, delta)}
             </span>
           </div>
           <div className="yt-video-analytics-overview__card">
@@ -104,7 +139,7 @@ export const YouTubeVideoAnalyticsOverview: React.FC<{
               {previousPeriodChangeLabel(
                 current?.watch_hours,
                 previous?.watch_hours,
-                days,
+                delta,
               )}
             </span>
           </div>
@@ -117,7 +152,7 @@ export const YouTubeVideoAnalyticsOverview: React.FC<{
               {previousPeriodChangeLabel(
                 current?.subscribers_net,
                 previous?.subscribers_net,
-                days,
+                delta,
               )}
             </span>
           </div>
