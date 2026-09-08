@@ -32,6 +32,7 @@ export function isTileConnectGated(_connected: boolean): boolean {
 export const OAUTH_SUB_MODAL_ACTIONS = [
   "channel_pulse",
   "video_performance",
+  "video_analytics",
   "retention",
   "comment_assistant",
   "engage_queue",
