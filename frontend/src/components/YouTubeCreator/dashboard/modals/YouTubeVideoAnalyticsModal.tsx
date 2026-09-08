@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { YouTubeActionModal } from "../YouTubeActionModal";
+import { youtubeStudioApi } from "../../../../services/youtubeStudioApi";
 import {
   YOUTUBE_WEDGE_MODAL_MAX_WIDTH,
   type YouTubeModalShellProps,
@@ -9,14 +10,22 @@ import {
   YOUTUBE_VIDEO_ANALYTICS_DEFAULT_TAB,
   YOUTUBE_VIDEO_ANALYTICS_PRESETS,
   YOUTUBE_VIDEO_ANALYTICS_TABS,
+  YOUTUBE_VIDEO_ANALYTICS_WINDOW_UNSUPPORTED,
   emptyAnalyticsPanelCopy,
   formatAnalyticsDateRange,
   formatAnalyticsPresetLabel,
   nextAnalyticsTab,
+  overviewDaysForPreset,
   type YouTubeVideoAnalyticsPresetId,
   type YouTubeVideoAnalyticsTabId,
 } from "../youtubeVideoAnalyticsUi";
+import {
+  YouTubeVideoAnalyticsOverview,
+  type YouTubeChannelOverviewPayload,
+} from "./YouTubeVideoAnalyticsOverview";
 import "../youtubeVideoAnalyticsLayout.css";
+
+const OVERVIEW_LOAD_FAILED = "Channel overview request failed.";
 
 export const YouTubeVideoAnalyticsModal: React.FC<{
   open: boolean;
@@ -30,9 +39,13 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
     YOUTUBE_VIDEO_ANALYTICS_DEFAULT_PRESET,
   );
   const [dateMenuOpen, setDateMenuOpen] = useState(false);
+  const [overviewPayload, setOverviewPayload] =
+    useState<YouTubeChannelOverviewPayload | null>(null);
+  const [overviewStatus, setOverviewStatus] = useState<string | null>(null);
   const today = useMemo(() => new Date(), [open]);
   const rangeLabel = formatAnalyticsDateRange(preset, today);
   const presetLabel = formatAnalyticsPresetLabel(preset);
+  const overviewDays = overviewDaysForPreset(preset);
 
   useEffect(() => {
     if (!open) {
@@ -46,6 +59,65 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
       preset: YOUTUBE_VIDEO_ANALYTICS_DEFAULT_PRESET,
     });
   }, [open]);
+
+  useEffect(() => {
+    if (!open || tab !== "overview") {
+      return;
+    }
+    const days = overviewDaysForPreset(preset);
+    if (days == null) {
+      setOverviewPayload(null);
+      setOverviewStatus(YOUTUBE_VIDEO_ANALYTICS_WINDOW_UNSUPPORTED);
+      console.info("[YouTubeVideoAnalytics] Overview skipped", {
+        reason: "window_unsupported",
+      });
+      return;
+    }
+    let cancelled = false;
+    setOverviewPayload(null);
+    setOverviewStatus("Loading channel overview.");
+    console.info("[YouTubeVideoAnalytics] Overview start", { days });
+    youtubeStudioApi
+      .getChannelOverview({ days })
+      .then((payload: YouTubeChannelOverviewPayload) => {
+        if (cancelled) {
+          return;
+        }
+        if (!payload?.success) {
+          console.warn("[YouTubeVideoAnalytics] Overview unsuccessful", {
+            errorCode: payload?.error_code || "unavailable",
+            days,
+          });
+          setOverviewPayload(payload || null);
+          setOverviewStatus(payload?.message || OVERVIEW_LOAD_FAILED);
+          return;
+        }
+        console.info("[YouTubeVideoAnalytics] Overview complete", {
+          days,
+          dayCount: Array.isArray(payload.views_by_day) ? payload.views_by_day.length : 0,
+          topCount: Array.isArray(payload.top_videos) ? payload.top_videos.length : 0,
+          latestCount: Array.isArray(payload.latest_videos)
+            ? payload.latest_videos.length
+            : 0,
+        });
+        setOverviewPayload(payload);
+        setOverviewStatus(null);
+      })
+      .catch((loadError: unknown) => {
+        if (cancelled) {
+          return;
+        }
+        console.error("[YouTubeVideoAnalytics] Overview failed", {
+          errorName: loadError instanceof Error ? loadError.name : "Error",
+          days,
+        });
+        setOverviewPayload(null);
+        setOverviewStatus(OVERVIEW_LOAD_FAILED);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, tab, preset]);
 
   const onSelectTab = (next: YouTubeVideoAnalyticsTabId) => {
     if (next === tab) {
@@ -156,7 +228,16 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
         id={`yt-video-analytics-panel-${tab}`}
         aria-labelledby={`yt-video-analytics-tab-${tab}`}
       >
-        {emptyAnalyticsPanelCopy(tab)}
+        {tab === "overview" ? (
+          <YouTubeVideoAnalyticsOverview
+            key={String(overviewDays)}
+            days={overviewDays ?? 28}
+            payload={overviewPayload}
+            status={overviewStatus}
+          />
+        ) : (
+          emptyAnalyticsPanelCopy(tab)
+        )}
       </div>
     </YouTubeActionModal>
   );

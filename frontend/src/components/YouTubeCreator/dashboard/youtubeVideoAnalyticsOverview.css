@@ -1,0 +1,134 @@
+.yt-video-analytics-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr);
+  gap: 24px;
+  color: #0f0f0f;
+}
+
+.yt-video-analytics-overview__headline {
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.yt-video-analytics-overview__cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px 24px;
+  margin-bottom: 16px;
+}
+
+.yt-video-analytics-overview__card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.yt-video-analytics-overview__card .yt-rail-stat-value {
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.yt-video-analytics-overview__delta {
+  color: #606060;
+  font-size: 12px;
+}
+
+.yt-video-analytics-overview__chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 8px 0 20px;
+  background: #fff;
+}
+
+.yt-video-analytics-overview__chart polyline {
+  fill: none;
+  stroke: #ff0000;
+  stroke-width: 2;
+}
+
+.yt-video-analytics-overview__section-title {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.yt-video-analytics-overview__list {
+  margin: 0;
+  padding: 0;
+  list-style: decimal;
+  padding-left: 20px;
+  color: #0f0f0f;
+}
+
+.yt-video-analytics-overview__list li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.yt-video-analytics-overview__list img,
+.yt-video-analytics-overview__latest img {
+  width: 64px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #e5e5e5;
+  background: #fff;
+}
+
+.yt-video-analytics-overview__latest {
+  border: 1px solid #e5e5e5;
+  border-radius: 14px;
+  padding: 14px;
+  background: #fff;
+}
+
+.yt-video-analytics-overview__latest img {
+  width: 100%;
+  height: auto;
+  max-height: 140px;
+}
+
+.yt-video-analytics-overview__latest-title {
+  margin: 8px 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.yt-video-analytics-overview__pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  color: #606060;
+  font-size: 12px;
+}
+
+.yt-video-analytics-overview__status,
+.yt-video-analytics-overview__empty {
+  margin: 0;
+  color: #606060;
+  font-size: 14px;
+}
+
+@media (max-width: 720px) {
+  .yt-video-analytics-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .yt-video-analytics-overview__cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .yt-video-analytics-overview__list li {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+}

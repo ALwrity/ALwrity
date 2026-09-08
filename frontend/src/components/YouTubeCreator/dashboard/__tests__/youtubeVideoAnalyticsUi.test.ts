@@ -11,6 +11,7 @@ import {
   formatAnalyticsDateRange,
   formatAnalyticsPresetLabel,
   nextAnalyticsTab,
+  overviewDaysForPreset,
 } from "../youtubeVideoAnalyticsUi";
 
 const TODAY = new Date(2026, 8, 8);
@@ -76,6 +77,13 @@ describe("youtubeVideoAnalyticsUi", () => {
       "Audience metrics will show here when analytics is connected.",
     );
     expect(emptyAnalyticsPanelCopy("overview")).not.toMatch(/\d/);
+  });
+
+  it("maps date presets to overview window days and skips All time", () => {
+    expect(overviewDaysForPreset("last_7")).toBe(7);
+    expect(overviewDaysForPreset("last_28")).toBe(28);
+    expect(overviewDaysForPreset("last_90")).toBe(90);
+    expect(overviewDaysForPreset("all_time")).toBeNull();
   });
 
   it("does not treat an invalid calendar date as All time", () => {

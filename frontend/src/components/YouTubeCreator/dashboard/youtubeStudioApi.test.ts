@@ -27,6 +27,44 @@ describe("youtubeStudioApi", () => {
     expect(result.message).toMatch(/Analytics/i);
   });
 
+  it("loads channel overview from /api/youtube/analytics/overview", async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: { success: true, window_days: 28, current: { views: 127 } },
+    });
+    const result = await youtubeStudioApi.getChannelOverview({ days: 28 });
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/analytics/overview", {
+      params: { days: 28 },
+    });
+    expect(result.current.views).toBe(127);
+  });
+
+  it("logs channel overview completion without video titles", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: {
+        success: true,
+        views_by_day: [{ date: "2026-09-04", views: 27 }],
+        top_videos: [{ video_id: "vid-secret", title: "Secret title" }],
+      },
+    });
+    await youtubeStudioApi.getChannelOverview({ days: 28 });
+    expect(info.mock.calls.join(" ")).toMatch(/channel overview complete/);
+    expect(info.mock.calls.join(" ")).not.toMatch(/Secret title|vid-secret/);
+    info.mockRestore();
+  });
+
+  it("logs channel overview failures without response bodies", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(apiClient.get).mockRejectedValueOnce({
+      name: "AxiosError",
+      response: { data: { detail: "filters=video==secret" } },
+    });
+    await expect(youtubeStudioApi.getChannelOverview({ days: 28 })).rejects.toBeTruthy();
+    expect(errorSpy.mock.calls.join(" ")).toMatch(/channel overview failed/);
+    expect(errorSpy.mock.calls.join(" ")).not.toMatch(/video==|secret/);
+    errorSpy.mockRestore();
+  });
+
   it("loads comment inbox from /api/youtube/comments/inbox", async () => {
     vi.mocked(apiClient.get).mockResolvedValueOnce({
       data: { success: true, comments: [] },

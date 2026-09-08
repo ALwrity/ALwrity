@@ -27,4 +27,17 @@ describe("YouTube Video Analytics layout stylesheet", () => {
     expect(analyticsCss).toMatch(/#606060/);
     expect(analyticsCss).toMatch(/@media \(max-width:\s*720px\)/);
   });
+
+  it("keeps Overview layout classes in the feature sheet, not hub layout", () => {
+    const overviewCss = fs.readFileSync(
+      path.join(dashboardDir, "youtubeVideoAnalyticsOverview.css"),
+      "utf8",
+    );
+    expect(hubCss).not.toMatch(/yt-video-analytics-overview/);
+    expect(overviewCss).toMatch(/\.yt-video-analytics-overview \{/);
+    expect(overviewCss).toMatch(/\.yt-video-analytics-overview__card/);
+    expect(overviewCss).toMatch(/repeat\(3,/);
+    expect(overviewCss).toMatch(/@media \(max-width:\s*720px\)/);
+    expect(overviewCss).toMatch(/#ff0000/);
+  });
 });

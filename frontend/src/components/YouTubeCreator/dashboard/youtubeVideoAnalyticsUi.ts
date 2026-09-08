@@ -119,3 +119,12 @@ export function nextAnalyticsTab(
   const next = (index + delta + ids.length) % ids.length;
   return ids[next];
 }
+
+export function overviewDaysForPreset(
+  preset: YouTubeVideoAnalyticsPresetId,
+): number | null {
+  return YOUTUBE_VIDEO_ANALYTICS_PRESETS.find((row) => row.id === preset)?.days ?? null;
+}
+
+export const YOUTUBE_VIDEO_ANALYTICS_WINDOW_UNSUPPORTED =
+  "Channel overview supports Last 7, 28, or 90 days. Pick a window to load analytics.";
