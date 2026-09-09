@@ -130,10 +130,22 @@ polling endpoint
     coverage), and propagate `grounding_validation.score` + warnings into the strategy the frontend
     already renders so the UI can show "Grounding: validated (0.82)".
 
-### QA-Phase 6 — Calendar handoff (P2, M)
+### QA-Phase 6 — Calendar handoff (P2, M) ✅
 17. When a calendar is generated for this strategy, include a compact strategy digest (pillars,
     preferred formats, frequency, brand voice, best timing) in the calendar request so content
     scheduling inherits the strategy instead of starting a parallel universe.
+    - Shipped: `buildStrategyDigest` (frontend `services/strategyCalendarMapper.ts`) built from
+      `base_strategy` merged over top-level (Comprehensive + EnhancedStrategy shapes), sent as
+      `strategy_digest` in the `/start` payload only when non-empty; backend
+      `CalendarGenerationRequest.strategy_digest` → `generate_comprehensive_calendar` →
+      `orchestrator.generate_calendar` → merged into `user_data["strategy_digest"]` + echoed on the
+      final calendar `structure` for visibility.
+    - Tests: `tests/api/test_calendar_handoff_digest.py` (8: request model, service/orchestrator
+      source-guards, behavioral `_initialize_context` merge) + frontend
+      `strategyCalendarMapper.digest.test.ts` (10: shapes, normalization, empty-only-when-no-signal,
+      CreateTab wiring source-guard). Also hardened `asStringArray` to unwrap array-of-dict elements
+      (was stringifying to `[object Object]`) and fixed a latent oxc parse error in `buildStrategyDigest`
+      (invoked-arrow → plain IIFE).
 
 ## Suggested order
 QA-1 → QA-2 (the two personalization levers), then QA-4, QA-5, QA-3, QA-6. QA-1+QA-2 together are

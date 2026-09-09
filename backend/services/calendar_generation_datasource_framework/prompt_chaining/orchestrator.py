@@ -188,6 +188,7 @@ class PromptChainOrchestrator:
         calendar_type: str = "monthly",
         industry: Optional[str] = None,
         business_size: str = "sme",
+        strategy_digest: Optional[Dict[str, Any]] = None,
         progress_callback: Optional[Callable] = None
     ) -> Dict[str, Any]:
         """
@@ -199,6 +200,9 @@ class PromptChainOrchestrator:
             calendar_type: Type of calendar (monthly, weekly, custom)
             industry: Business industry
             business_size: Business size (startup, sme, enterprise)
+            strategy_digest: QA-6 handoff: compact digest of the confirmed strategy
+                (pillars, preferred formats, frequency, brand voice, best timing) so
+                content scheduling inherits the strategy.
             progress_callback: Optional callback for progress updates
             
         Returns:
@@ -210,7 +214,7 @@ class PromptChainOrchestrator:
             
             # Initialize context with user data
             context = await self._initialize_context(
-                user_id, strategy_id, calendar_type, industry, business_size
+                user_id, strategy_id, calendar_type, industry, business_size, strategy_digest
             )
             
             # Initialize progress tracking
@@ -245,7 +249,8 @@ class PromptChainOrchestrator:
         strategy_id: Optional[int],
         calendar_type: str,
         industry: Optional[str],
-        business_size: str
+        business_size: str,
+        strategy_digest: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Initialize context with user data and configuration."""
         try:
@@ -253,6 +258,13 @@ class PromptChainOrchestrator:
             
             # Get comprehensive user data
             user_data = await self._get_comprehensive_user_data(user_id, strategy_id)
+            
+            # QA-6 calendar handoff: merge the confirmed strategy digest into
+            # user_data so any step that serializes user_data to a prompt inherits
+            # the strategy's pillars / formats / frequency / brand voice / timing.
+            digest = strategy_digest or {}
+            if digest:
+                user_data["strategy_digest"] = digest
             
             # Initialize context
             context = {
@@ -262,6 +274,7 @@ class PromptChainOrchestrator:
                 "industry": industry or user_data.get("industry", "technology"),
                 "business_size": business_size,
                 "user_data": user_data,
+                "strategy_digest": digest,
                 "step_results": {},
                 "quality_scores": {},
                 "current_step": 0,
@@ -449,6 +462,9 @@ class PromptChainOrchestrator:
                 "content_pillars": step_results.get("step_05", {}).get("content_pillars", []),
                 "platform_strategies": step_results.get("step_06", {}).get("platform_strategies", {}),
                 "content_mix": step_results.get("step_05", {}).get("content_mix", {}),
+                # QA-6: echo the confirmed-strategy digest the calendar was generated
+                # against, so content scheduling visibly inherits the strategy.
+                "strategy_digest": context.get("strategy_digest") or {},
                 "ai_confidence": 0.95,
                 "quality_score": self._calculate_overall_quality_score(context.get("quality_scores", {})),
                 "step_results_summary": {

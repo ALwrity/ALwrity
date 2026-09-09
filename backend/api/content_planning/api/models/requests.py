@@ -87,6 +87,12 @@ class CalendarGenerationRequest(BaseModel):
     industry: Optional[str] = None
     business_size: str = Field("sme", description="Business size: startup, sme, enterprise")
     force_refresh: bool = Field(False, description="Force refresh calendar generation")
+    strategy_digest: Optional[Dict[str, Any]] = Field(
+        None,
+        description="QA-6 calendar handoff: compact digest of the confirmed strategy "
+        "(content pillars, preferred formats, publishing frequency, brand voice, best timing) "
+        "so content scheduling inherits the strategy instead of starting a parallel universe.",
+    )
 
 class ContentOptimizationRequest(BaseModel):
     user_id: Optional[str] = None

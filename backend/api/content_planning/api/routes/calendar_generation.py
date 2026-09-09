@@ -98,7 +98,8 @@ async def generate_comprehensive_calendar(
             strategy_id=request.strategy_id,
             calendar_type=request.calendar_type,
             industry=request.industry,
-            business_size=request.business_size
+            business_size=request.business_size,
+            strategy_digest=request.strategy_digest
         )
         
         return CalendarGenerationResponse(**calendar_data)

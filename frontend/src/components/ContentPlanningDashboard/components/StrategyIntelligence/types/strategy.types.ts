@@ -6,6 +6,14 @@ export interface StrategyMetadata {
   generation_version?: string;
   ai_model?: string;
   personalization_level?: string;
+  grounding_status?: 'validated' | 'partial' | 'error' | string;
+  grounding_validation?: {
+    passed: boolean;
+    score: number;
+    status?: string;
+    violations?: string[];
+    error?: string;
+  };
   ai_generated: boolean;
   comprehensive: boolean;
   content_calendar_ready: boolean;

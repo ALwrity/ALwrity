@@ -93,3 +93,105 @@ class TestBuildBriefing:
         briefing = UserIntelligenceFormatter.build_briefing({})
         assert "Who this plan is for" in briefing
         assert "(No explicit user-provided strategy fields were supplied.)" in briefing
+
+
+class TestBriefingEnrichment:
+    """QA-1: onboarding context enrichment (competitors, voice & style, Bing,
+    data-quality note) must reach the briefing."""
+
+    @staticmethod
+    def _rich_onboarding():
+        return {
+            "website_analysis": {
+                "website_url": "https://acme.com",
+                "writing_style": {
+                    "tone": "professional",
+                    "voice": "authoritative",
+                    "complexity": "moderate",
+                    "engagement_level": "high",
+                },
+                "content_type": {
+                    "primary_type": "blog posts",
+                    "secondary_types": ["case studies", "explainers"],
+                    "purpose": "educate buyers",
+                },
+            },
+            "competitor_analysis": {
+                "competitors": [
+                    {"name": "Acme Rival", "domain": "rival.com"},
+                    {"name": "Beta Corp", "domain": "beta.io"},
+                ]
+            },
+            "deep_competitor_analysis": {
+                "competitors": [
+                    {
+                        "name": "Acme Rival",
+                        "strategy_summary": "Doubles down on SEO guides",
+                    }
+                ]
+            },
+            "gsc_analytics": {"total_clicks": 100, "total_impressions": 1000},
+            "bing_analytics": {"total_clicks": 50, "total_impressions": 500},
+            "data_quality": {"overall_score": 0.85, "completeness": 0.9},
+        }
+
+    def test_competitor_watchlist_reaches_briefing(self):
+        briefing = UserIntelligenceFormatter.build_briefing(
+            {"onboarding_data": self._rich_onboarding()}
+        )
+        assert "Competitor watchlist" in briefing
+        assert "Acme Rival (rival.com)" in briefing
+        assert "Beta Corp (beta.io)" in briefing
+        # Deep-analysis signal surfaces as context, not just the bare name
+        assert "SEO guides" in briefing
+
+    def test_voice_and_style_reach_briefing(self):
+        briefing = UserIntelligenceFormatter.build_briefing(
+            {"onboarding_data": self._rich_onboarding()}
+        )
+        assert "Their voice & style:" in briefing
+        assert "Tone: professional" in briefing
+        assert "Voice: authoritative" in briefing
+        assert "Preferred primary format: blog posts" in briefing
+
+    def test_bing_analytics_reaches_briefing(self):
+        briefing = UserIntelligenceFormatter.build_briefing(
+            {"onboarding_data": self._rich_onboarding()}
+        )
+        assert "100 clicks / 1000 impressions" in briefing
+        assert "50 clicks / 500 impressions (Bing)" in briefing
+
+    def test_data_quality_note_reaches_briefing(self):
+        briefing = UserIntelligenceFormatter.build_briefing(
+            {"onboarding_data": self._rich_onboarding()}
+        )
+        assert "Stored onboarding data quality: strong (score 0.85)" in briefing
+
+    def test_missing_sources_render_no_bogus_sections(self):
+        briefing = UserIntelligenceFormatter.build_briefing(
+            {"onboarding_data": {"website_analysis": {"website_url": "https://x.com"}}}
+        )
+        assert "Competitor watchlist" not in briefing
+        assert "Their voice & style:" not in briefing
+        assert "Existing organic footprint:" not in briefing
+        assert "Stored onboarding data quality:" not in briefing
+        assert "Website: https://x.com" in briefing
+
+    def test_string_writing_style_and_bare_competitor_list(self):
+        # minimal_onboarding-style shapes: writing_style is a plain string and
+        # competitor_analysis may already be a flat list.
+        onb = {
+            "website_analysis": {
+                "writing_style": "professional",
+                "content_type": ["blog", "guide"],
+            },
+            "competitor_analysis": [
+                {"name": "Competitor", "domain": "competitor.com"}
+            ],
+            "gsc_analytics": {"metrics": {"total_clicks": 10, "total_impressions": 9}},
+        }
+        briefing = UserIntelligenceFormatter.build_briefing({"onboarding_data": onb})
+        assert "Tone / voice: professional" in briefing
+        assert "Preferred content types: blog, guide" in briefing
+        assert "Competitor (competitor.com)" in briefing
+        assert "10 clicks / 9 impressions" in briefing

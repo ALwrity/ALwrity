@@ -52,7 +52,8 @@ class CalendarGenerationService:
     
     async def generate_comprehensive_calendar(self, user_id: str, strategy_id: Optional[int] = None, 
                                            calendar_type: str = "monthly", industry: Optional[str] = None, 
-                                           business_size: str = "sme") -> Dict[str, Any]:
+                                           business_size: str = "sme",
+                                           strategy_digest: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generate a comprehensive AI-powered content calendar using the 12-step orchestrator."""
         try:
             logger.info(f"🎯 Generating comprehensive calendar for user {user_id} using 12-step orchestrator")
@@ -67,7 +68,8 @@ class CalendarGenerationService:
                 "strategy_id": strategy_id,
                 "calendar_type": calendar_type,
                 "industry": industry,
-                "business_size": business_size
+                "business_size": business_size,
+                "strategy_digest": strategy_digest or {}
             }
             
             success = self.initialize_orchestrator_session(session_id, request_data)
@@ -592,6 +594,7 @@ class CalendarGenerationService:
                 calendar_type=request_data.get("calendar_type", "monthly"),
                 industry=request_data.get("industry"),
                 business_size=request_data.get("business_size", "sme"),
+                strategy_digest=request_data.get("strategy_digest") or {},
                 progress_callback=lambda progress: self._update_session_progress(session_id, progress)
             )
             
