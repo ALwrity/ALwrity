@@ -119,17 +119,22 @@ export function stageTypedWebsiteUrl(typedUrl: string): boolean {
   return true;
 }
 
-export interface OnboardingSeedSteps {
-  connect?: Record<string, unknown> | null;
-  research?: Record<string, unknown> | null;
-  personalization?: Record<string, unknown> | null;
-}
+export type {
+  BackendStepSeed,
+  MergeOnboardingSeedOptions,
+  MergeSeedResult,
+  OnboardingSeedSteps,
+} from './onboardingSeedMerge';
 
-export interface MergeOnboardingSeedOptions {
-  /** Skip backend connect/research/persona merge during Analyze New Website. */
-  suppressBackendConnectSeed?: boolean;
-}
+export { mergeArtifactAwareSeedIntoStepData } from './onboardingSeedMerge';
 
+import {
+  mergeArtifactAwareSeedIntoStepData,
+  type MergeOnboardingSeedOptions,
+  type OnboardingSeedSteps,
+} from './onboardingSeedMerge';
+
+/** @deprecated Prefer mergeArtifactAwareSeedIntoStepData for restoredSteps metadata. */
 export function mergeOnboardingSeedIntoStepData(
   previous: Record<string, unknown> | null | undefined,
   backend: OnboardingSeedSteps,
@@ -137,42 +142,13 @@ export function mergeOnboardingSeedIntoStepData(
   liveAnalysis?: Record<string, unknown> | null,
   options?: MergeOnboardingSeedOptions
 ): Record<string, unknown> {
-  const connect = backend.connect || null;
-  const backendWebsite = String(
-    connect?.website || connect?.website_url || ''
-  ).trim();
-  const liveMatchesBackend = shouldMergeBackendDownstreamSteps(
-    backendWebsite,
-    liveWebsiteUrl
-  );
-
-  if (options?.suppressBackendConnectSeed && !liveWebsiteUrl.trim()) {
-    console.log(
-      `${LOG_PREFIX} Skipping backend connect seed during start-fresh session`
-    );
-    return { ...(previous || {}) };
-  }
-
-  if (!liveMatchesBackend) {
-    return applyLiveWebsiteSessionToStepData(previous, {
-      website: liveWebsiteUrl,
-      analysis: liveAnalysis ?? null,
-    });
-  }
-
-  const next: Record<string, unknown> = { ...(previous || {}) };
-  if (connect) {
-    Object.assign(next, connect);
-    next.website = connect.website || connect.website_url;
-    next.analysis = connect.analysis || connect;
-  }
-  if (backend.research) {
-    Object.assign(next, backend.research);
-  }
-  if (backend.personalization) {
-    Object.assign(next, backend.personalization);
-  }
-  return next;
+  return mergeArtifactAwareSeedIntoStepData(
+    previous,
+    backend,
+    liveWebsiteUrl,
+    liveAnalysis,
+    options
+  ).stepData;
 }
 
 export function canReuseServerPersona(

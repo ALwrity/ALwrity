@@ -10,6 +10,21 @@ from services.onboarding.progress_utils import (
 )
 
 
+def resolve_step_has_data(
+    step_number: int, step_data: Optional[Dict[str, Any]]
+) -> bool:
+    """Step-specific artifact detection for init has_data (not merely non-null blob)."""
+    if step_data is None:
+        return False
+    if step_number == 1:
+        return has_website_analysis_data(step_data)
+    if step_number == 2:
+        return has_research_data(step_data)
+    if step_number == 3:
+        return has_persona_data(step_data)
+    return False
+
+
 def build_step_status_entry(
     step_number: int,
     status: Dict[str, Any],
@@ -17,7 +32,7 @@ def build_step_status_entry(
     step_data: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Build one init step payload with separated has_data and official status."""
-    has_data = step_data is not None
+    has_data = resolve_step_has_data(step_number, step_data)
     if step_number == 1:
         step_completed = is_connect_step_officially_complete(status)
     elif step_number == 2:
@@ -40,6 +55,21 @@ def build_step_status_entry(
 def has_website_analysis_data(website_analysis: Optional[Dict[str, Any]]) -> bool:
     website = website_analysis or {}
     return bool(website.get("website_url") or website.get("writing_style"))
+
+
+def has_research_data(research_data: Optional[Dict[str, Any]]) -> bool:
+    research = research_data or {}
+    competitors = research.get("competitors")
+    if isinstance(competitors, list) and len(competitors) > 0:
+        return True
+    if research.get("researchSummary") or research.get("research_summary"):
+        return True
+    pillars = research.get("content_pillars")
+    if isinstance(pillars, dict) and len(pillars) > 0:
+        return True
+    if research.get("research_depth") or research.get("content_types"):
+        return True
+    return False
 
 
 def has_persona_data(persona_data: Optional[Dict[str, Any]]) -> bool:

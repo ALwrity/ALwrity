@@ -3,6 +3,7 @@
 from api.onboarding_utils.onboarding_init_step_status import (
     build_step_status_entry,
     has_persona_data,
+    has_research_data,
     has_website_analysis_data,
 )
 from services.onboarding.progress_utils import (
@@ -48,6 +49,15 @@ class TestInitStepOfficialStatus:
             step_data={"competitors": []},
         )
         assert step["status"] == "completed"
+        assert step["has_data"] is False
+
+    def test_step2_empty_shell_has_no_data(self):
+        step = build_step_status_entry(
+            2,
+            {"current_step": 2, "completion_percentage": 25.0},
+            step_data={"competitors": []},
+        )
+        assert step["has_data"] is False
 
     def test_step3_persona_without_continue_is_pending_with_data(self):
         step = build_step_status_entry(
@@ -78,3 +88,11 @@ class TestInitStepDataHelpers:
     def test_has_persona_data(self):
         assert has_persona_data({"corePersona": {}}) is True
         assert has_persona_data({}) is False
+
+    def test_has_research_data(self):
+        assert has_research_data({"competitors": [{"url": "https://a.com"}]}) is True
+        assert has_research_data({"research_summary": {"total": 1}}) is True
+        assert has_research_data({"content_pillars": {"status": "complete"}}) is True
+        assert has_research_data({"research_depth": "basic"}) is True
+        assert has_research_data({"competitors": []}) is False
+        assert has_research_data({}) is False
