@@ -1,6 +1,42 @@
 import { create } from 'zustand';
 import { contentPlanningApi } from '../services/contentPlanningApi';
 
+// ---------------------------------------------------------------------------
+// Content strategy cache — persists the latest strategy payload to localStorage
+// so the Strategy Intelligence view keeps rendering content when the backend
+// is unreachable. On a failed load we fall back to the cached payload and stay
+// silent (no error banner), so the components keep showing their content until
+// the backend returns. Best-effort: any quota/availability error is swallowed.
+// ---------------------------------------------------------------------------
+const STRATEGY_CACHE_KEY = 'alwrity_content_strategy_cache_v1';
+
+interface StrategyCachePayload {
+  strategies: ContentStrategy[];
+  latestGeneratedStrategy: any | null;
+  cachedAt: string;
+}
+
+function readStrategyCache(): StrategyCachePayload | null {
+  try {
+    const raw = localStorage.getItem(STRATEGY_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as StrategyCachePayload;
+  } catch {
+    return null;
+  }
+}
+
+function writeStrategyCache(strategies: ContentStrategy[], latestGeneratedStrategy: any | null) {
+  try {
+    localStorage.setItem(
+      STRATEGY_CACHE_KEY,
+      JSON.stringify({ strategies, latestGeneratedStrategy, cachedAt: new Date().toISOString() }),
+    );
+  } catch {
+    // Non-fatal: caching is best-effort.
+  }
+}
+
 // Types
 export interface ContentStrategy {
   id: string;
@@ -394,6 +430,7 @@ export const useContentPlanningStore = create<ContentPlanningStore>((set, get) =
         hasRiskAssessment: !!strategy?.risk_assessment
       });
       set({ latestGeneratedStrategy: strategy });
+      writeStrategyCache(get().strategies, strategy);
     },
   
   // Calendar actions
@@ -530,14 +567,36 @@ export const useContentPlanningStore = create<ContentPlanningStore>((set, get) =
       
       if (Array.isArray(strategies)) {
         set({ strategies, loading: false });
+        writeStrategyCache(strategies, get().latestGeneratedStrategy);
       } else if (strategies && strategies.strategies && Array.isArray(strategies.strategies)) {
         set({ strategies: strategies.strategies, loading: false });
+        writeStrategyCache(strategies.strategies, get().latestGeneratedStrategy);
       } else {
         set({ strategies: [], loading: false });
       }
     } catch (error: any) {
       console.error('Error loading strategies:', error);
-      set({ error: error.message || 'Failed to load strategies', loading: false });
+      const state = get();
+      const cache = readStrategyCache();
+      const canRenderFromCache =
+        state.strategies.length > 0 ||
+        !!state.latestGeneratedStrategy ||
+        (cache !== null && (cache.strategies.length > 0 || !!cache.latestGeneratedStrategy));
+      if (canRenderFromCache) {
+        // Backend unreachable but content is still available (store memory or
+        // localStorage cache) — hydrate from the cache and stay silent so the
+        // strategy components keep rendering until the backend returns.
+        const next: Partial<ContentPlanningStore> = { loading: false };
+        if (state.strategies.length === 0 && cache && cache.strategies.length > 0) {
+          next.strategies = cache.strategies;
+        }
+        if (!state.latestGeneratedStrategy && cache?.latestGeneratedStrategy) {
+          next.latestGeneratedStrategy = cache.latestGeneratedStrategy;
+        }
+        set(next);
+      } else {
+        set({ error: error.message || 'Failed to load strategies', loading: false });
+      }
     }
   },
   
@@ -624,6 +683,7 @@ export const useContentPlanningStore = create<ContentPlanningStore>((set, get) =
   // Update data (for orchestrator)
   updateStrategies: (strategies: ContentStrategy[]) => {
     set({ strategies });
+    writeStrategyCache(strategies, get().latestGeneratedStrategy);
   },
   
   updateCalendarEvents: (events: CalendarEvent[]) => {

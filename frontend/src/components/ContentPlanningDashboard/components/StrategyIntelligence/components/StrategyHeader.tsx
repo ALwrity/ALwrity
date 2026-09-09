@@ -10,7 +10,12 @@ import {
   Paper,
   Grid,
   Typography,
-  Chip
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions
 } from '@mui/material';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -42,10 +47,12 @@ interface StrategyHeaderProps {
   strategyStatus?: 'active' | 'inactive' | 'pending' | 'none';
   onStartReview?: () => void;
   disableCardWrapper?: boolean; // New prop to control Card wrapper rendering
+  onGenerateContentCalendar?: () => void; // Navigate to the calendar wizard
 }
 
-const StrategyHeader: React.FC<StrategyHeaderProps> = ({ strategyData, strategyConfirmed, strategyStatus = 'none', onStartReview, disableCardWrapper = false }) => {
+const StrategyHeader: React.FC<StrategyHeaderProps> = ({ strategyData, strategyConfirmed, strategyStatus = 'none', onStartReview, disableCardWrapper = false, onGenerateContentCalendar }) => {
   const [showNextStepText, setShowNextStepText] = useState(false);
+  const [showRestartReviewWarning, setShowRestartReviewWarning] = useState(false);
   
   if (!strategyData) return null;
 
@@ -574,17 +581,17 @@ const StrategyHeader: React.FC<StrategyHeaderProps> = ({ strategyData, strategyC
             </Grid>
           </Grid>
 
-          {/* Next Steps Button - Area B */}
-          <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'center' }}>
+          {/* Next Steps Buttons - Area B */}
+          <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
             <Tooltip 
-              title="Start reviewing strategy components and create content calendar"
+              title="Start reviewing strategy components"
               arrow
               open={showNextStepText}
               onClose={() => setShowNextStepText(false)}
             >
               <Button
                 variant="contained"
-                onClick={onStartReview}
+                onClick={() => setShowRestartReviewWarning(true)}
                 onMouseEnter={() => setShowNextStepText(true)}
                 onMouseLeave={() => setShowNextStepText(false)}
                 sx={{
@@ -607,12 +614,74 @@ const StrategyHeader: React.FC<StrategyHeaderProps> = ({ strategyData, strategyC
                 }}
                 startIcon={<ArrowForwardIcon />}
               >
-                Next: Review Strategy and Create Content Calendar
+                Next: Review Strategy
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="Generate a content calendar from this strategy" arrow>
+              <Button
+                variant="contained"
+                onClick={onGenerateContentCalendar}
+                sx={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  px: 3,
+                  py: 1,
+                  borderRadius: 3,
+                  boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+                  border: '2px solid rgba(102, 126, 234, 0.3)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #764ba2 0%, #f093fb 100%)',
+                    boxShadow: '0 6px 20px rgba(102, 126, 234, 0.6)',
+                    transform: 'translateY(-2px)'
+                  },
+                  transition: 'all 0.3s ease',
+                  textTransform: 'none'
+                }}
+                startIcon={<CalendarTodayIcon />}
+              >
+                Generate Content Calendar
               </Button>
             </Tooltip>
           </Box>
         </CardContent>
       </Card>
+
+      {/* Destructive re-review warning dialog */}
+      <Dialog
+        open={showRestartReviewWarning}
+        onClose={() => setShowRestartReviewWarning(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <WarningIcon color="warning" />
+          Restart Strategy Review?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Starting the review again will reset all review progress. You will need to go
+            through all strategy components and mark them reviewed before the strategy can be
+            activated again. Your strategy content is not deleted — only the review state is reset.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowRestartReviewWarning(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={<WarningIcon />}
+            onClick={() => {
+              setShowRestartReviewWarning(false);
+              onStartReview?.();
+            }}
+          >
+            Yes, Restart Review
+          </Button>
+        </DialogActions>
+      </Dialog>
     </motion.div>
   );
 };

@@ -89,6 +89,8 @@ import AskAlwrityIcon from '../../assets/images/AskAlwrity-min.ico';
 import { SubscriptionGuard } from '../SubscriptionGuard';
 import { apiClient } from '../../api/client';
 import { useOnboardingTasksStatus } from '../../hooks/useOnboardingTasksStatus';
+import { useContentPlanningStore } from '../../stores/contentPlanningStore';
+import { useDashboardStore } from '../../stores/dashboardStore';
 
 // Shared components
 import DashboardHeader from '../shared/DashboardHeader';
@@ -98,6 +100,7 @@ import ContentLifecyclePillars from './ContentLifecyclePillars';
 import DashboardOnboardingStatus from './DashboardOnboardingStatus';
 import AnalyticsInsights from './components/AnalyticsInsights';
 import ToolsModal from './components/ToolsModal';
+import ContentStrategySnapshot from './components/ContentStrategySnapshot';  // ADD
 import EnhancedBillingDashboard from '../billing/EnhancedBillingDashboard';
 import CompactSidebar from './components/CompactSidebar';
 import TeamHuddleWidget from './components/TeamHuddleWidget';
@@ -139,6 +142,41 @@ const MainDashboard: React.FC = () => {
     showSnackbar,
     hideSnackbar,
   } = useDashboardStore();
+
+  // Content planning store for strategy data
+  const {
+    strategies,
+    currentStrategy,
+    latestGeneratedStrategy,
+    error: storeError,
+    loading: storeLoading,
+  } = useContentPlanningStore();
+
+  // Derive strategy status from store data for dashboard snapshot
+  const strategyStatus = useMemo(() => {
+    // Check if there's an active strategy
+    if (latestGeneratedStrategy && latestGeneratedStrategy.strategic_insights) {
+      return 'active';
+    }
+    if (strategies && strategies.length > 0) {
+      // Check most recent strategy status
+      const latest = strategies[strategies.length - 1];
+      if (latest.status === 'active') return 'active';
+      if (latest.status === 'inactive') return 'inactive';
+    }
+    return 'none';
+  }, [latestGeneratedStrategy, strategies]);
+
+  // Derive strategy data for dashboard snapshot
+  const strategyData = useMemo(() => {
+    if (latestGeneratedStrategy && latestGeneratedStrategy.strategic_insights) {
+      return latestGeneratedStrategy;
+    }
+    if (strategies && strategies.length > 0) {
+      return strategies[strategies.length - 1];
+    }
+    return null;
+  }, [latestGeneratedStrategy, strategies]);
 
   // Workflow store hooks
   const {
@@ -546,11 +584,24 @@ const MainDashboard: React.FC = () => {
               fallbackMessage="Your subscription is not active. Please upgrade to access the dashboard features."
               showUpgradeButton={true}
             >
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+<Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
                 <Button variant="outlined" onClick={() => navigate('/marketing-outcomes')} sx={{ backgroundColor: 'rgba(255,255,255,0.92)' }}>
                   View marketing outcomes
                 </Button>
               </Box>
+
+              {/* Content Strategy Snapshot - Shows strategy status and metrics for users with an active strategy */}
+              {hasActiveStrategy && strategyStatus !== 'none' && (
+                <ContentStrategySnapshot
+                  strategyStatus={strategyStatus}
+                  strategyData={strategyData}
+                  onboardingTasks={onboardingTasks}
+                  onViewStrategy={() => navigate('/content-planning', { state: { activeTab: 0 } })}
+                  onActivateStrategy={() => setShowOnboardingStatus(true)}
+                  onEditStrategy={() => setShowOnboardingStatus(true)}
+                />
+              )}
+
               {/* Content Lifecycle Pillars - First Panel */}
               <ContentLifecyclePillars />
 

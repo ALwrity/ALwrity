@@ -31,9 +31,11 @@ import { safeRenderText, safeRenderArray, hasValidData, getFallbackValue } from 
 
 interface RiskAssessmentCardProps {
   strategyData: StrategyData | null;
+  expanded?: boolean;
+  onToggle?: () => void;
 }
 
-const RiskAssessmentCard: React.FC<RiskAssessmentCardProps> = ({ strategyData }) => {
+const RiskAssessmentCard: React.FC<RiskAssessmentCardProps> = ({ strategyData, expanded, onToggle }) => {
 
   
   // Get style objects
@@ -79,9 +81,7 @@ const RiskAssessmentCard: React.FC<RiskAssessmentCardProps> = ({ strategyData })
             </Typography>
           </Box>
         }
-        trigger="hover"
-        autoCollapseDelay={3000}
-      />
+        />
     );
   }
 
@@ -409,8 +409,8 @@ const RiskAssessmentCard: React.FC<RiskAssessmentCardProps> = ({ strategyData })
       icon={<SecurityIcon sx={{ color: 'white', fontSize: 20 }} />}
       summary={summaryContent}
       details={detailedContent}
-      trigger="hover"
-      autoCollapseDelay={3000}
+      expanded={expanded}
+      onToggle={onToggle}
       componentId="risk_assessment"
     />
   );

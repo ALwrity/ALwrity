@@ -56,6 +56,15 @@ const ReviewStatusIndicator: React.FC<ReviewStatusIndicatorProps> = ({
           borderColor: 'rgba(76, 175, 80, 0.3)',
           textColor: ANALYSIS_CARD_STYLES.colors.success
         };
+      case 'in_review':
+        return {
+          icon: <ScheduleIcon />,
+          label: 'In Review',
+          color: ANALYSIS_CARD_STYLES.colors.warning,
+          bgColor: 'rgba(255, 152, 0, 0.1)',
+          borderColor: 'rgba(255, 152, 0, 0.3)',
+          textColor: ANALYSIS_CARD_STYLES.colors.warning
+        };
       case 'not_reviewed':
       default:
         return {

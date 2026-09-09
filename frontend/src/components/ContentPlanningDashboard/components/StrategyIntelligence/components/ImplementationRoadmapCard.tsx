@@ -30,9 +30,11 @@ import ProgressiveCard from './ProgressiveCard';
 
 interface ImplementationRoadmapCardProps {
   strategyData: StrategyData | null;
+  expanded?: boolean;
+  onToggle?: () => void;
 }
 
-const ImplementationRoadmapCard: React.FC<ImplementationRoadmapCardProps> = ({ strategyData }) => {
+const ImplementationRoadmapCard: React.FC<ImplementationRoadmapCardProps> = ({ strategyData, expanded, onToggle }) => {
   // Get style objects
   const sectionStyles = getSectionStyles();
   const accordionStyles = getAccordionStyles();
@@ -78,9 +80,7 @@ const ImplementationRoadmapCard: React.FC<ImplementationRoadmapCardProps> = ({ s
             </Typography>
           </Box>
         }
-        trigger="hover"
-        autoCollapseDelay={3000}
-      />
+        />
     );
   }
 
@@ -562,8 +562,8 @@ const ImplementationRoadmapCard: React.FC<ImplementationRoadmapCardProps> = ({ s
       icon={<TimelineIcon sx={{ color: 'white', fontSize: 20 }} />}
       summary={summaryContent}
       details={detailedContent}
-      trigger="hover"
-      autoCollapseDelay={3000}
+      expanded={expanded}
+      onToggle={onToggle}
       componentId="implementation_roadmap"
     />
   );

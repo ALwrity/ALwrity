@@ -9,7 +9,6 @@ import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SecurityIcon from '@mui/icons-material/Security';
 import ScheduleIcon from '@mui/icons-material/Schedule';
-import AssessmentIcon from '@mui/icons-material/Assessment';
 import ProgressiveCard from './ProgressiveCard';
 import { ANALYSIS_CARD_STYLES, getEnhancedChipStyles } from '../styles';
 
@@ -124,15 +123,14 @@ const ProgressiveDemo: React.FC = () => {
                 </Box>
               </Box>
             }
-            trigger="click"
           />
         </Grid>
 
-        {/* Hover Trigger Example */}
+        {/* Performance Predictions Example */}
         <Grid item xs={12} md={6}>
           <ProgressiveCard
             title="Performance Predictions"
-            subtitle="Hover to expand"
+            subtitle="Click to expand"
             icon={<TrendingUpIcon sx={{ color: 'white', fontSize: 20 }} />}
             summary={
               <Box>
@@ -215,8 +213,6 @@ const ProgressiveDemo: React.FC = () => {
                 </Box>
               </Box>
             }
-            trigger="hover"
-            autoCollapseDelay={5000}
           />
         </Grid>
 
@@ -307,7 +303,6 @@ const ProgressiveDemo: React.FC = () => {
                 </Box>
               </Box>
             }
-            trigger="click"
           />
         </Grid>
 
@@ -315,7 +310,7 @@ const ProgressiveDemo: React.FC = () => {
         <Grid item xs={12} md={6}>
           <ProgressiveCard
             title="Implementation Roadmap"
-            subtitle="Hover to expand"
+            subtitle="Click to expand"
             icon={<ScheduleIcon sx={{ color: 'white', fontSize: 20 }} />}
             summary={
               <Box>
@@ -399,8 +394,6 @@ const ProgressiveDemo: React.FC = () => {
                 </Box>
               </Box>
             }
-            trigger="hover"
-            autoCollapseDelay={4000}
           />
         </Grid>
       </Grid>
