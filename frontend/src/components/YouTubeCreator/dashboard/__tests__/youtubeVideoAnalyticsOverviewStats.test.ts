@@ -6,7 +6,6 @@ import {
   formatWatchHours,
   previousPeriodChangeLabel,
 } from "../youtubeVideoAnalyticsOverviewStats";
-import { viewsPolylinePoints } from "../youtubeVideoAnalyticsChart";
 
 describe("youtubeVideoAnalyticsOverviewStats", () => {
   it("builds a headline from real views", () => {
@@ -51,23 +50,3 @@ describe("youtubeVideoAnalyticsOverviewStats", () => {
   });
 });
 
-describe("youtubeVideoAnalyticsChart", () => {
-  it("builds polyline points from views_by_day", () => {
-    const points = viewsPolylinePoints(
-      [
-        { date: "2026-08-10", views: 0 },
-        { date: "2026-09-04", views: 27 },
-      ],
-      100,
-      40,
-      0,
-    );
-    expect(points).toBe("0.0,40.0 100.0,0.0");
-  });
-
-  it("returns an empty path when there is no numeric series", () => {
-    expect(viewsPolylinePoints([{ date: "2026-09-04", views: null }], 100, 40)).toBe(
-      "",
-    );
-  });
-});

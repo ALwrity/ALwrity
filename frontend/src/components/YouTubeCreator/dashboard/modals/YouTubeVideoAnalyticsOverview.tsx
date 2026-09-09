@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { viewsPolylinePoints } from "../youtubeVideoAnalyticsChart";
+import { YouTubeVideoAnalyticsOverviewChart } from "./YouTubeVideoAnalyticsOverviewChart";
 import {
   formatAverageViewDuration,
   formatOverviewHeadline,
@@ -10,6 +10,10 @@ import {
   type OverviewHeadlineWindow,
 } from "../youtubeVideoAnalyticsOverviewStats";
 import type { YouTubeAnalyticsDateSelection } from "../youtubeVideoAnalyticsDateRange";
+import type {
+  OverviewChartMetric,
+  YouTubeOverviewDayPoint,
+} from "../youtubeVideoAnalyticsChartScale";
 import "../youtubeVideoAnalyticsOverview.css";
 
 export type YouTubeChannelOverviewPayload = {
@@ -29,7 +33,7 @@ export type YouTubeChannelOverviewPayload = {
     watch_hours?: number | null;
     subscribers_net?: number | null;
   } | null;
-  views_by_day?: Array<{ date: string; views: number | null }>;
+  views_by_day?: YouTubeOverviewDayPoint[];
   top_videos?: Array<{
     video_id?: string;
     title?: string | null;
@@ -49,8 +53,11 @@ export type YouTubeChannelOverviewPayload = {
   }>;
 };
 
-const CHART_WIDTH = 320;
-const CHART_HEIGHT = 96;
+const METRIC_TABS: ReadonlyArray<{ id: OverviewChartMetric; label: string }> = [
+  { id: "views", label: "Views" },
+  { id: "watch_hours", label: "Watch time (hours)" },
+  { id: "subscribers_net", label: "Subscribers" },
+];
 
 function headlineWindow(selection: YouTubeAnalyticsDateSelection): OverviewHeadlineWindow {
   if (selection.type === "rolling") {
@@ -87,12 +94,12 @@ export const YouTubeVideoAnalyticsOverview: React.FC<{
   status: string | null;
 }> = ({ selection, payload, status }) => {
   const [latestIndex, setLatestIndex] = useState(0);
+  const [metric, setMetric] = useState<OverviewChartMetric>("views");
   const current = payload?.current;
   const previous = payload?.previous;
   const daySeries = payload?.views_by_day || [];
   const topVideos = payload?.top_videos || [];
   const latest = payload?.latest_videos || [];
-  const polyline = viewsPolylinePoints(daySeries, CHART_WIDTH, CHART_HEIGHT);
   const safeIndex = latest.length === 0 ? 0 : Math.min(latestIndex, latest.length - 1);
   const latestRow = latest[safeIndex];
   const delta = comparePeriod(selection, payload);
@@ -120,57 +127,65 @@ export const YouTubeVideoAnalyticsOverview: React.FC<{
         <h3 className="yt-video-analytics-overview__headline">
           {formatOverviewHeadline(current?.views, headline)}
         </h3>
-        <div className="yt-video-analytics-overview__cards">
-          <div className="yt-video-analytics-overview__card">
-            <span className="yt-rail-stat-label">Views</span>
-            <span className="yt-rail-stat-value">
-              {typeof current?.views === "number" ? current.views : "—"}
-            </span>
-            <span className="yt-video-analytics-overview__delta">
-              {previousPeriodChangeLabel(current?.views, previous?.views, delta)}
-            </span>
-          </div>
-          <div className="yt-video-analytics-overview__card">
-            <span className="yt-rail-stat-label">Watch time (hours)</span>
-            <span className="yt-rail-stat-value">
-              {formatWatchHours(current?.watch_hours)}
-            </span>
-            <span className="yt-video-analytics-overview__delta">
-              {previousPeriodChangeLabel(
-                current?.watch_hours,
-                previous?.watch_hours,
-                delta,
-              )}
-            </span>
-          </div>
-          <div className="yt-video-analytics-overview__card">
-            <span className="yt-rail-stat-label">Subscribers</span>
-            <span className="yt-rail-stat-value">
-              {formatSubscriberNet(current?.subscribers_net)}
-            </span>
-            <span className="yt-video-analytics-overview__delta">
-              {previousPeriodChangeLabel(
-                current?.subscribers_net,
-                previous?.subscribers_net,
-                delta,
-              )}
-            </span>
-          </div>
+        <div className="yt-video-analytics-overview__panel">
+        <div
+          className="yt-video-analytics-overview__cards"
+          role="tablist"
+          aria-label="Overview metrics"
+        >
+          {METRIC_TABS.map((tab) => {
+            const selected = tab.id === metric;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                className={
+                  selected
+                    ? "yt-video-analytics-overview__card yt-video-analytics-overview__card--active"
+                    : "yt-video-analytics-overview__card"
+                }
+                aria-selected={selected}
+                aria-controls="yt-video-analytics-overview-chart"
+                onClick={() => {
+                  if (tab.id === metric) {
+                    return;
+                  }
+                  console.info("[YouTubeVideoAnalytics] Chart metric", { metric: tab.id });
+                  setMetric(tab.id);
+                }}
+              >
+                <span className="yt-rail-stat-label">{tab.label}</span>
+                <span className="yt-rail-stat-value">
+                  {tab.id === "views"
+                    ? typeof current?.views === "number"
+                      ? current.views
+                      : "—"
+                    : tab.id === "watch_hours"
+                      ? formatWatchHours(current?.watch_hours)
+                      : formatSubscriberNet(current?.subscribers_net)}
+                </span>
+                <span className="yt-video-analytics-overview__delta">
+                  {tab.id === "views"
+                    ? previousPeriodChangeLabel(current?.views, previous?.views, delta)
+                    : tab.id === "watch_hours"
+                      ? previousPeriodChangeLabel(
+                          current?.watch_hours,
+                          previous?.watch_hours,
+                          delta,
+                        )
+                      : previousPeriodChangeLabel(
+                          current?.subscribers_net,
+                          previous?.subscribers_net,
+                          delta,
+                        )}
+                </span>
+              </button>
+            );
+          })}
         </div>
-        {polyline ? (
-          <svg
-            className="yt-video-analytics-overview__chart"
-            viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-            role="img"
-            aria-label="Daily views"
-          >
-            <polyline points={polyline} />
-          </svg>
-        ) : (
-          <p className="yt-video-analytics-overview__empty">
-            No daily views in this period.
-          </p>
-        )}
+        <YouTubeVideoAnalyticsOverviewChart series={daySeries} metric={metric} />
+        </div>
         <section className="yt-video-analytics-overview__top" aria-label="Top content">
           <h4 className="yt-video-analytics-overview__section-title">
             Your top content in this period.
