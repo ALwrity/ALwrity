@@ -53,7 +53,7 @@ export const AnalysisWedgeModal: React.FC<AnalysisWedgeProps> = ({
         icon="📉"
         accent="#ff0000"
         title="Video Analytics"
-        description="Overview, Reach, Engagement, and Audience for your videos."
+        description="Overview, Audience, Content, and Trends for your videos."
         onClick={() =>
           resolveOAuthTileClick(
             connected,

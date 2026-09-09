@@ -86,6 +86,11 @@
     align-items: stretch;
   }
 
+  .yt-video-analytics-tabs {
+    flex-wrap: wrap;
+    gap: 8px 16px;
+  }
+
   .yt-video-analytics-date__button {
     text-align: left;
   }

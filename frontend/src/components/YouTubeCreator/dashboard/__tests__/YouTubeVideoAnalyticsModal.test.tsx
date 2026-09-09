@@ -198,20 +198,23 @@ describe("YouTubeVideoAnalyticsModal", () => {
     errorSpy.mockRestore();
   });
 
-  it("switches to Reach without a second overview call and shows Reach waiting copy", async () => {
+  it("switches to Content coming soon without a second overview call", async () => {
     render(<YouTubeVideoAnalyticsModal open onClose={vi.fn()} />);
     await waitFor(() => {
       expect(mockedStudioApi.getChannelOverview).toHaveBeenCalledTimes(1);
     });
 
-    fireEvent.click(screen.getByRole("tab", { name: "Reach" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Content" }));
 
-    expect(screen.getByRole("tab", { name: "Reach" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "Content" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
-    expect(screen.getByRole("tabpanel", { name: "Reach" })).toHaveTextContent(
-      "Reach metrics will show here when analytics is connected.",
+    expect(screen.getByRole("tabpanel", { name: "Content" })).toHaveTextContent(
+      "Content analytics is coming soon.",
+    );
+    expect(screen.getByRole("tab", { name: "Content" }).textContent).toBe(
+      "Content",
     );
     expect(screen.queryByText(/Overview metrics will show/)).toBeNull();
     expect(mockedStudioApi.getChannelOverview).toHaveBeenCalledTimes(1);
@@ -220,14 +223,17 @@ describe("YouTubeVideoAnalyticsModal", () => {
     expect(mockedStudioApi.getVideoAnalytics).not.toHaveBeenCalled();
   });
 
-  it("shows Engagement waiting copy and loads Audience from getChannelAudience", async () => {
+  it("shows Trends coming soon and loads Audience from getChannelAudience", async () => {
     render(<YouTubeVideoAnalyticsModal open onClose={vi.fn()} />);
     await waitFor(() => {
       expect(mockedStudioApi.getChannelOverview).toHaveBeenCalledTimes(1);
     });
-    fireEvent.click(screen.getByRole("tab", { name: "Engagement" }));
-    expect(screen.getByRole("tabpanel", { name: "Engagement" })).toHaveTextContent(
-      "Engagement metrics will show here when analytics is connected.",
+    fireEvent.click(screen.getByRole("tab", { name: "Trends" }));
+    expect(screen.getByRole("tabpanel", { name: "Trends" })).toHaveTextContent(
+      "Trends analytics is coming soon.",
+    );
+    expect(screen.getByRole("tab", { name: "Trends" }).textContent).toBe(
+      "Trends",
     );
     expect(mockedStudioApi.getChannelAudience).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("tab", { name: "Audience" }));
@@ -244,10 +250,10 @@ describe("YouTubeVideoAnalyticsModal", () => {
     expect(mockedStudioApi.getVideoAnalytics).not.toHaveBeenCalled();
   });
 
-  it("moves to Reach with the right arrow key", () => {
+  it("moves to Audience with the right arrow key from Overview", () => {
     render(<YouTubeVideoAnalyticsModal open onClose={vi.fn()} />);
     fireEvent.keyDown(screen.getByRole("tablist"), { key: "ArrowRight" });
-    expect(screen.getByRole("tab", { name: "Reach" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "Audience" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
