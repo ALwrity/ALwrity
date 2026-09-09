@@ -4,6 +4,7 @@ import {
   Typography,
   Alert,
   Button,
+  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -36,6 +37,8 @@ interface CompetitorAnalysisStepProps {
   onValidationChange?: (isValid: boolean) => void;
   initialData?: any;
   researchStepCompleted?: boolean;
+  backendResearchHasData?: boolean;
+  onResearchSessionChange?: (payload: Record<string, unknown>) => void;
 }
 
 const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
@@ -47,6 +50,8 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   onValidationChange,
   initialData,
   researchStepCompleted = false,
+  backendResearchHasData = false,
+  onResearchSessionChange,
 }) => {
   const classes = useOnboardingStyles();
 
@@ -91,6 +96,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     isAnalyzing,
     analysisProgress, analysisStep,
     showProgressModal,
+    isRestoring,
     startCompetitorDiscovery,
     updateCacheWithSitemapAnalysis,
     refreshContentPillars,
@@ -101,6 +107,8 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     sitemapAnalysis,
     mergeCrawlSocialMedia,
     researchStepCompleted,
+    backendResearchHasData,
+    onResearchSessionChange,
   });
 
   const {
@@ -172,6 +180,17 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     setSelectedCompetitor(competitor);
     setShowHighlightsModal(true);
   };
+
+  if (isRestoring && competitors.length === 0 && !error) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center', mt: 8 }}>
+        <CircularProgress size={36} sx={{ mb: 2 }} />
+        <Typography variant="body1" color="text.secondary">
+          Loading your saved competitor research...
+        </Typography>
+      </Box>
+    );
+  }
 
   if (missingData) {
     return (

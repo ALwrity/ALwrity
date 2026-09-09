@@ -15,7 +15,8 @@ import {
 } from '../utils/websiteUtils';
 import {
   getStoredWebsiteUrl,
-  isWebsiteStartFreshSession,
+  clearWebsiteStartFreshUi,
+  isEffectiveStartFreshSession,
   markDownstreamDirty,
 } from '../../utils/onboardingWebsiteReset';
 import {
@@ -65,6 +66,7 @@ export function useWebsiteAnalysis({
   const [progress, setProgress] = useState<AnalysisProgress[]>(INITIAL_PROGRESS_STEPS);
   const urlWasPreFilledRef = useRef(false);
   const userChangedUrlRef = useRef(false);
+  const hydrationGenerationRef = useRef(0);
   const lastCommittedAnalysisUrlRef = useRef<string>(getStoredWebsiteUrl());
 
   const notifyLiveWebsiteSession = (
@@ -98,6 +100,10 @@ export function useWebsiteAnalysis({
     const { didInvalidateDownstream } = syncWebsiteAnalysisStorage(websiteUrl, nextAnalysis);
     notifyLiveWebsiteSession(websiteUrl, nextAnalysis);
 
+    if (reason !== 'start_fresh' && websiteUrl && nextAnalysis) {
+      clearWebsiteStartFreshUi();
+    }
+
     if (
       resolveWebsiteAnalysisWizardNotify({
         reason,
@@ -112,7 +118,8 @@ export function useWebsiteAnalysis({
   useEffect(() => {
     let cancelled = false;
     const loadLastAnalysis = async () => {
-      if (isWebsiteStartFreshSession()) {
+      const hydrationGeneration = hydrationGenerationRef.current;
+      if (isEffectiveStartFreshSession()) {
         console.log(
           '[useWebsiteAnalysis] Skipping last-analysis hydration during start-fresh session'
         );
@@ -124,7 +131,11 @@ export function useWebsiteAnalysis({
       setIsHydratingAnalysis(true);
       try {
         const result = await fetchLastAnalysis();
-        if (cancelled || userChangedUrlRef.current) {
+        if (
+          cancelled ||
+          userChangedUrlRef.current ||
+          hydrationGeneration !== hydrationGenerationRef.current
+        ) {
           console.log('[useWebsiteAnalysis] Ignoring stale last-analysis hydration');
           return;
         }
@@ -346,6 +357,7 @@ export function useWebsiteAnalysis({
   // F. Clean "Start Fresh" trigger
   const handleStartFresh = () => {
     console.log('[useWebsiteAnalysis] Clearing previous state data for fresh session.');
+    hydrationGenerationRef.current += 1;
     setWebsite('');
     setExistingAnalysis(null);
     setAnalysis(null);

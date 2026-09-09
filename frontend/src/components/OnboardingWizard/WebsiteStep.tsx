@@ -29,7 +29,11 @@ import {
   resolveConnectStepPresentation,
   resolveViewedTabsForReturn,
 } from './WebsiteStep/utils/websiteStepReturnExperience';
-import { DEFAULT_VIEWED_TABS, isWebsiteStartFreshSession } from './utils/onboardingWebsiteReset';
+import {
+  DEFAULT_VIEWED_TABS,
+  isEffectiveStartFreshSession,
+  isWebsiteStartFreshUiActive,
+} from './utils/onboardingWebsiteReset';
 
 // Constants and interfaces
 import {
@@ -69,6 +73,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
   const [useAnalysisForGenAI, setUseAnalysisForGenAI] = useState(true);
   const [activeTab, setActiveTab] = useState<'website' | 'linkedin' | 'youtube'>('website');
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const [isStartFreshUi, setIsStartFreshUi] = useState(() => isWebsiteStartFreshUiActive());
   const [viewedTabs, setViewedTabs] = useState<Record<number, boolean>>(() =>
     resolveViewedTabsForReturn(isConnectStepCompleted, DEFAULT_VIEWED_TABS, '')
   );
@@ -175,17 +180,19 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
     }
   }, [onDataReady, website, domainName, analysis, crawlResult, useAnalysisForGenAI, integrationData, connectedPlatforms, email, emailDigestOptIn, userTimezone]);
 
-  const hasWebsiteAnalysis = !!(website.trim() && analysis);
+  const isStartFreshSession = isEffectiveStartFreshSession(isStartFreshUi);
+  const hasWebsiteAnalysis = !!(website.trim() && analysis) && !isStartFreshSession;
   const connectPresentation = resolveConnectStepPresentation({
     hasWebsiteAnalysis,
     isConnectStepCompleted,
-    isStartFreshSession: isWebsiteStartFreshSession(),
+    isStartFreshSession,
     isHydratingAnalysis,
   });
 
   const handleStartFreshSession = () => {
     setHasUserInteracted(false);
     setViewedTabs(DEFAULT_VIEWED_TABS);
+    setIsStartFreshUi(true);
     handleStartFresh();
   };
 

@@ -6,7 +6,11 @@ import {
   getCommittedStep1WebsiteUrl,
   hasWebsiteChangedFromCommitted,
   isDownstreamDirty,
+  isEffectiveStartFreshSession,
+  clearWebsiteStartFreshUi,
   isWebsiteStartFreshSession,
+  isWebsiteStartFreshUiActive,
+  markWebsiteStartFreshUi,
   markDownstreamDirty,
   normalizeWebsiteUrl,
   ONBOARDING_DOWNSTREAM_DIRTY_KEY,
@@ -79,6 +83,19 @@ describe('onboardingWebsiteReset', () => {
 
     localStorage.setItem('website_url', 'https://brand-a.com');
     expect(isWebsiteStartFreshSession()).toBe(false);
+  });
+
+  it('treats local start-fresh UI latch as start-fresh even before storage settles', () => {
+    expect(isEffectiveStartFreshSession(true)).toBe(true);
+    expect(isEffectiveStartFreshSession(false)).toBe(false);
+  });
+
+  it('persists start-fresh UI across remount via sessionStorage', () => {
+    markWebsiteStartFreshUi();
+    expect(isWebsiteStartFreshUiActive()).toBe(true);
+    expect(isEffectiveStartFreshSession()).toBe(true);
+    clearWebsiteStartFreshUi();
+    expect(isWebsiteStartFreshUiActive()).toBe(false);
   });
 
   it('decides when downstream invalidation is required', () => {

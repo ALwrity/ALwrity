@@ -5,6 +5,7 @@ import {
   resolveWebsiteAnalysisWizardNotify,
 } from '../onboardingWebsiteSessionChange';
 import {
+  ONBOARDING_DOWNSTREAM_DIRTY_KEY,
   ONBOARDING_STEP1_WEBSITE_KEY,
   setCommittedStep1WebsiteUrl,
 } from '../onboardingWebsiteReset';
@@ -37,6 +38,7 @@ describe('onboardingWebsiteSessionChange', () => {
     expect(localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteUrl)).toBeNull();
     expect(localStorage.getItem(ONBOARDING_STORAGE_KEYS.websiteAnalysisData)).toBeNull();
     expect(localStorage.getItem(ONBOARDING_STEP1_WEBSITE_KEY)).toBe('brand-a.com');
+    expect(localStorage.getItem(ONBOARDING_DOWNSTREAM_DIRTY_KEY)).toBe('true');
   });
 
   it('resolveWebsiteAnalysisWizardNotify delegates to SSOT rules', () => {
