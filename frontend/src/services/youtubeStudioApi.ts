@@ -26,6 +26,79 @@ export const youtubeStudioApi = {
     return response.data;
   },
 
+  async getChannelOverview(params?: {
+    days?: number;
+    window?: string;
+    start_date?: string;
+    end_date?: string;
+    token_id?: number;
+  }) {
+    const days = params?.days;
+    console.info("[youtubeStudioApi] channel overview start", {
+      days,
+      window: params?.window,
+      hasStartDate: Boolean(params?.start_date),
+      hasEndDate: Boolean(params?.end_date),
+    });
+    try {
+      const response = await apiClient.get(`${API_BASE}/analytics/overview`, { params });
+      console.info("[youtubeStudioApi] channel overview complete", {
+        success: Boolean(response.data?.success),
+        dayCount: Array.isArray(response.data?.views_by_day)
+          ? response.data.views_by_day.length
+          : 0,
+        topCount: Array.isArray(response.data?.top_videos)
+          ? response.data.top_videos.length
+          : 0,
+        latestCount: Array.isArray(response.data?.latest_videos)
+          ? response.data.latest_videos.length
+          : 0,
+      });
+      return response.data;
+    } catch (overviewError) {
+      console.error("[youtubeStudioApi] channel overview failed", {
+        errorName: overviewError instanceof Error ? overviewError.name : "Error",
+      });
+      throw overviewError;
+    }
+  },
+
+  async getChannelAudience(params?: {
+    days?: number;
+    window?: string;
+    start_date?: string;
+    end_date?: string;
+    token_id?: number;
+  }) {
+    console.info("[youtubeStudioApi] channel audience start", {
+      days: params?.days,
+      window: params?.window,
+      hasStartDate: Boolean(params?.start_date),
+      hasEndDate: Boolean(params?.end_date),
+    });
+    try {
+      const response = await apiClient.get(`${API_BASE}/analytics/audience`, { params });
+      console.info("[youtubeStudioApi] channel audience complete", {
+        success: Boolean(response.data?.success),
+        demoCount: Array.isArray(response.data?.demographics?.rows)
+          ? response.data.demographics.rows.length
+          : 0,
+        countryCount: Array.isArray(response.data?.countries?.rows)
+          ? response.data.countries.rows.length
+          : 0,
+        subscribedCount: Array.isArray(response.data?.subscribed?.rows)
+          ? response.data.subscribed.rows.length
+          : 0,
+      });
+      return response.data;
+    } catch (audienceError) {
+      console.error("[youtubeStudioApi] channel audience failed", {
+        errorName: audienceError instanceof Error ? audienceError.name : "Error",
+      });
+      throw audienceError;
+    }
+  },
+
   async getCommentInbox(params?: { max_results?: number; token_id?: number }) {
     console.info("[youtubeStudioApi] comment inbox start", {
       maxResults: params?.max_results,

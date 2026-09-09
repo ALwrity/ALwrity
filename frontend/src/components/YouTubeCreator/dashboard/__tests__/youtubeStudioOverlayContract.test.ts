@@ -87,6 +87,11 @@ describe("YouTube Studio overlay inventory", () => {
   it("has unique overlay ids", () => {
     const ids = YOUTUBE_STUDIO_OVERLAY_INVENTORY.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toContain("video-analytics");
+    expect(
+      YOUTUBE_STUDIO_OVERLAY_INVENTORY.find((entry) => entry.id === "video-analytics")
+        ?.component,
+    ).toBe("YouTubeVideoAnalyticsModal");
   });
 
   it("classifies custom createPortal hosts", () => {

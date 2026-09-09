@@ -12,6 +12,7 @@ import {
 } from '../../api/client';
 import { saveNavigationState } from '../../utils/navigationState';
 import { onboardingCache } from '../../services/onboardingCache';
+import { resetOnboardingWizardSession } from '../OnboardingWizard/utils/onboardingWebsiteSessionChange';
 import {
   LINKEDIN_PERSONA_UPDATED_EVENT,
   type LinkedInPersonaSnapshot,
@@ -65,13 +66,7 @@ const clearLocalUserCaches = () => {
   try {
     onboardingCache.clearCache();
   } catch (_) {}
-  const lsKeys = [
-    'onboarding_step_data', 'onboarding_active_step',
-    'website_url', 'website_analysis_data',
-    'onboarding_complete', 'primary_website',
-  ];
-  lsKeys.forEach((k) => localStorage.removeItem(k));
-  sessionStorage.removeItem('onboarding_init');
+  resetOnboardingWizardSession('user_menu_reset');
 };
 
 const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light', showPlanChip = true }) => {

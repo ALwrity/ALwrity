@@ -8,14 +8,36 @@ from api.youtube.analytics_router import get_analytics_service
 from tests.api.youtube_studio_test_client import youtube_studio_client
 
 
+def _mounted_youtube_paths() -> set[str]:
+    from api.youtube.router import router as youtube_router
+
+    found: set[str] = set()
+    for route in youtube_router.routes:
+        orig = getattr(route, "original_router", None)
+        ctx = getattr(route, "include_context", None)
+        parent = getattr(ctx, "prefix", "") or ""
+        if orig is None:
+            path = getattr(route, "path", "") or ""
+            if path:
+                found.add(path)
+            continue
+        for child in orig.routes:
+            child_path = getattr(child, "path", "") or ""
+            if child_path:
+                found.add(f"{parent}{child_path}")
+    return found
+
+
 class TestYouTubeAnalyticsRouter:
     def test_pulse_path_is_mounted_once(self):
-        from api.youtube.router import router as youtube_router
-
-        paths = {getattr(r, "path", "") for r in youtube_router.routes}
+        paths = _mounted_youtube_paths()
         assert "/youtube/analytics/pulse" in paths
         assert "/youtube/analytics/retention" in paths
+        assert "/youtube/analytics/overview" in paths
+        assert "/youtube/analytics/audience" in paths
         assert "/youtube/youtube/analytics/pulse" not in paths
+        assert "/youtube/youtube/analytics/overview" not in paths
+        assert "/youtube/youtube/analytics/audience" not in paths
 
     def test_pulse_returns_service_error_without_fake_views(self):
         service = MagicMock()
@@ -63,3 +85,152 @@ class TestYouTubeAnalyticsRouter:
         client = TestClient(app, raise_server_exceptions=False)
         resp = client.get("/api/youtube/analytics/pulse")
         assert resp.status_code in (401, 403)
+
+    def test_overview_rejects_unauthenticated_user(self):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from api.youtube.router import router as youtube_router
+
+        app = FastAPI()
+        app.include_router(youtube_router, prefix="/api")
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.get("/api/youtube/analytics/overview")
+        assert resp.status_code in (401, 403)
+
+    def test_overview_rejects_days_outside_supported_window(self):
+        service = MagicMock()
+        client = youtube_studio_client({get_analytics_service: lambda: service})
+        too_low = client.get("/api/youtube/analytics/overview?days=0")
+        too_high = client.get("/api/youtube/analytics/overview?days=366")
+        assert too_low.status_code == 422
+        assert too_high.status_code == 422
+        service.get_channel_overview.assert_not_called()
+
+    def test_overview_allows_days_365_while_pulse_stays_90(self):
+        service = MagicMock()
+        service.get_channel_overview.return_value = {"success": True}
+        client = youtube_studio_client({get_analytics_service: lambda: service})
+        overview = client.get("/api/youtube/analytics/overview?days=365")
+        pulse = client.get("/api/youtube/analytics/pulse?days=365")
+        ninety_one = client.get("/api/youtube/analytics/overview?days=91")
+        assert overview.status_code == 200
+        assert ninety_one.status_code == 200
+        assert pulse.status_code == 422
+        service.get_channel_overview.assert_called()
+
+    def test_overview_rejects_mixed_days_and_custom_dates(self):
+        service = MagicMock()
+        client = youtube_studio_client({get_analytics_service: lambda: service})
+        resp = client.get(
+            "/api/youtube/analytics/overview?days=28&start_date=2026-08-01&end_date=2026-08-31"
+        )
+        assert resp.status_code == 422
+        service.get_channel_overview.assert_not_called()
+
+    def test_overview_rejects_future_custom_end(self):
+        service = MagicMock()
+        client = youtube_studio_client({get_analytics_service: lambda: service})
+        resp = client.get(
+            "/api/youtube/analytics/overview?window=calendar&start_date=2099-01-01&end_date=2099-01-31"
+        )
+        assert resp.status_code == 422
+        service.get_channel_overview.assert_not_called()
+
+    def test_overview_forwards_calendar_and_lifetime_windows(self):
+        from datetime import date, timedelta
+
+        service = MagicMock()
+        service.get_channel_overview.return_value = {"success": True}
+        client = youtube_studio_client({get_analytics_service: lambda: service})
+        today = date.today()
+        start = today - timedelta(days=10)
+        calendar = client.get(
+            f"/api/youtube/analytics/overview?window=calendar"
+            f"&start_date={start.isoformat()}&end_date={today.isoformat()}"
+        )
+        lifetime = client.get("/api/youtube/analytics/overview?window=lifetime")
+        assert calendar.status_code == 200
+        assert lifetime.status_code == 200
+        calendar_kwargs = service.get_channel_overview.call_args_list[0].kwargs
+        assert calendar_kwargs["window"] == "calendar"
+        assert calendar_kwargs["start_date"] == start
+        assert calendar_kwargs["end_date"] == today
+        assert service.get_channel_overview.call_args_list[1].kwargs["window"] == "lifetime"
+
+    def test_overview_returns_service_payload_without_fake_views(self):
+        service = MagicMock()
+        service.get_channel_overview.return_value = {
+            "success": False,
+            "error_code": "analytics_unavailable",
+            "message": "Channel overview is unavailable for this window.",
+        }
+        client = youtube_studio_client({get_analytics_service: lambda: service})
+        resp = client.get("/api/youtube/analytics/overview?days=28")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is False
+        assert body.get("current") is None
+        service.get_channel_overview.assert_called_once()
+        assert service.get_channel_overview.call_args.kwargs["days"] == 28
+
+    def test_overview_route_hides_unexpected_error_text(self):
+        service = MagicMock()
+        service.get_channel_overview.side_effect = RuntimeError("filters=video==secret")
+        client = youtube_studio_client({get_analytics_service: lambda: service})
+        resp = client.get("/api/youtube/analytics/overview?days=28")
+        assert resp.status_code == 500
+        detail = resp.json().get("detail") or ""
+        assert detail == "Channel overview request failed."
+        assert "video==" not in detail
+
+    def test_audience_rejects_unauthenticated_user(self):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from api.youtube.router import router as youtube_router
+
+        app = FastAPI()
+        app.include_router(youtube_router, prefix="/api")
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.get("/api/youtube/analytics/audience")
+        assert resp.status_code in (401, 403)
+
+    def test_pulse_days_stay_capped_while_audience_accepts_year(self):
+        service = MagicMock()
+        service.get_channel_audience.return_value = {"success": True}
+        client = youtube_studio_client({get_analytics_service: lambda: service})
+        pulse_over = client.get("/api/youtube/analytics/pulse?days=91")
+        assert pulse_over.status_code == 422
+        service.get_channel_pulse.assert_not_called()
+        year = client.get("/api/youtube/analytics/audience?days=365")
+        assert year.status_code == 200
+        service.get_channel_audience.assert_called_once()
+        assert service.get_channel_audience.call_args.kwargs["days"] == 365
+
+    def test_audience_rejects_days_outside_supported_window(self):
+        service = MagicMock()
+        client = youtube_studio_client({get_analytics_service: lambda: service})
+        too_high = client.get("/api/youtube/analytics/audience?days=366")
+        assert too_high.status_code == 422
+        service.get_channel_audience.assert_not_called()
+        service.get_channel_overview.assert_not_called()
+
+    def test_audience_forwards_days_and_hides_unexpected_error_text(self):
+        service = MagicMock()
+        service.get_channel_audience.return_value = {
+            "success": True,
+            "demographics": {"available": True, "rows": []},
+        }
+        client = youtube_studio_client({get_analytics_service: lambda: service})
+        resp = client.get("/api/youtube/analytics/audience?days=28")
+        assert resp.status_code == 200
+        service.get_channel_audience.assert_called_once()
+        assert service.get_channel_audience.call_args.kwargs["days"] == 28
+        service.get_channel_overview.assert_not_called()
+        service.get_channel_pulse.assert_not_called()
+
+        service.get_channel_audience.side_effect = RuntimeError("filters=video==secret")
+        failed = client.get("/api/youtube/analytics/audience?days=28")
+        assert failed.status_code == 500
+        detail = failed.json().get("detail") or ""
+        assert detail == "Channel audience request failed."
+        assert "video==" not in detail

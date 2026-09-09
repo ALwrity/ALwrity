@@ -33,6 +33,7 @@ import {
   applyDownstreamDirtyProgressOverride,
   clearDownstreamDirtyFlag,
   clearDownstreamLocalCaches,
+  isWebsiteStartFreshSession,
   setCommittedStep1WebsiteUrl,
   stripDownstreamStepData,
 } from './utils/onboardingWebsiteReset';
@@ -379,14 +380,16 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
             personalization: step3Data?.data || null,
           },
           liveWebsiteUrl,
-          liveAnalysis
+          liveAnalysis,
+          { suppressBackendConnectSeed: isWebsiteStartFreshSession() }
         )
       );
 
       if (step1Data?.data) {
         const d = step1Data.data;
         const committedWebsite = d.website || d.website_url;
-        if (committedWebsite && step1Data.status === 'completed') {
+        const connectOfficiallyComplete = completedFrontier >= 0;
+        if (committedWebsite && connectOfficiallyComplete && step1Data.status === 'completed') {
           setCommittedStep1WebsiteUrl(committedWebsite);
           setDownstreamLocked(false);
           commitConnectStepSnapshot(step1Data.data);
@@ -412,7 +415,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       localStorage.setItem('onboarding_active_step', String(computedStep));
     }
 
-  }, [data, currentStep, steps.length, furthestAccessibleStep, commitConnectStepSnapshot]);
+  }, [data, currentStep, steps.length, furthestAccessibleStep, completedFrontier, commitConnectStepSnapshot]);
 
   const { handleNext } = useWizardStepAdvance({
     activeStep,
@@ -644,6 +647,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       successMessage={successMessage}
       setSuccessMessage={setSuccessMessage}
       completedFrontier={completedFrontier}
+      isConnectStepOfficiallyComplete={isConnectStepOfficiallyComplete}
       personaOnboardingData={personaOnboardingData}
       personaStepData={personaStepData}
       handleNext={handleNext}

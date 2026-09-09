@@ -50,7 +50,7 @@ describe("YouTubeVideoPerformanceModal errors and logs", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /Rank Videos in 7 Days/ }),
+        screen.getByRole("heading", { name: "Rank Videos in 7 Days" }),
       ).toBeTruthy();
     });
     const text = loggedText(info);
@@ -132,7 +132,7 @@ describe("YouTubeVideoPerformanceModal errors and logs", () => {
     warn.mockRestore();
   });
 
-  it("logs video select without title or metadata rewrite", async () => {
+  it("logs sort changes without titles or metadata rewrite", async () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     mockedStudioApi.listChannelVideos.mockResolvedValueOnce({
       success: true,
@@ -141,15 +141,15 @@ describe("YouTubeVideoPerformanceModal errors and logs", () => {
     render(<YouTubeVideoPerformanceModal open onClose={vi.fn()} />);
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: /Rank Videos in 7 Days/ }),
+        screen.getByRole("heading", { name: "Rank Videos in 7 Days" }),
       ).toBeTruthy();
     });
-    fireEvent.click(screen.getByRole("button", { name: /Rank Videos in 7 Days/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Newest" }));
 
     const text = loggedText(info);
-    expect(text).toMatch(/\[YouTubeVideoPerformance\] Video selected/);
-    expect(text).toMatch(/"hasVideoId":true/);
-    expect(text.toLowerCase()).not.toMatch(/rank videos|apply|suggest/);
+    expect(text).toMatch(/\[YouTubeVideoPerformance\] Sort changed/);
+    expect(text).toMatch(/"sort":"newest"/);
+    expect(text.toLowerCase()).not.toMatch(/rank videos|apply|suggest|vid-1/);
     expect(mockedStudioApi.suggestStaleRefresh).not.toHaveBeenCalled();
     expect(mockedStudioApi.updateVideoMetadata).not.toHaveBeenCalled();
     info.mockRestore();

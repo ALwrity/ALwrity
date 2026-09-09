@@ -105,6 +105,7 @@ describe('WebsiteAnalysisTabContent - Tab Layout & View Tracking', () => {
       <WebsiteAnalysisTabContent
         {...baseProps}
         dashboardFirstMode={true}
+        showInlineUrlBar={false}
         suppressDashboardScroll={true}
         viewedTabs={{ 0: true, 1: true, 2: true }}
         setViewedTabs={vi.fn()}
@@ -120,6 +121,7 @@ describe('WebsiteAnalysisTabContent - Tab Layout & View Tracking', () => {
       <WebsiteAnalysisTabContent
         {...baseProps}
         dashboardFirstMode={true}
+        showInlineUrlBar={false}
         suppressDashboardScroll={true}
         viewedTabs={{ 0: true, 1: true, 2: true }}
         setViewedTabs={vi.fn()}
@@ -141,6 +143,39 @@ describe('WebsiteAnalysisTabContent - Tab Layout & View Tracking', () => {
     );
 
     expect(screen.getByRole('button', { name: /analyze new website/i })).toBeInTheDocument();
+  });
+
+  it('shows inline URL bar during start-fresh session', () => {
+    render(
+      <WebsiteAnalysisTabContent
+        {...baseProps}
+        analysis={null}
+        dashboardFirstMode={false}
+        showInlineUrlBar={true}
+        viewedTabs={{ 0: true, 1: false, 2: false }}
+        setViewedTabs={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('website-url-action-bar')).toBeInTheDocument();
+    expect(screen.queryByTestId('unified-folder-tab-dashboard')).not.toBeInTheDocument();
+  });
+
+  it('shows dashboard loading shell for returning users while analysis hydrates', () => {
+    render(
+      <WebsiteAnalysisTabContent
+        {...baseProps}
+        analysis={null}
+        dashboardFirstMode={true}
+        showInlineUrlBar={false}
+        showDashboardLoadingShell={true}
+        viewedTabs={{ 0: true, 1: true, 2: true }}
+        setViewedTabs={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('unified-folder-tab-dashboard-loading')).toBeInTheDocument();
+    expect(screen.queryByTestId('website-url-action-bar')).not.toBeInTheDocument();
   });
 
   it('shows latest-only last analyzed label in the previous analysis banner', () => {

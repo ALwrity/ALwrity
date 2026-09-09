@@ -15,8 +15,13 @@ import {
 } from '../utils/websiteUtils';
 import {
   getStoredWebsiteUrl,
+  isWebsiteStartFreshSession,
   markDownstreamDirty,
 } from '../../utils/onboardingWebsiteReset';
+import {
+  resetWebsiteInputForStartFresh,
+  resolveWebsiteAnalysisWizardNotify,
+} from '../../utils/onboardingWebsiteSessionChange';
 import {
   clearDownstreamForWebsiteChange,
   ONBOARDING_STORAGE_KEYS,
@@ -55,6 +60,7 @@ export function useWebsiteAnalysis({
   const [existingAnalysis, setExistingAnalysis] = useState<ExistingAnalysis | null>(null);
   const [domainName, setDomainName] = useState<string>('');
   const [hasCheckedExisting, setHasCheckedExisting] = useState(false);
+  const [isHydratingAnalysis, setIsHydratingAnalysis] = useState(true);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [progress, setProgress] = useState<AnalysisProgress[]>(INITIAL_PROGRESS_STEPS);
   const urlWasPreFilledRef = useRef(false);
@@ -93,10 +99,10 @@ export function useWebsiteAnalysis({
     notifyLiveWebsiteSession(websiteUrl, nextAnalysis);
 
     if (
-      didInvalidateDownstream ||
-      reason === 'reanalyze' ||
-      reason === 'start_fresh' ||
-      reason === 'new_website'
+      resolveWebsiteAnalysisWizardNotify({
+        reason,
+        didInvalidateDownstream,
+      })
     ) {
       await notifyWebsiteAnalysisChanged(websiteUrl, reason);
     }
@@ -106,7 +112,16 @@ export function useWebsiteAnalysis({
   useEffect(() => {
     let cancelled = false;
     const loadLastAnalysis = async () => {
+      if (isWebsiteStartFreshSession()) {
+        console.log(
+          '[useWebsiteAnalysis] Skipping last-analysis hydration during start-fresh session'
+        );
+        if (!cancelled) setIsHydratingAnalysis(false);
+        return;
+      }
+
       console.log('[useWebsiteAnalysis] Checking for active session on mount...');
+      setIsHydratingAnalysis(true);
       try {
         const result = await fetchLastAnalysis();
         if (cancelled || userChangedUrlRef.current) {
@@ -130,6 +145,8 @@ export function useWebsiteAnalysis({
         }
       } catch (err) {
         console.warn('[useWebsiteAnalysis] Non-critical pre-fill failure:', err);
+      } finally {
+        if (!cancelled) setIsHydratingAnalysis(false);
       }
     };
     loadLastAnalysis();
@@ -338,17 +355,12 @@ export function useWebsiteAnalysis({
     setSuccess(null);
     setAnalysisWarning(null);
     setHasCheckedExisting(false);
+    setIsHydratingAnalysis(false);
     urlWasPreFilledRef.current = false;
     userChangedUrlRef.current = true;
 
-    clearDownstreamForWebsiteChange({ preserveActiveStep: true });
+    resetWebsiteInputForStartFresh();
     notifyLiveWebsiteSession('', null);
-    try {
-      localStorage.removeItem(ONBOARDING_STORAGE_KEYS.websiteUrl);
-      localStorage.removeItem(ONBOARDING_STORAGE_KEYS.websiteAnalysisData);
-    } catch (err) {
-      console.warn('[useWebsiteAnalysis] Failed to clear website storage on Start Fresh:', err);
-    }
     lastCommittedAnalysisUrlRef.current = '';
     void notifyWebsiteAnalysisChanged('', 'start_fresh');
     setProgress(prev => prev.map(p => ({ ...p, completed: false })));
@@ -364,6 +376,7 @@ export function useWebsiteAnalysis({
     existingAnalysis,
     domainName,
     isProgressModalOpen,
+    isHydratingAnalysis,
     progress,
     handleAnalyze,
     handleLoadExistingConfirm,

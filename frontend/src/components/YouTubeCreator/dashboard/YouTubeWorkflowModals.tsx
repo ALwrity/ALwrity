@@ -26,6 +26,7 @@ import {
   StaleRefreshModal,
   WorkflowHelperModals,
   YouTubeVideoCreatorModal,
+  YouTubeVideoAnalyticsModal,
   YouTubeVideoPerformanceModal,
 } from "./modals";
 
@@ -70,6 +71,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
   const [communityOpen, setCommunityOpen] = useState(false);
   const [staleOpen, setStaleOpen] = useState(false);
   const [performanceOpen, setPerformanceOpen] = useState(false);
+  const [videoAnalyticsOpen, setVideoAnalyticsOpen] = useState(false);
   const [playlistOpen, setPlaylistOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
 
@@ -90,6 +92,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
     setCommunityOpen(false);
     setStaleOpen(false);
     setPerformanceOpen(false);
+    setVideoAnalyticsOpen(false);
     setPlaylistOpen(false);
     setScheduleOpen(false);
   }, [activeModal]);
@@ -98,7 +101,12 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
   const publishDrillOpen =
     coachOpen || costOpen || videosOpen || scheduleOpen || playlistOpen;
   const analysisDrillOpen =
-    pulseOpen || retentionOpen || gapsOpen || seoOpen || performanceOpen;
+    pulseOpen ||
+    retentionOpen ||
+    gapsOpen ||
+    seoOpen ||
+    performanceOpen ||
+    videoAnalyticsOpen;
   const engagementDrillOpen = commentsOpen || communityOpen;
   const remarketDrillOpen = staleOpen;
 
@@ -229,6 +237,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         onRequestConnect={onRequestConnect}
         onOpenPulse={() => setPulseOpen(true)}
         onOpenVideoPerformance={() => setPerformanceOpen(true)}
+        onOpenVideoAnalytics={() => setVideoAnalyticsOpen(true)}
         onOpenSeo={() => setSeoOpen(true)}
         onOpenGaps={() => setGapsOpen(true)}
         onOpenRetention={() => setRetentionOpen(true)}
@@ -289,6 +298,11 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         open={performanceOpen}
         onClose={() => setPerformanceOpen(false)}
         shell={subShell(() => setPerformanceOpen(false))}
+      />
+      <YouTubeVideoAnalyticsModal
+        open={videoAnalyticsOpen}
+        onClose={() => setVideoAnalyticsOpen(false)}
+        shell={subShell(() => setVideoAnalyticsOpen(false))}
       />
       <RetentionModal
         open={retentionOpen}

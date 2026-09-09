@@ -119,47 +119,36 @@ export function stageTypedWebsiteUrl(typedUrl: string): boolean {
   return true;
 }
 
-export interface OnboardingSeedSteps {
-  connect?: Record<string, unknown> | null;
-  research?: Record<string, unknown> | null;
-  personalization?: Record<string, unknown> | null;
-}
+export type {
+  BackendStepSeed,
+  MergeOnboardingSeedOptions,
+  MergeSeedResult,
+  OnboardingSeedSteps,
+} from './onboardingSeedMerge';
 
+export { mergeArtifactAwareSeedIntoStepData } from './onboardingSeedMerge';
+
+import {
+  mergeArtifactAwareSeedIntoStepData,
+  type MergeOnboardingSeedOptions,
+  type OnboardingSeedSteps,
+} from './onboardingSeedMerge';
+
+/** @deprecated Prefer mergeArtifactAwareSeedIntoStepData for restoredSteps metadata. */
 export function mergeOnboardingSeedIntoStepData(
   previous: Record<string, unknown> | null | undefined,
   backend: OnboardingSeedSteps,
   liveWebsiteUrl: string,
-  liveAnalysis?: Record<string, unknown> | null
+  liveAnalysis?: Record<string, unknown> | null,
+  options?: MergeOnboardingSeedOptions
 ): Record<string, unknown> {
-  const connect = backend.connect || null;
-  const backendWebsite = String(
-    connect?.website || connect?.website_url || ''
-  ).trim();
-  const liveMatchesBackend = shouldMergeBackendDownstreamSteps(
-    backendWebsite,
-    liveWebsiteUrl
-  );
-
-  if (!liveMatchesBackend) {
-    return applyLiveWebsiteSessionToStepData(previous, {
-      website: liveWebsiteUrl,
-      analysis: liveAnalysis ?? null,
-    });
-  }
-
-  const next: Record<string, unknown> = { ...(previous || {}) };
-  if (connect) {
-    Object.assign(next, connect);
-    next.website = connect.website || connect.website_url;
-    next.analysis = connect.analysis || connect;
-  }
-  if (backend.research) {
-    Object.assign(next, backend.research);
-  }
-  if (backend.personalization) {
-    Object.assign(next, backend.personalization);
-  }
-  return next;
+  return mergeArtifactAwareSeedIntoStepData(
+    previous,
+    backend,
+    liveWebsiteUrl,
+    liveAnalysis,
+    options
+  ).stepData;
 }
 
 export function canReuseServerPersona(
