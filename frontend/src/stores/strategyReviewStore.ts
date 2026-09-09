@@ -138,6 +138,7 @@ export const useStrategyReviewStore = create<ReviewState>()(
         // Reset review for a component
         resetReview: (componentId: string) => {
           set(state => ({
+            isReviewing: false,
             components: state.components.map(comp =>
               comp.id === componentId
                 ? {
@@ -157,6 +158,7 @@ export const useStrategyReviewStore = create<ReviewState>()(
         // Reset all reviews
         resetAllReviews: () => {
           set(state => ({
+            isReviewing: false,
             components: state.components.map(comp => ({
               ...comp,
               status: 'not_reviewed' as ReviewStatus,
@@ -182,11 +184,12 @@ export const useStrategyReviewStore = create<ReviewState>()(
             notes: undefined
           }));
           
-          set({ 
-            reviewProcessStarted: true,
-            components: resetComponents,
-            reviewProgress: 0
-          });
+set({ 
+          reviewProcessStarted: true,
+          isReviewing: false,
+          components: resetComponents,
+          reviewProgress: 0
+        });
           
           console.log('🔧 Review process started with reset components');
         },

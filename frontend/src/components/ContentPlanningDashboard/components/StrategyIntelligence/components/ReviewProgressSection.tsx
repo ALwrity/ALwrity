@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Typography,
@@ -6,11 +6,12 @@ import {
   Tooltip,
   CircularProgress,
   Badge,
-  Button
+  Button,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ScheduleIcon from '@mui/icons-material/Schedule';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { motion } from 'framer-motion';
 import { StrategyData } from '../types/strategy.types';
 import { useStrategyReviewStore, StrategyComponent } from '../../../../../stores/strategyReviewStore';
@@ -25,6 +26,8 @@ interface ReviewProgressSectionProps {
 }
 
 const ReviewProgressSection: React.FC<ReviewProgressSectionProps> = ({ strategyData }) => {
+  const [showActivationSuccess, setShowActivationSuccess] = useState(false);
+
   const {
     components,
     reviewProgress,
@@ -101,6 +104,10 @@ const ReviewProgressSection: React.FC<ReviewProgressSectionProps> = ({ strategyD
     
     // Activate the strategy in the store
     activateStrategy();
+    
+    // Surface a persistent success message (the activation button unmounts the
+    // instant the store flips to activated, so its internal snackbar is lost).
+    setShowActivationSuccess(true);
     
     // You can add additional logic here if needed
   };
@@ -381,32 +388,28 @@ const ReviewProgressSection: React.FC<ReviewProgressSectionProps> = ({ strategyD
             }}>
               Your content strategy is now live and being monitored with AI-powered analytics.
             </Typography>
-            <Button
-              variant="contained"
-              size="large"
-              onClick={handleGenerateContentCalendar}
-              startIcon={<AutoAwesomeIcon />}
-              sx={{
-                background: 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)',
-                borderRadius: 3,
-                px: 4,
-                py: 1.5,
-                fontWeight: 600,
-                textTransform: 'none',
-                boxShadow: '0 8px 32px rgba(76, 175, 80, 0.3)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #45a049 0%, #3d8b40 100%)',
-                  boxShadow: '0 12px 40px rgba(76, 175, 80, 0.4)',
-                  transform: 'translateY(-2px)'
-                },
-                transition: 'all 0.3s ease'
-              }}
-            >
-              Generate Content Calendar
-            </Button>
           </Box>
         </motion.div>
       )}
+
+      {/* Activation Success Snackbar */}
+      <Snackbar
+        open={showActivationSuccess}
+        autoHideDuration={5000}
+        onClose={() => setShowActivationSuccess(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          severity="success"
+          variant="filled"
+          sx={{
+            fontWeight: 600,
+            boxShadow: '0 8px 32px rgba(76, 175, 80, 0.4)'
+          }}
+        >
+          🎉 Strategy activated successfully! Your content strategy is now live and being monitored.
+        </Alert>
+      </Snackbar>
     </motion.div>
   );
 };

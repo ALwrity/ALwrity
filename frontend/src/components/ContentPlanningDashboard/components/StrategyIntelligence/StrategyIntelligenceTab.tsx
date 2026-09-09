@@ -1,4 +1,4 @@
-import React, { useEffect, memo } from 'react';
+import React, { useEffect, useState, memo } from 'react';
 import { Box, CircularProgress, Alert, Typography } from '@mui/material';
 import StrategyHeader from './components/StrategyHeader';
 import StrategicInsightsCard from './components/StrategicInsightsCard';
@@ -11,6 +11,9 @@ import StrategyErrorBoundary from './components/StrategyErrorBoundary';
 import GroundingStatusBadge from '../GroundingStatusBadge';
 import { StrategyData } from './types/strategy.types';
 import { useStrategyReviewStore } from '../../../../stores/strategyReviewStore';
+import { useStrategyBuilderStore } from '../../../../stores/strategyBuilderStore';
+import { useNavigationOrchestrator } from '../../../../services/navigationOrchestrator';
+import { useStrategyCalendarContext } from '../../../../contexts/StrategyCalendarContext';
 import { hasValidData } from './utils/defensiveRendering';
 import { createSafeStrategyData, validateStrategyData } from './utils/strategyDataValidator';
 
@@ -27,6 +30,13 @@ const StrategyIntelligenceTab: React.FC<StrategyIntelligenceTabProps> = ({
   error = null,
   strategyStatus = 'none'
 }) => {
+  // Single-open accordion: only one section card is expanded at a time.
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+
+  const toggleSection = (id: string) => {
+    setExpandedSection(prev => (prev === id ? null : id));
+  };
+
   // Get review process state from store with selective subscription
   const reviewProcessStarted = useStrategyReviewStore(state => state.reviewProcessStarted);
   const startReviewProcess = useStrategyReviewStore(state => state.startReviewProcess);
@@ -131,6 +141,31 @@ const StrategyIntelligenceTab: React.FC<StrategyIntelligenceTabProps> = ({
     startReviewProcess();
   };
 
+  // Navigate to the calendar wizard with the current strategy context.
+  // Shares the same payload as ReviewProgressHeader's calendar generation.
+  const { setStrategyContext } = useStrategyCalendarContext();
+  const navigationOrchestrator = useNavigationOrchestrator();
+  const currentStrategyFromBuilder = useStrategyBuilderStore(state => state.currentStrategy);
+
+  const handleGenerateContentCalendar = () => {
+    if (!safeStrategyData) return;
+    const actualStrategyData = currentStrategyFromBuilder || safeStrategyData;
+    let strategyId = '1';
+    if (actualStrategyData && 'id' in actualStrategyData && actualStrategyData.id) {
+      strategyId = actualStrategyData.id.toString();
+    }
+    const strategyContext = {
+      strategyId,
+      strategyData: actualStrategyData,
+      activationStatus: 'active' as const,
+      activationTimestamp: new Date().toISOString(),
+      userPreferences: {},
+      strategicIntelligence: {}
+    };
+    setStrategyContext(strategyContext);
+    navigationOrchestrator.navigateToCalendarWizard(strategyId, strategyContext);
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
@@ -199,6 +234,7 @@ const StrategyIntelligenceTab: React.FC<StrategyIntelligenceTabProps> = ({
         strategyConfirmed={strategyStatus === 'active'}
         strategyStatus={strategyStatus}
         onStartReview={handleStartReviewProcess}
+        onGenerateContentCalendar={handleGenerateContentCalendar}
       />
 
       {/* Review Progress Header - Only shown when review process is started */}
@@ -208,13 +244,7 @@ const StrategyIntelligenceTab: React.FC<StrategyIntelligenceTabProps> = ({
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: {
-            xs: '1fr',
-            sm: '1fr',
-            md: 'repeat(2, 1fr)',
-            lg: 'repeat(2, 1fr)',
-            xl: 'repeat(3, 1fr)'
-          },
+          gridTemplateColumns: '1fr',
           gridAutoRows: 'minmax(min-content, auto)',
           gap: 3,
           position: 'relative',
@@ -226,25 +256,42 @@ const StrategyIntelligenceTab: React.FC<StrategyIntelligenceTabProps> = ({
             zIndex: 1,
             transition: 'z-index 0.3s ease, transform 0.3s ease',
           },
-          '& > *:hover': {
-            zIndex: 10,
-          }
         }}
       >
         <StrategyErrorBoundary>
-          <StrategicInsightsCard strategyData={safeStrategyData} />
+          <StrategicInsightsCard
+            strategyData={safeStrategyData}
+            expanded={expandedSection === 'strategic_insights'}
+            onToggle={() => toggleSection('strategic_insights')}
+          />
         </StrategyErrorBoundary>
         <StrategyErrorBoundary>
-          <CompetitiveAnalysisCard strategyData={safeStrategyData} />
+          <CompetitiveAnalysisCard
+            strategyData={safeStrategyData}
+            expanded={expandedSection === 'competitive_analysis'}
+            onToggle={() => toggleSection('competitive_analysis')}
+          />
         </StrategyErrorBoundary>
         <StrategyErrorBoundary>
-          <PerformancePredictionsCard strategyData={safeStrategyData} />
+          <PerformancePredictionsCard
+            strategyData={safeStrategyData}
+            expanded={expandedSection === 'performance_predictions'}
+            onToggle={() => toggleSection('performance_predictions')}
+          />
         </StrategyErrorBoundary>
         <StrategyErrorBoundary>
-          <ImplementationRoadmapCard strategyData={safeStrategyData} />
+          <ImplementationRoadmapCard
+            strategyData={safeStrategyData}
+            expanded={expandedSection === 'implementation_roadmap'}
+            onToggle={() => toggleSection('implementation_roadmap')}
+          />
         </StrategyErrorBoundary>
         <StrategyErrorBoundary>
-          <RiskAssessmentCard strategyData={safeStrategyData} />
+          <RiskAssessmentCard
+            strategyData={safeStrategyData}
+            expanded={expandedSection === 'risk_assessment'}
+            onToggle={() => toggleSection('risk_assessment')}
+          />
         </StrategyErrorBoundary>
       </Box>
     </Box>

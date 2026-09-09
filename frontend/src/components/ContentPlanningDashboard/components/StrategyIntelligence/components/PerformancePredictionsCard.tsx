@@ -26,9 +26,11 @@ import { safeRenderText, safeRenderArray, hasValidData, getFallbackValue } from 
 
 interface PerformancePredictionsCardProps {
   strategyData: StrategyData | null;
+  expanded?: boolean;
+  onToggle?: () => void;
 }
 
-const PerformancePredictionsCard: React.FC<PerformancePredictionsCardProps> = ({ strategyData }) => {
+const PerformancePredictionsCard: React.FC<PerformancePredictionsCardProps> = ({ strategyData, expanded, onToggle }) => {
   // Get style objects
   const sectionStyles = getSectionStyles();
   const listItemStyles = getListItemStyles();
@@ -62,9 +64,7 @@ const PerformancePredictionsCard: React.FC<PerformancePredictionsCardProps> = ({
             </Typography>
           </Box>
         }
-        trigger="hover"
-        autoCollapseDelay={3000}
-      />
+        />
     );
   }
 
@@ -568,8 +568,8 @@ const PerformancePredictionsCard: React.FC<PerformancePredictionsCardProps> = ({
       icon={<ShowChartIcon sx={{ color: 'white', fontSize: 20 }} />}
       summary={summaryContent}
       details={detailedContent}
-      trigger="hover"
-      autoCollapseDelay={3000}
+      expanded={expanded}
+      onToggle={onToggle}
       componentId="performance_predictions"
     />
   );

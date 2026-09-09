@@ -34,9 +34,11 @@ import { safeRenderText, safeRenderArray, hasValidData, getFallbackValue } from 
 
 interface CompetitiveAnalysisCardProps {
   strategyData: StrategyData | null;
+  expanded?: boolean;
+  onToggle?: () => void;
 }
 
-const CompetitiveAnalysisCard: React.FC<CompetitiveAnalysisCardProps> = ({ strategyData }) => {
+const CompetitiveAnalysisCard: React.FC<CompetitiveAnalysisCardProps> = ({ strategyData, expanded, onToggle }) => {
   const [chipModal, setChipModal] = useState<{
     open: boolean;
     anchorEl: HTMLElement | null;
@@ -89,9 +91,7 @@ const CompetitiveAnalysisCard: React.FC<CompetitiveAnalysisCardProps> = ({ strat
             </Typography>
           </Box>
         }
-        trigger="hover"
-        autoCollapseDelay={3000}
-      />
+        />
     );
   }
 
@@ -636,8 +636,8 @@ const CompetitiveAnalysisCard: React.FC<CompetitiveAnalysisCardProps> = ({ strat
         icon={<TrendingUpIcon sx={{ color: 'white', fontSize: 20 }} />}
         summary={summaryContent}
         details={detailedContent}
-        trigger="hover"
-        autoCollapseDelay={3000}
+        expanded={expanded}
+        onToggle={onToggle}
         componentId="competitive_analysis"
       />
 

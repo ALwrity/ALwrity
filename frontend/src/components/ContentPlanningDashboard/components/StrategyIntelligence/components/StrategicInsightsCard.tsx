@@ -31,9 +31,11 @@ import { safeRenderText, hasValidData } from '../utils/defensiveRendering';
 
 interface StrategicInsightsCardProps {
   strategyData: StrategyData | null;
+  expanded?: boolean;
+  onToggle?: () => void;
 }
 
-const StrategicInsightsCard: React.FC<StrategicInsightsCardProps> = ({ strategyData }) => {
+const StrategicInsightsCard: React.FC<StrategicInsightsCardProps> = ({ strategyData, expanded, onToggle }) => {
   // Get style objects
   const sectionStyles = getSectionStyles();
   const accordionStyles = getAccordionStyles();
@@ -62,7 +64,6 @@ const StrategicInsightsCard: React.FC<StrategicInsightsCardProps> = ({ strategyD
               </Typography>
             </Box>
           }
-          trigger="click"
         />
       </Grid>
     );
@@ -586,8 +587,8 @@ const StrategicInsightsCard: React.FC<StrategicInsightsCardProps> = ({ strategyD
       icon={<LightbulbIcon sx={{ color: 'white', fontSize: 20 }} />}
       summary={summaryContent}
       details={detailedContent}
-      trigger="hover"
-      autoCollapseDelay={2000}
+      expanded={expanded}
+      onToggle={onToggle}
       componentId="strategic_insights"
     />
   );
