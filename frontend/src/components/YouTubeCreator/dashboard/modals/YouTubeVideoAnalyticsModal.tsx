@@ -25,9 +25,14 @@ import {
   YouTubeVideoAnalyticsOverview,
   type YouTubeChannelOverviewPayload,
 } from "./YouTubeVideoAnalyticsOverview";
+import {
+  YouTubeVideoAnalyticsAudience,
+  type YouTubeChannelAudiencePayload,
+} from "./YouTubeVideoAnalyticsAudience";
 import "../youtubeVideoAnalyticsLayout.css";
 
 const OVERVIEW_LOAD_FAILED = "Channel overview request failed.";
+const AUDIENCE_LOAD_FAILED = "Channel audience request failed.";
 
 export const YouTubeVideoAnalyticsModal: React.FC<{
   open: boolean;
@@ -44,6 +49,9 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
   const [overviewPayload, setOverviewPayload] =
     useState<YouTubeChannelOverviewPayload | null>(null);
   const [overviewStatus, setOverviewStatus] = useState<string | null>(null);
+  const [audiencePayload, setAudiencePayload] =
+    useState<YouTubeChannelAudiencePayload | null>(null);
+  const [audienceStatus, setAudienceStatus] = useState<string | null>(null);
   const today = useMemo(() => new Date(), [open]);
   const rangeLabel = formatSelectionRange(selection, today);
   const presetLabel = selectionLabel(selection);
@@ -119,6 +127,74 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
         });
         setOverviewPayload(null);
         setOverviewStatus(OVERVIEW_LOAD_FAILED);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, tab, selection, today]);
+
+  useEffect(() => {
+    if (!open || tab !== "audience") {
+      return;
+    }
+    const params = toOverviewRequest(selection, today);
+    if (!params) {
+      setAudiencePayload(null);
+      setAudienceStatus(YOUTUBE_VIDEO_ANALYTICS_WINDOW_UNSUPPORTED);
+      console.info("[YouTubeVideoAnalytics] Audience skipped", {
+        reason: "window_unsupported",
+      });
+      return;
+    }
+    let cancelled = false;
+    setAudiencePayload(null);
+    setAudienceStatus("Loading channel audience.");
+    console.info("[YouTubeVideoAnalytics] Audience start", {
+      window: params.window,
+      days: params.days,
+      hasStartDate: Boolean(params.start_date),
+      hasEndDate: Boolean(params.end_date),
+    });
+    youtubeStudioApi
+      .getChannelAudience(params)
+      .then((payload: YouTubeChannelAudiencePayload) => {
+        if (cancelled) {
+          return;
+        }
+        if (!payload?.success) {
+          console.warn("[YouTubeVideoAnalytics] Audience unsuccessful", {
+            errorCode: payload?.error_code || "unavailable",
+            window: params.window,
+          });
+          setAudiencePayload(payload || null);
+          setAudienceStatus(payload?.message || AUDIENCE_LOAD_FAILED);
+          return;
+        }
+        console.info("[YouTubeVideoAnalytics] Audience complete", {
+          window: params.window,
+          demoCount: Array.isArray(payload.demographics?.rows)
+            ? payload.demographics.rows.length
+            : 0,
+          countryCount: Array.isArray(payload.countries?.rows)
+            ? payload.countries.rows.length
+            : 0,
+          subscribedCount: Array.isArray(payload.subscribed?.rows)
+            ? payload.subscribed.rows.length
+            : 0,
+        });
+        setAudiencePayload(payload);
+        setAudienceStatus(null);
+      })
+      .catch((loadError: unknown) => {
+        if (cancelled) {
+          return;
+        }
+        console.error("[YouTubeVideoAnalytics] Audience failed", {
+          errorName: loadError instanceof Error ? loadError.name : "Error",
+          window: params.window,
+        });
+        setAudiencePayload(null);
+        setAudienceStatus(AUDIENCE_LOAD_FAILED);
       });
     return () => {
       cancelled = true;
@@ -239,6 +315,12 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
             selection={selection}
             payload={overviewPayload}
             status={overviewStatus}
+          />
+        ) : tab === "audience" ? (
+          <YouTubeVideoAnalyticsAudience
+            key={selection.id}
+            payload={audiencePayload}
+            status={audienceStatus}
           />
         ) : (
           emptyAnalyticsPanelCopy(tab)
