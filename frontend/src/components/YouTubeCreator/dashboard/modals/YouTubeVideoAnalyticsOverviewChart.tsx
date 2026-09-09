@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   chartAriaLabel,
+  chartPlotCoordinates,
+  chartTooltipAnchorPercent,
   emptyChartCopy,
   formatChartXLabel,
   formatChartYTick,
@@ -41,30 +43,62 @@ export const YouTubeVideoAnalyticsOverviewChart: React.FC<{
   }, [metric, series]);
 
   useEffect(() => {
-    if (points.length > 0) {
+    if (points.length === 0) {
+      console.info("[YouTubeVideoAnalytics] Chart empty", {
+        metric,
+        seriesCount: series.length,
+      });
       return;
     }
-    console.info("[YouTubeVideoAnalytics] Chart empty", {
+    console.info("[YouTubeVideoAnalytics] Chart ready", {
       metric,
-      seriesCount: series.length,
+      pointCount: points.length,
     });
   }, [metric, points.length, series.length]);
 
   if (!polyline) {
     return (
-      <p
+      <div
         id="yt-video-analytics-overview-chart"
-        className="yt-video-analytics-overview__empty"
+        className="yt-video-analytics-overview__chart-pane"
       >
-        {emptyChartCopy(metric)}
-      </p>
+        <p className="yt-video-analytics-overview__empty">
+          {emptyChartCopy(metric)}
+        </p>
+      </div>
     );
   }
 
   const span = scale.max - scale.min || 1;
+  const hoverPlot =
+    safeHover && hoverIndex != null
+      ? chartPlotCoordinates(
+          hoverIndex,
+          points.length,
+          safeHover.value,
+          scale.min,
+          scale.max,
+          PLOT_WIDTH,
+          PLOT_HEIGHT,
+        )
+      : null;
+  const tooltipAnchor = hoverPlot
+    ? chartTooltipAnchorPercent({
+        plotX: hoverPlot.x,
+        plotY: hoverPlot.y,
+        viewWidth: VIEW_WIDTH,
+        viewHeight: VIEW_HEIGHT,
+        padLeft: PAD_LEFT,
+        padTop: PAD_TOP,
+      })
+    : null;
 
   return (
-    <div id="yt-video-analytics-overview-chart" className="yt-video-analytics-overview__chart-wrap">
+    <div
+      id="yt-video-analytics-overview-chart"
+      className="yt-video-analytics-overview__chart-pane"
+    >
+      <div className="yt-video-analytics-overview__chart-wrap">
       <svg
         className="yt-video-analytics-overview__chart"
         viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
@@ -72,14 +106,21 @@ export const YouTubeVideoAnalyticsOverviewChart: React.FC<{
         aria-label={chartAriaLabel(metric)}
         onMouseLeave={() => setHoverIndex(null)}
         onMouseMove={(event) => {
-          const bounds = event.currentTarget.getBoundingClientRect();
-          if (bounds.width <= 0) {
-            return;
+          try {
+            const bounds = event.currentTarget.getBoundingClientRect();
+            if (bounds.width <= 0) {
+              return;
+            }
+            const x = ((event.clientX - bounds.left) / bounds.width) * VIEW_WIDTH;
+            setHoverIndex(
+              nearestChartIndex(points.length, PLOT_WIDTH, 0, x - PAD_LEFT),
+            );
+          } catch (error: unknown) {
+            console.error("[YouTubeVideoAnalytics] Chart hover failed", {
+              errorName: error instanceof Error ? error.name : "Error",
+              metric,
+            });
           }
-          const x = ((event.clientX - bounds.left) / bounds.width) * VIEW_WIDTH;
-          setHoverIndex(
-            nearestChartIndex(points.length, PLOT_WIDTH, 0, x - PAD_LEFT),
-          );
         }}
       >
         {scale.ticks.map((tick) => {
@@ -107,6 +148,23 @@ export const YouTubeVideoAnalyticsOverviewChart: React.FC<{
         })}
         <g transform={`translate(${PAD_LEFT}, ${PAD_TOP})`}>
           <polyline points={polyline} />
+          {hoverPlot ? (
+            <g>
+              <line
+                className="yt-video-analytics-overview__hover-line"
+                x1={hoverPlot.x}
+                x2={hoverPlot.x}
+                y1={0}
+                y2={PLOT_HEIGHT}
+              />
+              <circle
+                className="yt-video-analytics-overview__hover-dot"
+                cx={hoverPlot.x}
+                cy={hoverPlot.y}
+                r={4}
+              />
+            </g>
+          ) : null}
         </g>
         {xLabels.map((index, slot) => {
           const x =
@@ -130,12 +188,17 @@ export const YouTubeVideoAnalyticsOverviewChart: React.FC<{
           );
         })}
       </svg>
-      {safeHover ? (
-        <p className="yt-video-analytics-overview__tooltip" role="status">
+      {safeHover && tooltipAnchor ? (
+        <p
+          className="yt-video-analytics-overview__tooltip"
+          role="status"
+          style={{ left: `${tooltipAnchor.left}%`, top: `${tooltipAnchor.top}%` }}
+        >
           <span>{formatChartXLabel(safeHover.date)}</span>
           <span>{formatChartYTick(safeHover.value, metric)}</span>
         </p>
       ) : null}
+      </div>
     </div>
   );
 };

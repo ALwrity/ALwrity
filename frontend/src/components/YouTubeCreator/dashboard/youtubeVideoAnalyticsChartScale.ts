@@ -169,6 +169,77 @@ export function chartPolylinePoints(
     .join(" ");
 }
 
+const TOOLTIP_PAD_MIN = 2;
+const TOOLTIP_LEFT_MAX = 72;
+const TOOLTIP_TOP_MAX = 70;
+const TOOLTIP_OFFSET_X = 12;
+const TOOLTIP_OFFSET_Y = 40;
+
+function isFiniteNumber(value: number): boolean {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+export function chartPlotCoordinates(
+  index: number,
+  pointCount: number,
+  value: number,
+  yMin: number,
+  yMax: number,
+  plotWidth: number,
+  plotHeight: number,
+): { x: number; y: number } {
+  const safeHeight = isFiniteNumber(plotHeight) ? plotHeight : 0;
+  if (
+    !isFiniteNumber(index) ||
+    !isFiniteNumber(pointCount) ||
+    pointCount < 1 ||
+    !isFiniteNumber(value) ||
+    !isFiniteNumber(yMin) ||
+    !isFiniteNumber(yMax) ||
+    !isFiniteNumber(plotWidth)
+  ) {
+    return { x: 0, y: safeHeight };
+  }
+  const span = yMax - yMin || 1;
+  const x =
+    pointCount <= 1 ? plotWidth / 2 : (index / Math.max(pointCount - 1, 1)) * plotWidth;
+  const y = plotHeight - ((value - yMin) / span) * plotHeight;
+  if (!isFiniteNumber(x) || !isFiniteNumber(y)) {
+    return { x: 0, y: safeHeight };
+  }
+  return { x, y };
+}
+
+export function chartTooltipAnchorPercent(args: {
+  plotX: number;
+  plotY: number;
+  viewWidth: number;
+  viewHeight: number;
+  padLeft: number;
+  padTop: number;
+}): { left: number; top: number } {
+  if (
+    !isFiniteNumber(args.plotX) ||
+    !isFiniteNumber(args.plotY) ||
+    !isFiniteNumber(args.viewWidth) ||
+    !isFiniteNumber(args.viewHeight) ||
+    args.viewWidth <= 0 ||
+    args.viewHeight <= 0 ||
+    !isFiniteNumber(args.padLeft) ||
+    !isFiniteNumber(args.padTop)
+  ) {
+    return { left: TOOLTIP_PAD_MIN, top: TOOLTIP_PAD_MIN };
+  }
+  const absX = args.padLeft + args.plotX;
+  const absY = args.padTop + args.plotY;
+  const rawLeft = ((absX + TOOLTIP_OFFSET_X) / args.viewWidth) * 100;
+  const rawTop = ((absY - TOOLTIP_OFFSET_Y) / args.viewHeight) * 100;
+  return {
+    left: Math.min(TOOLTIP_LEFT_MAX, Math.max(TOOLTIP_PAD_MIN, rawLeft)),
+    top: Math.min(TOOLTIP_TOP_MAX, Math.max(TOOLTIP_PAD_MIN, rawTop)),
+  };
+}
+
 export function nearestChartIndex(
   pointCount: number,
   width: number,

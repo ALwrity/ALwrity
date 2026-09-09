@@ -124,68 +124,79 @@ export const YouTubeVideoAnalyticsOverview: React.FC<{
   return (
     <div className="yt-video-analytics-overview">
       <div className="yt-video-analytics-overview__main">
-        <h3 className="yt-video-analytics-overview__headline">
-          {formatOverviewHeadline(current?.views, headline)}
-        </h3>
-        <div className="yt-video-analytics-overview__panel">
-        <div
-          className="yt-video-analytics-overview__cards"
-          role="tablist"
-          aria-label="Overview metrics"
+        <section
+          className="yt-video-analytics-overview__panel yt-video-analytics-overview__summary"
+          aria-labelledby="yt-video-analytics-overview-summary-title"
         >
-          {METRIC_TABS.map((tab) => {
-            const selected = tab.id === metric;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                className={
-                  selected
-                    ? "yt-video-analytics-overview__card yt-video-analytics-overview__card--active"
-                    : "yt-video-analytics-overview__card"
-                }
-                aria-selected={selected}
-                aria-controls="yt-video-analytics-overview-chart"
-                onClick={() => {
-                  if (tab.id === metric) {
-                    return;
+          <header className="yt-video-analytics-overview__summary-header">
+            <h3
+              id="yt-video-analytics-overview-summary-title"
+              className="yt-video-analytics-overview__summary-title"
+            >
+              Analytics Summary
+            </h3>
+            <p className="yt-video-analytics-overview__headline">
+              {formatOverviewHeadline(current?.views, headline)}
+            </p>
+          </header>
+          <div
+            className="yt-video-analytics-overview__cards yt-video-analytics-overview__metric-strip"
+            role="tablist"
+            aria-label="Overview metrics"
+          >
+            {METRIC_TABS.map((tab) => {
+              const selected = tab.id === metric;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  className={
+                    selected
+                      ? "yt-video-analytics-overview__card yt-video-analytics-overview__card--active"
+                      : "yt-video-analytics-overview__card"
                   }
-                  console.info("[YouTubeVideoAnalytics] Chart metric", { metric: tab.id });
-                  setMetric(tab.id);
-                }}
-              >
-                <span className="yt-rail-stat-label">{tab.label}</span>
-                <span className="yt-rail-stat-value">
-                  {tab.id === "views"
-                    ? typeof current?.views === "number"
-                      ? current.views
-                      : "—"
-                    : tab.id === "watch_hours"
-                      ? formatWatchHours(current?.watch_hours)
-                      : formatSubscriberNet(current?.subscribers_net)}
-                </span>
-                <span className="yt-video-analytics-overview__delta">
-                  {tab.id === "views"
-                    ? previousPeriodChangeLabel(current?.views, previous?.views, delta)
-                    : tab.id === "watch_hours"
-                      ? previousPeriodChangeLabel(
-                          current?.watch_hours,
-                          previous?.watch_hours,
-                          delta,
-                        )
-                      : previousPeriodChangeLabel(
-                          current?.subscribers_net,
-                          previous?.subscribers_net,
-                          delta,
-                        )}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <YouTubeVideoAnalyticsOverviewChart series={daySeries} metric={metric} />
-        </div>
+                  aria-selected={selected}
+                  aria-controls="yt-video-analytics-overview-chart"
+                  onClick={() => {
+                    if (tab.id === metric) {
+                      return;
+                    }
+                    console.info("[YouTubeVideoAnalytics] Chart metric", { metric: tab.id });
+                    setMetric(tab.id);
+                  }}
+                >
+                  <span className="yt-rail-stat-label">{tab.label}</span>
+                  <span className="yt-rail-stat-value">
+                    {tab.id === "views"
+                      ? typeof current?.views === "number"
+                        ? current.views
+                        : "—"
+                      : tab.id === "watch_hours"
+                        ? formatWatchHours(current?.watch_hours)
+                        : formatSubscriberNet(current?.subscribers_net)}
+                  </span>
+                  <span className="yt-video-analytics-overview__delta">
+                    {tab.id === "views"
+                      ? previousPeriodChangeLabel(current?.views, previous?.views, delta)
+                      : tab.id === "watch_hours"
+                        ? previousPeriodChangeLabel(
+                            current?.watch_hours,
+                            previous?.watch_hours,
+                            delta,
+                          )
+                        : previousPeriodChangeLabel(
+                            current?.subscribers_net,
+                            previous?.subscribers_net,
+                            delta,
+                          )}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <YouTubeVideoAnalyticsOverviewChart series={daySeries} metric={metric} />
+        </section>
         <section className="yt-video-analytics-overview__top" aria-label="Top content">
           <h4 className="yt-video-analytics-overview__section-title">
             Your top content in this period.

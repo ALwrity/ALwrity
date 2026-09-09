@@ -44,6 +44,22 @@ describe("YouTube Video Analytics layout stylesheet", () => {
     expect(overviewCss).toMatch(/yt-video-analytics-overview__panel/);
     expect(overviewCss).toMatch(/border-radius:\s*14px/);
     expect(hubCss).not.toMatch(/yt-video-analytics-overview__panel/);
+    expect(overviewCss).toMatch(/yt-video-analytics-overview__summary/);
+    expect(overviewCss).toMatch(/yt-video-analytics-overview__metric-strip/);
+    expect(overviewCss).toMatch(/yt-video-analytics-overview__chart-pane/);
+    expect(overviewCss).not.toMatch(/#020617/);
+    expect(overviewCss).not.toMatch(/#a855f7/);
+    const overviewSource = [
+      fs.readFileSync(
+        path.join(dashboardDir, "modals", "YouTubeVideoAnalyticsOverview.tsx"),
+        "utf8",
+      ),
+      fs.readFileSync(
+        path.join(dashboardDir, "modals", "YouTubeVideoAnalyticsOverviewChart.tsx"),
+        "utf8",
+      ),
+    ].join("\n");
+    expect(overviewSource).not.toMatch(/recharts|PlatformAnalytics|CtrPositionChart/);
   });
 
   it("keeps the date menu sheet out of hub layout", () => {

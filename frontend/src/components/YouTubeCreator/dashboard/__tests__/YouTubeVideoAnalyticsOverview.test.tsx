@@ -72,6 +72,45 @@ describe("YouTubeVideoAnalyticsOverview chart", () => {
     fireEvent.mouseMove(svg, { clientX: 186, clientY: 40 });
     expect(screen.getByRole("status")).toBeTruthy();
     expect(document.querySelector(".yt-video-analytics-overview__panel")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Analytics Summary" })).toBeTruthy();
+    expect(document.querySelector(".yt-video-analytics-overview__summary")).toBeTruthy();
+    expect(document.querySelector(".yt-video-analytics-overview__metric-strip")).toBeTruthy();
+    expect(document.querySelector(".yt-video-analytics-overview__chart-pane")).toBeTruthy();
+    const tooltip = screen.getByRole("status");
+    expect(tooltip.getAttribute("style")).toMatch(/left:/);
+    expect(tooltip.getAttribute("style")).toMatch(/top:/);
+    expect(document.querySelector(".yt-video-analytics-overview__hover-dot")).toBeTruthy();
+    fireEvent.mouseLeave(svg);
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(document.querySelector(".yt-video-analytics-overview__hover-dot")).toBeNull();
+  });
+
+  it("keeps loading and unavailable states without the summary chart", () => {
+    const { rerender } = render(
+      <YouTubeVideoAnalyticsOverview
+        selection={YOUTUBE_ANALYTICS_DEFAULT_SELECTION}
+        payload={null}
+        status="Loading channel overview."
+      />,
+    );
+    expect(screen.getByText("Loading channel overview.")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Analytics Summary" })).toBeNull();
+
+    rerender(
+      <YouTubeVideoAnalyticsOverview
+        selection={YOUTUBE_ANALYTICS_DEFAULT_SELECTION}
+        payload={{
+          success: false,
+          message: "Channel overview is unavailable for this window.",
+        }}
+        status={null}
+      />,
+    );
+    expect(
+      screen.getByText("Channel overview is unavailable for this window."),
+    ).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Analytics Summary" })).toBeNull();
+    expect(screen.queryByRole("tablist", { name: "Overview metrics" })).toBeNull();
   });
 
   it("does not paint overlapping X-axis dates for a long window", () => {
@@ -134,5 +173,7 @@ describe("YouTubeVideoAnalyticsOverview chart", () => {
     expect(screen.getByText("No daily watch time in this period.")).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: /Subscribers/ }));
     expect(screen.getByText("No daily subscribers in this period.")).toBeTruthy();
+    expect(document.querySelector(".yt-video-analytics-overview__chart-pane")).toBeTruthy();
+    expect(screen.queryByRole("img", { name: chartAriaLabel("subscribers_net") })).toBeNull();
   });
 });

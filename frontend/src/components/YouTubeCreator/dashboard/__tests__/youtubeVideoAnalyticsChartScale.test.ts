@@ -1,5 +1,7 @@
 import {
+  chartPlotCoordinates,
   chartPolylinePoints,
+  chartTooltipAnchorPercent,
   formatChartXLabel,
   formatChartYTick,
   maxChartXLabels,
@@ -89,5 +91,47 @@ describe("youtubeVideoAnalyticsChartScale", () => {
     expect(nearestChartIndex(2, 100, 0, 0)).toBe(0);
     expect(nearestChartIndex(2, 100, 0, 100)).toBe(1);
     expect(nearestChartIndex(5, 100, 0, 50)).toBe(2);
+  });
+
+  it("maps a hovered point into plot coordinates and clamps tooltip percents", () => {
+    const low = chartPlotCoordinates(0, 2, 0, 0, 30, 100, 40);
+    const high = chartPlotCoordinates(1, 2, 27, 0, 30, 100, 40);
+    expect(low.x).toBe(0);
+    expect(low.y).toBe(40);
+    expect(high.x).toBe(100);
+    expect(high.y).toBeLessThan(low.y);
+    const nearEdge = chartTooltipAnchorPercent({
+      plotX: 100,
+      plotY: 2,
+      viewWidth: 372,
+      viewHeight: 140,
+      padLeft: 8,
+      padTop: 8,
+    });
+    expect(nearEdge.left).toBeGreaterThanOrEqual(2);
+    expect(nearEdge.left).toBeLessThanOrEqual(72);
+    expect(nearEdge.top).toBeGreaterThanOrEqual(2);
+    expect(nearEdge.top).toBeLessThanOrEqual(70);
+  });
+
+  it("returns safe plot and tooltip anchors when inputs are not finite", () => {
+    expect(chartPlotCoordinates(Number.NaN, 2, 10, 0, 30, 100, 40)).toEqual({
+      x: 0,
+      y: 40,
+    });
+    expect(chartPlotCoordinates(0, 0, 10, 0, 30, 100, 40)).toEqual({
+      x: 0,
+      y: 40,
+    });
+    expect(
+      chartTooltipAnchorPercent({
+        plotX: Number.NaN,
+        plotY: 0,
+        viewWidth: 0,
+        viewHeight: 0,
+        padLeft: 8,
+        padTop: 8,
+      }),
+    ).toEqual({ left: 2, top: 2 });
   });
 });
