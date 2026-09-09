@@ -90,6 +90,13 @@ const AUDIENCE_OK = {
     ],
     message: null,
   },
+  devices: {
+    available: true,
+    rows: [
+      { device_type: "DESKTOP", views: 10, watch_hours: 1, watch_share_percent: 100 },
+    ],
+    message: null,
+  },
 };
 
 describe("YouTubeVideoAnalyticsModal", () => {

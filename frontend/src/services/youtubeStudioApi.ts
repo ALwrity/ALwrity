@@ -89,6 +89,9 @@ export const youtubeStudioApi = {
         subscribedCount: Array.isArray(response.data?.subscribed?.rows)
           ? response.data.subscribed.rows.length
           : 0,
+        deviceCount: Array.isArray(response.data?.devices?.rows)
+          ? response.data.devices.rows.length
+          : 0,
       });
       return response.data;
     } catch (audienceError) {

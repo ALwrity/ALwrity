@@ -31,17 +31,25 @@ const PAYLOAD = {
     ],
     message: null,
   },
+  devices: {
+    available: true,
+    rows: [
+      { device_type: "DESKTOP", views: 80, watch_hours: 1, watch_share_percent: 60 },
+      { device_type: "MOBILE", views: 20, watch_hours: 0.7, watch_share_percent: 40 },
+    ],
+    message: null,
+  },
 };
 
 describe("YouTubeVideoAnalyticsAudience", () => {
-  it("renders three Hub sections from live rows", () => {
+  it("renders Hub sections including Device type from live rows", () => {
     render(
       <YouTubeVideoAnalyticsAudience payload={PAYLOAD} status={null} />,
     );
     expect(screen.getByRole("heading", { name: "Age and gender" })).toBeTruthy();
     expect(screen.getByText("18–24")).toBeTruthy();
     expect(screen.getByText("Female")).toBeTruthy();
-    expect(screen.getByText("40%")).toBeTruthy();
+    expect(screen.getAllByText("40%").length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Top countries" })).toBeTruthy();
     expect(screen.getByText("Unknown country")).toBeTruthy();
     expect(screen.getByRole("columnheader", { name: "Views" })).toBeTruthy();
@@ -56,6 +64,15 @@ describe("YouTubeVideoAnalyticsAudience", () => {
     expect(subscribedKpi).toHaveTextContent("Views");
     expect(subscribedKpi).toHaveTextContent("Watch time (hours)");
     expect(document.querySelector(".yt-video-analytics-audience__bar")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Device type" })).toBeTruthy();
+    expect(screen.getAllByText("Watch time (hours)").length).toBeGreaterThan(1);
+    expect(screen.getByText("Computer")).toBeTruthy();
+    expect(screen.getByText("Mobile phone")).toBeTruthy();
+    expect(screen.getAllByText("60%").length).toBeGreaterThan(0);
+    const stackSeg = document.querySelector(
+      ".yt-video-analytics-audience__stack-seg",
+    ) as HTMLElement | null;
+    expect(stackSeg?.style.flexGrow).toBe("60");
   });
 
   it("shows section copy instead of invented demographics", () => {
@@ -78,6 +95,11 @@ describe("YouTubeVideoAnalyticsAudience", () => {
             rows: [],
             message: "No subscribed-viewer data in this period.",
           },
+          devices: {
+            available: false,
+            rows: [],
+            message: "Audience device type is unavailable for this window.",
+          },
         }}
         status={null}
       />,
@@ -87,6 +109,10 @@ describe("YouTubeVideoAnalyticsAudience", () => {
       screen.getByText("Audience countries are unavailable for this window."),
     ).toBeTruthy();
     expect(screen.queryByText("50%")).toBeNull();
+    expect(
+      screen.getByText("Audience device type is unavailable for this window."),
+    ).toBeTruthy();
+    expect(screen.queryByText("25%")).toBeNull();
   });
 
   it("shows loading and unavailable status without panels", () => {

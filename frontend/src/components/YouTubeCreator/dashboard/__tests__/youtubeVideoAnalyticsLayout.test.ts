@@ -84,7 +84,9 @@ describe("YouTube Video Analytics layout stylesheet", () => {
     expect(hubCss).not.toMatch(/yt-video-analytics-audience/);
     expect(audienceCss).toMatch(/\.yt-video-analytics-audience \{/);
     expect(audienceCss).toMatch(/yt-video-analytics-audience__panel/);
-    expect(audienceCss).toMatch(/yt-video-analytics-audience__kpi-title/);
+    expect(audienceCss).toMatch(/yt-video-analytics-audience__stack/);
+    expect(audienceCss).toMatch(/yt-video-analytics-audience__stack-seg/);
+    expect(audienceCss).toMatch(/yt-video-analytics-audience__legend/);
     expect(audienceCss).toMatch(/flex-direction:\s*column/);
     expect(audienceCss).toMatch(/border-radius:\s*14px/);
     expect(audienceCss).toMatch(/#ff0000/);

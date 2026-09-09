@@ -6,6 +6,8 @@ from services.youtube.youtube_analytics_audience_query import (
     COUNTRY_TOP_N,
     DEMOGRAPHICS_DIMENSIONS,
     DEMOGRAPHICS_METRICS,
+    DEVICE_DIMENSIONS,
+    DEVICE_METRICS,
     GEO_DIMENSIONS,
     GEO_METRICS,
     SUBSCRIBED_DIMENSIONS,
@@ -13,9 +15,11 @@ from services.youtube.youtube_analytics_audience_query import (
     country_label,
     execute_countries,
     execute_demographics,
+    execute_devices,
     execute_subscribed,
     parse_countries,
     parse_demographics,
+    parse_devices,
     parse_subscribed,
 )
 
@@ -31,6 +35,11 @@ def test_query_constants_are_separate_reports():
     assert SUBSCRIBED_DIMENSIONS == "subscribedStatus"
     assert SUBSCRIBED_METRICS == "views,estimatedMinutesWatched"
     assert "day" not in SUBSCRIBED_DIMENSIONS
+    assert DEVICE_DIMENSIONS == "deviceType"
+    assert DEVICE_METRICS == "views,estimatedMinutesWatched"
+    assert "ageGroup" not in DEVICE_DIMENSIONS
+    assert "country" not in DEVICE_DIMENSIONS
+    assert "subscribedStatus" not in DEVICE_DIMENSIONS
 
 
 def test_empty_demographics_are_empty_not_fifty_fifty():
@@ -100,6 +109,53 @@ def test_subscribed_maps_watch_hours_without_invented_status():
     ]
 
 
+def test_empty_devices_are_empty_not_even_shares():
+    assert parse_devices({"rows": []}) == []
+    assert parse_devices(None) == []
+
+
+def test_devices_sort_by_minutes_and_compute_watch_share():
+    parsed = parse_devices(
+        {
+            "rows": [
+                ["MOBILE", 20, 40],
+                ["DESKTOP", 80, 60],
+                ["", 4, 1],
+                ["TABLET"],
+            ]
+        }
+    )
+    assert parsed == [
+        {
+            "device_type": "DESKTOP",
+            "views": 80.0,
+            "watch_hours": 1.0,
+            "watch_share_percent": 60.0,
+        },
+        {
+            "device_type": "MOBILE",
+            "views": 20.0,
+            "watch_hours": 0.7,
+            "watch_share_percent": 40.0,
+        },
+    ]
+    assert sum(item["watch_share_percent"] for item in parsed) == 100.0
+
+
+def test_devices_watch_share_remainder_sums_to_one_hundred():
+    parsed = parse_devices(
+        {
+            "rows": [
+                ["DESKTOP", 1, 20],
+                ["MOBILE", 1, 20],
+                ["TABLET", 1, 20],
+            ]
+        }
+    )
+    assert [item["watch_share_percent"] for item in parsed] == [33.3, 33.3, 33.4]
+    assert sum(item["watch_share_percent"] for item in parsed) == 100.0
+
+
 def test_executors_use_independent_dimension_metric_pairs():
     from datetime import date
 
@@ -109,11 +165,13 @@ def test_executors_use_independent_dimension_metric_pairs():
     execute_demographics(analytics, start, end)
     execute_countries(analytics, start, end)
     execute_subscribed(analytics, start, end)
+    execute_devices(analytics, start, end)
     calls = analytics.reports.return_value.query.call_args_list
-    assert len(calls) == 3
+    assert len(calls) == 4
     demo = calls[0].kwargs
     geo = calls[1].kwargs
     sub = calls[2].kwargs
+    devices = calls[3].kwargs
     assert demo["dimensions"] == DEMOGRAPHICS_DIMENSIONS
     assert demo["metrics"] == DEMOGRAPHICS_METRICS
     assert geo["dimensions"] == GEO_DIMENSIONS
@@ -122,3 +180,8 @@ def test_executors_use_independent_dimension_metric_pairs():
     assert sub["metrics"] == SUBSCRIBED_METRICS
     assert demo["ids"] == "channel==MINE"
     assert "day" not in sub["dimensions"]
+    assert devices["dimensions"] == DEVICE_DIMENSIONS
+    assert devices["metrics"] == DEVICE_METRICS
+    assert "ageGroup" not in devices["dimensions"]
+    assert "country" not in devices["dimensions"]
+    assert "subscribedStatus" not in devices["dimensions"]
