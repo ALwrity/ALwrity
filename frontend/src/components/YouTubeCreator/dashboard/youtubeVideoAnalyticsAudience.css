@@ -18,6 +18,16 @@
   line-height: 1.3;
 }
 
+.yt-video-analytics-audience__title:has(+ .yt-video-analytics-audience__subtitle) {
+  margin-bottom: 4px;
+}
+
+.yt-video-analytics-audience__subtitle {
+  margin: 0 0 12px;
+  color: #606060;
+  font-size: 13px;
+}
+
 .yt-video-analytics-audience__table {
   width: 100%;
   border-collapse: collapse;
@@ -94,6 +104,89 @@
   margin: 0;
   color: #606060;
   font-size: 14px;
+}
+
+.yt-video-analytics-audience__stack {
+  display: flex;
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #e5e5e5;
+}
+
+.yt-video-analytics-audience__stack-seg {
+  min-width: 0;
+  height: 12px;
+  flex-shrink: 1;
+}
+
+.yt-video-analytics-audience__stack-seg:nth-child(8n + 1),
+.yt-video-analytics-audience__legend li:nth-child(8n + 1) .yt-video-analytics-audience__swatch {
+  background: #ff0000;
+}
+
+.yt-video-analytics-audience__stack-seg:nth-child(8n + 2),
+.yt-video-analytics-audience__legend li:nth-child(8n + 2) .yt-video-analytics-audience__swatch {
+  background: rgba(255, 0, 0, 0.55);
+}
+
+.yt-video-analytics-audience__stack-seg:nth-child(8n + 3),
+.yt-video-analytics-audience__legend li:nth-child(8n + 3) .yt-video-analytics-audience__swatch {
+  background: #0f0f0f;
+}
+
+.yt-video-analytics-audience__stack-seg:nth-child(8n + 4),
+.yt-video-analytics-audience__legend li:nth-child(8n + 4) .yt-video-analytics-audience__swatch {
+  background: #606060;
+}
+
+.yt-video-analytics-audience__stack-seg:nth-child(8n + 5),
+.yt-video-analytics-audience__legend li:nth-child(8n + 5) .yt-video-analytics-audience__swatch {
+  background: rgba(255, 0, 0, 0.35);
+}
+
+.yt-video-analytics-audience__stack-seg:nth-child(8n + 6),
+.yt-video-analytics-audience__legend li:nth-child(8n + 6) .yt-video-analytics-audience__swatch {
+  background: rgba(15, 15, 15, 0.45);
+}
+
+.yt-video-analytics-audience__stack-seg:nth-child(8n + 7),
+.yt-video-analytics-audience__legend li:nth-child(8n + 7) .yt-video-analytics-audience__swatch {
+  background: rgba(96, 96, 96, 0.7);
+}
+
+.yt-video-analytics-audience__stack-seg:nth-child(8n + 8),
+.yt-video-analytics-audience__legend li:nth-child(8n + 8) .yt-video-analytics-audience__swatch {
+  background: rgba(255, 0, 0, 0.28);
+}
+
+.yt-video-analytics-audience__legend {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.yt-video-analytics-audience__legend li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #e5e5e5;
+  font-size: 13px;
+}
+
+.yt-video-analytics-audience__legend li:last-child {
+  border-bottom: 0;
+}
+
+.yt-video-analytics-audience__swatch {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff0000;
 }
 
 @media (max-width: 720px) {

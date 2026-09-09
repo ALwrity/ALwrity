@@ -181,6 +181,9 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
           subscribedCount: Array.isArray(payload.subscribed?.rows)
             ? payload.subscribed.rows.length
             : 0,
+          deviceCount: Array.isArray(payload.devices?.rows)
+            ? payload.devices.rows.length
+            : 0,
         });
         setAudiencePayload(payload);
         setAudienceStatus(null);

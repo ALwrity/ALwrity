@@ -76,9 +76,13 @@ class TestYouTubeAnalyticsAudience:
                         "services.youtube.youtube_analytics_audience.execute_subscribed",
                         return_value={"rows": [["SUBSCRIBED", 40, 30]]},
                     ):
-                        result = _service(_connected_oauth()).get_channel_audience(
-                            USER_ID, days=28
-                        )
+                        with patch(
+                            "services.youtube.youtube_analytics_audience.execute_devices",
+                            return_value={"rows": [["DESKTOP", 10, 60]]},
+                        ):
+                            result = _service(_connected_oauth()).get_channel_audience(
+                                USER_ID, days=28
+                            )
 
         assert result["success"] is True
         assert result["demographics"]["available"] is False
@@ -88,6 +92,46 @@ class TestYouTubeAnalyticsAudience:
         assert result["countries"]["rows"][0]["country"] == "US"
         assert result["subscribed"]["available"] is True
         assert result["subscribed"]["rows"][0]["status"] == "SUBSCRIBED"
+        assert result["devices"]["available"] is True
+        assert result["devices"]["rows"][0]["device_type"] == "DESKTOP"
+
+    def test_device_query_failure_leaves_other_sections(self):
+        youtube = MagicMock()
+        _channel_ok(youtube)
+
+        def _build(api, version, **kwargs):
+            if api == "youtubeAnalytics":
+                return MagicMock()
+            return youtube
+
+        with patch("services.youtube.youtube_analytics_audience.build", side_effect=_build):
+            with patch(
+                "services.youtube.youtube_analytics_audience.execute_demographics",
+                return_value={"rows": [["age18-24", "female", 40]]},
+            ):
+                with patch(
+                    "services.youtube.youtube_analytics_audience.execute_countries",
+                    return_value={"rows": [["US", 50, 60]]},
+                ):
+                    with patch(
+                        "services.youtube.youtube_analytics_audience.execute_subscribed",
+                        return_value={"rows": [["SUBSCRIBED", 40, 30]]},
+                    ):
+                        with patch(
+                            "services.youtube.youtube_analytics_audience.execute_devices",
+                            side_effect=RuntimeError("query not supported"),
+                        ):
+                            result = _service(_connected_oauth()).get_channel_audience(
+                                USER_ID, days=28
+                            )
+
+        assert result["success"] is True
+        assert result["devices"]["available"] is False
+        assert result["devices"]["rows"] == []
+        assert "unavailable" in result["devices"]["message"].lower()
+        assert result["countries"]["available"] is True
+        assert result["demographics"]["available"] is True
+        assert result["subscribed"]["available"] is True
 
     def test_empty_demographics_are_available_without_invented_percent(self):
         youtube = MagicMock()
@@ -111,9 +155,13 @@ class TestYouTubeAnalyticsAudience:
                         "services.youtube.youtube_analytics_audience.execute_subscribed",
                         return_value={"rows": []},
                     ):
-                        result = _service(_connected_oauth()).get_channel_audience(
-                            USER_ID, days=28
-                        )
+                        with patch(
+                            "services.youtube.youtube_analytics_audience.execute_devices",
+                            return_value={"rows": []},
+                        ):
+                            result = _service(_connected_oauth()).get_channel_audience(
+                                USER_ID, days=28
+                            )
 
         assert result["success"] is True
         assert result["demographics"]["available"] is True
@@ -121,3 +169,10 @@ class TestYouTubeAnalyticsAudience:
         assert "No demographic" in result["demographics"]["message"]
         assert result["countries"]["rows"] == []
         assert result["subscribed"]["rows"] == []
+        assert result["devices"]["available"] is True
+        assert result["devices"]["rows"] == []
+        assert "No device" in result["devices"]["message"]
+        assert all(
+            item.get("watch_share_percent") != 25
+            for item in result["devices"]["rows"]
+        )

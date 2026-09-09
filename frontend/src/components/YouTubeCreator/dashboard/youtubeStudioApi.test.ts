@@ -46,11 +46,14 @@ describe("youtubeStudioApi", () => {
         demographics: {
           rows: [{ age_group: "age18-24", gender: "female", viewer_percentage: 40 }],
         },
+        devices: {
+          rows: [{ device_type: "DESKTOP", watch_share_percent: 60 }],
+        },
       },
     });
     await youtubeStudioApi.getChannelAudience({ days: 28 });
     expect(info.mock.calls.join(" ")).toMatch(/channel audience complete/);
-    expect(info.mock.calls.join(" ")).not.toMatch(/age18-24|female/);
+    expect(info.mock.calls.join(" ")).not.toMatch(/age18-24|female|DESKTOP/);
     info.mockRestore();
   });
 

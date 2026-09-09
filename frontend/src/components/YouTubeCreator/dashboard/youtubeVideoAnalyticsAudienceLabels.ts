@@ -45,6 +45,21 @@ export function subscribedStatusLabel(status: string): string {
   return status;
 }
 
+const DEVICE_TYPE_LABELS: Record<string, string> = {
+  DESKTOP: "Computer",
+  MOBILE: "Mobile phone",
+  TABLET: "Tablet",
+  TV: "TV",
+  GAME_CONSOLE: "Game console",
+  AUTOMOTIVE: "Automotive",
+  WEARABLE: "Wearable",
+  UNKNOWN_PLATFORM: "Unknown device",
+};
+
+export function deviceTypeLabel(deviceType: string): string {
+  return DEVICE_TYPE_LABELS[deviceType] || deviceType;
+}
+
 export function formatViewerPercent(value: number | null | undefined): string {
   if (typeof value !== "number" || Number.isNaN(value)) {
     return "—";

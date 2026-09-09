@@ -1,6 +1,6 @@
 """Load channel Audience reports for Video Analytics.
 
-Three independent Analytics queries. One failure does not invent metrics
+Four independent Analytics queries. One failure does not invent metrics
 for the others. Window math matches Overview.
 """
 
@@ -15,9 +15,11 @@ from loguru import logger
 from services.youtube.youtube_analytics_audience_query import (
     execute_countries,
     execute_demographics,
+    execute_devices,
     execute_subscribed,
     parse_countries,
     parse_demographics,
+    parse_devices,
     parse_subscribed,
 )
 from services.youtube.youtube_analytics_overview_query import analytics_error_kind
@@ -34,6 +36,8 @@ COUNTRIES_UNAVAILABLE = "Audience countries are unavailable for this window."
 COUNTRIES_EMPTY = "No country data in this period."
 SUBSCRIBED_UNAVAILABLE = "Audience subscriber split is unavailable for this window."
 SUBSCRIBED_EMPTY = "No subscribed-viewer data in this period."
+DEVICES_UNAVAILABLE = "Audience device type is unavailable for this window."
+DEVICES_EMPTY = "No device data in this period."
 
 
 def _section(rows: List[Dict[str, Any]], empty_message: str) -> Dict[str, Any]:
@@ -116,12 +120,14 @@ def load_channel_audience(
         demographics = _load_demographics(analytics, start, end)
         countries = _load_countries(analytics, start, end)
         subscribed = _load_subscribed(analytics, start, end)
+        devices = _load_devices(analytics, start, end)
         logger.info(
-            "YouTube channel audience complete kind={} demo_rows={} country_rows={} sub_rows={}",
+            "YouTube channel audience complete kind={} demo_rows={} country_rows={} sub_rows={} device_rows={}",
             resolved.get("kind"),
             len(demographics.get("rows") or []),
             len(countries.get("rows") or []),
             len(subscribed.get("rows") or []),
+            len(devices.get("rows") or []),
         )
         return {
             "success": True,
@@ -133,6 +139,7 @@ def load_channel_audience(
             "demographics": demographics,
             "countries": countries,
             "subscribed": subscribed,
+            "devices": devices,
             "message": "Channel audience loaded.",
         }
     except OverviewWindowError:
@@ -198,3 +205,20 @@ def _load_subscribed(analytics, start: date, end: date) -> Dict[str, Any]:
             analytics_error_kind(exc),
         )
         return _failed_section(SUBSCRIBED_UNAVAILABLE)
+
+
+def _load_devices(analytics, start: date, end: date) -> Dict[str, Any]:
+    try:
+        report = execute_devices(analytics, start, end)
+        section = _section(parse_devices(report), DEVICES_EMPTY)
+        logger.info(
+            "YouTube channel audience devices complete rows={}",
+            len(section.get("rows") or []),
+        )
+        return section
+    except Exception as exc:
+        logger.warning(
+            "YouTube channel audience devices skipped kind={}",
+            analytics_error_kind(exc),
+        )
+        return _failed_section(DEVICES_UNAVAILABLE)

@@ -3,6 +3,7 @@ import { formatWatchHours } from "../youtubeVideoAnalyticsOverviewStats";
 import {
   ageGroupLabel,
   countryRowLabel,
+  deviceTypeLabel,
   formatViewerPercent,
   genderLabel,
   subscribedStatusLabel,
@@ -35,6 +36,12 @@ export type YouTubeChannelAudiencePayload = {
     status?: string;
     views?: number | null;
     watch_hours?: number | null;
+  }>;
+  devices?: YouTubeAudienceSection<{
+    device_type?: string;
+    views?: number | null;
+    watch_hours?: number | null;
+    watch_share_percent?: number | null;
   }>;
 };
 
@@ -74,6 +81,7 @@ export const YouTubeVideoAnalyticsAudience: React.FC<{
 
   const demoRows = payload.demographics?.rows || [];
   const countryRows = payload.countries?.rows || [];
+  const deviceRows = payload.devices?.rows || [];
   const subscribed = payload.subscribed;
   const subscribedRowData = subscribedRow(subscribed, "SUBSCRIBED");
   const unsubscribedRowData = subscribedRow(subscribed, "UNSUBSCRIBED");
@@ -219,6 +227,53 @@ export const YouTubeVideoAnalyticsAudience: React.FC<{
               </div>
             </div>
           </div>
+        )}
+      </section>
+      <section
+        className="yt-video-analytics-audience__panel"
+        aria-labelledby="yt-video-analytics-audience-devices"
+      >
+        <h3
+          id="yt-video-analytics-audience-devices"
+          className="yt-video-analytics-audience__title"
+        >
+          Device type
+        </h3>
+        <p className="yt-video-analytics-audience__subtitle">Watch time (hours)</p>
+        {deviceRows.length === 0 ? (
+          <p className="yt-video-analytics-audience__empty">
+            {sectionMessage(payload.devices, "No device data in this period.")}
+          </p>
+        ) : (
+          <>
+            <div
+              className="yt-video-analytics-audience__stack"
+              role="img"
+              aria-label="Watch time by device"
+            >
+              {deviceRows.map((row, index) => (
+                <span
+                  key={`${row.device_type}-${index}`}
+                  className="yt-video-analytics-audience__stack-seg"
+                  style={{
+                    flexGrow:
+                      typeof row.watch_share_percent === "number"
+                        ? row.watch_share_percent
+                        : 0,
+                  }}
+                />
+              ))}
+            </div>
+            <ul className="yt-video-analytics-audience__legend">
+              {deviceRows.map((row, index) => (
+                <li key={`${row.device_type}-legend-${index}`}>
+                  <span className="yt-video-analytics-audience__swatch" />
+                  <span>{deviceTypeLabel(row.device_type || "")}</span>
+                  <span>{formatViewerPercent(row.watch_share_percent)}</span>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </section>
     </div>

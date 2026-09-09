@@ -298,7 +298,7 @@ class YouTubeAnalyticsService:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
     ) -> Dict[str, Any]:
-        """Channel Audience for Video Analytics: demographics, countries, subscribed."""
+        """Channel Audience for Video Analytics: demographics, countries, subscribed, devices."""
         from services.youtube.youtube_analytics_audience import load_channel_audience
 
         return load_channel_audience(
