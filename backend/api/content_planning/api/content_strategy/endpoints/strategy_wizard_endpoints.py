@@ -296,6 +296,24 @@ async def activate_strategy(
         except Exception as cache_error:
             logger.debug(f"Could not clear active strategy cache: {cache_error}")
 
+        # SIF x Strategy (non-blocking): mirror active.md to the VFS and
+        # schedule txtai embedding. Fire-and-forget — must never fail
+        # activation; the write + task dispatch each swallow their errors.
+        # ``existing.activation_date`` is preserved on re-activation of an
+        # already-active strategy (keeps the source hash stable → the
+        # watermark skips a no-op re-embed); fall back to ``now`` only when
+        # the row has no timestamp yet.
+        try:
+            from services.intelligence.strategy_vfs_companion import dispatch_activation_indexing
+            dispatch_activation_indexing(
+                db,
+                user_id,
+                strategy.to_dict(),
+                existing.activation_date if existing.activation_date is not None else now,
+            )
+        except Exception as sif_error:
+            logger.debug(f"Could not dispatch SIF strategy indexing: {sif_error}")
+
         return ResponseBuilder.create_success_response(
             message="Strategy activated",
             data={
