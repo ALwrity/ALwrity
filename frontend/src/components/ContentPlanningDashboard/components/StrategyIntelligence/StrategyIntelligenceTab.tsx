@@ -8,6 +8,7 @@ import ImplementationRoadmapCard from './components/ImplementationRoadmapCard';
 import RiskAssessmentCard from './components/RiskAssessmentCard';
 import ReviewProgressHeader from './components/ReviewProgressHeader';
 import StrategyErrorBoundary from './components/StrategyErrorBoundary';
+import GroundingStatusBadge from '../GroundingStatusBadge';
 import { StrategyData } from './types/strategy.types';
 import { useStrategyReviewStore } from '../../../../stores/strategyReviewStore';
 import { hasValidData } from './utils/defensiveRendering';
@@ -182,6 +183,16 @@ const StrategyIntelligenceTab: React.FC<StrategyIntelligenceTabProps> = ({
 
   return (
     <Box sx={{ p: 3 }}>
+      {/* Grounding score transparency (QA-5): ground truth status surfaces so a
+          "validated (82%)" or "Partial (45%)" chip is always visible */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+        <GroundingStatusBadge
+          status={safeStrategyData.strategy_metadata?.grounding_status}
+          score={safeStrategyData.strategy_metadata?.grounding_validation?.score}
+          violations={safeStrategyData.strategy_metadata?.grounding_validation?.violations}
+        />
+      </Box>
+
       {/* Header Section */}
       <StrategyHeader 
         strategyData={safeStrategyData} 

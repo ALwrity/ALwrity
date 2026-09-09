@@ -60,6 +60,37 @@ NON-NEGOTIABLE RULES:
    label estimates as estimates.
 """
 
+# Shared COMPONENT RUBRIC injected into every strategy component USER prompt
+# (strategy-quality-audit.md QA-2). The system prompt (STRATEGY_SYSTEM_PROMPT)
+# carries the same contract where a provider honors system prompts; embedding
+# the rubric inline in the user prompt makes the directives provider-agnostic
+# so the model cannot miss the personalization levers even when a provider
+# drops/downweights the system role. Phrasing adapts the proven quality rubrics
+# ("DATA-DRIVEN PRECISION", "STRICT NICHE RELEVANCE") — one source of
+# truth, not a second prompt bank.
+_COMPONENT_RUBRIC = """You are the user's senior content strategy consultant working from \
+their data below. Apply these working directives to EVERY item in your response:
+
+1. PERSONALIZATION: Ground each recommendation in the USER & BUSINESS INTELLIGENCE and \
+BASE STRATEGY above — their objectives, target metrics, budget, team size, timeline, \
+baseline metrics, audience, and brand voice. Never write for a generic business.
+
+2. COMPETITOR GROUNDING: Wherever a competitive claim is made, reference the user's \
+competitor watchlist BY NAME; never invent competitor names.
+
+3. NICHE RELEVANCE: Stay strictly relevant to the user's industry and the topics in their \
+data. Avoid generic industry jargon unless it is their niche (STRICT NICHE RELEVANCE).
+
+4. DATA-DRIVEN PRECISION: Base every projection and recommendation on the user's stored \
+metrics and stated goals. Do not fabricate numbers — label any estimate as an estimate.
+
+5. ANTI-GENERICITY: If you cannot tie a statement to the user's data or stated goals, \
+omit it. No filler, no invented facts.
+
+6. ACTIONABLE VALUE: Frame recommendations as actions a marketer executes (traffic, \
+leads, conversions, topical authority, realistic effort-to-impact) and keep them within \
+the user's realistic capacity (team size, content budget, sustainable cadence)."""
+
 @dataclass
 class StrategyGenerationConfig:
     """Configuration for strategy generation."""
@@ -118,6 +149,10 @@ class AIStrategyGenerator:
             
             # Track which components failed during generation
             failed_components = []
+            # Prior-component digest for QA-4 cross-component consistency: each
+            # later component sees the earlier ones so roadmap/predictions/risk
+            # are generated against the same insights, not blind to each other.
+            prior_components: Dict[str, Any] = {}
             
             # Step 1: Generate base strategy fields (using existing autofill system)
             self._emit_progress(progress_callback, 1, 10, "Getting user context...")
@@ -127,6 +162,7 @@ class AIStrategyGenerator:
             # Step 2: Generate strategic insights and recommendations
             self._emit_progress(progress_callback, 3, 30, "Generating strategic insights...")
             strategic_insights = await self._generate_strategic_insights(base_strategy, context, user_id=user_id)
+            prior_components["strategic_insights"] = strategic_insights
             if strategic_insights.get("ai_generation_failed"):
                 failed_components.append("strategic_insights")
             else:
@@ -134,7 +170,8 @@ class AIStrategyGenerator:
             
             # Step 3: Generate competitive analysis
             self._emit_progress(progress_callback, 4, 40, "Generating competitive analysis...")
-            competitive_analysis = await self._generate_competitive_analysis(base_strategy, context, user_id=user_id)
+            competitive_analysis = await self._generate_competitive_analysis(base_strategy, context, prior_components=prior_components, user_id=user_id)
+            prior_components["competitive_analysis"] = competitive_analysis
             if competitive_analysis.get("ai_generation_failed"):
                 failed_components.append("competitive_analysis")
             else:
@@ -142,7 +179,8 @@ class AIStrategyGenerator:
             
             # Step 4: Generate performance predictions
             self._emit_progress(progress_callback, 5, 50, "Generating performance predictions...")
-            performance_predictions = await self._generate_performance_predictions(base_strategy, context, user_id=user_id)
+            performance_predictions = await self._generate_performance_predictions(base_strategy, context, prior_components=prior_components, user_id=user_id)
+            prior_components["performance_predictions"] = performance_predictions
             if performance_predictions.get("ai_generation_failed"):
                 failed_components.append("performance_predictions")
             else:
@@ -150,7 +188,8 @@ class AIStrategyGenerator:
             
             # Step 5: Generate implementation roadmap
             self._emit_progress(progress_callback, 6, 60, "Generating implementation roadmap...")
-            implementation_roadmap = await self._generate_implementation_roadmap(base_strategy, context, user_id=user_id)
+            implementation_roadmap = await self._generate_implementation_roadmap(base_strategy, context, prior_components=prior_components, user_id=user_id)
+            prior_components["implementation_roadmap"] = implementation_roadmap
             if implementation_roadmap.get("ai_generation_failed"):
                 failed_components.append("implementation_roadmap")
             else:
@@ -158,7 +197,7 @@ class AIStrategyGenerator:
             
             # Step 6: Generate risk assessment
             self._emit_progress(progress_callback, 7, 70, "Generating risk assessment...")
-            risk_assessment = await self._generate_risk_assessment(base_strategy, context, user_id=user_id)
+            risk_assessment = await self._generate_risk_assessment(base_strategy, context, prior_components=prior_components, user_id=user_id)
             if risk_assessment.get("ai_generation_failed"):
                 failed_components.append("risk_assessment")
             else:
@@ -185,7 +224,7 @@ class AIStrategyGenerator:
                     "generation_version": "2.0",
                     "ai_provider": _provider,
                     "ai_model": _model or _provider,
-                    "personalization_level": "high",
+                    "personalization_level": self._derive_personalization_level(context, failed_components),
                     "ai_generated": True,
                     "comprehensive": True,
                     "content_calendar_ready": False,  # Indicates calendar needs to be generated separately
@@ -199,10 +238,10 @@ class AIStrategyGenerator:
                 "implementation_roadmap": implementation_roadmap,
                 "risk_assessment": risk_assessment,
                 "summary": {
-                    "estimated_roi": performance_predictions.get("estimated_roi", "15-25%"),
-                    "implementation_timeline": implementation_roadmap.get("total_duration", "12 months"),
-                    "risk_level": risk_assessment.get("overall_risk_level", "Medium"),
-                    "success_probability": performance_predictions.get("success_probability", "85%"),
+                    "estimated_roi": self._honest_summary(performance_predictions, "estimated_roi", "15-25%", "performance predictions"),
+                    "implementation_timeline": self._honest_summary(implementation_roadmap, "timeline", "12 months", "implementation roadmap"),
+                    "risk_level": self._honest_summary(risk_assessment, "overall_risk_level", "Medium", "risk assessment"),
+                    "success_probability": self._honest_summary(performance_predictions, "success_probability", "85%", "performance predictions"),
                     "next_step": "Review strategy and generate content calendar"
                 }
             }
@@ -287,6 +326,197 @@ class AIStrategyGenerator:
         opaque structured noise.
         """
         return UserIntelligenceFormatter.build_briefing(context)
+
+    # ------------------------------------------------------------------
+    # Prior-components digest (strategy-quality-audit.md QA-4)
+    # Each later component prompt receives a compact digest of the earlier
+    # components so roadmap/predictions/risk are generated CONSISTENTLY with
+    # the insights and competitor analysis — not blind to each other.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _digest_insights(insights: Dict[str, Any], limit: int = 4) -> List[str]:
+        if not insights or insights.get("ai_generation_failed"):
+            return []
+        raw = insights.get("insights")
+        if isinstance(raw, list):
+            texts = [
+                str(item.get("insight"))
+                for item in raw
+                if isinstance(item, dict) and item.get("insight")
+            ]
+            return texts[:limit]
+        texts: List[str] = []
+        growth = insights.get("growth_potential") or {}
+        texts.extend(str(x) for x in (growth.get("key_drivers") or [])[:limit])
+        texts.extend(str(x) for x in (insights.get("content_opportunities") or [])[:limit])
+        swot = (insights.get("swot_summary") or {}).get("primary_strengths") or []
+        texts.extend(str(x) for x in swot[:limit])
+        return [t for t in texts if t][:limit]
+
+    @staticmethod
+    def _digest_competitors(competitive: Dict[str, Any], limit: int = 6) -> List[str]:
+        if not competitive or competitive.get("ai_generation_failed"):
+            return []
+        names: List[str] = []
+        comps = competitive.get("competitors") or []
+        if isinstance(comps, list):
+            for item in comps:
+                if not isinstance(item, dict):
+                    continue
+                name = (
+                    item.get("name")
+                    or item.get("domain")
+                    or item.get("website")
+                    or item.get("url")
+                )
+                if name:
+                    names.append(str(name))
+        return names[:limit]
+
+    @staticmethod
+    def _digest_gaps(competitive: Dict[str, Any], limit: int = 3) -> List[str]:
+        gaps = (competitive or {}).get("market_gaps") or []
+        if not isinstance(gaps, list):
+            return []
+        return [str(g) for g in gaps if g][:limit]
+
+    @staticmethod
+    def _digest_predictions(performance: Dict[str, Any], limit: int = 4) -> List[str]:
+        if not performance or performance.get("ai_generation_failed"):
+            return []
+        lines: List[str] = []
+        roi = performance.get("estimated_roi")
+        if roi:
+            lines.append(f"estimated ROI {roi}")
+        probability = performance.get("success_probability")
+        if probability:
+            lines.append(f"success probability {probability}")
+        traffic = performance.get("traffic_growth") or {}
+        for month in ("month_3", "month_6", "month_12"):
+            value = traffic.get(month)
+            if value:
+                lines.append(f"traffic growth by {month.replace('_', ' ')}: {value}")
+        return [line for line in lines if line][:limit]
+
+    @classmethod
+    def _build_prior_components_digest(cls, prior_components: Optional[Dict[str, Any]]) -> str:
+        """Compact, natural-language digest of the components already generated."""
+        if not prior_components:
+            return ""
+        sections: List[str] = []
+
+        insights = cls._digest_insights(prior_components.get("strategic_insights"))
+        if insights:
+            sections.append(
+                "  Strategic insights already established: " + " | ".join(insights)
+            )
+
+        competitive = prior_components.get("competitive_analysis")
+        if competitive and not competitive.get("ai_generation_failed"):
+            names = cls._digest_competitors(competitive)
+            gaps = cls._digest_gaps(competitive)
+            bits: List[str] = []
+            if names:
+                bits.append("competitors analyzed: " + ", ".join(names))
+            if gaps:
+                bits.append("market gaps: " + " | ".join(gaps))
+            if bits:
+                sections.append(
+                    "  Competitive analysis already established: " + " | ".join(bits)
+                )
+
+        predictions = cls._digest_predictions(
+            prior_components.get("performance_predictions")
+        )
+        if predictions:
+            sections.append(
+                "  Performance predictions already established: "
+                + " | ".join(predictions)
+            )
+
+        roadmap = prior_components.get("implementation_roadmap")
+        if roadmap and not roadmap.get("ai_generation_failed"):
+            timeline = roadmap.get("timeline") or roadmap.get("total_duration")
+            if timeline:
+                sections.append(
+                    f"  Implementation roadmap already established: timeline {timeline}"
+                )
+
+        risk = prior_components.get("risk_assessment")
+        if risk and not risk.get("ai_generation_failed"):
+            level = risk.get("overall_risk_level")
+            if level:
+                sections.append(
+                    f"  Risk assessment already established: overall level {level}"
+                )
+
+        return "PRIOR AI-GENERATED COMPONENTS (ground your output in these; do not contradict them):\n" + "\n".join(sections)
+
+    @classmethod
+    def _prior_components_block(cls, prior_components: Optional[Dict[str, Any]]) -> str:
+        """Prompt section for prior components; empty when none exist."""
+        digest = cls._build_prior_components_digest(prior_components)
+        return digest if digest else ""
+
+    @staticmethod
+    def _honest_summary(
+        component: Dict[str, Any],
+        field: str,
+        fallback: str,
+        label: str,
+    ) -> str:
+        """QA-4 honesty: a failed component must not masquerade as confident
+        numbers in the strategy summary (previously hard-coded defaults like
+        '15-25%' / '85%' / '12 months' surfaced even when generation failed)."""
+        if component.get("ai_generation_failed") or not component.get(field):
+            return f"{label} unavailable — component generation failed"
+        return str(component.get(field, fallback))
+
+    @classmethod
+    def _derive_personalization_level(
+        cls,
+        context: Dict[str, Any],
+        failed_components: List[str],
+    ) -> str:
+        """QA-5: derive personalization_level from actual signals instead of the
+        previous hard-coded ``"high"`` (dishonest for partial generations).
+
+        Signals: onboarding source coverage (persona / competitors / website
+        voice-style / search analytics / canonical profile) and how much of the
+        30-field strategy-builder form the user filled. Failed components cap
+        the level regardless of richness.
+        """
+        onboarding = (context or {}).get("onboarding_data") or {}
+        sources: List[str] = []
+        if (onboarding.get("persona_data") or {}).get("core_persona"):
+            sources.append("persona")
+        if onboarding.get("competitor_analysis") or onboarding.get(
+            "deep_competitor_analysis"
+        ):
+            sources.append("competitor")
+        website = onboarding.get("website_analysis") or {}
+        if website.get("writing_style") or website.get("content_type"):
+            sources.append("voice_style")
+        if onboarding.get("gsc_analytics") or onboarding.get("bing_analytics"):
+            sources.append("analytics")
+        if onboarding.get("canonical_profile"):
+            sources.append("canonical")
+
+        filled_form = sum(
+            1
+            for value in ((context or {}).get("form_data") or {}).values()
+            if value not in (None, "")
+        )
+
+        if len(failed_components) >= 2:
+            return "low"
+        if len(failed_components) == 1:
+            return "medium"
+        if len(sources) == 0 and filled_form == 0:
+            return "low"
+        if len(sources) >= 2 or filled_form >= 5:
+            return "high"
+        return "medium"
 
     async def _call_llm_structured(
         self,
@@ -385,6 +615,8 @@ class AIStrategyGenerator:
             4. Growth potential assessment
             5. Strategic recommendations
             
+            {_COMPONENT_RUBRIC}
+            
             Format as structured JSON with insights, reasoning, and confidence levels.
             """
             
@@ -442,7 +674,7 @@ class AIStrategyGenerator:
                 "failure_reason": str(e)
             }
 
-    async def _generate_competitive_analysis(self, base_strategy: Dict[str, Any], context: Dict[str, Any], user_id: Optional[int] = None, ai_manager: Optional[Any] = None) -> Dict[str, Any]:
+    async def _generate_competitive_analysis(self, base_strategy: Dict[str, Any], context: Dict[str, Any], user_id: Optional[int] = None, ai_manager: Optional[Any] = None, prior_components: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generate competitive analysis using AI."""
         try:
             logger.info("🔍 Generating competitive analysis...")
@@ -456,12 +688,16 @@ class AIStrategyGenerator:
             BASE STRATEGY:
             {json.dumps(base_strategy, indent=2)}
             
+            {self._prior_components_block(prior_components)}
+            
             Please provide competitive analysis including:
             1. Competitor identification and analysis
             2. Market gap identification
             3. Differentiation opportunities
             4. Competitive positioning
             5. Strategic recommendations
+            
+            {_COMPONENT_RUBRIC}
             
             Format as structured JSON with detailed analysis and recommendations.
             """
@@ -524,7 +760,7 @@ class AIStrategyGenerator:
                 "failure_reason": str(e)
             }
 
-    async def _generate_content_calendar(self, base_strategy: Dict[str, Any], context: Dict[str, Any], user_id: Optional[int] = None, ai_manager: Optional[Any] = None) -> Dict[str, Any]:
+    async def _generate_content_calendar(self, base_strategy: Dict[str, Any], context: Dict[str, Any], user_id: Optional[int] = None, ai_manager: Optional[Any] = None, prior_components: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generate content calendar using AI."""
         try:
             logger.info("📅 Generating content calendar...")
@@ -538,12 +774,16 @@ class AIStrategyGenerator:
             BASE STRATEGY:
             {json.dumps(base_strategy, indent=2)}
             
+            {self._prior_components_block(prior_components)}
+            
             Please provide content calendar including:
             1. Content pieces with titles and descriptions
             2. Publishing schedule and timing
             3. Content types and formats
             4. Platform distribution strategy
             5. Content themes and pillars
+            
+            {_COMPONENT_RUBRIC}
             
             Format as structured JSON with detailed content schedule.
             """
@@ -635,7 +875,7 @@ class AIStrategyGenerator:
             logger.error(f"❌ Error generating content calendar: {str(e)}")
             raise RuntimeError(f"Failed to generate content calendar: {str(e)}")
 
-    async def _generate_performance_predictions(self, base_strategy: Dict[str, Any], context: Dict[str, Any], user_id: Optional[int] = None, ai_manager: Optional[Any] = None) -> Dict[str, Any]:
+    async def _generate_performance_predictions(self, base_strategy: Dict[str, Any], context: Dict[str, Any], user_id: Optional[int] = None, ai_manager: Optional[Any] = None, prior_components: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generate performance predictions using AI."""
         try:
             logger.info("📊 Generating performance predictions...")
@@ -649,12 +889,16 @@ class AIStrategyGenerator:
             BASE STRATEGY:
             {json.dumps(base_strategy, indent=2)}
             
+            {self._prior_components_block(prior_components)}
+            
             Please provide performance predictions including:
             1. Traffic growth projections
             2. Engagement rate predictions
             3. Conversion rate estimates
             4. ROI projections
             5. Success probability assessment
+            
+            {_COMPONENT_RUBRIC}
             
             Format as structured JSON with detailed predictions and confidence levels.
             """
@@ -726,7 +970,7 @@ class AIStrategyGenerator:
                 "failure_reason": str(e)
             }
 
-    async def _generate_implementation_roadmap(self, base_strategy: Dict[str, Any], context: Dict[str, Any], user_id: Optional[int] = None, ai_manager: Optional[Any] = None) -> Dict[str, Any]:
+    async def _generate_implementation_roadmap(self, base_strategy: Dict[str, Any], context: Dict[str, Any], user_id: Optional[int] = None, ai_manager: Optional[Any] = None, prior_components: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generate implementation roadmap using AI."""
         try:
             logger.info("🗺️ Generating implementation roadmap...")
@@ -740,12 +984,16 @@ class AIStrategyGenerator:
             BASE STRATEGY:
             {json.dumps(base_strategy, indent=2)}
             
+            {self._prior_components_block(prior_components)}
+            
             Please provide implementation roadmap including:
             1. Phase-by-phase breakdown
             2. Timeline with milestones
             3. Resource allocation
             4. Success metrics
             5. Risk mitigation strategies
+            
+            {_COMPONENT_RUBRIC}
             
             Format as structured JSON with detailed implementation plan.
             """
@@ -830,7 +1078,7 @@ class AIStrategyGenerator:
                 "failure_reason": str(e)
             }
 
-    async def _generate_risk_assessment(self, base_strategy: Dict[str, Any], context: Dict[str, Any], user_id: Optional[int] = None, ai_manager: Optional[Any] = None) -> Dict[str, Any]:
+    async def _generate_risk_assessment(self, base_strategy: Dict[str, Any], context: Dict[str, Any], user_id: Optional[int] = None, ai_manager: Optional[Any] = None, prior_components: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Generate risk assessment using AI."""
         try:
             logger.info("⚠️ Generating risk assessment...")
@@ -843,6 +1091,8 @@ class AIStrategyGenerator:
             
             BASE STRATEGY:
             {json.dumps(base_strategy, indent=2)}
+            
+            {self._prior_components_block(prior_components)}
             
             Please provide risk assessment including:
             1. Risk identification and analysis with detailed risk descriptions
@@ -857,6 +1107,8 @@ class AIStrategyGenerator:
             - market_risks: Market changes, competition, audience shifts, industry trends
             - operational_risks: Process, resource, team, or execution risks
             - financial_risks: Budget, ROI, cost, or financial performance risks
+            
+            {_COMPONENT_RUBRIC}
             
             Format as structured JSON with detailed risk analysis and mitigation plans.
             """

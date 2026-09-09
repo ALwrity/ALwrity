@@ -1114,6 +1114,333 @@ class TestStrategyGeneratorGrounding:
             sig = inspect.signature(getattr(generator, name))
             assert "user_id" in sig.parameters, f"{name} must accept user_id kwarg"
 
+    def test_all_component_prompts_embed_rubric_and_briefing(self):
+        """QA-2: every component prompt must co-inject the shared rubric AND the
+        user intelligence briefing. Guards against a component silently falling
+        back to an unrubricated, de-personalized prompt."""
+        import inspect
+
+        from api.content_planning.services.content_strategy.ai_generation import (
+            strategy_generator,
+        )
+
+        component_methods = [
+            "_generate_strategic_insights",
+            "_generate_competitive_analysis",
+            "_generate_performance_predictions",
+            "_generate_implementation_roadmap",
+            "_generate_risk_assessment",
+        ]
+        for name in component_methods:
+            source = inspect.getsource(getattr(strategy_generator.AIStrategyGenerator, name))
+            assert "{_COMPONENT_RUBRIC}" in source, (
+                f"{name} must inject the shared _COMPONENT_RUBRIC into its prompt"
+            )
+            assert "self._build_user_intelligence_prompt(context)" in source, (
+                f"{name} must inject the user intelligence briefing into its prompt"
+            )
+
+    def test_component_rubric_contains_personalization_anchors(self):
+        """QA-2: the shared rubric must carry the personalization levers the
+        audit demands (role, data grounding, competitor-by-name, anti-genericity,
+        niche relevance) so the prompt contract cannot silently weaken."""
+        from api.content_planning.services.content_strategy.ai_generation.strategy_generator import (
+            _COMPONENT_RUBRIC,
+            STRATEGY_SYSTEM_PROMPT,
+        )
+
+        assert "senior content strategy consultant" in _COMPONENT_RUBRIC
+        for anchor in [
+            "PERSONALIZATION",
+            "COMPETITOR GROUNDING",
+            "NICHE RELEVANCE",
+            "DATA-DRIVEN PRECISION",
+            "ANTI-GENERICITY",
+            "ACTIONABLE VALUE",
+        ]:
+            assert anchor in _COMPONENT_RUBRIC
+        # One source of truth must not have drifted off the system-prompt contract
+        assert "NON-NEGOTIABLE RULES" in STRATEGY_SYSTEM_PROMPT
+
+    def test_later_components_accept_and_inject_prior_components(self):
+        """QA-4: every later component must accept prior_components and inject
+        the digest block into its prompt (cross-component consistency)."""
+        import inspect
+
+        from api.content_planning.services.content_strategy.ai_generation import (
+            strategy_generator,
+        )
+
+        for name in [
+            "_generate_competitive_analysis",
+            "_generate_performance_predictions",
+            "_generate_implementation_roadmap",
+            "_generate_risk_assessment",
+        ]:
+            sig = inspect.signature(
+                getattr(strategy_generator.AIStrategyGenerator, name)
+            )
+            assert "prior_components" in sig.parameters, (
+                f"{name} must accept prior_components kwarg"
+            )
+            source = inspect.getsource(
+                getattr(strategy_generator.AIStrategyGenerator, name)
+            )
+            assert "{self._prior_components_block(prior_components)}" in source, (
+                f"{name} must inject the prior-components digest into its prompt"
+            )
+
+    @pytest.mark.asyncio
+    async def test_prior_components_are_threaded_through_generation(self):
+        """QA-4: generate_comprehensive_strategy must pass earlier component
+        outputs to each later component (the digest source)."""
+        from unittest.mock import patch
+
+        from api.content_planning.services.content_strategy.ai_generation.strategy_generator import (
+            AIStrategyGenerator,
+        )
+
+        generator = AIStrategyGenerator()
+        context = {"onboarding_data": {}, "user_id": "user_test"}
+        captured = {}
+        seen_keys = {}
+
+        async def mock_base(user_id, ctx):
+            return {"business_objectives": "Grow"}
+
+        async def mock_capture(key, result):
+            async def _f(base, ctx, **kwargs):
+                pc = kwargs.get("prior_components") or {}
+                captured[key] = dict(pc)
+                seen_keys[key] = set(pc.keys())
+                return result
+
+            return _f
+
+        with patch.object(generator, "_generate_base_strategy_fields", side_effect=mock_base), \
+             patch.object(
+                 generator, "_generate_strategic_insights",
+                 side_effect=await mock_capture("strategic_insights", {"insights": []}),
+             ), \
+             patch.object(
+                 generator, "_generate_competitive_analysis",
+                 side_effect=await mock_capture(
+                     "competitive_analysis", {"competitors": [{"name": "Rival"}], "market_gaps": []},
+                 ),
+             ), \
+             patch.object(
+                 generator, "_generate_performance_predictions",
+                 side_effect=await mock_capture(
+                     "performance_predictions", {"estimated_roi": "20%"},
+                 ),
+             ), \
+             patch.object(
+                 generator, "_generate_implementation_roadmap",
+                 side_effect=await mock_capture(
+                     "implementation_roadmap", {"phases": [], "timeline": "9 months"},
+                 ),
+             ), \
+             patch.object(
+                 generator, "_generate_risk_assessment",
+                 side_effect=await mock_capture(
+                     "risk_assessment", {"overall_risk_level": "Low"},
+                 ),
+             ):
+            await generator.generate_comprehensive_strategy(
+                user_id="user_test", context=context, strategy_name="Test"
+            )
+
+        assert seen_keys["competitive_analysis"] == {"strategic_insights"}
+        assert seen_keys["performance_predictions"] == {
+            "strategic_insights", "competitive_analysis",
+        }
+        assert seen_keys["implementation_roadmap"] == {
+            "strategic_insights", "competitive_analysis", "performance_predictions",
+        }
+        assert seen_keys["risk_assessment"] == {
+            "strategic_insights", "competitive_analysis",
+            "performance_predictions", "implementation_roadmap",
+        }
+
+    def test_prior_components_digest_surfaces_signal(self):
+        """QA-4: the digest renders competitor names, market gaps, insight
+        bullets, and predicted KPIs as usable prompt context."""
+        from api.content_planning.services.content_strategy.ai_generation.strategy_generator import (
+            AIStrategyGenerator,
+        )
+
+        digest = AIStrategyGenerator._build_prior_components_digest(
+            {
+                "strategic_insights": {
+                    "content_opportunities": ["Write CTO scalability guides"]
+                },
+                "competitive_analysis": {
+                    "competitors": [{"name": "Rival Co"}],
+                    "market_gaps": ["No scalability content"],
+                },
+                "performance_predictions": {
+                    "estimated_roi": "20-30%",
+                    "traffic_growth": {"month_3": "25%"},
+                },
+            }
+        )
+        assert "PRIOR AI-GENERATED COMPONENTS" in digest
+        assert "Write CTO scalability guides" in digest
+        assert "Rival Co" in digest
+        assert "market gaps: No scalability content" in digest
+        assert "estimated ROI 20-30%" in digest
+        assert "traffic growth by month 3: 25%" in digest
+
+    @pytest.mark.asyncio
+    async def test_summary_is_honest_when_component_fails(self):
+        """QA-4: summary must say 'component generation failed' instead of
+        surfacing hard-coded figures ('15-25%' / '85%' / '12 months') when a
+        component failed."""
+        from unittest.mock import patch
+
+        from api.content_planning.services.content_strategy.ai_generation.strategy_generator import (
+            AIStrategyGenerator,
+        )
+
+        generator = AIStrategyGenerator()
+        context = {"onboarding_data": {}, "user_id": "user_test"}
+
+        async def mock_base(user_id, ctx):
+            return {"business_objectives": "Grow"}
+
+        async def mock_ok(base, ctx, **kwargs):
+            return {}
+
+        async def mock_failed(base, ctx, **kwargs):
+            return {"ai_generation_failed": True, "failure_reason": "rate limited"}
+
+        with patch.object(generator, "_generate_base_strategy_fields", side_effect=mock_base), \
+             patch.object(generator, "_generate_strategic_insights", side_effect=mock_ok), \
+             patch.object(generator, "_generate_competitive_analysis", side_effect=mock_ok), \
+             patch.object(generator, "_generate_performance_predictions", side_effect=mock_failed), \
+             patch.object(generator, "_generate_implementation_roadmap", side_effect=mock_ok), \
+             patch.object(generator, "_generate_risk_assessment", side_effect=mock_failed):
+
+            strategy = await generator.generate_comprehensive_strategy(
+                user_id="user_test", context=context, strategy_name="Test"
+            )
+
+        summary = strategy["summary"]
+        assert "component generation failed" in summary["estimated_roi"]
+        assert "component generation failed" in summary["success_probability"]
+        assert "component generation failed" in summary["risk_level"]
+        assert "15-25%" not in summary["estimated_roi"]
+        assert "85%" not in summary["success_probability"]
+        assert "Medium" not in summary["risk_level"]
+        # roadmap "succeeded" but carried no timeline — honest, not '12 months'
+        assert "implementation roadmap unavailable" in summary["implementation_timeline"]
+
+    @pytest.mark.parametrize(
+        "context,failed,expected",
+        [
+            # No onboarding, no form data -> honest 'low' (was hard-coded 'high').
+            ({}, [], "low"),
+            # Rich context but two failed components -> capped at 'low'.
+            (
+                {
+                    "onboarding_data": {
+                        "persona_data": {"core_persona": {"name": "P"}},
+                        "competitor_analysis": [{"name": "C"}],
+                        "gsc_analytics": {"clicks": 100},
+                    },
+                    "form_data": {"industry": "tech", "goal": "grow"},
+                },
+                ["insights", "risk"],
+                "low",
+            ),
+            # One failed component caps to 'medium'.
+            (
+                {
+                    "onboarding_data": {
+                        "persona_data": {"core_persona": {"name": "P"}},
+                        "competitor_analysis": [{"name": "C"}],
+                        "gsc_analytics": {"clicks": 100},
+                    }
+                },
+                ["risk"],
+                "medium",
+            ),
+            # Two onboarding sources -> 'high'.
+            (
+                {
+                    "onboarding_data": {
+                        "persona_data": {"core_persona": {"name": "P"}},
+                        "website_analysis": {"writing_style": "friendly"},
+                    }
+                },
+                [],
+                "high",
+            ),
+            # Form data coverage alone drives 'high'.
+            (
+                {
+                    "form_data": {
+                        "industry": "tech",
+                        "goal": "grow",
+                        "audience": "x",
+                        "content_type": "blog",
+                        "tone": "casual",
+                        "cadence": "weekly",
+                    }
+                },
+                [],
+                "high",
+            ),
+            # Single analytics source, no form data -> 'medium'.
+            (
+                {"onboarding_data": {"bing_analytics": {"clicks": 5}}},
+                [],
+                "medium",
+            ),
+        ],
+    )
+    def test_derive_personalization_level_signal_based(self, context, failed, expected):
+        """QA-5: personalization_level must be derived from actual signals
+        (onboarding source coverage + filled form fields), not hard-coded, and
+        failed components must cap it."""
+        from api.content_planning.services.content_strategy.ai_generation.strategy_generator import (
+            AIStrategyGenerator,
+        )
+
+        assert AIStrategyGenerator._derive_personalization_level(context, failed) == expected
+
+    @pytest.mark.asyncio
+    async def test_metadata_personalization_level_is_honest_on_empty_context(self):
+        """QA-5 integration: empty context previously yielded a hard-coded
+        ``personalization_level: "high"`` that overstated grounding honesty."""
+        from unittest.mock import patch
+
+        from api.content_planning.services.content_strategy.ai_generation.strategy_generator import (
+            AIStrategyGenerator,
+        )
+
+        generator = AIStrategyGenerator()
+        context = {"onboarding_data": {}, "user_id": "user_test"}
+
+        async def mock_base(user_id, ctx):
+            return {"business_objectives": "Grow"}
+
+        async def mock_ok(base, ctx, **kwargs):
+            return {}
+
+        with patch.object(generator, "_generate_base_strategy_fields", side_effect=mock_base), \
+             patch.object(generator, "_generate_strategic_insights", side_effect=mock_ok), \
+             patch.object(generator, "_generate_competitive_analysis", side_effect=mock_ok), \
+             patch.object(generator, "_generate_performance_predictions", side_effect=mock_ok), \
+             patch.object(generator, "_generate_implementation_roadmap", side_effect=mock_ok), \
+             patch.object(generator, "_generate_risk_assessment", side_effect=mock_ok):
+
+            strategy = await generator.generate_comprehensive_strategy(
+                user_id="user_test", context=context, strategy_name="Test"
+            )
+
+        assert strategy["strategy_metadata"]["personalization_level"] == "low"
+
 
 class TestGroundingEnforcementMode:
     """Phase 3: soft vs hard grounding enforcement."""

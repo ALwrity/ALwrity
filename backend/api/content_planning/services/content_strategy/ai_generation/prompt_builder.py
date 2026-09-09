@@ -114,6 +114,84 @@ class UserIntelligenceFormatter:
             target.append((label, text))
 
     @classmethod
+    def _analytics_pair(cls, analytics: Dict[str, Any]):
+        """Return (clicks, impressions) supporting top-level or ``metrics.`` nesting."""
+        if not analytics:
+            return None, None
+        metrics = analytics.get("metrics") or {}
+        clicks = analytics.get("total_clicks")
+        if clicks is None:
+            clicks = metrics.get("total_clicks")
+        impressions = analytics.get("total_impressions")
+        if impressions is None:
+            impressions = metrics.get("total_impressions")
+        return clicks, impressions
+
+    @classmethod
+    def _competitor_entries(cls, onboarding: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Flatten ``competitor_analysis`` (list or ``{competitors: [...]}``) into
+        deduplicated {name, domain} entries."""
+        comp = onboarding.get("competitor_analysis") or {}
+        if isinstance(comp, list):
+            primary = comp
+        elif isinstance(comp, dict):
+            primary = comp.get("competitors") or comp.get("results") or []
+        else:
+            primary = []
+        entries: List[Dict[str, Any]] = []
+        seen = set()
+        for item in primary:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name")
+            domain = item.get("domain") or item.get("url") or item.get("website")
+            key = name or domain or str(item)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            entries.append({"name": name, "domain": domain})
+        return entries
+
+    @classmethod
+    def _competitor_signals(cls, onboarding: Dict[str, Any]) -> Dict[str, str]:
+        """One-line deep-analysis signal per competitor (name/domain → summary)."""
+        deep = onboarding.get("deep_competitor_analysis") or {}
+        if isinstance(deep, list):
+            items = deep
+        elif isinstance(deep, dict):
+            items = deep.get("competitors") or deep.get("results") or []
+        else:
+            items = []
+        signals: Dict[str, str] = {}
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            signal = (
+                item.get("strategy_summary")
+                or item.get("content_strategy")
+                or item.get("overview")
+                or item.get("market_gaps")
+                or item.get("gaps")
+            )
+            key = item.get("name") or item.get("domain") or item.get("url")
+            if signal and key:
+                signals[str(key)] = str(signal).strip()
+        return signals
+
+    @classmethod
+    def _field_lines(cls, mapping: Dict[str, Any], labels: Dict[str, str]) -> List[str]:
+        """Render non-empty ``{field: label}`` pairs as readable briefing lines."""
+        lines: List[str] = []
+        for key, label in labels.items():
+            value = mapping.get(key)
+            if not value:
+                continue
+            if isinstance(value, (list, tuple)):
+                value = ", ".join(str(v) for v in value)
+            lines.append(f"  - {label}: {value}")
+        return lines
+
+    @classmethod
     def format_form_data(cls, form_data: Dict[str, Any]) -> str:
         """Render the user's 30 strategy-builder fields as a briefing."""
         if not form_data:
@@ -191,17 +269,106 @@ class UserIntelligenceFormatter:
         if site_url:
             sections.append(f"Website: {site_url}")
 
-        analytics = {
-            "clicks": (onboarding.get("gsc_analytics") or {}).get("total_clicks"),
-            "impressions": (onboarding.get("gsc_analytics") or {}).get(
-                "total_impressions"
-            ),
-        }
-        if analytics.get("clicks") is not None or analytics.get("impressions") is not None:
-            sections.append(
-                "Existing organic footprint: "
-                + f"{analytics['clicks']} clicks / {analytics['impressions']} "
-                + "impressions (Google Search Console)"
+        # Competitor watchlist — the model is scored on referencing the user's
+        # ACTUAL stored competitors (grounding gate), so it must see them.
+        watchlist = cls._format_competitor_watchlist(onboarding)
+        if watchlist:
+            sections.append(watchlist)
+
+        # Voice & style — stored brand voice the model should match.
+        style_lines: List[str] = []
+        writing_style = website.get("writing_style")
+        if isinstance(writing_style, dict):
+            style_lines.extend(
+                cls._field_lines(
+                    writing_style,
+                    {
+                        "tone": "Tone",
+                        "voice": "Voice",
+                        "complexity": "Complexity",
+                        "engagement_level": "Engagement level",
+                    },
+                )
             )
+        elif writing_style:
+            style_lines.append(f"  - Tone / voice: {writing_style}")
+        content_type = website.get("content_type")
+        if isinstance(content_type, dict):
+            style_lines.extend(
+                cls._field_lines(
+                    content_type,
+                    {
+                        "primary_type": "Preferred primary format",
+                        "purpose": "Primary purpose",
+                        "secondary_types": "Secondary formats",
+                    },
+                )
+            )
+        elif isinstance(content_type, (list, tuple)):
+            style_lines.append(
+                f"  - Preferred content types: {', '.join(str(v) for v in content_type)}"
+            )
+        elif content_type:
+            style_lines.append(f"  - Preferred content types: {content_type}")
+        if style_lines:
+            sections.append("Their voice & style:")
+            sections.extend(style_lines)
+
+        # Search footprint — Google + Bing (both are stored onboarding signals).
+        footprint_lines: List[str] = []
+        gsc_clicks, gsc_impressions = cls._analytics_pair(
+            onboarding.get("gsc_analytics") or {}
+        )
+        if gsc_clicks is not None or gsc_impressions is not None:
+            footprint_lines.append(
+                f"{gsc_clicks} clicks / {gsc_impressions} impressions "
+                "(Google Search Console)"
+            )
+        bing_clicks, bing_impressions = cls._analytics_pair(
+            onboarding.get("bing_analytics") or {}
+        )
+        if bing_clicks is not None or bing_impressions is not None:
+            footprint_lines.append(
+                f"{bing_clicks} clicks / {bing_impressions} impressions (Bing)"
+            )
+        if footprint_lines:
+            sections.append("Existing organic footprint: " + "; ".join(footprint_lines))
+
+        # Data-quality note — one honesty line so the model can discount its
+        # confidence when the stored onboarding data is thin or stale.
+        data_quality = onboarding.get("data_quality") or {}
+        quality_score = data_quality.get(
+            "overall_score", data_quality.get("completeness")
+        )
+        if quality_score is not None:
+            try:
+                score = float(quality_score)
+            except (TypeError, ValueError):
+                score = None
+            if score is not None:
+                label = "strong" if score >= 0.7 else "moderate" if score >= 0.4 else "limited"
+                sections.append(
+                    f"Stored onboarding data quality: {label} (score {score:.2f})"
+                )
 
         return "\n".join(sections)
+
+    @classmethod
+    def _format_competitor_watchlist(cls, onboarding: Dict[str, Any]) -> str:
+        entries = cls._competitor_entries(onboarding)
+        if not entries:
+            return ""
+        signals = cls._competitor_signals(onboarding)
+        lines = [
+            "Competitor watchlist (reference these BY NAME in competitive positioning):"
+        ]
+        for entry in entries:
+            label = entry["name"] or entry["domain"] or "listed competitor"
+            line = f"  - {label}"
+            if entry["domain"] and entry["domain"] != label:
+                line += f" ({entry['domain']})"
+            signal = signals.get(entry["name"] or entry["domain"])
+            if signal:
+                line += f" — {signal[:160]}"
+            lines.append(line)
+        return "\n".join(lines)

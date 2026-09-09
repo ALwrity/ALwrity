@@ -19,6 +19,7 @@ import { apiClient } from '../../../api/client';
 // Import hooks and services
 import { useStrategyCalendarContext } from '../../../contexts/StrategyCalendarContext';
 import { useContentPlanningStore } from '../../../stores/contentPlanningStore';
+import { buildStrategyDigest } from '../../../services/strategyCalendarMapper';
 
 // Import types
 import { type CalendarConfig } from '../components/CalendarWizardSteps/types';
@@ -146,13 +147,19 @@ const CreateTab: React.FC = () => {
       setIsModalOpen(true);
       
       // Transform calendarConfig to match backend CalendarGenerationRequest format
+      // QA-6: ship a compact strategy digest so content scheduling inherits the
+      // confirmed strategy (pillars, formats, frequency, brand voice, timing).
+      const strategyDigest = strategyContext?.strategyData
+        ? buildStrategyDigest(strategyContext.strategyData)
+        : {};
       const requestData = {
         user_id: user?.id ?? null,
         strategy_id: strategyContext?.strategyId ? parseInt(strategyContext.strategyId) : undefined,
         calendar_type: calendarConfig.calendarType || 'monthly',
         industry: userData?.industry || 'technology',
         business_size: 'sme',
-        force_refresh: false
+        force_refresh: false,
+        ...(Object.keys(strategyDigest).length > 0 && { strategy_digest: strategyDigest })
       };
       
       console.log('🎯 Starting calendar generation request:', requestData);

@@ -43,6 +43,19 @@ export interface SmartDefaults {
   suggestedGenerateTopics: boolean;
 }
 
+/**
+ * QA-6 calendar handoff: the compact strategy digest shipped inside the
+ * calendar-generation request so content scheduling inherits the confirmed
+ * strategy instead of starting a parallel universe.
+ */
+export interface StrategyDigest {
+  content_pillars?: string[];
+  preferred_formats?: string[];
+  content_frequency?: string;
+  brand_voice?: string;
+  best_timing?: string;
+}
+
 export interface UserGuidance {
   warnings: GuidanceItem[];
   recommendations: GuidanceItem[];
@@ -199,6 +212,84 @@ export class SimplifiedStrategyCalendarMapper {
       suggestedAutoSchedule: this.suggestAutoSchedule(teamSize),
       suggestedGenerateTopics: this.suggestGenerateTopics(strategy)
     };
+  }
+
+  /**
+   * Build the QA-6 compact strategy digest for the calendar-generation request.
+   *
+   * Accepts either the AI-generated comprehensive strategy (strategyData JSON
+   * with base_strategy) or the EnhancedStrategy builder shape. Only concrete
+   * values are emitted so a strategy with no handoff signal yields an empty
+   * digest that the frontend drops before sending.
+   */
+  static buildStrategyDigest(strategy: StrategyData | null): StrategyDigest {
+    if (!strategy) {
+      return {};
+    }
+
+    const source = ((): any => {
+      const base: any = (strategy.base_strategy && typeof strategy.base_strategy === 'object'
+        && !Array.isArray(strategy.base_strategy))
+        ? strategy.base_strategy
+        : {};
+      return { ...base, ...strategy };
+    })();
+
+    const digest: StrategyDigest = {
+      content_pillars: this.asStringArray(source.content_pillars ?? source.contentPillars),
+      preferred_formats: this.asStringArray(
+        source.preferred_formats ?? source.preferredFormats ?? source.content_type,
+      ),
+      content_frequency: this.asScalar(source.content_frequency ?? source.contentFrequency),
+      brand_voice: this.asScalar(source.brand_voice ?? source.brandVoice),
+      best_timing: this.asScalar(
+        source.optimal_timing
+          ?? source.timeline
+          ?? (strategy as any)?.implementation_roadmap?.timeline
+          ?? (strategy as any)?.summary?.implementation_timeline,
+      ),
+    };
+
+    return Object.fromEntries(Object.entries(digest).filter(([, v]) => v != null && v !== ''));
+  }
+
+  private static asStringArray(value: any): string[] | undefined {
+    if (value == null) return undefined;
+    let items: any[];
+    if (Array.isArray(value)) {
+      items = value;
+    } else if (typeof value === 'string') {
+      items = value.split(',');
+    } else if (typeof value === 'object') {
+      items = [value];
+    } else {
+      items = [value];
+    }
+    const normalized = items
+      .map((item) => {
+        if (item && typeof item === 'object') {
+          const pick = item.label ?? item.value ?? item.name;
+          return pick != null ? String(pick) : null;
+        }
+        return String(item);
+      })
+      .map((s) => (s ? s.trim() : ''))
+      .filter(Boolean);
+    return normalized.length ? normalized : undefined;
+  }
+
+  private static asScalar(value: any): string | undefined {
+    if (value == null) return undefined;
+    if (typeof value === 'string') return value.trim() || undefined;
+    if (Array.isArray(value)) {
+      const array = this.asStringArray(value);
+      return array ? array.join(', ') : undefined;
+    }
+    if (typeof value === 'object') {
+      const pick = value.label ?? value.value ?? value.name ?? value.voice_description;
+      return pick != null && String(pick).trim() ? String(pick) : undefined;
+    }
+    return String(value);
   }
 
   /**
@@ -872,6 +963,9 @@ export const calculateStrategyConfidence = (strategy: StrategyData | null) =>
 
 export const generateSmartDefaults = (strategy: StrategyData | null) => 
   SimplifiedStrategyCalendarMapper.generateSmartDefaults(strategy);
+
+export const buildStrategyDigest = (strategy: StrategyData | null) =>
+  SimplifiedStrategyCalendarMapper.buildStrategyDigest(strategy);
 
 export const generateUserGuidance = (strategy: StrategyData | null) => 
   SimplifiedStrategyCalendarMapper.generateUserGuidance(strategy);
