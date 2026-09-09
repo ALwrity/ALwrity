@@ -102,3 +102,49 @@ def get_channel_overview(
             status_code=500,
             detail="Channel overview request failed.",
         )
+
+
+@router.get("/audience")
+def get_channel_audience(
+    days: Optional[int] = Query(None, ge=1, le=365),
+    window: Optional[str] = Query(None),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    token_id: Optional[int] = Query(None),
+    user: dict = Depends(get_current_user),
+    service: YouTubeAnalyticsService = Depends(get_analytics_service),
+):
+    user_id = user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        resolve_overview_query(
+            window=window,
+            days=days,
+            start_date=start_date,
+            end_date=end_date,
+            today=date.today(),
+        )
+        return service.get_channel_audience(
+            user_id,
+            days=days,
+            token_id=token_id,
+            window=window,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    except OverviewWindowError as exc:
+        logger.warning(
+            "YouTube channel audience route rejected code={}",
+            exc.error_code,
+        )
+        raise HTTPException(status_code=422, detail=exc.message)
+    except Exception as exc:
+        logger.warning(
+            "YouTube channel audience route error kind={}",
+            type(exc).__name__,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Channel audience request failed.",
+        )

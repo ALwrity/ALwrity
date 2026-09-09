@@ -1,0 +1,113 @@
+/**
+ * Audience panels — Hub tables and KPI cells. No invented percentages.
+ */
+import React from "react";
+import { render, screen } from "@testing-library/react";
+import { YouTubeVideoAnalyticsAudience } from "../modals/YouTubeVideoAnalyticsAudience";
+
+const PAYLOAD = {
+  success: true,
+  demographics: {
+    available: true,
+    rows: [
+      { age_group: "age18-24", gender: "female", viewer_percentage: 40 },
+      { age_group: "age25-34", gender: "male", viewer_percentage: 60 },
+    ],
+    message: null,
+  },
+  countries: {
+    available: true,
+    rows: [
+      { country: "US", label: "US", views: 50, watch_hours: 1.2 },
+      { country: "ZZ", label: "Unknown country", views: 10, watch_hours: 0.2 },
+    ],
+    message: null,
+  },
+  subscribed: {
+    available: true,
+    rows: [
+      { status: "SUBSCRIBED", views: 80, watch_hours: 2 },
+      { status: "UNSUBSCRIBED", views: 20, watch_hours: 0.5 },
+    ],
+    message: null,
+  },
+};
+
+describe("YouTubeVideoAnalyticsAudience", () => {
+  it("renders three Hub sections from live rows", () => {
+    render(
+      <YouTubeVideoAnalyticsAudience payload={PAYLOAD} status={null} />,
+    );
+    expect(screen.getByRole("heading", { name: "Age and gender" })).toBeTruthy();
+    expect(screen.getByText("18–24")).toBeTruthy();
+    expect(screen.getByText("Female")).toBeTruthy();
+    expect(screen.getByText("40%")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Top countries" })).toBeTruthy();
+    expect(screen.getByText("Unknown country")).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: "Views" })).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: "Watch time (hours)" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Subscribers watching" })).toBeTruthy();
+    expect(screen.getByText("Subscribed")).toBeTruthy();
+    expect(screen.getByText("Unsubscribed")).toBeTruthy();
+    const subscribedKpi = screen.getByText("Subscribed").closest(
+      ".yt-video-analytics-audience__kpi",
+    );
+    expect(subscribedKpi?.textContent).not.toMatch(/Subscribed80/);
+    expect(subscribedKpi).toHaveTextContent("Views");
+    expect(subscribedKpi).toHaveTextContent("Watch time (hours)");
+    expect(document.querySelector(".yt-video-analytics-audience__bar")).toBeTruthy();
+  });
+
+  it("shows section copy instead of invented demographics", () => {
+    render(
+      <YouTubeVideoAnalyticsAudience
+        payload={{
+          success: true,
+          demographics: {
+            available: true,
+            rows: [],
+            message: "No demographic data in this period.",
+          },
+          countries: {
+            available: false,
+            rows: [],
+            message: "Audience countries are unavailable for this window.",
+          },
+          subscribed: {
+            available: true,
+            rows: [],
+            message: "No subscribed-viewer data in this period.",
+          },
+        }}
+        status={null}
+      />,
+    );
+    expect(screen.getByText("No demographic data in this period.")).toBeTruthy();
+    expect(
+      screen.getByText("Audience countries are unavailable for this window."),
+    ).toBeTruthy();
+    expect(screen.queryByText("50%")).toBeNull();
+  });
+
+  it("shows loading and unavailable status without panels", () => {
+    const { rerender } = render(
+      <YouTubeVideoAnalyticsAudience
+        payload={null}
+        status="Loading channel audience."
+      />,
+    );
+    expect(screen.getByText("Loading channel audience.")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Age and gender" })).toBeNull();
+    rerender(
+      <YouTubeVideoAnalyticsAudience
+        payload={{
+          success: false,
+          message: "Connect YouTube to load channel audience.",
+        }}
+        status={null}
+      />,
+    );
+    expect(screen.getByText("Connect YouTube to load channel audience.")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Top countries" })).toBeNull();
+  });
+});

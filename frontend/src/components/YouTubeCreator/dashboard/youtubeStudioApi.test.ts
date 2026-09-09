@@ -38,6 +38,33 @@ describe("youtubeStudioApi", () => {
     expect(result.current.views).toBe(127);
   });
 
+  it("logs channel audience completion without row payloads", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: {
+        success: true,
+        demographics: {
+          rows: [{ age_group: "age18-24", gender: "female", viewer_percentage: 40 }],
+        },
+      },
+    });
+    await youtubeStudioApi.getChannelAudience({ days: 28 });
+    expect(info.mock.calls.join(" ")).toMatch(/channel audience complete/);
+    expect(info.mock.calls.join(" ")).not.toMatch(/age18-24|female/);
+    info.mockRestore();
+  });
+
+  it("loads channel audience from /api/youtube/analytics/audience", async () => {
+    vi.mocked(apiClient.get).mockResolvedValueOnce({
+      data: { success: true, demographics: { rows: [] } },
+    });
+    const result = await youtubeStudioApi.getChannelAudience({ days: 28 });
+    expect(apiClient.get).toHaveBeenCalledWith("/api/youtube/analytics/audience", {
+      params: { days: 28 },
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("logs channel overview completion without video titles", async () => {
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     vi.mocked(apiClient.get).mockResolvedValueOnce({

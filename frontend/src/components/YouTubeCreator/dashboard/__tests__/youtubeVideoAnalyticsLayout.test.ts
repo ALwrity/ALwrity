@@ -75,4 +75,26 @@ describe("YouTube Video Analytics layout stylesheet", () => {
     expect(dateMenuCss).toMatch(/input\[type=["']date["']\]/);
     expect(dateMenuCss).toMatch(/yt-video-analytics-date__custom-actions/);
   });
+
+  it("keeps Audience layout classes in the feature sheet, not hub layout", () => {
+    const audienceCss = fs.readFileSync(
+      path.join(dashboardDir, "youtubeVideoAnalyticsAudience.css"),
+      "utf8",
+    );
+    expect(hubCss).not.toMatch(/yt-video-analytics-audience/);
+    expect(audienceCss).toMatch(/\.yt-video-analytics-audience \{/);
+    expect(audienceCss).toMatch(/yt-video-analytics-audience__panel/);
+    expect(audienceCss).toMatch(/yt-video-analytics-audience__kpi-title/);
+    expect(audienceCss).toMatch(/flex-direction:\s*column/);
+    expect(audienceCss).toMatch(/border-radius:\s*14px/);
+    expect(audienceCss).toMatch(/#ff0000/);
+    expect(audienceCss).toMatch(/#0f0f0f/);
+    expect(audienceCss).not.toMatch(/#020617/);
+    expect(audienceCss).not.toMatch(/#a855f7/);
+    const audienceSource = fs.readFileSync(
+      path.join(dashboardDir, "modals", "YouTubeVideoAnalyticsAudience.tsx"),
+      "utf8",
+    );
+    expect(audienceSource).not.toMatch(/recharts|PlatformAnalytics|CtrPositionChart/);
+  });
 });

@@ -21,6 +21,7 @@ vi.mock("../../../../services/youtubeStudioApi", async (importOriginal) => {
       getVideoAnalytics: vi.fn(),
       getChannelPulse: vi.fn(),
       getChannelOverview: vi.fn(),
+      getChannelAudience: vi.fn(),
     },
   };
 });
@@ -69,10 +70,33 @@ const OVERVIEW_OK = {
   ],
 };
 
+const AUDIENCE_OK = {
+  success: true,
+  demographics: {
+    available: true,
+    rows: [{ age_group: "age18-24", gender: "female", viewer_percentage: 40 }],
+    message: null,
+  },
+  countries: {
+    available: true,
+    rows: [{ country: "US", label: "US", views: 50, watch_hours: 1.2 }],
+    message: null,
+  },
+  subscribed: {
+    available: true,
+    rows: [
+      { status: "SUBSCRIBED", views: 80, watch_hours: 2 },
+      { status: "UNSUBSCRIBED", views: 20, watch_hours: 0.5 },
+    ],
+    message: null,
+  },
+};
+
 describe("YouTubeVideoAnalyticsModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedStudioApi.getChannelOverview.mockResolvedValue(OVERVIEW_OK);
+    mockedStudioApi.getChannelAudience.mockResolvedValue(AUDIENCE_OK);
   });
 
   it("does not render when closed", () => {
@@ -113,6 +137,7 @@ describe("YouTubeVideoAnalyticsModal", () => {
     expect(mockedStudioApi.getChannelPulse).not.toHaveBeenCalled();
     expect(mockedStudioApi.listChannelVideos).not.toHaveBeenCalled();
     expect(mockedStudioApi.getVideoAnalytics).not.toHaveBeenCalled();
+    expect(mockedStudioApi.getChannelAudience).not.toHaveBeenCalled();
     const logs = info.mock.calls.join(" ");
     expect(logs).toMatch(/\[YouTubeVideoAnalytics\] Open/);
     expect(logs).toMatch(/Overview complete/);
@@ -183,21 +208,33 @@ describe("YouTubeVideoAnalyticsModal", () => {
     );
     expect(screen.queryByText(/Overview metrics will show/)).toBeNull();
     expect(mockedStudioApi.getChannelOverview).toHaveBeenCalledTimes(1);
+    expect(mockedStudioApi.getChannelAudience).not.toHaveBeenCalled();
     expect(mockedStudioApi.getChannelPulse).not.toHaveBeenCalled();
     expect(mockedStudioApi.getVideoAnalytics).not.toHaveBeenCalled();
   });
 
-  it("shows Engagement and Audience waiting copy without fake counts", () => {
+  it("shows Engagement waiting copy and loads Audience from getChannelAudience", async () => {
     render(<YouTubeVideoAnalyticsModal open onClose={vi.fn()} />);
+    await waitFor(() => {
+      expect(mockedStudioApi.getChannelOverview).toHaveBeenCalledTimes(1);
+    });
     fireEvent.click(screen.getByRole("tab", { name: "Engagement" }));
     expect(screen.getByRole("tabpanel", { name: "Engagement" })).toHaveTextContent(
       "Engagement metrics will show here when analytics is connected.",
     );
+    expect(mockedStudioApi.getChannelAudience).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("tab", { name: "Audience" }));
-    expect(screen.getByRole("tabpanel", { name: "Audience" })).toHaveTextContent(
-      "Audience metrics will show here when analytics is connected.",
-    );
-    expect(screen.getByRole("tabpanel")).not.toHaveTextContent(/\d/);
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Age and gender" })).toBeTruthy();
+    });
+    expect(screen.getByText("18–24")).toBeTruthy();
+    expect(screen.getByText("Female")).toBeTruthy();
+    expect(mockedStudioApi.getChannelAudience).toHaveBeenCalledWith({
+      window: "last_28",
+      days: 28,
+    });
+    expect(mockedStudioApi.getChannelPulse).not.toHaveBeenCalled();
+    expect(mockedStudioApi.getVideoAnalytics).not.toHaveBeenCalled();
   });
 
   it("moves to Reach with the right arrow key", () => {

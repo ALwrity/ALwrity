@@ -289,6 +289,28 @@ class YouTubeAnalyticsService:
                 "message": "Channel overview is unavailable for this window.",
             }
 
+    def get_channel_audience(
+        self,
+        user_id: str,
+        days: Optional[int] = None,
+        token_id: Optional[int] = None,
+        window: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> Dict[str, Any]:
+        """Channel Audience for Video Analytics: demographics, countries, subscribed."""
+        from services.youtube.youtube_analytics_audience import load_channel_audience
+
+        return load_channel_audience(
+            self.oauth_service,
+            user_id,
+            days=days,
+            token_id=token_id,
+            window=window,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
     def _overview_previous_window(self, analytics, start: date, end: date) -> Optional[Dict[str, Any]]:
         try:
             report = execute_channel_window(analytics, start, end)
