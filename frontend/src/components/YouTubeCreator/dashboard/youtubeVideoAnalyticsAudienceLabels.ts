@@ -2,6 +2,43 @@
  * Audience Analytics labels — display copy for live dimension values.
  */
 
+export const YOUTUBE_AUDIENCE_HUB_SECTIONS = [
+  {
+    id: "demographics",
+    label: "Age and gender",
+    tooltip: "Viewer share by age and gender for this date range.",
+  },
+  {
+    id: "countries",
+    label: "Top countries",
+    tooltip: "Views and watch time by country for this date range.",
+  },
+  {
+    id: "subscribed",
+    label: "Subscribers watching",
+    tooltip: "Views and watch time from subscribed and unsubscribed viewers.",
+  },
+  {
+    id: "devices",
+    label: "Device type",
+    tooltip: "Watch time share by device for this date range.",
+  },
+] as const;
+
+export type YouTubeAudienceHubSectionId =
+  (typeof YOUTUBE_AUDIENCE_HUB_SECTIONS)[number]["id"];
+
+export function audienceHubSectionLabel(
+  id: YouTubeAudienceHubSectionId | string,
+): string {
+  const match = YOUTUBE_AUDIENCE_HUB_SECTIONS.find((item) => item.id === id);
+  if (!match) {
+    console.error("[YouTubeVideoAnalytics] Audience section unknown", { section: id });
+    return id;
+  }
+  return match.label;
+}
+
 export function ageGroupLabel(ageGroup: string): string {
   const match = /^age(\d+)-(\d+)$/.exec(ageGroup);
   if (match) {

@@ -250,6 +250,21 @@ describe("YouTubeVideoAnalyticsModal", () => {
     expect(mockedStudioApi.getVideoAnalytics).not.toHaveBeenCalled();
   });
 
+  it("does not refetch Audience when switching Hub chips", async () => {
+    render(<YouTubeVideoAnalyticsModal open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Audience" }));
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Age and gender" })).toBeTruthy();
+    });
+    expect(mockedStudioApi.getChannelAudience).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Top countries" }));
+    expect(screen.getByRole("heading", { name: "Top countries" })).toBeTruthy();
+    expect(screen.getByText("US")).toBeTruthy();
+    expect(mockedStudioApi.getChannelAudience).toHaveBeenCalledTimes(1);
+    expect(mockedStudioApi.getChannelPulse).not.toHaveBeenCalled();
+    expect(mockedStudioApi.getVideoAnalytics).not.toHaveBeenCalled();
+  });
+
   it("moves to Audience with the right arrow key from Overview", () => {
     render(<YouTubeVideoAnalyticsModal open onClose={vi.fn()} />);
     fireEvent.keyDown(screen.getByRole("tablist"), { key: "ArrowRight" });

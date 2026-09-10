@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { formatWatchHours } from "../youtubeVideoAnalyticsOverviewStats";
 import {
   ageGroupLabel,
@@ -8,6 +8,9 @@ import {
   genderLabel,
   subscribedStatusLabel,
   viewerPercentBarWidth,
+  audienceHubSectionLabel,
+  YOUTUBE_AUDIENCE_HUB_SECTIONS,
+  type YouTubeAudienceHubSectionId,
 } from "../youtubeVideoAnalyticsAudienceLabels";
 import "../youtubeVideoAnalyticsAudience.css";
 
@@ -63,6 +66,10 @@ export const YouTubeVideoAnalyticsAudience: React.FC<{
   payload: YouTubeChannelAudiencePayload | null;
   status: string | null;
 }> = ({ payload, status }) => {
+  const [section, setSection] = useState<YouTubeAudienceHubSectionId>(
+    "demographics",
+  );
+
   if (status) {
     return <p className="yt-video-analytics-audience__status">{status}</p>;
   }
@@ -86,8 +93,48 @@ export const YouTubeVideoAnalyticsAudience: React.FC<{
   const subscribedRowData = subscribedRow(subscribed, "SUBSCRIBED");
   const unsubscribedRowData = subscribedRow(subscribed, "UNSUBSCRIBED");
 
+  const selectSection = (next: YouTubeAudienceHubSectionId) => {
+    if (next === section) {
+      return;
+    }
+    console.info("[YouTubeVideoAnalytics] Audience section", { section: next });
+    setSection(next);
+  };
+
   return (
     <div className="yt-video-analytics-audience">
+      <div
+        className="yt-video-analytics-audience__chips"
+        role="group"
+        aria-label="Audience sections"
+      >
+        {YOUTUBE_AUDIENCE_HUB_SECTIONS.map((item) => {
+          const active = item.id === section;
+          const tipId = `yt-video-analytics-audience-tip-${item.id}`;
+          return (
+            <span key={item.id} className="yt-video-analytics-audience__chip-wrap">
+              <button
+                type="button"
+                className={
+                  active
+                    ? "yt-video-analytics-audience__chip yt-video-analytics-audience__chip--active"
+                    : "yt-video-analytics-audience__chip"
+                }
+                aria-pressed={active}
+                aria-describedby={tipId}
+                data-tooltip={item.tooltip}
+                onClick={() => selectSection(item.id)}
+              >
+                {item.label}
+              </button>
+              <span id={tipId} className="yt-video-analytics-audience__chip-tip">
+                {item.tooltip}
+              </span>
+            </span>
+          );
+        })}
+      </div>
+      {section === "demographics" ? (
       <section
         className="yt-video-analytics-audience__panel"
         aria-labelledby="yt-video-analytics-audience-demo"
@@ -96,7 +143,7 @@ export const YouTubeVideoAnalyticsAudience: React.FC<{
           id="yt-video-analytics-audience-demo"
           className="yt-video-analytics-audience__title"
         >
-          Age and gender
+          {audienceHubSectionLabel("demographics")}
         </h3>
         {demoRows.length === 0 ? (
           <p className="yt-video-analytics-audience__empty">
@@ -134,6 +181,8 @@ export const YouTubeVideoAnalyticsAudience: React.FC<{
           </table>
         )}
       </section>
+      ) : null}
+      {section === "countries" ? (
       <section
         className="yt-video-analytics-audience__panel"
         aria-labelledby="yt-video-analytics-audience-countries"
@@ -142,7 +191,7 @@ export const YouTubeVideoAnalyticsAudience: React.FC<{
           id="yt-video-analytics-audience-countries"
           className="yt-video-analytics-audience__title"
         >
-          Top countries
+          {audienceHubSectionLabel("countries")}
         </h3>
         {countryRows.length === 0 ? (
           <p className="yt-video-analytics-audience__empty">
@@ -169,6 +218,8 @@ export const YouTubeVideoAnalyticsAudience: React.FC<{
           </table>
         )}
       </section>
+      ) : null}
+      {section === "subscribed" ? (
       <section
         className="yt-video-analytics-audience__panel"
         aria-labelledby="yt-video-analytics-audience-subscribed"
@@ -177,7 +228,7 @@ export const YouTubeVideoAnalyticsAudience: React.FC<{
           id="yt-video-analytics-audience-subscribed"
           className="yt-video-analytics-audience__title"
         >
-          Subscribers watching
+          {audienceHubSectionLabel("subscribed")}
         </h3>
         {!(subscribed?.available) || (subscribed.rows || []).length === 0 ? (
           <p className="yt-video-analytics-audience__empty">
@@ -229,6 +280,8 @@ export const YouTubeVideoAnalyticsAudience: React.FC<{
           </div>
         )}
       </section>
+      ) : null}
+      {section === "devices" ? (
       <section
         className="yt-video-analytics-audience__panel"
         aria-labelledby="yt-video-analytics-audience-devices"
@@ -237,7 +290,7 @@ export const YouTubeVideoAnalyticsAudience: React.FC<{
           id="yt-video-analytics-audience-devices"
           className="yt-video-analytics-audience__title"
         >
-          Device type
+          {audienceHubSectionLabel("devices")}
         </h3>
         <p className="yt-video-analytics-audience__subtitle">Watch time (hours)</p>
         {deviceRows.length === 0 ? (
@@ -276,6 +329,7 @@ export const YouTubeVideoAnalyticsAudience: React.FC<{
           </>
         )}
       </section>
+      ) : null}
     </div>
   );
 };
