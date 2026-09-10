@@ -88,6 +88,44 @@ describe("YouTube Video Analytics layout stylesheet", () => {
     expect(audienceCss).toMatch(/yt-video-analytics-audience__stack/);
     expect(audienceCss).toMatch(/yt-video-analytics-audience__stack-seg/);
     expect(audienceCss).toMatch(/yt-video-analytics-audience__legend/);
+    expect(audienceCss).toMatch(/yt-video-analytics-audience__chips/);
+    expect(audienceCss).toMatch(/yt-video-analytics-audience__chip--active/);
+    expect(audienceCss).toMatch(/attr\(data-tooltip\)/);
+    expect(audienceCss).toMatch(/yt-video-analytics-audience__chip:hover::after/);
+    expect(audienceCss).toMatch(/yt-video-analytics-audience__chip:focus-visible::after/);
+    expect(audienceCss).toMatch(
+      /\.yt-video-analytics-audience__chip::after[\s\S]*background:\s*#fff/,
+    );
+    expect(audienceCss).toMatch(
+      /\.yt-video-analytics-audience__chip::after[\s\S]*color:\s*#0f0f0f/,
+    );
+    expect(audienceCss).toMatch(
+      /\.yt-video-analytics-audience__chip::after[\s\S]*left:\s*0/,
+    );
+    expect(audienceCss).toMatch(
+      /\.yt-video-analytics-audience__chip-wrap:last-child[\s\S]*right:\s*0/,
+    );
+    expect(audienceCss).not.toMatch(
+      /\.yt-video-analytics-audience__chip-wrap:first-child/,
+    );
+    expect(audienceCss).not.toMatch(
+      /\.yt-video-analytics-audience__chip::after[\s\S]*left:\s*50%/,
+    );
+    expect(audienceCss).toMatch(
+      /\.yt-video-analytics-audience__chip:hover[\s\S]*border-color:\s*#ff0000/,
+    );
+    expect(audienceCss).toMatch(
+      /\.yt-video-analytics-audience__chip:hover[\s\S]*scale\(/,
+    );
+    expect(audienceCss).toMatch(
+      /\.yt-video-analytics-audience__chip[\s\S]*outline:\s*none/,
+    );
+    expect(audienceCss).toMatch(
+      /linear-gradient\(135deg,\s*#CC0000 0%,\s*#991B1B 100%\)/,
+    );
+    expect(audienceCss).toMatch(/flex-wrap:\s*wrap/);
+    expect(audienceCss).toMatch(/border-radius:\s*999px/);
+    expect(audienceCss).not.toMatch(/yt-video-analytics-tabs/);
     expect(audienceCss).toMatch(/flex-direction:\s*column/);
     expect(audienceCss).toMatch(/border-radius:\s*14px/);
     expect(audienceCss).toMatch(/#ff0000/);
@@ -99,5 +137,6 @@ describe("YouTube Video Analytics layout stylesheet", () => {
       "utf8",
     );
     expect(audienceSource).not.toMatch(/recharts|PlatformAnalytics|CtrPositionChart/);
+    expect(audienceSource).not.toMatch(/@mui\/material\/Tooltip/);
   });
 });
