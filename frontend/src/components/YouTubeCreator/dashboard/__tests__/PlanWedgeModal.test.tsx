@@ -121,6 +121,7 @@ describe("PlanWedgeModal", () => {
     goCreate: vi.fn(),
     markNotify: vi.fn(),
     notifyKeys: {},
+    onOpenCommunity: vi.fn(),
   };
 
   it("uses a two-column Plan layout with unlocked tools on the right", () => {
@@ -136,14 +137,25 @@ describe("PlanWedgeModal", () => {
     const urlTile = screen.getByRole("button", { name: /Blog \/ URL → Video/i });
     const trends = screen.getByRole("button", { name: /YouTube Trends/i });
     const series = screen.getByRole("button", { name: /Series Planner/i });
+    const community = screen.getByRole("button", { name: /Community Post Ideas/i });
     expect((urlTile as HTMLButtonElement).disabled).toBe(false);
     expect((trends as HTMLButtonElement).disabled).toBe(false);
     expect((series as HTMLButtonElement).disabled).toBe(false);
+    expect((community as HTMLButtonElement).disabled).toBe(false);
 
     fireEvent.click(trends);
     fireEvent.click(series);
     expect(baseProps.goCreate).toHaveBeenCalledTimes(2);
     expect(baseProps.goCreate).toHaveBeenCalledWith({ step: 0 });
+  });
+
+  it("opens Community Post Ideas from Plan without starting Video Creator", () => {
+    render(<PlanWedgeModal {...baseProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Community Post Ideas/i }));
+
+    expect(baseProps.onOpenCommunity).toHaveBeenCalledTimes(1);
+    expect(baseProps.goCreate).not.toHaveBeenCalled();
   });
 
   it("opens Saved Ideas as a drill-down modal and returns to Plan", () => {

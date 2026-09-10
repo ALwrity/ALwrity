@@ -23,6 +23,7 @@ export interface PlanWedgeProps extends WedgeModalBaseProps {
   planAvatarUrl?: string | null;
   onChannelBibleSaved?: (bible: YouTubeChannelBible) => void;
   onCreatorDraftPatched?: (state: YouTubeCreatorState) => void;
+  onOpenCommunity: () => void;
 }
 
 export interface CreateWedgeProps extends WedgeModalBaseProps {
@@ -47,9 +48,7 @@ export interface AnalysisWedgeProps extends GatedWedgeProps {
 }
 
 export interface EngagementWedgeProps extends GatedWedgeProps {
-  creatorState: YouTubeCreatorState;
   onOpenComments: () => void;
-  onOpenCommunity: () => void;
 }
 
 export interface RemarketWedgeProps extends GatedWedgeProps {
