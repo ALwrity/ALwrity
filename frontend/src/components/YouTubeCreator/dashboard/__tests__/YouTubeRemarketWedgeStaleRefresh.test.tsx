@@ -25,6 +25,7 @@ describe("RemarketWedgeModal Stale Video Refresh tile", () => {
         onRequestConnect={onRequestConnect}
         creatorState={emptyCreatorState}
         onOpenStale={onOpenStale}
+        onOpenGaps={vi.fn()}
         onNavigateBlog={vi.fn()}
         onNavigateLibrary={vi.fn()}
       />,
@@ -48,6 +49,7 @@ describe("RemarketWedgeModal Stale Video Refresh tile", () => {
         onRequestConnect={onRequestConnect}
         creatorState={emptyCreatorState}
         onOpenStale={onOpenStale}
+        onOpenGaps={vi.fn()}
         onNavigateBlog={vi.fn()}
         onNavigateLibrary={vi.fn()}
       />,

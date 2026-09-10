@@ -44,9 +44,6 @@ export interface AnalysisWedgeProps extends GatedWedgeProps {
   onOpenPulse: () => void;
   onOpenVideoPerformance: () => void;
   onOpenVideoAnalytics: () => void;
-  onOpenSeo: () => void;
-  onOpenGaps: () => void;
-  onOpenRetention: () => void;
 }
 
 export interface EngagementWedgeProps extends GatedWedgeProps {
@@ -58,6 +55,7 @@ export interface EngagementWedgeProps extends GatedWedgeProps {
 export interface RemarketWedgeProps extends GatedWedgeProps {
   creatorState: YouTubeCreatorState;
   onOpenStale: () => void;
+  onOpenGaps: () => void;
   onNavigateBlog: () => void;
   onNavigateLibrary: () => void;
 }

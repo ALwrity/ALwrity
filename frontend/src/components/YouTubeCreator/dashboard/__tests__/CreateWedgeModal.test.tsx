@@ -45,4 +45,19 @@ describe("CreateWedgeModal — shared goCreate → Full Creator modal", () => {
     fireEvent.click(screen.getByRole("button", { name: /Shorts Fast Path/i }));
     expect(goCreate).toHaveBeenCalledWith({ step: 0, durationType: "shorts" });
   });
+
+  it("still lists SEO Pack Editor so Analysis catalog cleanup does not drop Create SEO", () => {
+    render(
+      <CreateWedgeModal
+        open
+        onClose={vi.fn()}
+        goCreate={vi.fn()}
+        creatorState={emptyCreatorState}
+        onOpenSeo={vi.fn()}
+        onOpenThumb={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /SEO Pack Editor/i })).toBeTruthy();
+  });
 });

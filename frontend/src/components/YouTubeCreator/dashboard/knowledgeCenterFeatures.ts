@@ -88,6 +88,6 @@ export const YOUTUBE_ASK_FAQ: Array<{ q: string; a: string }> = [
   },
   {
     q: "How do I use Analysis?",
-    a: "Open the Analysis wedge for Channel Pulse, video performance, SEO audit, content gaps, and retention. Connect YouTube OAuth for live channel data; plan-based tools work without OAuth.",
+    a: "Open the Analysis wedge for Channel Pulse, Video Performance, and Video Analytics. Connect YouTube OAuth for live channel data. Content Gaps lives on Remarket; SEO audit is on Create.",
   },
 ];
