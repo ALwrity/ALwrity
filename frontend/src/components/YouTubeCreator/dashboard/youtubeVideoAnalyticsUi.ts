@@ -5,9 +5,9 @@
 
 export type YouTubeVideoAnalyticsTabId =
   | "overview"
-  | "reach"
-  | "engagement"
-  | "audience";
+  | "audience"
+  | "content"
+  | "trends";
 
 export type YouTubeVideoAnalyticsPresetId =
   | "last_7"
@@ -21,9 +21,9 @@ export const YOUTUBE_VIDEO_ANALYTICS_TABS: ReadonlyArray<{
   label: string;
 }> = [
   { id: "overview", label: "Overview" },
-  { id: "reach", label: "Reach" },
-  { id: "engagement", label: "Engagement" },
   { id: "audience", label: "Audience" },
+  { id: "content", label: "Content" },
+  { id: "trends", label: "Trends" },
 ];
 
 export const YOUTUBE_VIDEO_ANALYTICS_PRESETS: ReadonlyArray<{
@@ -42,12 +42,15 @@ export const YOUTUBE_VIDEO_ANALYTICS_DEFAULT_TAB: YouTubeVideoAnalyticsTabId =
   "overview";
 
 export function emptyAnalyticsPanelCopy(tab: YouTubeVideoAnalyticsTabId): string {
-  const label = YOUTUBE_VIDEO_ANALYTICS_TABS.find((item) => item.id === tab)?.label;
-  if (!label) {
+  const item = YOUTUBE_VIDEO_ANALYTICS_TABS.find((entry) => entry.id === tab);
+  if (!item) {
     console.warn("[YouTubeVideoAnalytics] Unknown tab");
     return "Metrics will show here when analytics is connected.";
   }
-  return `${label} metrics will show here when analytics is connected.`;
+  if (tab === "content" || tab === "trends") {
+    return `${item.label} analytics is coming soon.`;
+  }
+  return `${item.label} metrics will show here when analytics is connected.`;
 }
 
 export function nextAnalyticsTab(

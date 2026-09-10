@@ -58,7 +58,7 @@ describe("AnalysisWedgeModal Video Analytics tile", () => {
   it("describes the four Studio analytics tabs", () => {
     renderAnalysis();
     expect(
-      screen.getByText("Overview, Reach, Engagement, and Audience for your videos."),
+      screen.getByText("Overview, Audience, Content, and Trends for your videos."),
     ).toBeTruthy();
   });
 });

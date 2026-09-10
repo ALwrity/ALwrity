@@ -22,6 +22,7 @@ describe("YouTube Video Analytics layout stylesheet", () => {
     expect(analyticsCss).toMatch(/\.yt-video-analytics-toolbar/);
     expect(analyticsCss).toMatch(/\.yt-video-analytics-tabs/);
     expect(analyticsCss).toMatch(/\.yt-video-analytics-tab--active/);
+    expect(analyticsCss).not.toMatch(/yt-video-analytics-tab__soon/);
     expect(analyticsCss).toMatch(/\.yt-video-analytics-date/);
     expect(analyticsCss).toMatch(/#0f0f0f/);
     expect(analyticsCss).toMatch(/#606060/);
