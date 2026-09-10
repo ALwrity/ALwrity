@@ -1,4 +1,5 @@
 import { normalizeOnboardingUrl } from '../common/onboardingSessionKey';
+import { shouldRestoreStepArtifacts } from '../common/onboardingArtifactRestore';
 import { shouldMergeBackendDownstreamSteps } from '../common/wizardLiveWebsiteSession';
 
 const LOG_PREFIX = '[onboarding:competitor-restore]';
@@ -34,9 +35,13 @@ export function hasPersistedResearchPayload(
   if (!data || typeof data !== 'object') return false;
   const competitors = data.competitors;
   const summary = data.researchSummary || data.research_summary;
+  const pillars = data.content_pillars;
   return (
     (Array.isArray(competitors) && competitors.length > 0) ||
-    !!summary
+    !!summary ||
+    (pillars !== null &&
+      typeof pillars === 'object' &&
+      Object.keys(pillars as object).length > 0)
   );
 }
 
@@ -109,18 +114,31 @@ export function mapDbCompetitorsToUi(records: DbCompetitorRecord[]) {
   });
 }
 
+export interface HydrateResearchOptions {
+  /** Init API step 2 has_data — artifacts exist without official Continue. */
+  backendHasData: boolean;
+  isStartFreshSession: boolean;
+}
+
 export function shouldHydrateResearchFromBackend(
   stepData: Record<string, unknown> | null | undefined,
   backendResearch: Record<string, unknown> | null | undefined,
   backendConnectWebsite: string | undefined,
   liveWebsiteUrl: string,
-  researchStepCompleted: boolean
+  options: HydrateResearchOptions
 ): boolean {
-  if (!researchStepCompleted) return false;
-  if (hasPersistedResearchPayload(stepData)) return false;
-  if (!hasPersistedResearchPayload(backendResearch)) return false;
+  const hasBackendPayload =
+    options.backendHasData || hasPersistedResearchPayload(backendResearch);
 
-  return shouldMergeBackendDownstreamSteps(backendConnectWebsite, liveWebsiteUrl);
+  return shouldRestoreStepArtifacts({
+    hasData: hasBackendPayload,
+    websiteMatch: shouldMergeBackendDownstreamSteps(
+      backendConnectWebsite,
+      liveWebsiteUrl
+    ),
+    isStartFreshSession: options.isStartFreshSession,
+    stepDataAlreadyHasPayload: hasPersistedResearchPayload(stepData),
+  });
 }
 
 export function mergeResearchSeedIntoStepData(

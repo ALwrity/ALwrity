@@ -12,6 +12,7 @@ import {
   shouldHydrateResearchFromBackend,
 } from '../CompetitorAnalysisStep/competitorResearchRestore';
 import { readLiveWebsiteUrlFromStorage } from '../common/wizardLiveWebsiteSession';
+import { isWebsiteStartFreshSession } from '../utils/onboardingWebsiteReset';
 
 interface StepHeaderContent {
   title: string;
@@ -50,6 +51,8 @@ export interface WizardStepContentProps {
   onLiveWebsiteSessionChange?: (payload: { website: string; analysis: any }) => void;
   backendResearchData?: Record<string, unknown> | null;
   backendConnectWebsite?: string;
+  backendStep2HasData?: boolean;
+  onResearchSessionChange?: (payload: Record<string, unknown>) => void;
 }
 
 export const WizardStepContent: React.FC<WizardStepContentProps> = ({
@@ -81,6 +84,8 @@ export const WizardStepContent: React.FC<WizardStepContentProps> = ({
   onLiveWebsiteSessionChange,
   backendResearchData = null,
   backendConnectWebsite = '',
+  backendStep2HasData = false,
+  onResearchSessionChange,
 }) => {
   const liveWebsiteUrl =
     stepData?.website ||
@@ -94,7 +99,10 @@ export const WizardStepContent: React.FC<WizardStepContentProps> = ({
       backendResearchData,
       backendConnectWebsite,
       liveWebsiteUrl,
-      completedFrontier >= 1
+      {
+        backendHasData: backendStep2HasData,
+        isStartFreshSession: isWebsiteStartFreshSession(),
+      }
     ) && backendResearchData
       ? mergeResearchSeedIntoStepData(stepData, backendResearchData, backendConnectWebsite)
       : stepData;
@@ -149,6 +157,8 @@ export const WizardStepContent: React.FC<WizardStepContentProps> = ({
         industryContext={stepData?.industryContext}
         initialData={researchInitialData}
         researchStepCompleted={completedFrontier >= 1}
+        backendResearchHasData={backendStep2HasData}
+        onResearchSessionChange={onResearchSessionChange}
         onDataReady={handleCompetitorDataReady}
         onValidationChange={onStep1Valid}
       />

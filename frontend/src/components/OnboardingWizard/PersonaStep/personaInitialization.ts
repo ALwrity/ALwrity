@@ -28,6 +28,15 @@ interface PersonaInitializationProps {
   generatePersonas: (force?: boolean) => Promise<void>;
 }
 
+export function hasRestorablePersonaStepData(
+  stepData?: PersonaInitializationProps['stepData']
+): boolean {
+  if (!stepData) return false;
+  if (stepData.corePersona) return true;
+  const platforms = stepData.platformPersonas;
+  return !!platforms && typeof platforms === 'object' && Object.keys(platforms).length > 0;
+}
+
 export const usePersonaInitialization = ({
   websiteSessionKey,
   stepData,
@@ -67,7 +76,7 @@ export const usePersonaInitialization = ({
       return;
     }
 
-    if (stepData?.corePersona) {
+    if (hasRestorablePersonaStepData(stepData)) {
       console.log('PersonaStep: Loading persona data from stepData (navigation back)');
       setCorePersona(stepData.corePersona);
       setPlatformPersonas(stepData.platformPersonas || {});

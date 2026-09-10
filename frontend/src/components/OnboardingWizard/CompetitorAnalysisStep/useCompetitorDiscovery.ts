@@ -11,6 +11,8 @@ import {
   readCompetitorCacheSessionKey,
   writeCompetitorCacheSessionKey,
 } from './competitorDiscoveryCache';
+import { shouldSkipExpensiveStepRerun } from '../common/onboardingArtifactRestore';
+import { isWebsiteStartFreshSession } from '../utils/onboardingWebsiteReset';
 import {
   canTrustBackendResearchData,
   mapDbCompetitorsToUi,
@@ -23,6 +25,8 @@ interface UseCompetitorDiscoveryProps {
   sitemapAnalysis: any;
   mergeCrawlSocialMedia: (exaData: Record<string, any>) => Record<string, any>;
   researchStepCompleted?: boolean;
+  backendResearchHasData?: boolean;
+  onResearchSessionChange?: (payload: Record<string, unknown>) => void;
 }
 
 interface UseCompetitorDiscoveryReturn {
@@ -42,6 +46,7 @@ interface UseCompetitorDiscoveryReturn {
   analysisStep: string;
   showProgressModal: boolean;
   usingCachedData: boolean;
+  isRestoring: boolean;
   startCompetitorDiscovery: (force?: boolean) => Promise<void>;
   loadCachedAnalysis: () => boolean;
   updateCacheWithSitemapAnalysis: (sitemapResult: any) => void;
@@ -55,6 +60,8 @@ export function useCompetitorDiscovery({
   sitemapAnalysis,
   mergeCrawlSocialMedia,
   researchStepCompleted = false,
+  backendResearchHasData = false,
+  onResearchSessionChange,
 }: UseCompetitorDiscoveryProps): UseCompetitorDiscoveryReturn {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -69,6 +76,9 @@ export function useCompetitorDiscovery({
   const [error, setError] = useState<string | null>(null);
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [usingCachedData, setUsingCachedData] = useState(!!(initialData?.competitors?.length > 0));
+  const [isRestoring, setIsRestoring] = useState(
+    initialData === undefined || initialData === null
+  );
 
   const initializationStarted = useRef(false);
   const crawlSocialMediaRef = useRef<Record<string, string>>({});
@@ -124,11 +134,15 @@ export function useCompetitorDiscovery({
           Date.now().toString()
         );
         writeCompetitorCacheSessionKey(sessionKey);
+        onResearchSessionChange?.({
+          ...analysisData,
+          userUrl: finalUserUrl,
+        });
       } catch (cacheErr) {
         console.warn('[useCompetitorDiscovery] Failed to cache competitor analysis:', cacheErr);
       }
     },
-    []
+    [onResearchSessionChange]
   );
 
   const loadCachedAnalysis = useCallback((): boolean => {
@@ -425,10 +439,15 @@ export function useCompetitorDiscovery({
       // Wait until the Wizard has loaded the backend step data. On the first
       // render initialData can be null, which would otherwise cause an
       // unnecessary AI call. When it populates, the effect re-runs.
-      if (initialData === undefined || initialData === null) return;
+      if (initialData === undefined || initialData === null) {
+        setIsRestoring(true);
+        return;
+      }
 
       initializationStarted.current = true;
+      setIsRestoring(true);
 
+      try {
       const crawlData = initialData?.crawl_social_media || initialData?.crawlResult?.content?.social_media || {};
       if (Object.keys(crawlData).length > 0) {
         crawlSocialMediaRef.current = crawlData;
@@ -480,16 +499,24 @@ export function useCompetitorDiscovery({
         return;
       }
 
-      // 4. Completed research should not silently re-run expensive discovery
-      if (researchStepCompleted) {
+      // 4. Saved research artifacts should not silently re-run expensive discovery
+      if (
+        shouldSkipExpensiveStepRerun({
+          hasRestorableArtifacts: backendResearchHasData || researchStepCompleted,
+          isStartFreshSession: isWebsiteStartFreshSession(),
+        })
+      ) {
         console.warn(
-          '[useCompetitorDiscovery] Research step is completed but no persisted research was found. Use Run Fresh Analysis to regenerate.'
+          '[useCompetitorDiscovery] Research artifacts exist but could not be restored locally. Use Run Fresh Analysis to regenerate.'
         );
         return;
       }
 
       // 5. First-time research only
       await startCompetitorDiscovery(false);
+      } finally {
+        setIsRestoring(false);
+      }
     };
 
     initialize();
@@ -504,6 +531,7 @@ export function useCompetitorDiscovery({
     persistCompetitorCache,
     userUrl,
     researchStepCompleted,
+    backendResearchHasData,
   ]);
 
   return {
@@ -523,6 +551,7 @@ export function useCompetitorDiscovery({
     analysisStep,
     showProgressModal,
     usingCachedData,
+    isRestoring,
     startCompetitorDiscovery,
     loadCachedAnalysis,
     updateCacheWithSitemapAnalysis,

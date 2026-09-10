@@ -11,9 +11,11 @@ import { useOnboardingResumeToast } from './common/useOnboardingResumeToast';
 import {
   resolveCurrentWebsiteSessionKey,
 } from './common/onboardingStorageKeys';
+import type { OnboardingArtifactStep } from './common/onboardingArtifactRestore';
+import { useOnboardingArtifactRestoreToast } from './common/useOnboardingArtifactRestoreToast';
 import {
   applyLiveWebsiteSessionToStepData,
-  mergeOnboardingSeedIntoStepData,
+  mergeArtifactAwareSeedIntoStepData,
   readLiveWebsiteAnalysisFromStorage,
   readLiveWebsiteUrlFromStorage,
 } from './common/wizardLiveWebsiteSession';
@@ -33,11 +35,13 @@ import {
   applyDownstreamDirtyProgressOverride,
   clearDownstreamDirtyFlag,
   clearDownstreamLocalCaches,
+  isEffectiveStartFreshSession,
   isWebsiteStartFreshSession,
   setCommittedStep1WebsiteUrl,
   stripDownstreamStepData,
 } from './utils/onboardingWebsiteReset';
 import { invalidateDownstreamOnboardingSteps } from '../../api/onboarding';
+import { buildResearchStepDataPatch } from './utils/onboardingResearchSessionChange';
 import { WizardStepContent } from './Wizard/WizardStepContent';
 import { useWizardStepAdvance, useWizardStepRetry } from './Wizard/useWizardStepAdvance';
 import { WizardShell } from './Wizard/WizardShell';
@@ -82,6 +86,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   const [retryNextStep, setRetryNextStep] = useState<number>(0);
   // sessionId removed - backend uses Clerk user ID from auth token
   const [stepData, setStepData] = useState<any>(null);
+  const [lastRestoredSteps, setLastRestoredSteps] = useState<OnboardingArtifactStep[]>([]);
   const [downstreamLocked, setDownstreamLocked] = useState<boolean>(() => {
     try {
       return localStorage.getItem('onboarding_downstream_dirty') === 'true';
@@ -170,7 +175,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   const isConnectStepOfficiallyComplete = completedFrontier >= 0 && !downstreamLocked;
 
   useEffect(() => {
-    if (isConnectStepOfficiallyComplete) {
+    if (isConnectStepOfficiallyComplete && !isEffectiveStartFreshSession()) {
       setDownstreamLocked(false);
       clearDownstreamDirtyFlag();
     }
@@ -184,6 +189,20 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     isCompleted: isOnboardingComplete,
     stepLabels: steps.map((step) => step.label),
   });
+
+  const { restoreToast, dismissRestoreToast } = useOnboardingArtifactRestoreToast({
+    loading,
+    activeStep,
+    backendSteps: data?.onboarding?.steps,
+    isStartFreshSession: isWebsiteStartFreshSession(),
+    restoredSteps: lastRestoredSteps,
+  });
+
+  const displayResumeToast = restoreToast ?? resumeToast;
+  const handleDismissResumeToast = useCallback(() => {
+    dismissRestoreToast();
+    dismissResumeToast();
+  }, [dismissRestoreToast, dismissResumeToast]);
 
   // Prevent activeStep from sitting ahead of what completion_percentage unlocks.
   useEffect(() => {
@@ -306,7 +325,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       }
 
       try {
-        await refresh();
+        await refresh({ silent: reason === 'start_fresh' });
       } catch (err) {
         console.error('[Wizard] Refresh after website analysis change failed:', err);
       }
@@ -371,25 +390,43 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       const liveWebsiteUrl = readLiveWebsiteUrlFromStorage();
       const liveAnalysis = readLiveWebsiteAnalysisFromStorage();
 
-      setStepData((prev: any) =>
-        mergeOnboardingSeedIntoStepData(
+      const seedPayload = {
+        connect: {
+          data: step1Data?.data || null,
+          hasData: step1Data?.has_data === true,
+        },
+        research: {
+          data: step2Data?.data || null,
+          hasData: step2Data?.has_data === true,
+        },
+        personalization: {
+          data: step3Data?.data || null,
+          hasData: step3Data?.has_data === true,
+        },
+      };
+
+      setStepData((prev: any) => {
+        const { stepData: merged, restoredSteps } = mergeArtifactAwareSeedIntoStepData(
           prev,
-          {
-            connect: step1Data?.data || null,
-            research: step2Data?.data || null,
-            personalization: step3Data?.data || null,
-          },
+          seedPayload,
           liveWebsiteUrl,
           liveAnalysis,
-          { suppressBackendConnectSeed: isWebsiteStartFreshSession() }
-        )
-      );
+          { suppressBackendConnectSeed: isEffectiveStartFreshSession() }
+        );
+        setLastRestoredSteps(restoredSteps);
+        return merged;
+      });
 
       if (step1Data?.data) {
         const d = step1Data.data;
         const committedWebsite = d.website || d.website_url;
-        const connectOfficiallyComplete = completedFrontier >= 0;
-        if (committedWebsite && connectOfficiallyComplete && step1Data.status === 'completed') {
+        const connectHasRestorableData =
+          step1Data.has_data === true || step1Data.status === 'completed';
+        if (
+          committedWebsite &&
+          connectHasRestorableData &&
+          !isEffectiveStartFreshSession()
+        ) {
           setCommittedStep1WebsiteUrl(committedWebsite);
           setDownstreamLocked(false);
           commitConnectStepSnapshot(step1Data.data);
@@ -616,6 +653,13 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     []
   );
 
+  const handleResearchSessionChange = useCallback((payload: Record<string, unknown>) => {
+    setStepData((prev: any) => ({
+      ...prev,
+      ...buildResearchStepDataPatch(payload),
+    }));
+  }, []);
+
   const handleStepDataChange = useCallback((data: any) => {
     trace('Wizard: handleStepDataChange:', data ? Object.keys(data) : 'empty');
     setStepData((prev: any) => ({
@@ -632,6 +676,11 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   const backendResearchData = useMemo(() => {
     const step2 = data?.onboarding?.steps?.find((s: any) => s.step_number === 2);
     return (step2?.data as Record<string, unknown> | undefined) || null;
+  }, [data?.onboarding?.steps]);
+
+  const backendStep2HasData = useMemo(() => {
+    const step2 = data?.onboarding?.steps?.find((s: any) => s.step_number === 2);
+    return step2?.has_data === true;
   }, [data?.onboarding?.steps]);
 
   const renderStepContent = (step: number) => (
@@ -663,8 +712,10 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       handleStepDataChange={handleStepDataChange}
       onWebsiteAnalysisChanged={handleWebsiteAnalysisChanged}
       onLiveWebsiteSessionChange={handleLiveWebsiteSessionChange}
+      onResearchSessionChange={handleResearchSessionChange}
       backendResearchData={backendResearchData}
       backendConnectWebsite={backendConnectWebsite}
+      backendStep2HasData={backendStep2HasData}
     />
   );
 
@@ -681,8 +732,8 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       showProgressMessage={showProgressMessage}
       progressMessage={progressMessage}
       progressMessageIsError={progressMessageIsError}
-      resumeToast={resumeToast}
-      onDismissResumeToast={dismissResumeToast}
+      resumeToast={displayResumeToast}
+      onDismissResumeToast={handleDismissResumeToast}
       showHelp={showHelp}
       isMobile={isMobile}
       email={email}
