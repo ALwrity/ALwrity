@@ -10,17 +10,11 @@ function renderAnalysis(overrides: {
   onOpenVideoPerformance?: () => void;
   onOpenVideoAnalytics?: () => void;
   onOpenPulse?: () => void;
-  onOpenSeo?: () => void;
-  onOpenGaps?: () => void;
-  onOpenRetention?: () => void;
   onRequestConnect?: () => void;
 } = {}) {
   const onOpenVideoPerformance = overrides.onOpenVideoPerformance ?? vi.fn();
   const onOpenVideoAnalytics = overrides.onOpenVideoAnalytics ?? vi.fn();
   const onOpenPulse = overrides.onOpenPulse ?? vi.fn();
-  const onOpenSeo = overrides.onOpenSeo ?? vi.fn();
-  const onOpenGaps = overrides.onOpenGaps ?? vi.fn();
-  const onOpenRetention = overrides.onOpenRetention ?? vi.fn();
   const onRequestConnect = overrides.onRequestConnect ?? vi.fn();
   render(
     <AnalysisWedgeModal
@@ -32,18 +26,12 @@ function renderAnalysis(overrides: {
       onOpenPulse={onOpenPulse}
       onOpenVideoPerformance={onOpenVideoPerformance}
       onOpenVideoAnalytics={onOpenVideoAnalytics}
-      onOpenSeo={onOpenSeo}
-      onOpenGaps={onOpenGaps}
-      onOpenRetention={onOpenRetention}
     />,
   );
   return {
     onOpenVideoPerformance,
     onOpenVideoAnalytics,
     onOpenPulse,
-    onOpenSeo,
-    onOpenGaps,
-    onOpenRetention,
     onRequestConnect,
   };
 }
@@ -72,23 +60,20 @@ describe("AnalysisWedgeModal Video Performance tile", () => {
     expect(onRequestConnect).not.toHaveBeenCalled();
   });
 
-  it("does not open Pulse, SEO, Gaps, or Retention from Video Performance", () => {
+  it("does not open Pulse or Video Analytics from Video Performance", () => {
     const handlers = renderAnalysis({ connected: true });
 
     fireEvent.click(screen.getByRole("button", { name: /Video Performance/i }));
 
     expect(handlers.onOpenVideoPerformance).toHaveBeenCalledTimes(1);
     expect(handlers.onOpenPulse).not.toHaveBeenCalled();
-    expect(handlers.onOpenSeo).not.toHaveBeenCalled();
-    expect(handlers.onOpenGaps).not.toHaveBeenCalled();
-    expect(handlers.onOpenRetention).not.toHaveBeenCalled();
     expect(handlers.onOpenVideoAnalytics).not.toHaveBeenCalled();
   });
 
-  it("describes recent uploads with view and like signals", () => {
+  it("describes recent uploads with public views, likes, and comments", () => {
     renderAnalysis();
     expect(
-      screen.getByText("Recent uploads with view/like signals from your channel."),
+      screen.getByText("Recent uploads with public views, likes, and comments."),
     ).toBeTruthy();
   });
 });
