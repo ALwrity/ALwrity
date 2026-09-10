@@ -24,6 +24,9 @@ describe("YouTube Video Analytics layout stylesheet", () => {
     expect(analyticsCss).toMatch(/\.yt-video-analytics-tab--active/);
     expect(analyticsCss).not.toMatch(/yt-video-analytics-tab__soon/);
     expect(analyticsCss).toMatch(/\.yt-video-analytics-date/);
+    expect(analyticsCss).toMatch(/\.yt-video-analytics-progress/);
+    expect(hubCss).not.toMatch(/yt-video-analytics-progress/);
+    expect(analyticsCss).not.toMatch(/yt-comment-action-progress/);
     expect(analyticsCss).toMatch(/#0f0f0f/);
     expect(analyticsCss).toMatch(/#606060/);
     expect(analyticsCss).toMatch(/@media \(max-width:\s*720px\)/);
