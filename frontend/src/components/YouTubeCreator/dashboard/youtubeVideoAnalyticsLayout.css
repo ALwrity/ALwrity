@@ -80,6 +80,10 @@
   min-height: 120px;
 }
 
+.yt-video-analytics-progress {
+  margin: 0;
+}
+
 @media (max-width: 720px) {
   .yt-video-analytics-toolbar {
     flex-direction: column;
