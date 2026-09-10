@@ -98,7 +98,8 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
   const publishDrillOpen =
     coachOpen || costOpen || videosOpen || scheduleOpen || playlistOpen;
   const analysisDrillOpen = pulseOpen || performanceOpen || videoAnalyticsOpen;
-  const engagementDrillOpen = commentsOpen || communityOpen;
+  const engagementDrillOpen = commentsOpen;
+  const planDrillOpen = communityOpen;
   const remarketDrillOpen = staleOpen || gapsOpen;
 
   const markNotify = useCallback((key: string) => {
@@ -183,7 +184,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
   return (
     <>
       <PlanWedgeModal
-        open={activeModal === "plan"}
+        open={activeModal === "plan" && !planDrillOpen}
         onClose={onClose}
         goCreate={goCreate}
         markNotify={markNotify}
@@ -192,6 +193,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         planAvatarUrl={creatorState.avatarUrl || null}
         onChannelBibleSaved={onChannelBibleSaved}
         onCreatorDraftPatched={onCreatorDraftPatched}
+        onOpenCommunity={() => setCommunityOpen(true)}
       />
       <CreateWedgeModal
         open={activeModal === "create" && !createDrillOpen && !fullCreatorOpen}
@@ -236,9 +238,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         goCreate={goCreate}
         connected={connected}
         onRequestConnect={onRequestConnect}
-        creatorState={creatorState}
         onOpenComments={() => setCommentsOpen(true)}
-        onOpenCommunity={() => setCommunityOpen(true)}
       />
       <RemarketWedgeModal
         open={activeModal === "remarket" && !remarketDrillOpen}
