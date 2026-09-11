@@ -40,7 +40,7 @@ async def restore_website_analysis_tasks(scheduler):
             try:
                 db = get_session_for_user(user_id)
                 if not db:
-                    logger.warning(f"[Website Analysis Restoration] Could not get database session for user {user_id}")
+                    logger.trace(f"[Website Analysis Restoration] Could not get database session for user {user_id}")
                     continue
                 
                 try:
@@ -53,8 +53,8 @@ async def restore_website_analysis_tasks(scheduler):
                         ).all()
                         total_existing_tasks += len(existing_user_tasks)
                     except Exception as table_error:
-                        logger.error(
-                            f"[Website Analysis Restoration] ⚠️ WebsiteAnalysisTask table may not exist for user {user_id}: {table_error}"
+                        logger.trace(
+                            f"[Website Analysis Restoration] WebsiteAnalysisTask table missing for user {user_id}: {table_error}"
                         )
                         continue
                     
@@ -81,8 +81,8 @@ async def restore_website_analysis_tasks(scheduler):
                         if not is_completed:
                             continue
                             
-                        logger.warning(
-                            f"[Website Analysis Restoration] ⚠️ User {user_id} completed onboarding "
+                        logger.trace(
+                            f"[Website Analysis Restoration] User {user_id} completed onboarding "
                             f"but has no website analysis tasks. Creating tasks..."
                         )
                         
@@ -100,19 +100,19 @@ async def restore_website_analysis_tasks(scheduler):
                             replace_existing=True,
                         )
                         total_created += 1
-                        logger.warning(
-                            f"[Website Analysis Restoration] ✅ Scheduled website analysis task creation "
+                        logger.trace(
+                            f"[Website Analysis Restoration] Scheduled website analysis task creation "
                             f"for user {user_id} at {run_date.isoformat()}"
                         )
                             
                     except Exception as e:
-                        logger.warning(f"[Website Analysis Restoration] Could not check onboarding for user {user_id}: {e}")
+                        logger.trace(f"[Website Analysis Restoration] Could not check onboarding for user {user_id}: {e}")
                         
                 finally:
                     db.close()
                     
             except Exception as e:
-                logger.warning(f"[Website Analysis Restoration] Error processing user {user_id}: {e}")
+                logger.trace(f"[Website Analysis Restoration] Error processing user {user_id}: {e}")
         
         logger.info(
             f"[Website Analysis Restoration] ✅ Completed. "

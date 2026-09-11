@@ -21,6 +21,7 @@ import CalendarIcon from '@mui/icons-material/CalendarToday';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import SearchIcon from '@mui/icons-material/Search';
 import AIInsightsIcon from '@mui/icons-material/Lightbulb';
+import SchemaIcon from '@mui/icons-material/Schema';
 import CloseIcon from '@mui/icons-material/Close';
 import CreateIcon from '@mui/icons-material/Add';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -30,8 +31,10 @@ import AnalyticsTab from './tabs/AnalyticsTab';
 import GapAnalysisTab from './tabs/GapAnalysisTab';
 import CreateTab from './tabs/CreateTab';
 import AIInsightsPanel from './components/AIInsightsPanel';
+import SemanticIndexCard from './components/SemanticIndexCard';
 import SystemStatusIndicator from './components/SystemStatusIndicator';
 import ProgressIndicator from './components/ProgressIndicator';
+import { isStrategySifCardEnabled } from '../../config/strategySifConfig';
 import { useContentPlanningStore } from '../../stores/contentPlanningStore';
 import { 
   contentPlanningOrchestrator, 
@@ -276,6 +279,7 @@ const ContentPlanningDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [aiInsightsDrawerOpen, setAiInsightsDrawerOpen] = useState(false);
+  const [semanticDrawerOpen, setSemanticDrawerOpen] = useState(false);
 
   const { 
     updateStrategies,
@@ -375,6 +379,34 @@ const ContentPlanningDashboard: React.FC = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <SystemStatusIndicator />
             
+            {/* Semantic Dashboard — opens the Semantic Index card in a drawer */}
+            {isStrategySifCardEnabled() && (
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Button
+                  variant="outlined"
+                  startIcon={<SchemaIcon />}
+                  onClick={() => setSemanticDrawerOpen(true)}
+                  data-testid="semantic-dashboard-chip"
+                  sx={{
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    borderColor: 'primary.main',
+                    color: 'primary.main',
+                    '&:hover': {
+                      borderColor: 'primary.dark',
+                      backgroundColor: 'rgba(102, 126, 234, 0.08)'
+                    }
+                  }}
+                >
+                  Semantic Dashboard
+                </Button>
+              </motion.div>
+            )}
+
             {/* AI Insights Button with Badge */}
             <motion.div
               whileHover={{ scale: 1.05 }}
@@ -492,6 +524,31 @@ const ContentPlanningDashboard: React.FC = () => {
           </Box>
         </Box>
         <AIInsightsPanel />
+      </Drawer>
+
+      {/* Semantic Index Dashboard Drawer */}
+      <Drawer
+        anchor="right"
+        open={semanticDrawerOpen}
+        onClose={() => setSemanticDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            width: { xs: '100%', sm: 420 },
+            maxWidth: '100vw'
+          }
+        }}
+      >
+        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">Semantic Dashboard</Typography>
+            <IconButton onClick={() => setSemanticDrawerOpen(false)} aria-label="Close semantic dashboard">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </Box>
+        <Box sx={{ p: 2, overflowY: 'auto' }}>
+          <SemanticIndexCard />
+        </Box>
       </Drawer>
         </Container>
       </StrategyCalendarProvider>

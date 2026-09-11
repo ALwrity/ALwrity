@@ -29,6 +29,7 @@ import {
   YouTubeVideoAnalyticsAudience,
   type YouTubeChannelAudiencePayload,
 } from "./YouTubeVideoAnalyticsAudience";
+import { YouTubeVideoAnalyticsProgressPanel } from "../YouTubeVideoAnalyticsProgressPanel";
 import "../youtubeVideoAnalyticsLayout.css";
 
 const OVERVIEW_LOAD_FAILED = "Channel overview request failed.";
@@ -49,9 +50,11 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
   const [overviewPayload, setOverviewPayload] =
     useState<YouTubeChannelOverviewPayload | null>(null);
   const [overviewStatus, setOverviewStatus] = useState<string | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(false);
   const [audiencePayload, setAudiencePayload] =
     useState<YouTubeChannelAudiencePayload | null>(null);
   const [audienceStatus, setAudienceStatus] = useState<string | null>(null);
+  const [audienceLoading, setAudienceLoading] = useState(false);
   const today = useMemo(() => new Date(), [open]);
   const rangeLabel = formatSelectionRange(selection, today);
   const presetLabel = selectionLabel(selection);
@@ -76,6 +79,7 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
     const params = toOverviewRequest(selection, today);
     if (!params) {
       setOverviewPayload(null);
+      setOverviewLoading(false);
       setOverviewStatus(YOUTUBE_VIDEO_ANALYTICS_WINDOW_UNSUPPORTED);
       console.info("[YouTubeVideoAnalytics] Overview skipped", {
         reason: "window_unsupported",
@@ -84,7 +88,8 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
     }
     let cancelled = false;
     setOverviewPayload(null);
-    setOverviewStatus("Loading channel overview.");
+    setOverviewStatus(null);
+    setOverviewLoading(true);
     console.info("[YouTubeVideoAnalytics] Overview start", {
       window: params.window,
       days: params.days,
@@ -103,6 +108,7 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
             window: params.window,
           });
           setOverviewPayload(payload || null);
+          setOverviewLoading(false);
           setOverviewStatus(payload?.message || OVERVIEW_LOAD_FAILED);
           return;
         }
@@ -115,6 +121,7 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
             : 0,
         });
         setOverviewPayload(payload);
+        setOverviewLoading(false);
         setOverviewStatus(null);
       })
       .catch((loadError: unknown) => {
@@ -126,10 +133,12 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
           window: params.window,
         });
         setOverviewPayload(null);
+        setOverviewLoading(false);
         setOverviewStatus(OVERVIEW_LOAD_FAILED);
       });
     return () => {
       cancelled = true;
+      setOverviewLoading(false);
     };
   }, [open, tab, selection, today]);
 
@@ -140,6 +149,7 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
     const params = toOverviewRequest(selection, today);
     if (!params) {
       setAudiencePayload(null);
+      setAudienceLoading(false);
       setAudienceStatus(YOUTUBE_VIDEO_ANALYTICS_WINDOW_UNSUPPORTED);
       console.info("[YouTubeVideoAnalytics] Audience skipped", {
         reason: "window_unsupported",
@@ -148,7 +158,8 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
     }
     let cancelled = false;
     setAudiencePayload(null);
-    setAudienceStatus("Loading channel audience.");
+    setAudienceStatus(null);
+    setAudienceLoading(true);
     console.info("[YouTubeVideoAnalytics] Audience start", {
       window: params.window,
       days: params.days,
@@ -167,6 +178,7 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
             window: params.window,
           });
           setAudiencePayload(payload || null);
+          setAudienceLoading(false);
           setAudienceStatus(payload?.message || AUDIENCE_LOAD_FAILED);
           return;
         }
@@ -181,8 +193,12 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
           subscribedCount: Array.isArray(payload.subscribed?.rows)
             ? payload.subscribed.rows.length
             : 0,
+          deviceCount: Array.isArray(payload.devices?.rows)
+            ? payload.devices.rows.length
+            : 0,
         });
         setAudiencePayload(payload);
+        setAudienceLoading(false);
         setAudienceStatus(null);
       })
       .catch((loadError: unknown) => {
@@ -194,10 +210,12 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
           window: params.window,
         });
         setAudiencePayload(null);
+        setAudienceLoading(false);
         setAudienceStatus(AUDIENCE_LOAD_FAILED);
       });
     return () => {
       cancelled = true;
+      setAudienceLoading(false);
     };
   }, [open, tab, selection, today]);
 
@@ -309,7 +327,11 @@ export const YouTubeVideoAnalyticsModal: React.FC<{
         id={`yt-video-analytics-panel-${tab}`}
         aria-labelledby={`yt-video-analytics-tab-${tab}`}
       >
-        {tab === "overview" ? (
+        {tab === "overview" && overviewLoading ? (
+          <YouTubeVideoAnalyticsProgressPanel fetch="overview" />
+        ) : tab === "audience" && audienceLoading ? (
+          <YouTubeVideoAnalyticsProgressPanel fetch="audience" />
+        ) : tab === "overview" ? (
           <YouTubeVideoAnalyticsOverview
             key={selection.id}
             selection={selection}

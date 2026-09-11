@@ -66,6 +66,7 @@ import models.semantic_health_check  # noqa: E402, F401
 import models.semantic_monitoring_snapshot  # noqa: E402, F401
 import models.seo_analysis  # noqa: E402, F401
 import models.sif_indexing_watermark  # noqa: E402, F401
+import models.strategy_sif_index_status  # noqa: E402, F401
 import models.story_project_models  # noqa: E402, F401
 import models.subscription_models  # noqa: E402, F401
 import models.task_memory_models  # noqa: E402, F401
@@ -179,7 +180,7 @@ def init_user_database(user_id: str) -> None:
                 conn.commit()
             conn.close()
         except Exception as heal_exc:
-            logger.debug(f"Schema column check for {user_id}: {heal_exc}")
+            logger.trace(f"Schema column check for {user_id}: {heal_exc}")
 
         if user_id not in _pricing_initialized:
             _pricing_initialized.add(user_id)
@@ -193,7 +194,7 @@ def init_user_database(user_id: str) -> None:
                     pricing_service.initialize_default_pricing()
                     pricing_service.initialize_default_plans()
                     db.commit()
-                    logger.debug(f"Default pricing and plans initialized for user {user_id}")
+                    logger.trace(f"Default pricing and plans initialized for user {user_id}")
                 except Exception as data_error:
                     logger.error(f"Error initializing default data for user {user_id}: {data_error}")
                     db.rollback()
@@ -204,7 +205,7 @@ def init_user_database(user_id: str) -> None:
                     f"Could not initialize pricing data (PricingService import failed): {import_error}"
                 )
 
-        logger.debug(f"Database initialized successfully for user {user_id}")
+        logger.trace(f"Database initialized successfully for user {user_id}")
     except SQLAlchemyError as e:
         logger.error(f"Error initializing database for user {user_id}: {str(e)}")
         raise

@@ -81,7 +81,7 @@ describe('competitorResearchRestore', () => {
   });
 
   describe('shouldHydrateResearchFromBackend', () => {
-    it('hydrates when research step is complete but live stepData lost competitors', () => {
+    it('hydrates when backend has_data but Connect was not officially continued', () => {
       expect(
         shouldHydrateResearchFromBackend(
           { website: 'https://www.alwrity.com', analysis: { id: 1 } },
@@ -91,9 +91,21 @@ describe('competitorResearchRestore', () => {
           },
           'https://www.alwrity.com',
           'https://www.alwrity.com',
-          true
+          { backendHasData: true, isStartFreshSession: false }
         )
       ).toBe(true);
+    });
+
+    it('does not hydrate during start-fresh session', () => {
+      expect(
+        shouldHydrateResearchFromBackend(
+          { website: 'https://www.alwrity.com' },
+          { competitors: [{ url: 'https://competitor.com' }] },
+          'https://www.alwrity.com',
+          'https://www.alwrity.com',
+          { backendHasData: true, isStartFreshSession: true }
+        )
+      ).toBe(false);
     });
 
     it('does not hydrate when stepData already has competitors', () => {
@@ -103,7 +115,7 @@ describe('competitorResearchRestore', () => {
           { competitors: [{ url: 'https://backend.com' }] },
           'https://www.alwrity.com',
           'https://www.alwrity.com',
-          true
+          { backendHasData: true, isStartFreshSession: false }
         )
       ).toBe(false);
     });

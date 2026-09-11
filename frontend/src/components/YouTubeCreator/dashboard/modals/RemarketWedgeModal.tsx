@@ -12,6 +12,7 @@ export const RemarketWedgeModal: React.FC<RemarketWedgeProps> = ({
   onRequestConnect,
   creatorState,
   onOpenStale,
+  onOpenGaps,
   onNavigateBlog,
   onNavigateLibrary,
 }) => {
@@ -88,6 +89,17 @@ export const RemarketWedgeModal: React.FC<RemarketWedgeProps> = ({
           onClick={() =>
             resolveOAuthTileClick(connected, "stale_refresh", onOpenStale, onRequestConnect)
           }
+        />
+        <YouTubeToolTile
+          icon="🧩"
+          accent="#10b981"
+          title="Content Gaps"
+          description="Fill niche holes from your Channel Bible + recent uploads."
+          hitl
+          onClick={() => {
+            console.info("[YouTubeRemarket] Open Content Gaps");
+            onOpenGaps();
+          }}
         />
         <YouTubeToolTile
           icon="📺"

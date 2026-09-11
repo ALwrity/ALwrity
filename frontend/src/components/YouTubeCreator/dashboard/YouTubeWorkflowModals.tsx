@@ -21,7 +21,6 @@ import {
   PlaylistAttachModal,
   PublishWedgeModal,
   RemarketWedgeModal,
-  RetentionModal,
   SchedulePublishModal,
   StaleRefreshModal,
   WorkflowHelperModals,
@@ -65,7 +64,6 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
   const [videosOpen, setVideosOpen] = useState(false);
   const [videos, setVideos] = useState<string[]>([]);
   const [pulseOpen, setPulseOpen] = useState(false);
-  const [retentionOpen, setRetentionOpen] = useState(false);
   const [gapsOpen, setGapsOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [communityOpen, setCommunityOpen] = useState(false);
@@ -86,7 +84,6 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
     setCostOpen(false);
     setVideosOpen(false);
     setPulseOpen(false);
-    setRetentionOpen(false);
     setGapsOpen(false);
     setCommentsOpen(false);
     setCommunityOpen(false);
@@ -100,15 +97,10 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
   const createDrillOpen = seoOpen || thumbOpen;
   const publishDrillOpen =
     coachOpen || costOpen || videosOpen || scheduleOpen || playlistOpen;
-  const analysisDrillOpen =
-    pulseOpen ||
-    retentionOpen ||
-    gapsOpen ||
-    seoOpen ||
-    performanceOpen ||
-    videoAnalyticsOpen;
-  const engagementDrillOpen = commentsOpen || communityOpen;
-  const remarketDrillOpen = staleOpen;
+  const analysisDrillOpen = pulseOpen || performanceOpen || videoAnalyticsOpen;
+  const engagementDrillOpen = commentsOpen;
+  const planDrillOpen = communityOpen;
+  const remarketDrillOpen = staleOpen || gapsOpen;
 
   const markNotify = useCallback((key: string) => {
     setNotifyKeys((prev) => ({ ...prev, [key]: true }));
@@ -192,7 +184,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
   return (
     <>
       <PlanWedgeModal
-        open={activeModal === "plan"}
+        open={activeModal === "plan" && !planDrillOpen}
         onClose={onClose}
         goCreate={goCreate}
         markNotify={markNotify}
@@ -201,6 +193,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         planAvatarUrl={creatorState.avatarUrl || null}
         onChannelBibleSaved={onChannelBibleSaved}
         onCreatorDraftPatched={onCreatorDraftPatched}
+        onOpenCommunity={() => setCommunityOpen(true)}
       />
       <CreateWedgeModal
         open={activeModal === "create" && !createDrillOpen && !fullCreatorOpen}
@@ -238,9 +231,6 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         onOpenPulse={() => setPulseOpen(true)}
         onOpenVideoPerformance={() => setPerformanceOpen(true)}
         onOpenVideoAnalytics={() => setVideoAnalyticsOpen(true)}
-        onOpenSeo={() => setSeoOpen(true)}
-        onOpenGaps={() => setGapsOpen(true)}
-        onOpenRetention={() => setRetentionOpen(true)}
       />
       <EngagementWedgeModal
         open={activeModal === "engagement" && !engagementDrillOpen}
@@ -248,9 +238,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         goCreate={goCreate}
         connected={connected}
         onRequestConnect={onRequestConnect}
-        creatorState={creatorState}
         onOpenComments={() => setCommentsOpen(true)}
-        onOpenCommunity={() => setCommunityOpen(true)}
       />
       <RemarketWedgeModal
         open={activeModal === "remarket" && !remarketDrillOpen}
@@ -260,6 +248,7 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         onRequestConnect={onRequestConnect}
         creatorState={creatorState}
         onOpenStale={() => setStaleOpen(true)}
+        onOpenGaps={() => setGapsOpen(true)}
         onNavigateBlog={() => {
           onClose();
           navigate("/blog-writer");
@@ -303,11 +292,6 @@ export const YouTubeWorkflowModals: React.FC<YouTubeWorkflowModalsProps> = ({
         open={videoAnalyticsOpen}
         onClose={() => setVideoAnalyticsOpen(false)}
         shell={subShell(() => setVideoAnalyticsOpen(false))}
-      />
-      <RetentionModal
-        open={retentionOpen}
-        onClose={() => setRetentionOpen(false)}
-        shell={subShell(() => setRetentionOpen(false))}
       />
       <ContentGapsModal
         open={gapsOpen}

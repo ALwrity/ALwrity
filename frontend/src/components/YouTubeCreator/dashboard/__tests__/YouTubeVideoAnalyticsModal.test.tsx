@@ -28,6 +28,14 @@ vi.mock("../../../../services/youtubeStudioApi", async (importOriginal) => {
 
 const mockedStudioApi = vi.mocked(youtubeStudioApi);
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 const OVERVIEW_OK = {
   success: true,
   window_days: 28,
@@ -90,6 +98,13 @@ const AUDIENCE_OK = {
     ],
     message: null,
   },
+  devices: {
+    available: true,
+    rows: [
+      { device_type: "DESKTOP", views: 10, watch_hours: 1, watch_share_percent: 100 },
+    ],
+    message: null,
+  },
 };
 
 describe("YouTubeVideoAnalyticsModal", () => {
@@ -145,6 +160,24 @@ describe("YouTubeVideoAnalyticsModal", () => {
     info.mockRestore();
   });
 
+  it("shows Overview progress until getChannelOverview resolves", async () => {
+    const pending = deferred<typeof OVERVIEW_OK>();
+    mockedStudioApi.getChannelOverview.mockReturnValueOnce(pending.promise);
+    render(<YouTubeVideoAnalyticsModal open onClose={vi.fn()} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Loading channel overview");
+    expect(screen.getByRole("progressbar")).toBeTruthy();
+    expect(screen.queryByText(/Your channel got 127/)).toBeNull();
+    pending.resolve(OVERVIEW_OK);
+    await waitFor(() => {
+      expect(
+        screen.getByText("Your channel got 127 views in the last 28 days."),
+      ).toBeTruthy();
+    });
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(mockedStudioApi.getChannelPulse).not.toHaveBeenCalled();
+    expect(mockedStudioApi.getVideoAnalytics).not.toHaveBeenCalled();
+  });
+
   it("shows the API message for not_connected without fake metrics", async () => {
     mockedStudioApi.getChannelOverview.mockResolvedValue({
       success: false,
@@ -157,6 +190,8 @@ describe("YouTubeVideoAnalyticsModal", () => {
         screen.getByText("Connect YouTube to load channel overview."),
       ).toBeTruthy();
     });
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByRole("progressbar")).toBeNull();
     expect(screen.queryByText(/Your channel got 127/)).toBeNull();
     expect(screen.queryByText("0.7")).toBeNull();
   });
@@ -191,20 +226,23 @@ describe("YouTubeVideoAnalyticsModal", () => {
     errorSpy.mockRestore();
   });
 
-  it("switches to Reach without a second overview call and shows Reach waiting copy", async () => {
+  it("switches to Content coming soon without a second overview call", async () => {
     render(<YouTubeVideoAnalyticsModal open onClose={vi.fn()} />);
     await waitFor(() => {
       expect(mockedStudioApi.getChannelOverview).toHaveBeenCalledTimes(1);
     });
 
-    fireEvent.click(screen.getByRole("tab", { name: "Reach" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Content" }));
 
-    expect(screen.getByRole("tab", { name: "Reach" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "Content" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
-    expect(screen.getByRole("tabpanel", { name: "Reach" })).toHaveTextContent(
-      "Reach metrics will show here when analytics is connected.",
+    expect(screen.getByRole("tabpanel", { name: "Content" })).toHaveTextContent(
+      "Content analytics is coming soon.",
+    );
+    expect(screen.getByRole("tab", { name: "Content" }).textContent).toBe(
+      "Content",
     );
     expect(screen.queryByText(/Overview metrics will show/)).toBeNull();
     expect(mockedStudioApi.getChannelOverview).toHaveBeenCalledTimes(1);
@@ -213,14 +251,17 @@ describe("YouTubeVideoAnalyticsModal", () => {
     expect(mockedStudioApi.getVideoAnalytics).not.toHaveBeenCalled();
   });
 
-  it("shows Engagement waiting copy and loads Audience from getChannelAudience", async () => {
+  it("shows Trends coming soon and loads Audience from getChannelAudience", async () => {
     render(<YouTubeVideoAnalyticsModal open onClose={vi.fn()} />);
     await waitFor(() => {
       expect(mockedStudioApi.getChannelOverview).toHaveBeenCalledTimes(1);
     });
-    fireEvent.click(screen.getByRole("tab", { name: "Engagement" }));
-    expect(screen.getByRole("tabpanel", { name: "Engagement" })).toHaveTextContent(
-      "Engagement metrics will show here when analytics is connected.",
+    fireEvent.click(screen.getByRole("tab", { name: "Trends" }));
+    expect(screen.getByRole("tabpanel", { name: "Trends" })).toHaveTextContent(
+      "Trends analytics is coming soon.",
+    );
+    expect(screen.getByRole("tab", { name: "Trends" }).textContent).toBe(
+      "Trends",
     );
     expect(mockedStudioApi.getChannelAudience).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("tab", { name: "Audience" }));
@@ -237,10 +278,51 @@ describe("YouTubeVideoAnalyticsModal", () => {
     expect(mockedStudioApi.getVideoAnalytics).not.toHaveBeenCalled();
   });
 
-  it("moves to Reach with the right arrow key", () => {
+  it("does not refetch Audience when switching Hub chips", async () => {
+    render(<YouTubeVideoAnalyticsModal open onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Audience" }));
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Age and gender" })).toBeTruthy();
+    });
+    expect(mockedStudioApi.getChannelAudience).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("status")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Top countries" }));
+    expect(screen.getByRole("heading", { name: "Top countries" })).toBeTruthy();
+    expect(screen.getByText("US")).toBeTruthy();
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(mockedStudioApi.getChannelAudience).toHaveBeenCalledTimes(1);
+    expect(mockedStudioApi.getChannelPulse).not.toHaveBeenCalled();
+    expect(mockedStudioApi.getVideoAnalytics).not.toHaveBeenCalled();
+  });
+
+  it("shows Audience progress until getChannelAudience resolves", async () => {
+    const pending = deferred<typeof AUDIENCE_OK>();
+    mockedStudioApi.getChannelAudience.mockReturnValueOnce(pending.promise);
+    render(<YouTubeVideoAnalyticsModal open onClose={vi.fn()} />);
+    await waitFor(() => {
+      expect(
+        screen.getByText("Your channel got 127 views in the last 28 days."),
+      ).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "Audience" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Loading channel audience");
+    expect(screen.queryByText("Loading channel overview")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Age and gender" })).toBeNull();
+    expect(mockedStudioApi.getChannelAudience).toHaveBeenCalledTimes(1);
+    pending.resolve(AUDIENCE_OK);
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Age and gender" })).toBeTruthy();
+    });
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(mockedStudioApi.getChannelAudience).toHaveBeenCalledTimes(1);
+    expect(mockedStudioApi.getChannelPulse).not.toHaveBeenCalled();
+    expect(mockedStudioApi.getVideoAnalytics).not.toHaveBeenCalled();
+  });
+
+  it("moves to Audience with the right arrow key from Overview", () => {
     render(<YouTubeVideoAnalyticsModal open onClose={vi.fn()} />);
     fireEvent.keyDown(screen.getByRole("tablist"), { key: "ArrowRight" });
-    expect(screen.getByRole("tab", { name: "Reach" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "Audience" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -319,16 +401,29 @@ describe("YouTubeVideoAnalyticsModal", () => {
         days: 28,
       });
     });
+    await waitFor(() => {
+      expect(
+        screen.getByText("Your channel got 127 views in the last 28 days."),
+      ).toBeTruthy();
+    });
+    const pending = deferred<typeof OVERVIEW_OK>();
+    mockedStudioApi.getChannelOverview.mockReturnValueOnce(pending.promise);
 
     fireEvent.click(screen.getByRole("button", { name: /Analytics date range/i }));
     fireEvent.click(screen.getByRole("option", { name: "Last 7 days" }));
 
     expect(screen.getByText("Last 7 days")).toBeTruthy();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading channel overview");
+    expect(screen.queryByText(/Your channel got 127/)).toBeNull();
+    pending.resolve(OVERVIEW_OK);
     await waitFor(() => {
       expect(mockedStudioApi.getChannelOverview).toHaveBeenCalledWith({
         window: "last_7",
         days: 7,
       });
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("status")).toBeNull();
     });
     expect(mockedStudioApi.getChannelPulse).not.toHaveBeenCalled();
     expect(mockedStudioApi.getVideoAnalytics).not.toHaveBeenCalled();

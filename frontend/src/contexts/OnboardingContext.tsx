@@ -74,7 +74,7 @@ interface OnboardingContextValue {
   onboardingType: string;
   
   // Actions
-  refresh: () => Promise<void>;
+  refresh: (options?: { silent?: boolean }) => Promise<void>;
   markStepComplete: (stepNumber: number) => void;
   clearError: () => void;
   initializeOnboarding: () => void;
@@ -151,22 +151,25 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   /**
    * Fetch onboarding data from batch endpoint
    */
-  const fetchOnboardingData = useCallback(async () => {
+  const fetchOnboardingData = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
     // Don't fetch if not signed in
     if (!isSignedIn) {
       console.log('OnboardingContext: User not signed in, skipping fetch');
-      setLoading(false);
+      if (!silent) setLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       setError(null);
       
       // Skip onboarding fetch in demo mode - onboarding is disabled
       if (shouldSkipOnboarding()) {
         console.log('OnboardingContext: Skipping onboarding fetch in demo mode');
-        setLoading(false);
+        if (!silent) setLoading(false);
         return;
       }
       
@@ -215,19 +218,19 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       // Also cache in sessionStorage for backwards compatibility
       sessionStorage.setItem('onboarding_init', JSON.stringify(response.data));
       
-      setLoading(false);
+      if (!silent) setLoading(false);
     } catch (err) {
       console.error('OnboardingContext: Error fetching data:', err);
 
       // Surface connection issues in context state instead of uncaught async throws
       if (err instanceof NetworkError || err instanceof ConnectionError) {
         setError(err.message);
-        setLoading(false);
+        if (!silent) setLoading(false);
         return;
       }
 
       setError(err instanceof Error ? err.message : 'Failed to load onboarding data');
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [isSignedIn]);
 
@@ -272,9 +275,9 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   /**
    * Refresh onboarding data (e.g., after completing a step)
    */
-  const refresh = useCallback(async () => {
-    console.log('OnboardingContext: Refreshing data...');
-    await fetchOnboardingData();
+  const refresh = useCallback(async (options?: { silent?: boolean }) => {
+    console.log('OnboardingContext: Refreshing data...', options?.silent ? '(silent)' : '');
+    await fetchOnboardingData(options);
   }, [fetchOnboardingData]);
 
   /**

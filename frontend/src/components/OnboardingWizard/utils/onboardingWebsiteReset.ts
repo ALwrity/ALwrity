@@ -3,8 +3,11 @@
  * analysis changes (new URL or re-analyze).
  */
 
+import { clearRestoreToastFlags } from '../common/onboardingArtifactRestoreMessage';
+
 export const ONBOARDING_STEP1_WEBSITE_KEY = 'onboarding_step1_website_url';
 export const ONBOARDING_DOWNSTREAM_DIRTY_KEY = 'onboarding_downstream_dirty';
+export const WEBSITE_START_FRESH_UI_KEY = 'onboarding_website_start_fresh_ui';
 
 const DOWNSTREAM_CACHE_KEYS = [
   'competitor_analysis_data',
@@ -94,6 +97,39 @@ export function isWebsiteStartFreshSession(): boolean {
   } catch {
     return true;
   }
+}
+
+export function markWebsiteStartFreshUi(): void {
+  try {
+    sessionStorage.setItem(WEBSITE_START_FRESH_UI_KEY, '1');
+  } catch (err) {
+    console.warn('[onboardingWebsiteReset] Failed to mark website start-fresh UI:', err);
+  }
+}
+
+export function clearWebsiteStartFreshUi(): void {
+  try {
+    sessionStorage.removeItem(WEBSITE_START_FRESH_UI_KEY);
+  } catch (err) {
+    console.warn('[onboardingWebsiteReset] Failed to clear website start-fresh UI:', err);
+  }
+}
+
+export function isWebsiteStartFreshUiActive(): boolean {
+  try {
+    return sessionStorage.getItem(WEBSITE_START_FRESH_UI_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Local UI latch OR storage-backed start-fresh (Analyze New Website). */
+export function isEffectiveStartFreshSession(localStartFreshUi = false): boolean {
+  return (
+    localStartFreshUi ||
+    isWebsiteStartFreshUiActive() ||
+    isWebsiteStartFreshSession()
+  );
 }
 
 export function hasWebsiteChangedFromCommitted(currentUrl: string): boolean {
@@ -208,6 +244,8 @@ export type WebsiteAnalysisChangeReason =
 export function clearOnboardingWizardLocalState(reason: string): void {
   console.log('[onboardingWebsiteReset] Clearing wizard local state:', reason);
   try {
+    clearWebsiteStartFreshUi();
+    clearRestoreToastFlags();
     for (const key of WIZARD_RESET_LOCAL_KEYS) {
       localStorage.removeItem(key);
     }

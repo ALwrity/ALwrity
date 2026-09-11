@@ -23,6 +23,7 @@ export interface PlanWedgeProps extends WedgeModalBaseProps {
   planAvatarUrl?: string | null;
   onChannelBibleSaved?: (bible: YouTubeChannelBible) => void;
   onCreatorDraftPatched?: (state: YouTubeCreatorState) => void;
+  onOpenCommunity: () => void;
 }
 
 export interface CreateWedgeProps extends WedgeModalBaseProps {
@@ -44,20 +45,16 @@ export interface AnalysisWedgeProps extends GatedWedgeProps {
   onOpenPulse: () => void;
   onOpenVideoPerformance: () => void;
   onOpenVideoAnalytics: () => void;
-  onOpenSeo: () => void;
-  onOpenGaps: () => void;
-  onOpenRetention: () => void;
 }
 
 export interface EngagementWedgeProps extends GatedWedgeProps {
-  creatorState: YouTubeCreatorState;
   onOpenComments: () => void;
-  onOpenCommunity: () => void;
 }
 
 export interface RemarketWedgeProps extends GatedWedgeProps {
   creatorState: YouTubeCreatorState;
   onOpenStale: () => void;
+  onOpenGaps: () => void;
   onNavigateBlog: () => void;
   onNavigateLibrary: () => void;
 }

@@ -337,3 +337,44 @@ class TestLinkedInHealMigration:
                 assert row == ("unipile",)
         finally:
             _cleanup(eng)
+
+
+class TestLegacyFleetHeadUpgrade:
+    """A fleet DB stamped at a pre-feature-branch head must still upgrade.
+
+    Regression for "Can't locate revision identified by 'b2c3d4e5f6a7'":
+    the activation user_id Int->String migration (mainline commit e1e144de)
+    was never ported to this branch, so every per-user ``alembic upgrade
+    head`` failed for DBs created under the mainline fleet head.
+    """
+
+    @pytest.fixture
+    def engine(self):
+        eng = _fresh_engine()
+        yield eng
+        _cleanup(eng)
+
+    def test_upgrade_head_from_legacy_fleet_stamp(self, engine):
+        """Upgrade to the legacy fleet head, then continue to the current head.
+
+        Mirrors startup: a fleet DB stamped at ``b2c3d4e5f6a7`` must resolve
+        that revision and advance to ``f102a3b4c5d6``, gaining only the
+        strategy SIF status table and the already-stringified activation
+        column.
+        """
+        cfg = _alembic_cfg(engine._db_path)
+
+        command.upgrade(cfg, "b2c3d4e5f6a7")
+        assert _alembic_version_row(engine) == "b2c3d4e5f6a7"
+
+        command.upgrade(cfg, "head")
+        assert _alembic_version_row(engine) == "f102a3b4c5d6"
+
+        tables = _table_names(engine)
+        assert "strategy_sif_index_status" in tables
+        assert "strategy_wizard_state" in tables
+
+        cols = {c["name"]: c for c in inspect(engine).get_columns("strategy_activation_status")}
+        assert "VARCHAR" in str(cols["user_id"]["type"]).upper(), (
+            f"activation user_id must be VARCHAR after migration, got {cols['user_id']['type']}"
+        )

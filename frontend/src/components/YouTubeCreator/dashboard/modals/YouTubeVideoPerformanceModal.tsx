@@ -12,6 +12,7 @@ import {
   type YouTubeVideoPerformanceSort,
 } from "../youtubeVideoPerformanceStats";
 import { YouTubeVideoPerformanceCard } from "./YouTubeVideoPerformanceCard";
+import { YouTubeAnalysisWedgeProgressPanel } from "../YouTubeAnalysisWedgeProgressPanel";
 import "../youtubeVideoPerformanceLayout.css";
 
 const LOAD_FAILED = "Could not load videos. Please try again.";
@@ -21,9 +22,19 @@ export const YouTubeVideoPerformanceModal: React.FC<{
   onClose: () => void;
   shell?: YouTubeModalShellProps;
 }> = ({ open, onClose, shell }) => {
+  const [wasOpen, setWasOpen] = useState(open);
   const [videos, setVideos] = useState<YouTubeVideoPerformanceRow[]>([]);
   const [status, setStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(open);
   const [sort, setSort] = useState<YouTubeVideoPerformanceSort>("views");
+
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    setVideos([]);
+    setStatus(null);
+    setSort("views");
+    setLoading(open);
+  }
 
   useEffect(() => {
     if (!open) {
@@ -32,21 +43,23 @@ export const YouTubeVideoPerformanceModal: React.FC<{
     setStatus(null);
     setVideos([]);
     setSort("views");
+    setLoading(true);
     let cancelled = false;
-    console.info("[YouTubeVideoPerformance] List start");
+    console.info("[YouTubeVideoPerformance] List start", { maxResults: 50 });
     youtubeStudioApi
       .listChannelVideos({ max_results: 50 })
       .then((res) => {
         if (cancelled) {
           return;
         }
-        const rows = Array.isArray(res.videos) ? res.videos : [];
-        if (!res.success || !Array.isArray(res.videos)) {
+        setLoading(false);
+        const rows = Array.isArray(res?.videos) ? res.videos : [];
+        if (!res?.success || !Array.isArray(res.videos)) {
           console.warn("[YouTubeVideoPerformance] List unsuccessful", {
-            error_code: res.success === false ? res.error_code : "invalid_payload",
+            error_code: res?.success === false ? res.error_code : "invalid_payload",
           });
           setVideos([]);
-          setStatus(res.message || LOAD_FAILED);
+          setStatus(res?.message || LOAD_FAILED);
           return;
         }
         console.info("[YouTubeVideoPerformance] List complete", {
@@ -54,7 +67,7 @@ export const YouTubeVideoPerformanceModal: React.FC<{
         });
         setVideos(rows);
         if (rows.length === 0) {
-          setStatus(res.message || LOAD_FAILED);
+          setStatus(res?.message || LOAD_FAILED);
         }
       })
       .catch((loadError: unknown) => {
@@ -65,6 +78,7 @@ export const YouTubeVideoPerformanceModal: React.FC<{
           errorName: loadError instanceof Error ? loadError.name : "Error",
         });
         setVideos([]);
+        setLoading(false);
         setStatus(LOAD_FAILED);
       });
     return () => {
@@ -98,8 +112,9 @@ export const YouTubeVideoPerformanceModal: React.FC<{
       titleSize={shell?.titleSize}
       headerLayout={shell?.headerLayout}
     >
-      {status ? <p className="yt-modal-intro">{status}</p> : null}
-      {videos.length > 0 ? (
+      {loading ? <YouTubeAnalysisWedgeProgressPanel fetch="performance" /> : null}
+      {!loading && status ? <p className="yt-modal-intro">{status}</p> : null}
+      {!loading && videos.length > 0 ? (
         <>
           <div className="yt-video-performance-sort">
             <button

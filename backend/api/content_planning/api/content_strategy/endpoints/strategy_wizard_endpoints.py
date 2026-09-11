@@ -10,6 +10,8 @@ from sqlalchemy import desc
 from models.content_strategy_state_models import StrategyWizardState
 from models.enhanced_strategy_models import EnhancedContentStrategy
 from models.monitoring_models import StrategyActivationStatus
+from services.intelligence.strategy_sif_status import query_active_activation
+from services.intelligence.sif_strategy_source_ids import active_strategy_source_id
 from ....utils.error_handlers import ContentPlanningErrorHandler
 from ....utils.response_builders import ResponseBuilder
 
@@ -205,13 +207,9 @@ async def get_latest_strategy(
             )
 
         active_strategy_id = None
-        if uid is not None:
-            active = db.query(StrategyActivationStatus).filter(
-                StrategyActivationStatus.user_id == uid,
-                StrategyActivationStatus.status == "active",
-            ).order_by(desc(StrategyActivationStatus.activation_date)).first()
-            if active:
-                active_strategy_id = active.strategy_id
+        active = query_active_activation(db, user_id, uid)
+        if active is not None:
+            active_strategy_id = active.strategy_id
 
         return ResponseBuilder.create_success_response(
             message="Latest strategy retrieved",
@@ -296,6 +294,24 @@ async def activate_strategy(
         except Exception as cache_error:
             logger.debug(f"Could not clear active strategy cache: {cache_error}")
 
+        # SIF x Strategy (non-blocking): mirror active.md to the VFS and
+        # schedule txtai embedding. Fire-and-forget — must never fail
+        # activation; the write + task dispatch each swallow their errors.
+        # ``existing.activation_date`` is preserved on re-activation of an
+        # already-active strategy (keeps the source hash stable → the
+        # watermark skips a no-op re-embed); fall back to ``now`` only when
+        # the row has no timestamp yet.
+        try:
+            from services.intelligence.strategy_vfs_companion import dispatch_activation_indexing
+            dispatch_activation_indexing(
+                db,
+                user_id,
+                strategy.to_dict(),
+                existing.activation_date if existing.activation_date is not None else now,
+            )
+        except Exception as sif_error:
+            logger.debug(f"Could not dispatch SIF strategy indexing: {sif_error}")
+
         return ResponseBuilder.create_success_response(
             message="Strategy activated",
             data={
@@ -325,16 +341,7 @@ async def get_active_strategy(
         user_id = str(current_user.get("id"))
         uid = _as_int_user_id(user_id)
 
-        if uid is None:
-            return ResponseBuilder.create_success_response(
-                message="No active strategy",
-                data=None
-            )
-
-        active = db.query(StrategyActivationStatus).filter(
-            StrategyActivationStatus.user_id == uid,
-            StrategyActivationStatus.status == "active",
-        ).order_by(desc(StrategyActivationStatus.activation_date)).first()
+        active = query_active_activation(db, user_id, uid)
 
         if not active:
             return ResponseBuilder.create_success_response(
@@ -365,3 +372,121 @@ async def get_active_strategy(
     except Exception as e:
         logger.error(f"Error getting active strategy: {str(e)}")
         raise ContentPlanningErrorHandler.handle_general_error(e, "get_active_strategy")
+
+
+@router.get("/strategy/sif-status")
+async def get_strategy_sif_status(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """Read-only semantic-index status for the active content strategy.
+
+    Tells the UI what happened to the SIF embedding for the active
+    strategy: the durable ``strategy_sif_index_status`` lifecycle
+    (pending / running / success / skipped / failed), the successful-embed
+    watermark, whether the VFS mirror ``strategy/active.md`` exists, and
+    the 8 canonical document kinds. Never writes and never loads txtai —
+    safe to poll while indexing runs.
+    """
+    try:
+        user_id = str(current_user.get("id"))
+        uid = _as_int_user_id(user_id)
+
+        from services.intelligence.strategy_sif_status import (
+            build_strategy_sif_status_payload,
+        )
+
+        data = build_strategy_sif_status_payload(db, user_id, uid)
+        return ResponseBuilder.create_success_response(
+            message="Strategy SIF status retrieved",
+            data=data
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error retrieving strategy SIF status: {str(e)}")
+        raise ContentPlanningErrorHandler.handle_general_error(e, "get_strategy_sif_status")
+
+
+STRATEGY_KIND_LABELS: Dict[str, str] = {
+    "form_summary": "Strategy summary",
+    "base_strategy": "Base strategy",
+    "strategic_insights": "Strategic insights",
+    "competitive_analysis": "Competitive analysis",
+    "performance_predictions": "Performance predictions",
+    "implementation_roadmap": "Implementation roadmap",
+    "risk_assessment": "Risk assessment",
+    "user_persona_digest": "User persona",
+}
+
+
+@router.get("/strategy/sif-search")
+async def search_strategy_sif(
+    query: str = "",
+    limit: int = 4,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Semantic search over ONLY the active strategy's SIF documents.
+
+    Mirrors the onboarding white-box search (``/api/onboarding/sif/search``)
+    but scoped to the strategy contract: hits are filtered to the active
+    strategy's document ids (``user:{uid}:strategy_active:current:*``) and
+    labeled with the 8 canonical kinds. The Semantic Dashboard's preset
+    questions call this so an end user can prove "SIF x Content strategy is
+    working" by clicking a query and reading the matching strategy passage.
+    """
+    try:
+        user_id = str(current_user.get("id"))
+        source_id = active_strategy_source_id(user_id)
+        prefix = f"{source_id}:"
+
+        from services.intelligence.txtai_service import TxtaiIntelligenceService
+
+        svc = TxtaiIntelligenceService(user_id)
+        raw = await svc.search(query, limit=max(limit * 4, 12))
+
+        hits: list = []
+        for result in raw or []:
+            if isinstance(result, dict):
+                doc_id = result.get("id")
+                score = result.get("score") or 0
+                text = result.get("text") or ""
+            elif isinstance(result, (list, tuple)):
+                doc_id = result[0] if len(result) > 0 else None
+                score = result[1] if len(result) > 1 else 0
+                text = ""
+            else:
+                continue
+            doc_id = str(doc_id) if doc_id is not None else ""
+            if not doc_id.startswith(prefix):
+                continue
+            # txtai search returns id + score only; enrich with the stored
+            # document text so the caller can render a meaningful answer.
+            if not text or text == doc_id:
+                try:
+                    text = svc.get_document_text(doc_id)
+                except Exception:
+                    text = ""
+            kind = doc_id.rsplit(":", 1)[-1]
+            hits.append({
+                "id": doc_id,
+                "kind": kind,
+                "kind_label": STRATEGY_KIND_LABELS.get(kind, kind),
+                "score": score,
+                "text": text,
+            })
+
+        hits.sort(key=lambda hit: hit["score"], reverse=True)
+        return ResponseBuilder.create_success_response(
+            message="Strategy SIF search completed",
+            data={"query": query, "source_id": source_id, "hits": hits[:limit]},
+        )
+
+    except Exception as e:
+        logger.error(f"Error searching strategy SIF: {str(e)}")
+        return ResponseBuilder.create_success_response(
+            message="Strategy SIF search failed",
+            data={"query": query, "hits": [], "error": str(e)},
+        )

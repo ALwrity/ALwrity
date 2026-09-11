@@ -8,6 +8,7 @@ import ProtectedRoute from './components/shared/ProtectedRoute';
 import ErrorBoundary from './components/shared/ErrorBoundary';
 import { OnboardingProvider } from './contexts/OnboardingContext';
 import { SubscriptionProvider } from './contexts/SubscriptionContext';
+import { BackendUnavailableProvider } from './contexts/BackendUnavailableContext';
 import InitialRouteHandler from './components/App/InitialRouteHandler';
 import TokenInstaller from './components/App/TokenInstaller';
 import { ConditionalCopilotKit, AuthenticatedCopilotWrapper } from './components/App/CopilotWrappers';
@@ -339,9 +340,11 @@ const App: React.FC = () => {
       <QueryClientProvider client={queryClient}>
         <ClerkProvider publishableKey={clerkPublishableKey} clerkJSUrl={clerkJSUrl}>
           <SubscriptionProvider>
-            <OnboardingProvider>
-              {renderApp()}
-            </OnboardingProvider>
+            <BackendUnavailableProvider>
+              <OnboardingProvider>
+                {renderApp()}
+              </OnboardingProvider>
+            </BackendUnavailableProvider>
           </SubscriptionProvider>
         </ClerkProvider>
       </QueryClientProvider>

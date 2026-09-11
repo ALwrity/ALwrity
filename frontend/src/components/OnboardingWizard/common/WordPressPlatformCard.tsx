@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { OnboardingDialogCloseButton } from './OnboardingDialogCloseButton';
 import {
   Box,
   Card,
@@ -267,7 +268,18 @@ const WordPressPlatformCard: React.FC<WordPressPlatformCardProps> = ({
 
       {/* Add Site Dialog */}
       <Dialog open={showAddDialog} onClose={() => setShowAddDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Connect WordPress Site</DialogTitle>
+        <DialogTitle
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1,
+            pr: 1.5,
+          }}
+        >
+          <span>Connect WordPress Site</span>
+          <OnboardingDialogCloseButton onClick={() => setShowAddDialog(false)} />
+        </DialogTitle>
         <DialogContent>
           <Box pt={1}>
             <TextField
@@ -345,7 +357,18 @@ const WordPressPlatformCard: React.FC<WordPressPlatformCardProps> = ({
 
       {/* Manage Sites Dialog */}
       <Dialog open={showSitesDialog} onClose={() => setShowSitesDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Manage WordPress Sites</DialogTitle>
+        <DialogTitle
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1,
+            pr: 1.5,
+          }}
+        >
+          <span>Manage WordPress Sites</span>
+          <OnboardingDialogCloseButton onClick={() => setShowSitesDialog(false)} />
+        </DialogTitle>
         <DialogContent>
           <List>
             {sites.map((site, index) => (

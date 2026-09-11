@@ -28,6 +28,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircleOutline';
 import AIIcon from '@mui/icons-material/AutoAwesome';
 import { apiClient, longRunningApiClient } from '../../../api/client';
 import { SitemapBenchmarkResults } from './SitemapBenchmarkResults';
+import { OnboardingDialogCloseButton } from '../common/OnboardingDialogCloseButton';
 import { StrategicInsightsResults } from './StrategicInsightsResults';
 
 export const ComingSoonSection: React.FC<{ missingData?: boolean }> = ({ missingData = false }) => {
@@ -479,7 +480,8 @@ export const ComingSoonSection: React.FC<{ missingData?: boolean }> = ({ missing
         }}
       >
         <DialogTitle sx={{ pb: 2, backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, flex: 1, minWidth: 0 }}>
             {selectedFeatureData && (
               <>
                 <Box
@@ -512,6 +514,12 @@ export const ComingSoonSection: React.FC<{ missingData?: boolean }> = ({ missing
                 </Box>
               </>
             )}
+          </Box>
+          <OnboardingDialogCloseButton
+            onClick={() => {
+              if (!sitemapBenchmarkRunning) setOpenModal(false);
+            }}
+          />
           </Box>
         </DialogTitle>
         

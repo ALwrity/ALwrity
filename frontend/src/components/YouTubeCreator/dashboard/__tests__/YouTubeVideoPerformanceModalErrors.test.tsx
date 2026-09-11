@@ -38,6 +38,7 @@ function loggedText(spy: ReturnType<typeof vi.spyOn>): string {
 describe("YouTubeVideoPerformanceModal errors and logs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedStudioApi.listChannelVideos.mockReset();
   });
 
   it("logs list start and complete with counts only", async () => {
@@ -55,6 +56,7 @@ describe("YouTubeVideoPerformanceModal errors and logs", () => {
     });
     const text = loggedText(info);
     expect(text).toMatch(/\[YouTubeVideoPerformance\] List start/);
+    expect(text).toMatch(/"maxResults":50/);
     expect(text).toMatch(/\[YouTubeVideoPerformance\] List complete/);
     expect(text).toMatch(/"videoCount":1/);
     expect(text.toLowerCase()).not.toMatch(/rank videos|vid-1|token|authorization/);

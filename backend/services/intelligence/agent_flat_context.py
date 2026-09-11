@@ -28,6 +28,9 @@ class AgentFlatContextStore:
     STEP5_FILENAME = "step5_integrations.json"
     MANIFEST_FILENAME = "context_manifest.json"
     WORKSPACE_README = "README.md"
+    # SIF x Strategy: the active content strategy, mirrored for agents as
+    # human-readable markdown at ``<workspace>/strategy/active.md``.
+    STRATEGY_ACTIVE_MARKDOWN = "strategy/active.md"
     ALLOWED_CONTEXT_FILES = {
         STEP2_FILENAME,
         STEP3_FILENAME,
@@ -617,6 +620,28 @@ class AgentFlatContextStore:
         except Exception as exc:
             logger.error(f"Failed to save context for user {self.user_id} ({context_type}): {exc}")
             self._audit_event("write_context", filename, "error")
+            return False
+
+    def save_strategy_active_markdown(self, markdown: str) -> bool:
+        """Atomically write the active-strategy markdown mirror for agents.
+
+        Path: ``<workspace>/workspace_{user}/strategy/active.md`` (owner-only
+        dirs/files via ``_atomic_write_text``; the operator never reads or
+        serves this file). SIF x Strategy calls this on activation so the
+        VFS companion stays in sync with the SSOT even if embedding is
+        delayed. Returns True on success; a failure only logs a warning
+        and must never fail activation.
+        """
+        try:
+            target_file = self._workspace_file(self.STRATEGY_ACTIVE_MARKDOWN)
+            self._atomic_write_text(target_file, markdown)
+            self._audit_event("write_strategy_active", self.STRATEGY_ACTIVE_MARKDOWN, "success")
+            return True
+        except Exception as exc:
+            logger.warning(
+                f"Failed to write strategy active markdown for user {self.safe_user_id}: {exc}"
+            )
+            self._audit_event("write_strategy_active", self.STRATEGY_ACTIVE_MARKDOWN, "error")
             return False
 
     def save_step2_website_analysis(self, payload: Dict[str, Any], *, source: str = "onboarding_step2") -> bool:

@@ -9,6 +9,8 @@ import {
 } from '../common/onboardingStorageKeys';
 import {
   clearOnboardingWizardLocalState,
+  markDownstreamDirty,
+  markWebsiteStartFreshUi,
   shouldNotifyWebsiteAnalysisChanged,
   type WebsiteAnalysisChangeReason,
 } from './onboardingWebsiteReset';
@@ -17,6 +19,8 @@ export type { WebsiteAnalysisChangeReason };
 
 export function resetWebsiteInputForStartFresh(): void {
   console.log('[onboarding:session-change] Resetting website input for start fresh');
+  markDownstreamDirty();
+  markWebsiteStartFreshUi();
   clearDownstreamForWebsiteChange({ preserveActiveStep: true });
   try {
     localStorage.removeItem(ONBOARDING_STORAGE_KEYS.websiteUrl);

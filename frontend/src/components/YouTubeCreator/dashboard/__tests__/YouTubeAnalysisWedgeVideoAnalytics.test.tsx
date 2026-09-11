@@ -13,9 +13,6 @@ function renderAnalysis(overrides: {
   const onOpenVideoAnalytics = overrides.onOpenVideoAnalytics ?? vi.fn();
   const onOpenVideoPerformance = overrides.onOpenVideoPerformance ?? vi.fn();
   const onOpenPulse = overrides.onOpenPulse ?? vi.fn();
-  const onOpenSeo = vi.fn();
-  const onOpenGaps = vi.fn();
-  const onOpenRetention = vi.fn();
   render(
     <AnalysisWedgeModal
       open
@@ -26,18 +23,12 @@ function renderAnalysis(overrides: {
       onOpenPulse={onOpenPulse}
       onOpenVideoPerformance={onOpenVideoPerformance}
       onOpenVideoAnalytics={onOpenVideoAnalytics}
-      onOpenSeo={onOpenSeo}
-      onOpenGaps={onOpenGaps}
-      onOpenRetention={onOpenRetention}
     />,
   );
   return {
     onOpenVideoAnalytics,
     onOpenVideoPerformance,
     onOpenPulse,
-    onOpenSeo,
-    onOpenGaps,
-    onOpenRetention,
   };
 }
 
@@ -50,15 +41,12 @@ describe("AnalysisWedgeModal Video Analytics tile", () => {
     expect(handlers.onOpenVideoAnalytics).toHaveBeenCalledTimes(1);
     expect(handlers.onOpenVideoPerformance).not.toHaveBeenCalled();
     expect(handlers.onOpenPulse).not.toHaveBeenCalled();
-    expect(handlers.onOpenSeo).not.toHaveBeenCalled();
-    expect(handlers.onOpenGaps).not.toHaveBeenCalled();
-    expect(handlers.onOpenRetention).not.toHaveBeenCalled();
   });
 
   it("describes the four Studio analytics tabs", () => {
     renderAnalysis();
     expect(
-      screen.getByText("Overview, Reach, Engagement, and Audience for your videos."),
+      screen.getByText("Overview, Audience, Content, and Trends for your videos."),
     ).toBeTruthy();
   });
 });

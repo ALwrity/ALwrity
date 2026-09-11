@@ -1,6 +1,6 @@
 """YouTube Analytics API v2 helpers for channel Audience reports.
 
-Independent queries: demographics, geography, subscribed status.
+Independent queries: demographics, geography, subscribed status, device type.
 Used by youtube_analytics_audience. Not a second API client.
 """
 
@@ -22,6 +22,8 @@ GEO_DIMENSIONS = "country"
 GEO_METRICS = "views,estimatedMinutesWatched"
 SUBSCRIBED_DIMENSIONS = "subscribedStatus"
 SUBSCRIBED_METRICS = "views,estimatedMinutesWatched"
+DEVICE_DIMENSIONS = "deviceType"
+DEVICE_METRICS = "views,estimatedMinutesWatched"
 COUNTRY_TOP_N = 10
 UNKNOWN_COUNTRY_CODE = "ZZ"
 UNKNOWN_COUNTRY_LABEL = "Unknown country"
@@ -95,6 +97,49 @@ def parse_subscribed(report: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return parsed
 
 
+def parse_devices(report: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    parsed: List[Dict[str, Any]] = []
+    for row in (report or {}).get("rows") or []:
+        if not row or len(row) < 2:
+            continue
+        device_type = str(row[0] or "").strip()
+        if not device_type:
+            continue
+        views = optional_num(row[1])
+        minutes = optional_num(row[2] if len(row) > 2 else None)
+        parsed.append(
+            {
+                "device_type": device_type,
+                "views": views,
+                "watch_hours": watch_hours_from_minutes(minutes),
+                "minutes": minutes or 0.0,
+            }
+        )
+    parsed.sort(key=lambda item: item.get("minutes") or 0, reverse=True)
+    total_minutes = sum(item.get("minutes") or 0 for item in parsed)
+    result: List[Dict[str, Any]] = []
+    assigned = 0.0
+    last_index = len(parsed) - 1
+    for index, item in enumerate(parsed):
+        minutes = item.get("minutes") or 0.0
+        if total_minutes <= 0:
+            share = 0.0
+        elif index == last_index:
+            share = round(100.0 - assigned, 1)
+        else:
+            share = round(100.0 * minutes / total_minutes, 1)
+            assigned += share
+        result.append(
+            {
+                "device_type": item["device_type"],
+                "views": item["views"],
+                "watch_hours": item["watch_hours"],
+                "watch_share_percent": share,
+            }
+        )
+    return result
+
+
 def execute_demographics(analytics, start: date, end: date) -> Dict[str, Any]:
     logger.info(
         "YouTube channel audience demographics query start={} end={}",
@@ -147,6 +192,25 @@ def execute_subscribed(analytics, start: date, end: date) -> Dict[str, Any]:
             endDate=end.isoformat(),
             dimensions=SUBSCRIBED_DIMENSIONS,
             metrics=SUBSCRIBED_METRICS,
+        )
+        .execute()
+    )
+
+
+def execute_devices(analytics, start: date, end: date) -> Dict[str, Any]:
+    logger.info(
+        "YouTube channel audience devices query start={} end={}",
+        start.isoformat(),
+        end.isoformat(),
+    )
+    return (
+        analytics.reports()
+        .query(
+            ids="channel==MINE",
+            startDate=start.isoformat(),
+            endDate=end.isoformat(),
+            dimensions=DEVICE_DIMENSIONS,
+            metrics=DEVICE_METRICS,
         )
         .execute()
     )

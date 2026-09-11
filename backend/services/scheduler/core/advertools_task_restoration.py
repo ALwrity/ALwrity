@@ -75,7 +75,7 @@ async def restore_advertools_tasks(scheduler: Any) -> int:
                     )
                     db.commit()
                     total_created += 1
-                    logger.debug(f"Created weekly {task_type} task for user {user_id}")
+                    logger.trace(f"Created weekly {task_type} task for user {user_id}")
 
             finally:
                 db.close()

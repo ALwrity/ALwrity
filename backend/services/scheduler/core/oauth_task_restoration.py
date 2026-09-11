@@ -42,7 +42,7 @@ async def restore_oauth_monitoring_tasks(scheduler):
             try:
                 db = get_session_for_user(user_id)
                 if not db:
-                    logger.debug(f"[OAuth Task Restoration] Could not get database session for user {user_id}")
+                    logger.trace(f"[OAuth Task Restoration] Could not get database session for user {user_id}")
                     continue
                 
                 try:

@@ -51,26 +51,14 @@ def _has_active_strategy(db, user_id: str) -> bool:
     """Return True when the user has a strategy whose activation status is 'active'.
 
     Checked against ``StrategyActivationStatus`` (monitoring_models), which is
-    the single source of truth for strategy activation. Defensive: any failure
-    (missing table, DB hiccup, non-numeric user id) degrades to False so the
-    tasks-status endpoint never breaks because of this extra check.
+    the single source of truth for strategy activation. The row is resolved by
+    both the legacy numeric uid and the raw (Clerk) string ``user_id``.
+    Defensive: any failure (missing table, DB hiccup) degrades to False so
+    the tasks-status endpoint never breaks because of this extra check.
     """
     try:
-        from models.monitoring_models import StrategyActivationStatus
-        uid = int(user_id)
-    except (ImportError, ValueError, TypeError):
-        return False
-
-    try:
-        row = (
-            db.query(StrategyActivationStatus)
-            .filter(
-                StrategyActivationStatus.user_id == uid,
-                StrategyActivationStatus.status == "active",
-            )
-            .first()
-        )
-        return row is not None
+        from services.intelligence.strategy_sif_status import query_active_activation
+        return query_active_activation(db, user_id) is not None
     except Exception as e:
         logger.warning(f"[tasks_status] active-strategy check failed for user {user_id}: {e}")
         return False

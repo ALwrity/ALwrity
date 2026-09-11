@@ -11,11 +11,10 @@ import {
   ListItemIcon,
   ListItemText,
   Chip,
-  IconButton,
 } from '@mui/material';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import SearchIcon from '@mui/icons-material/Search';
-import CloseIcon from '@mui/icons-material/Close';
+import { OnboardingDialogCloseButton } from '../common/OnboardingDialogCloseButton';
 
 function safeText(item: any): string {
   if (typeof item === 'string') return item;
@@ -56,7 +55,7 @@ export const InsightsModals: React.FC<InsightsModalsProps> = ({
         PaperProps={{ sx: { borderRadius: 2, bgcolor: '#ffffff' } }}>
         <DialogTitle sx={{ pb: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography variant="h6" component="span" fontWeight={700} sx={{ color: '#0f172a' }}>Industry Benchmarks</Typography>
-          <IconButton size="small" onClick={onCloseBenchmarks} aria-label="close" sx={{ color: '#64748b' }}><CloseIcon fontSize="small" /></IconButton>
+          <OnboardingDialogCloseButton onClick={onCloseBenchmarks} />
         </DialogTitle>
         <DialogContent sx={{ pt: 2.5, bgcolor: '#ffffff' }}>
           {sitemapAnalysis?.analysis_data?.onboarding_insights?.industry_benchmarks?.map((benchmark: any, i: number) => {
@@ -75,7 +74,7 @@ export const InsightsModals: React.FC<InsightsModalsProps> = ({
         PaperProps={{ sx: { borderRadius: 2, bgcolor: '#ffffff' } }}>
         <DialogTitle sx={{ pb: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography variant="h6" component="span" fontWeight={700} sx={{ color: '#0f172a' }}>Content Strategy & SEO Insights</Typography>
-          <IconButton size="small" onClick={onCloseStrategy} aria-label="close" sx={{ color: '#64748b' }}><CloseIcon fontSize="small" /></IconButton>
+          <OnboardingDialogCloseButton onClick={onCloseStrategy} />
         </DialogTitle>
         <DialogContent sx={{ pt: 2.5, bgcolor: '#ffffff' }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: '0.85rem' }}>
@@ -123,7 +122,7 @@ export const InsightsModals: React.FC<InsightsModalsProps> = ({
         PaperProps={{ sx: { borderRadius: 2, bgcolor: '#ffffff' } }}>
         <DialogTitle sx={{ pb: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography variant="h6" component="span" fontWeight={700} sx={{ color: '#0f172a' }}>Publishing Patterns &amp; Trends</Typography>
-          <IconButton size="small" onClick={onClosePublishing} aria-label="close" sx={{ color: '#64748b' }}><CloseIcon fontSize="small" /></IconButton>
+          <OnboardingDialogCloseButton onClick={onClosePublishing} />
         </DialogTitle>
         <DialogContent sx={{ pt: 2.5, bgcolor: '#ffffff' }}>
           <Typography variant="body2" sx={{ mb: 2.5, color: '#475569', fontSize: '0.85rem' }}>
@@ -205,7 +204,7 @@ export const InsightsModals: React.FC<InsightsModalsProps> = ({
         PaperProps={{ sx: { borderRadius: 2, bgcolor: '#ffffff' } }}>
         <DialogTitle sx={{ pb: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography variant="h6" component="span" fontWeight={700} sx={{ color: '#0f172a' }}>Topics Your Site Covers</Typography>
-          <IconButton size="small" onClick={onCloseStructure} aria-label="close" sx={{ color: '#64748b' }}><CloseIcon fontSize="small" /></IconButton>
+          <OnboardingDialogCloseButton onClick={onCloseStructure} />
         </DialogTitle>
         <DialogContent sx={{ pt: 2.5, bgcolor: '#ffffff' }}>
           <Typography variant="body2" sx={{ mb: 2.5, color: '#475569', fontSize: '0.85rem' }}>

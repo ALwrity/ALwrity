@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import json
 import os
+import sqlite3
 import sys
 import tempfile
 import threading
@@ -234,6 +236,89 @@ def test_remediate_is_best_effort():
         assert result is True
         # Marker was removed even if index files weren't
         assert not os.path.exists(marker)
+
+
+def _make_txtai_index(dirpath: str, offset: int, rows: int) -> str:
+    """Build a minimal txtai index layout (config.json + embedded
+    ``documents`` SQLite DB with sections/documents/objects tables)."""
+    idx = os.path.join(dirpath, "fake_idx")
+    os.makedirs(idx, exist_ok=True)
+    with open(os.path.join(idx, "config.json"), "w") as f:
+        json.dump({"offset": offset}, f)
+    db = sqlite3.connect(os.path.join(idx, "documents"))
+    db.execute(
+        "CREATE TABLE sections (indexid INTEGER PRIMARY KEY, id TEXT, "
+        "text TEXT, tags TEXT, entry TEXT)"
+    )
+    db.execute(
+        "CREATE TABLE documents (id TEXT PRIMARY KEY, data TEXT, tags TEXT, entry TEXT)"
+    )
+    db.execute(
+        "CREATE TABLE objects (id TEXT PRIMARY KEY, object BLOB, tags TEXT, entry TEXT)"
+    )
+    db.executemany(
+        "INSERT INTO sections (indexid, id, text) VALUES (?, ?, ?)",
+        [(i, f"doc{i}", f"text{i}") for i in range(rows)],
+    )
+    db.commit()
+    db.close()
+    return idx
+
+
+def test_heal_index_consistency_no_drift():
+    mod = _load(
+        "_sif_heal_idle",
+        INTELLIGENCE_DIR / "sif_index_remediation.py",
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        idx = _make_txtai_index(tmp, offset=30, rows=30)
+        assert mod.heal_index_consistency(idx) is False
+        db = sqlite3.connect(os.path.join(idx, "documents"))
+        assert db.execute("SELECT COUNT(*) FROM sections").fetchone()[0] == 30
+        db.close()
+
+
+def test_heal_index_consistency_prunes_orphans():
+    """Sections ahead of ANN offset are pruned so the next upsert cannot
+    collide with existing ``sections.indexid`` values."""
+    mod = _load(
+        "_sif_heal_drift",
+        INTELLIGENCE_DIR / "sif_index_remediation.py",
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        idx = _make_txtai_index(tmp, offset=30, rows=47)
+        assert mod.heal_index_consistency(idx, user_id="u1") is True
+        db = sqlite3.connect(os.path.join(idx, "documents"))
+        assert db.execute("SELECT COUNT(*) FROM sections").fetchone()[0] == 30
+        assert db.execute("SELECT MAX(indexid) FROM sections").fetchone()[0] == 29
+        db.close()
+
+
+def test_heal_index_consistency_best_effort():
+    """Missing index/config must return False without raising."""
+    mod = _load(
+        "_sif_heal_missing",
+        INTELLIGENCE_DIR / "sif_index_remediation.py",
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        idx = os.path.join(tmp, "missing")
+        assert mod.heal_index_consistency(idx) is False
+
+
+def test_heal_index_consistency_malformed_db_best_effort():
+    """A non-SQLite 'documents' file must not raise."""
+    mod = _load(
+        "_sif_heal_baddb",
+        INTELLIGENCE_DIR / "sif_index_remediation.py",
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        idx = os.path.join(tmp, "fake_idx")
+        os.makedirs(idx, exist_ok=True)
+        with open(os.path.join(idx, "config.json"), "w") as f:
+            json.dump({"offset": 5}, f)
+        with open(os.path.join(idx, "documents"), "w") as f:
+            f.write("not a database")
+        assert mod.heal_index_consistency(idx) is False
 
 
 # ============================================================================

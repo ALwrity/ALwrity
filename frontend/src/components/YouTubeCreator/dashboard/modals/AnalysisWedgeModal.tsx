@@ -12,9 +12,6 @@ export const AnalysisWedgeModal: React.FC<AnalysisWedgeProps> = ({
   onOpenPulse,
   onOpenVideoPerformance,
   onOpenVideoAnalytics,
-  onOpenSeo,
-  onOpenGaps,
-  onOpenRetention,
 }) => (
   <YouTubeActionModal
     open={open}
@@ -30,7 +27,7 @@ export const AnalysisWedgeModal: React.FC<AnalysisWedgeProps> = ({
         icon="📊"
         accent="#8b5cf6"
         title="Channel Pulse"
-        description="Subscribers, views, and 28-day watch metrics."
+        description="Lifetime subscribers and views, plus 28-day watch time."
         onClick={() =>
           resolveOAuthTileClick(connected, "channel_pulse", onOpenPulse, onRequestConnect)
         }
@@ -39,7 +36,7 @@ export const AnalysisWedgeModal: React.FC<AnalysisWedgeProps> = ({
         icon="📈"
         accent="#0ea5e9"
         title="Video Performance"
-        description="Recent uploads with view/like signals from your channel."
+        description="Recent uploads with public views, likes, and comments."
         onClick={() =>
           resolveOAuthTileClick(
             connected,
@@ -53,7 +50,7 @@ export const AnalysisWedgeModal: React.FC<AnalysisWedgeProps> = ({
         icon="📉"
         accent="#ff0000"
         title="Video Analytics"
-        description="Overview, Reach, Engagement, and Audience for your videos."
+        description="Overview, Audience, Content, and Trends for your videos."
         onClick={() =>
           resolveOAuthTileClick(
             connected,
@@ -61,31 +58,6 @@ export const AnalysisWedgeModal: React.FC<AnalysisWedgeProps> = ({
             onOpenVideoAnalytics,
             onRequestConnect,
           )
-        }
-      />
-      <YouTubeToolTile
-        icon="🔎"
-        accent="#6366f1"
-        title="SEO & Metadata Audit"
-        description="Audit title/desc/tags vs your plan keywords."
-        hitl
-        onClick={onOpenSeo}
-      />
-      <YouTubeToolTile
-        icon="🧩"
-        accent="#10b981"
-        title="Content Gaps"
-        description="Fill niche holes from your Channel Bible + recent uploads."
-        hitl
-        onClick={onOpenGaps}
-      />
-      <YouTubeToolTile
-        icon="⏱️"
-        accent="#f59e0b"
-        title="Audience / Retention"
-        description="Avg view duration and watch-time tips."
-        onClick={() =>
-          resolveOAuthTileClick(connected, "retention", onOpenRetention, onRequestConnect)
         }
       />
     </div>

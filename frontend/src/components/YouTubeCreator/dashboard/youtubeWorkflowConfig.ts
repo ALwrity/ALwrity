@@ -77,7 +77,7 @@ const CARD_DEFS: Array<
   {
     id: "engagement",
     title: "Engagement",
-    description: "15-minute authority routine — reply, pin, community",
+    description: "15-minute authority routine — draft replies, you send",
     accent: "#10b981",
   },
   {

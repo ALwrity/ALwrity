@@ -10,18 +10,18 @@ import {
 } from "../youtubeVideoAnalyticsUi";
 
 describe("youtubeVideoAnalyticsUi", () => {
-  it("exposes Studio tab order Overview, Reach, Engagement, Audience", () => {
+  it("exposes Studio tab order Overview, Audience, Content, Trends", () => {
     expect(YOUTUBE_VIDEO_ANALYTICS_TABS.map((tab) => tab.id)).toEqual([
       "overview",
-      "reach",
-      "engagement",
       "audience",
+      "content",
+      "trends",
     ]);
     expect(YOUTUBE_VIDEO_ANALYTICS_TABS.map((tab) => tab.label)).toEqual([
       "Overview",
-      "Reach",
-      "Engagement",
       "Audience",
+      "Content",
+      "Trends",
     ]);
   });
 
@@ -44,21 +44,22 @@ describe("youtubeVideoAnalyticsUi", () => {
     expect(emptyAnalyticsPanelCopy("overview")).toBe(
       "Overview metrics will show here when analytics is connected.",
     );
-    expect(emptyAnalyticsPanelCopy("reach")).toBe(
-      "Reach metrics will show here when analytics is connected.",
+    expect(emptyAnalyticsPanelCopy("content")).toBe(
+      "Content analytics is coming soon.",
     );
-    expect(emptyAnalyticsPanelCopy("engagement")).toBe(
-      "Engagement metrics will show here when analytics is connected.",
+    expect(emptyAnalyticsPanelCopy("trends")).toBe(
+      "Trends analytics is coming soon.",
     );
     expect(emptyAnalyticsPanelCopy("audience")).toBe(
       "Audience metrics will show here when analytics is connected.",
     );
+    expect(emptyAnalyticsPanelCopy("content")).not.toMatch(/\d/);
     expect(emptyAnalyticsPanelCopy("overview")).not.toMatch(/\d/);
   });
 
   it("moves between Studio tabs in order", () => {
-    expect(nextAnalyticsTab("overview", 1)).toBe("reach");
-    expect(nextAnalyticsTab("audience", 1)).toBe("overview");
-    expect(nextAnalyticsTab("overview", -1)).toBe("audience");
+    expect(nextAnalyticsTab("overview", 1)).toBe("audience");
+    expect(nextAnalyticsTab("trends", 1)).toBe("overview");
+    expect(nextAnalyticsTab("overview", -1)).toBe("trends");
   });
 });

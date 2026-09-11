@@ -25,6 +25,7 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
   planAvatarUrl = null,
   onChannelBibleSaved,
   onCreatorDraftPatched,
+  onOpenCommunity,
 }) => {
   const niche = (channelBible?.niche || "").trim();
   const [bibleEditorOpen, setBibleEditorOpen] = useState(false);
@@ -180,6 +181,7 @@ export const PlanWedgeModal: React.FC<PlanWedgeProps> = ({
             <YouTubePlanSidebarTools
               goCreate={goCreate}
               onOpenUrlImport={() => setUrlImportOpen(true)}
+              onOpenCommunity={onOpenCommunity}
             />
           </div>
         </div>

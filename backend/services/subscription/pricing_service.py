@@ -139,7 +139,7 @@ class PricingService:
         # table; subsequent runs are no-ops (upsert).
         existing = self.db.query(APIProviderPricing).first()
         if existing is not None:
-            logger.debug("[PRICING_INIT] Pricing already initialized — skipping")
+            logger.trace("[PRICING_INIT] Pricing already initialized — skipping")
             return
 
         config = _shared_pricing_loader.get_config()
@@ -218,10 +218,10 @@ class PricingService:
                         except (AttributeError, Exception) as e:
                             logger.debug(f"Could not set {key} on plan {existing.name}: {e}")
                 existing.updated_at = datetime.utcnow()
-                logger.debug(f"Updated existing plan: {existing.name}")
+                logger.trace(f"Updated existing plan: {existing.name}")
 
         self.db.commit()
-        logger.debug("[PLANS_INIT] Default subscription plans synced from pricing.yaml")
+        logger.trace("[PLANS_INIT] Default subscription plans synced from pricing.yaml")
 
     def calculate_api_cost(self, provider: APIProvider, model_name: str, 
                           tokens_input: int = 0, tokens_output: int = 0, 

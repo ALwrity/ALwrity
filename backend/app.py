@@ -958,6 +958,39 @@ async def serve_frontend():
     """Serve the React frontend."""
     return frontend_serving.serve_frontend()
 
+def _derive_frontend_origin() -> str:
+    """Pick the frontend origin to advertise from the CORS origins list."""
+    backend_port = os.getenv("PORT", "8000")
+    backend_origins = {f"http://localhost:{backend_port}", f"http://127.0.0.1:{backend_port}"}
+    http_candidates: list[str] = []
+    for origin in allowed_origins:
+        if origin in backend_origins:
+            continue
+        if origin.startswith("https"):
+            return origin
+        http_candidates.append(origin)
+    return http_candidates[0] if http_candidates else "http://localhost:3000"
+
+def _print_backend_ready_banner(startup_seconds: float) -> None:
+    """Print a prominent readiness banner (plain print, not loguru, so it
+    always shows even with clean logging configured). With uvicorn reload the
+    child process fires this startup event only when the app is truly ready."""
+    host = os.getenv("HOST", "0.0.0.0")
+    port = os.getenv("PORT", "8000")
+    display_host = "localhost" if host in ("0.0.0.0", "127.0.0.1", "::") else host
+    backend_url = f"http://{display_host}:{port}"
+    frontend_url = _derive_frontend_origin()
+    border = "=" * 68
+    print("\n" + border, flush=True)
+    print("  ALWRITY BACKEND IS READY TO SERVE THE FRONTEND", flush=True)
+    print(border, flush=True)
+    print(f"   Frontend           : {frontend_url}", flush=True)
+    print(f"   Backend (API)      : {backend_url}", flush=True)
+    print(f"   API docs           : {backend_url}/api/docs", flush=True)
+    print(f"   Health check       : {backend_url}/health", flush=True)
+    print(f"   Startup completed  : {startup_seconds:.1f}s", flush=True)
+    print(border + "\n", flush=True)
+
 # Startup event - fires AFTER port is bound
 @app.on_event("startup")
 async def startup_event():
@@ -1032,6 +1065,14 @@ async def startup_event():
             except Exception as e:
                 logger.warning(f"[STARTUP] YouTube task recovery skipped: {e}")
 
+        # Phase 5: backfill strategies activated before SIF indexing shipped.
+        # Flag-gated + best-effort (run_startup_backfill never raises).
+        try:
+            from services.intelligence.strategy_backfill import run_startup_backfill
+            run_startup_backfill()
+        except Exception as backfill_err:
+            logger.warning(f"[STARTUP] Strategy SIF backfill skipped: {backfill_err}")
+
         # Check Wix configuration (OAuth-based, API key optional)
         wix_api_key = os.getenv('WIX_API_KEY')
         if wix_api_key:
@@ -1064,6 +1105,10 @@ async def startup_event():
             _assert_router_mounted("podcast")
         if _is_feature_enabled("blog_writer"):
             _assert_router_mounted("blog_writer")
+
+        # Prominent readiness banner — printed once, after every blocking
+        # initialization above completed, so it is true when it appears.
+        _print_backend_ready_banner(elapsed)
     except Exception as e:
         logger.error(f"Error during startup: {e}")
         # Don't raise - let the server start anyway

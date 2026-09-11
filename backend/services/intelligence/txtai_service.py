@@ -166,7 +166,10 @@ class TxtaiIntelligenceService:
     def _record_sif_event(operation: str, user_id: str, outcome: str, **extra):
         from .sif_metrics import inc_counter, log_sif_event
         inc_counter(f"sif_{operation}_total", outcome, value=extra.pop("value", 1))
-        log_sif_event(operation, user_id=user_id, outcome=outcome, extra=extra or None)
+        level = extra.pop("level", "info")
+        log_sif_event(
+            operation, user_id=user_id, outcome=outcome, extra=extra or None, level=level
+        )
         # Phase 5 / Issue #617 #10: stamp the instance as recently
         # used so the singleton cleanup doesn't evict it. The
         # cleanup itself runs only every Nth call to keep the
@@ -226,8 +229,12 @@ class TxtaiIntelligenceService:
         best-effort cleanup contract.
         """
         if load_existing_index:
-            from .sif_index_remediation import remediate_corrupt_index
+            from .sif_index_remediation import (
+                heal_index_consistency,
+                remediate_corrupt_index,
+            )
             remediate_corrupt_index(self.index_path, user_id=self.user_id)
+            heal_index_consistency(self.index_path, user_id=self.user_id)
         # Reset ANN flag after remediation — the recreated index uses
         # the correct faiss config (IVF1,Flat) and should be compatible.
         self._disable_ann_queries = False
@@ -501,9 +508,11 @@ class TxtaiIntelligenceService:
 
         except Exception as e:
             logger.error(f"Error indexing content for user {self.user_id}: {e}")
-            # Phase 4.2: record error.
+            # Phase 4.2: record error. The logger.error above is the
+            # user-visible signal; the per-attempt event line is TRACE so a
+            # retrying backfill doesn't repeat the same event at INFO.
             self._record_sif_event(
-                "index", user_id=self.user_id, outcome="error",
+                "index", user_id=self.user_id, outcome="error", level="trace",
             )
             message = str(e)
             is_windows_lock_error = isinstance(e, PermissionError) or "WinError 32" in message

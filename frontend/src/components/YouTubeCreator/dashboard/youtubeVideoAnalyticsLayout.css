@@ -80,10 +80,19 @@
   min-height: 120px;
 }
 
+.yt-video-analytics-progress {
+  margin: 0;
+}
+
 @media (max-width: 720px) {
   .yt-video-analytics-toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .yt-video-analytics-tabs {
+    flex-wrap: wrap;
+    gap: 8px 16px;
   }
 
   .yt-video-analytics-date__button {

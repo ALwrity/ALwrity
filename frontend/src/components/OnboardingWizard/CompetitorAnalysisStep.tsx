@@ -4,6 +4,7 @@ import {
   Typography,
   Alert,
   Button,
+  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -26,6 +27,7 @@ import { useCompetitorDiscovery } from './CompetitorAnalysisStep/useCompetitorDi
 import { useCompetitorResearchWorkflow } from './CompetitorAnalysisStep/useCompetitorResearchWorkflow';
 import { CompetitorAnalysisHeader } from './CompetitorAnalysisStep/CompetitorAnalysisHeader';
 import { labelify, renderStringList } from './CompetitorAnalysisStep/competitorStepUiHelpers';
+import { OnboardingDialogCloseButton } from './common/OnboardingDialogCloseButton';
 
 interface CompetitorAnalysisStepProps {
   onContinue: (researchData?: any) => void;
@@ -36,6 +38,8 @@ interface CompetitorAnalysisStepProps {
   onValidationChange?: (isValid: boolean) => void;
   initialData?: any;
   researchStepCompleted?: boolean;
+  backendResearchHasData?: boolean;
+  onResearchSessionChange?: (payload: Record<string, unknown>) => void;
 }
 
 const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
@@ -47,6 +51,8 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   onValidationChange,
   initialData,
   researchStepCompleted = false,
+  backendResearchHasData = false,
+  onResearchSessionChange,
 }) => {
   const classes = useOnboardingStyles();
 
@@ -58,7 +64,6 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   const [sitemapAnalysis, setSitemapAnalysis] = useState<any>(initialData?.sitemapAnalysis ?? null);
   const [isAnalyzingSitemap, setIsAnalyzingSitemap] = useState(false);
   const [isDiscoveringSocial, setIsDiscoveringSocial] = useState(false);
-  const [showHeaderInfo, setShowHeaderInfo] = useState(false);
   const [missingData, setMissingData] = useState(false);
   const [showBenchmarksModal, setShowBenchmarksModal] = useState(false);
   const [showStrategyModal, setShowStrategyModal] = useState(false);
@@ -91,6 +96,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     isAnalyzing,
     analysisProgress, analysisStep,
     showProgressModal,
+    isRestoring,
     startCompetitorDiscovery,
     updateCacheWithSitemapAnalysis,
     refreshContentPillars,
@@ -101,6 +107,8 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     sitemapAnalysis,
     mergeCrawlSocialMedia,
     researchStepCompleted,
+    backendResearchHasData,
+    onResearchSessionChange,
   });
 
   const {
@@ -173,6 +181,17 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     setShowHighlightsModal(true);
   };
 
+  if (isRestoring && competitors.length === 0 && !error) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center', mt: 8 }}>
+        <CircularProgress size={36} sx={{ mb: 2 }} />
+        <Typography variant="body1" color="text.secondary">
+          Loading your saved competitor research...
+        </Typography>
+      </Box>
+    );
+  }
+
   if (missingData) {
     return (
       <Box sx={{ p: 4, textAlign: 'center', mt: 8 }}>
@@ -192,9 +211,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   return (
     <Box sx={classes.container}>
       <CompetitorAnalysisHeader
-        showHeaderInfo={showHeaderInfo}
         isAnalyzing={isAnalyzing}
-        onToggleHeaderInfo={() => setShowHeaderInfo(!showHeaderInfo)}
         onRunFreshAnalysis={() => startCompetitorDiscovery(true)}
         onOpenBackgroundSetup={() => setBackgroundSetupOpen(true)}
       />
@@ -288,13 +305,24 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
       >
         {selectedCompetitor && (
           <>
-            <DialogTitle>
-              <Typography variant="h6" component="span" fontWeight={700} sx={{ color: '#0B1220' }}>
-                {selectedCompetitor.title || selectedCompetitor.domain}
-              </Typography>
-              <Typography variant="caption" component="div" sx={{ color: '#6B7280', mt: 0.5 }}>
-                {selectedCompetitor.domain}
-              </Typography>
+            <DialogTitle
+              sx={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: 1,
+                pr: 1.5,
+              }}
+            >
+              <Box>
+                <Typography variant="h6" component="span" fontWeight={700} sx={{ color: '#0B1220' }}>
+                  {selectedCompetitor.title || selectedCompetitor.domain}
+                </Typography>
+                <Typography variant="caption" component="div" sx={{ color: '#6B7280', mt: 0.5 }}>
+                  {selectedCompetitor.domain}
+                </Typography>
+              </Box>
+              <OnboardingDialogCloseButton onClick={() => setShowHighlightsModal(false)} />
             </DialogTitle>
             <DialogContent dividers>
               <Stack spacing={2.5}>

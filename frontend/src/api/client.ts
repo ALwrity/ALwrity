@@ -103,6 +103,38 @@ export const triggerSubscriptionError = async (error: any) => {
   return false;
 };
 
+// Global backend-unavailable handler (mirrors the subscription handler pattern).
+// Fired at most once per outage episode — on the transition into cooldown — so
+// the modal opens without spamming on every throttled request.
+let globalBackendUnavailableHandler: ((info: { reason: string; retrySeconds: number }) => void) | null = null;
+let globalBackendRecoveredHandler: (() => void) | null = null;
+
+export const setGlobalBackendUnavailableHandler = (
+  handler: (info: { reason: string; retrySeconds: number }) => void
+) => {
+  globalBackendUnavailableHandler = handler;
+};
+
+export const setGlobalBackendRecoveredHandler = (handler: () => void) => {
+  globalBackendRecoveredHandler = handler;
+};
+
+const notifyBackendUnavailable = (reason: string, retrySeconds: number): void => {
+  try {
+    globalBackendUnavailableHandler?.({ reason, retrySeconds });
+  } catch (err) {
+    console.error('[apiClient] Global backend-unavailable handler failed:', err);
+  }
+};
+
+const notifyBackendRecovered = (): void => {
+  try {
+    globalBackendRecoveredHandler?.();
+  } catch (err) {
+    console.error('[apiClient] Global backend-recovered handler failed:', err);
+  }
+};
+
 // Optional token getter installed from within the app after Clerk is available
 let authTokenGetter: (() => Promise<string | null>) | null = null;
 
@@ -173,6 +205,7 @@ const cooldownSkipLoggedBySource = new Map<string, number>();
 const isBackendTemporarilyUnavailable = () => Date.now() < backendUnavailableUntil;
 
 const openBackendCooldown = (reason: string) => {
+  const wasInCooldown = isBackendTemporarilyUnavailable();
   backendFailureCount = Math.min(6, backendFailureCount + 1);
   const cooldownMs = Math.min(
     BACKEND_COOLDOWN_MAX_MS,
@@ -182,15 +215,23 @@ const openBackendCooldown = (reason: string) => {
   console.warn(
     `[apiClient] Backend unavailable (${reason}). Cooling down requests for ${Math.ceil(cooldownMs / 1000)}s.`
   );
+  // Fire only on the transition into cooldown (once per outage episode).
+  if (!wasInCooldown) {
+    notifyBackendUnavailable(reason, Math.ceil(cooldownMs / 1000));
+  }
 };
 
 const clearBackendCooldown = () => {
-  if (backendFailureCount > 0 || backendUnavailableUntil > 0) {
+  const wasInCooldown = backendFailureCount > 0 || backendUnavailableUntil > 0;
+  if (wasInCooldown) {
     console.info('[apiClient] Backend connectivity restored. Clearing cooldown state.');
   }
   backendFailureCount = 0;
   backendUnavailableUntil = 0;
   cooldownSkipLoggedBySource.clear();
+  if (wasInCooldown) {
+    notifyBackendRecovered();
+  }
 };
 
 const buildCooldownError = () => {

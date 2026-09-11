@@ -67,7 +67,7 @@ async def get_content_gap_analyses(
     """Get content gap analysis with real AI insights - Database first approach."""
     try:
         user_id = str(current_user.get('id'))
-        logger.info(f"🚀 Starting content gap analysis for user: {user_id}, strategy: {strategy_id}, force_refresh: {force_refresh}")
+        logger.trace(f"🚀 Starting content gap analysis for user: {user_id}, strategy: {strategy_id}, force_refresh: {force_refresh}")
         
         result = await gap_analysis_service.get_gap_analyses(user_id, strategy_id, force_refresh)
         return result
