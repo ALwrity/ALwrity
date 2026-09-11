@@ -87,8 +87,15 @@ class CalendarGenerationService:
             while elapsed_time < max_wait_time:
                 progress = self.get_orchestrator_progress(session_id)
                 if progress and progress.get("status") == "completed":
-                    calendar_data = progress.get("step_results", {}).get("step_12", {}).get("result", {})
+                    # The orchestrator stores the final assembled calendar on
+                    # the session; the progress tracker only keeps per-step
+                    # metadata (so the old ``step_12.result`` read was empty).
+                    session = self.orchestrator_sessions.get(session_id, {})
+                    calendar_data = session.get("result", {}) or {}
                     processing_time = time.time() - start_time
+                    calendar_data["processing_time"] = processing_time
+                    if "generated_at" not in calendar_data:
+                        calendar_data["generated_at"] = datetime.now().isoformat()
                     
                     # Save to database
                     await self._save_calendar_to_db(user_id, strategy_id, calendar_data, session_id)
@@ -96,6 +103,8 @@ class CalendarGenerationService:
                     logger.info(f"✅ Calendar generated successfully in {processing_time:.2f}s")
                     return calendar_data
                 elif progress and progress.get("status") == "failed":
+                    raise Exception(f"Calendar generation failed: {progress.get('errors', ['Unknown error'])}")
+                elif progress and progress.get("status") == "error":
                     raise Exception(f"Calendar generation failed: {progress.get('errors', ['Unknown error'])}")
                 
                 await asyncio.sleep(wait_interval)
@@ -598,13 +607,39 @@ class CalendarGenerationService:
                 progress_callback=lambda progress: self._update_session_progress(session_id, progress)
             )
             
-            # Update session with final result
-            session["status"] = "completed"
-            session["result"] = result
-            session["end_time"] = datetime.now()
+            # Update session with final result. Only a real calendar counts as
+            # completed: the orchestrator's error_handler returns an error dict
+            # (status == "error") or a completed status without any calendar.
+            is_real_calendar = (
+                isinstance(result, dict)
+                and result.get("status") == "completed"
+                and (result.get("daily_schedule") or result.get("final_calendar"))
+            )
+
+            if is_real_calendar:
+                session["status"] = "completed"
+                session["result"] = result
+                session["end_time"] = datetime.now()
+                logger.info(f"✅ Orchestrator generation completed for session {session_id}")
+            else:
+                error_message = (
+                    result.get("error_message")
+                    if isinstance(result, dict)
+                    else None
+                ) or "Calendar generation did not produce a valid calendar"
+                logger.error(f"❌ Orchestrator generation failed for session {session_id}: {error_message}")
+                session["status"] = "error"
+                session["error"] = error_message
+                session["end_time"] = datetime.now()
+                session.setdefault("progress", {}).setdefault("errors", []).append({
+                    "message": error_message,
+                    "step": None,
+                    "timestamp": datetime.now().isoformat(),
+                    "severity": "error",
+                    "recoverable": False,
+                })
+
             self._persist_session_to_db(session_id)
-            
-            logger.info(f"✅ Orchestrator generation completed for session {session_id}")
             
         except Exception as e:
             logger.error(f"❌ Orchestrator generation failed for session {session_id}: {e}")
@@ -656,7 +691,10 @@ class CalendarGenerationService:
                 "transparency_messages": session.get("transparency_messages", []),
                 "educational_content": session.get("educational_content", []),
                 "estimated_completion": session.get("estimated_completion"),
-                "last_updated": session.get("last_updated", datetime.now().isoformat())
+                "last_updated": session.get("last_updated", datetime.now().isoformat()),
+                # B4: deliver the assembled calendar only once the session
+                # actually completed with a real result.
+                "result": session.get("result") if session["status"] == "completed" else None
             }
             
         except Exception as e:
@@ -695,6 +733,16 @@ class CalendarGenerationService:
         try:
             if not self.db_session:
                 logger.warning("⚠️ No database session available, skipping persistence")
+                return
+
+            # F4/F5: never persist an error dict (or an empty result) as a
+            # completed calendar. The failure is already recorded on the
+            # session by start_orchestrator_generation / _persist_session_to_db.
+            if (
+                calendar_data.get("status") == "error"
+                or not (calendar_data.get("daily_schedule") or calendar_data.get("final_calendar"))
+            ):
+                logger.error(f"❌ Skipping DB persistence for failed calendar generation (session {session_id})")
                 return
 
             # Save session record
@@ -742,8 +790,8 @@ class CalendarGenerationService:
                             strategy_id=strategy_id,
                             title=item.get("title", "Untitled Event"),
                             description=item.get("description"),
-                            content_type=item.get("type", "social_post"),
-                            platform=item.get("platform", "generic"),
+                            content_type=item.get("type") or item.get("content_type") or "social_post",
+                            platform=item.get("platform") or item.get("target_platform") or "generic",
                             scheduled_date=scheduled_date,
                             status="draft",
                             ai_recommendations=item

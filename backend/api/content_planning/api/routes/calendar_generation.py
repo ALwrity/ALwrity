@@ -372,7 +372,8 @@ async def get_calendar_generation_progress(
             "errors": orchestrator_progress.get("errors", []),
             "warnings": orchestrator_progress.get("warnings", []),
             "estimated_completion": orchestrator_progress.get("estimated_completion"),
-            "last_updated": orchestrator_progress.get("last_updated")
+            "last_updated": orchestrator_progress.get("last_updated"),
+            "result": orchestrator_progress.get("result")
         }
         
     except Exception as e:

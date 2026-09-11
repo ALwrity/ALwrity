@@ -438,34 +438,86 @@ class PromptChainOrchestrator:
         """Generate final calendar from all step results."""
         try:
             logger.info("🎨 Generating final calendar from step results")
-            
-            # Extract results from each step
+
+            # Extract the per-step output data using the real wrapped shapes
+            # stored by the orchestrator (see _extract_step_output).
             step_results = context["step_results"]
-            
-            # TODO: Implement final calendar assembly logic
-            final_calendar = {
-                "calendar_type": context["calendar_type"],
-                "industry": context["industry"],
-                "business_size": context["business_size"],
-                "daily_schedule": step_results.get("step_08", {}).get("daily_schedule", []),
-                "weekly_themes": step_results.get("step_07", {}).get("weekly_themes", []),
-                "content_recommendations": step_results.get("step_09", {}).get("recommendations", []),
-                "optimal_timing": step_results.get("step_03", {}).get("timing", {}),
-                "performance_predictions": step_results.get("step_10", {}).get("predictions", {}),
-                "trending_topics": step_results.get("step_02", {}).get("trending_topics", []),
-                "repurposing_opportunities": step_results.get("step_09", {}).get("repurposing", []),
-                "ai_insights": step_results.get("step_01", {}).get("insights", []),
-                "competitor_analysis": step_results.get("step_02", {}).get("competitor_analysis", {}),
-                "gap_analysis_insights": step_results.get("step_02", {}).get("gap_analysis", {}),
-                "strategy_insights": step_results.get("step_01", {}).get("strategy_insights", {}),
-                "onboarding_insights": context["user_data"].get("onboarding_data", {}),
-                "content_pillars": step_results.get("step_05", {}).get("content_pillars", []),
-                "platform_strategies": step_results.get("step_06", {}).get("platform_strategies", {}),
-                "content_mix": step_results.get("step_05", {}).get("content_mix", {}),
+            step_01 = self._extract_step_output(step_results, "step_01")
+            step_02 = self._extract_step_output(step_results, "step_02")
+            step_03 = self._extract_step_output(step_results, "step_03")
+            step_09 = self._extract_step_output(step_results, "step_09")
+            step_10 = self._extract_step_output(step_results, "step_10")
+
+            # Step 12 already assembled the authoritative calendar.
+            step_12_output = self._extract_step_output(step_results, "step_12")
+            final_calendar = step_12_output.get("final_calendar", {})
+            calendar_structure = final_calendar.get("calendar_structure", {})
+            content_schedule = calendar_structure.get("content_schedule", [])
+            calendar_framework = calendar_structure.get("calendar_framework", {})
+            weekly_themes = calendar_framework.get("weekly_themes", []) or []
+
+            daily_schedule = [
+                self._project_schedule_day(day) for day in content_schedule
+            ]
+
+            content_pillars = self._as_str_list(step_01.get("content_pillars", []))
+            platform_strategies = self._as_dict(step_03.get("platform_strategies", {}))
+            content_mix = self._build_content_mix(
+                daily_schedule,
+                self._as_dict(step_03.get("content_mix", {})),
+                content_pillars,
+            )
+
+            # QA-6: echo the confirmed-strategy digest the calendar was generated
+            # against, so content scheduling visibly inherits the strategy.
+            final_calendar_response = {
+                "user_id": context.get("user_id", ""),
+                "strategy_id": context.get("strategy_id"),
+                "calendar_type": context.get("calendar_type", "monthly"),
+                "industry": context.get("industry") or "",
+                "business_size": context.get("business_size", "sme"),
+                "generated_at": datetime.now(),
+                "content_pillars": content_pillars,
+                "platform_strategies": platform_strategies,
+                "content_mix": content_mix,
+                "daily_schedule": daily_schedule,
+                "weekly_themes": weekly_themes,
+                "content_recommendations": self._as_list_of_dicts(
+                    step_09.get("final_recommendations")
+                    or step_09.get("content_recommendations")
+                    or [],
+                    content_key="recommendation",
+                ),
+                "optimal_timing": self._as_dict(
+                    step_03.get("optimal_timing") or {}, content_key="optimal_times"
+                ),
+                "performance_predictions": self._as_dict(
+                    step_10.get("prediction_metrics")
+                    or step_10.get("performance_metrics")
+                    or {},
+                ),
+                "trending_topics": self._as_list_of_dicts(
+                    step_02.get("trending_topics", []), content_key="topic"
+                ),
+                "repurposing_opportunities": [],
+                "ai_insights": self._as_list_of_dicts(
+                    step_01.get("strategic_insights", []), content_key="insight"
+                ),
+                "competitor_analysis": self._competitor_digest(step_01, step_02),
+                "gap_analysis_insights": self._gap_analysis_digest(step_02),
+                "strategy_insights": self._strategy_insights_digest(step_01),
+                "onboarding_insights": self._as_dict(
+                    context.get("user_data", {}).get("onboarding_data", {})
+                ),
+                "processing_time": 0.0,
+                "ai_confidence": float(
+                    final_calendar.get("quality_score")
+                    or step_12_output.get("quality_metrics", {}).get("overall_quality_score")
+                    or 0.8
+                ),
                 # QA-6: echo the confirmed-strategy digest the calendar was generated
                 # against, so content scheduling visibly inherits the strategy.
                 "strategy_digest": context.get("strategy_digest") or {},
-                "ai_confidence": 0.95,
                 "quality_score": self._calculate_overall_quality_score(context.get("quality_scores", {})),
                 "step_results_summary": {
                     step_key: {
@@ -475,13 +527,157 @@ class PromptChainOrchestrator:
                     for step_key in self.steps
                 }
             }
-            
+
             logger.info("✅ Final calendar generated successfully")
-            return final_calendar
-            
+            return final_calendar_response
+
         except Exception as e:
             logger.error(f"❌ Error generating final calendar: {str(e)}")
             raise
+
+    def _extract_step_output(self, step_results: Dict[str, Any], step_key: str) -> Dict[str, Any]:
+        """Extract the output data dict for a step from the orchestrator container.
+
+        The orchestrator stores the wrapped ``base_step.run()`` response under
+        ``step_results[step_key]``. Different step implementations wrap their
+        data differently (under ``result``, ``result.results``, or
+        ``result.output``), mirroring the shapes in step 12's normalization.
+        """
+        wrapped = step_results.get(step_key, {})
+        if not isinstance(wrapped, dict):
+            return {}
+        payload = wrapped.get("result", wrapped)
+        if not isinstance(payload, dict):
+            return {}
+
+        if step_key == "step_12":
+            if payload.get("completed") is True and isinstance(payload.get("output"), dict):
+                return payload["output"]
+            return {}
+
+        if isinstance(payload.get("output"), dict):
+            return payload["output"]
+
+        if step_key in ("step_01", "step_02", "step_03", "step_04", "step_08"):
+            results = payload.get("results")
+            if isinstance(results, dict):
+                return results
+            return payload
+
+        if step_key == "step_11":
+            nested = payload.get("step_11")
+            if isinstance(nested, dict):
+                return nested
+            return payload
+
+        return payload
+
+    def _project_schedule_day(self, day: Dict[str, Any]) -> Dict[str, Any]:
+        """Project a step-12 content-schedule day into the response contract.
+
+        ``content_items`` aliases the assembled ``content_pieces`` so the
+        persistence layer can materialize ``CalendarEvent`` rows from it.
+        """
+        content_pieces = day.get("content_pieces", [])
+        return {
+            "date": day.get("date"),
+            "week_number": day.get("week_number"),
+            "theme": day.get("theme", "General"),
+            "content_items": content_pieces,
+            "content_pieces": content_pieces,
+            "platform_distribution": self._as_dict(day.get("platform_distribution", {})),
+            "quality_metrics": day.get("quality_metrics"),
+            "optimization_notes": day.get("optimization_notes", []),
+        }
+
+    def _build_content_mix(self, daily_schedule: List[Dict[str, Any]], raw_mix: Dict[str, Any], content_pillars: List[str]) -> Dict[str, float]:
+        """Derive a contract-safe ``Dict[str, float]`` content mix.
+
+        Merges the step-3 mix (if already numeric) with fractions computed
+        from the scheduled content pieces; falls back to an even split over
+        content pillars when nothing is scheduled.
+        """
+        mix: Dict[str, float] = {}
+        for key, value in raw_mix.items():
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                mix[str(key)] = float(value)
+
+        counts: Dict[str, int] = {}
+        for day in daily_schedule:
+            for item in day.get("content_items", []):
+                content_type = item.get("content_type") or item.get("type") or "misc"
+                counts[content_type] = counts.get(content_type, 0) + 1
+
+        if counts:
+            total = float(sum(counts.values()))
+            mix.update({key: round(value / total, 4) for key, value in counts.items()})
+
+        if not mix and content_pillars:
+            split = round(1.0 / len(content_pillars), 4)
+            mix = {pillar: split for pillar in content_pillars}
+
+        return mix
+
+    def _competitor_digest(self, step_01: Dict[str, Any], step_02: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge step-1 competitive landscape and step-2 competitor insights."""
+        digest = {}
+        landscape = self._as_dict(step_01.get("competitive_landscape", {}))
+        insights = self._as_dict(step_02.get("competitor_insights", {}))
+        for source in (insights, landscape):
+            for key, value in source.items():
+                digest.setdefault(key, value)
+        return digest
+
+    def _gap_analysis_digest(self, step_02: Dict[str, Any]) -> Dict[str, Any]:
+        """Shape step-2 gap analysis into the response's insights container."""
+        digest = {}
+        for key in ("content_gaps", "keyword_opportunities", "competitor_insights", "recommendations"):
+            value = step_02.get(key)
+            if value is not None:
+                digest[key] = value
+        return digest
+
+    def _strategy_insights_digest(self, step_01: Dict[str, Any]) -> Dict[str, Any]:
+        """Shape step-1 strategy analysis into the response's insights digest."""
+        return {
+            "business_goals": self._as_list(step_01.get("business_goals", [])),
+            "content_pillars": self._as_str_list(step_01.get("content_pillars", [])),
+            "market_positioning": step_01.get("market_positioning", ""),
+            "goal_alignment_score": step_01.get("goal_alignment_score", 0.0),
+            "strategy_coherence": step_01.get("strategy_coherence", 0.0),
+        }
+
+    def _as_str_list(self, value: Any) -> List[str]:
+        if not isinstance(value, list):
+            return []
+        return [str(item) for item in value if item is not None]
+
+    def _as_list(self, value: Any) -> List[Any]:
+        return list(value) if isinstance(value, list) else []
+
+    def _as_list_of_dicts(self, value: Any, content_key: str = "item") -> List[Dict[str, Any]]:
+        """Normalize a list into a list of dicts (contract-safe for ``List[Dict]``)."""
+        items = []
+        if isinstance(value, dict):
+            value = [value]
+        if not isinstance(value, list):
+            return items
+        for item in value:
+            if isinstance(item, dict):
+                items.append(item)
+            elif item is not None:
+                items.append({content_key: str(item)})
+        return items
+
+    def _as_dict(self, value: Any, content_key: str = "value") -> Dict[str, Any]:
+        """Normalize a value into a dict (contract-safe for ``Dict[str, Any]``)."""
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, list):
+            return {content_key: value}
+        if isinstance(value, (str, int, float)) and value not in ("", None):
+            return {content_key: value}
+        return {}
     
     def _calculate_overall_quality_score(self, quality_scores: Dict[str, float]) -> float:
         scores = [s for s in quality_scores.values() if s > 0.0]
