@@ -4,8 +4,8 @@ import {
   Button, Box, Typography, Stack, Tabs, Tab, IconButton, Dialog as MuiDialog,
 } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import CloseIcon from '@mui/icons-material/Close';
 import SkipNext from '@mui/icons-material/SkipNext';
+import { OnboardingDialogCloseButton } from '../../common/OnboardingDialogCloseButton';
 import ArticleIcon from '@mui/icons-material/Article';
 import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
 import ImageIcon from '@mui/icons-material/Image';
@@ -91,7 +91,7 @@ export const TestPersonaModal: React.FC<TestPersonaModalProps> = ({
             pb: 1,
           }}
         >
-          <Stack direction="row" alignItems="center" gap={1}>
+          <Stack direction="row" alignItems="flex-start" gap={1}>
             <Box
               sx={{
                 p: 1,
@@ -109,6 +109,7 @@ export const TestPersonaModal: React.FC<TestPersonaModalProps> = ({
                 Try text, voice, image, and video with your brand
               </Typography>
             </Box>
+            <OnboardingDialogCloseButton onClick={onClose} />
           </Stack>
           <Tabs
             value={activeTab}

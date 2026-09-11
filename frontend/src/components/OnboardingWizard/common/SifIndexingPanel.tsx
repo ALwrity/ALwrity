@@ -3,6 +3,7 @@ import { Box, Typography, Paper, CircularProgress } from '@mui/material';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import { apiClient } from '../../../api/client';
+import { OnboardingDialogCloseButton } from './OnboardingDialogCloseButton';
 import { invalidateOnboardingTasksStatus, useOnboardingTasksStatus } from '../../../hooks/useOnboardingTasksStatus';
 import type { OnboardingSifIndexingDetails } from '../../../api/onboarding';
 
@@ -290,8 +291,7 @@ export const SifIndexingPanel: React.FC = () => {
             style={{ background: '#fff', borderRadius: 14, maxWidth: 560, width: '90vw', maxHeight: '70vh', display: 'flex', flexDirection: 'column', boxShadow: '0 16px 48px rgba(0,0,0,0.2)' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #e8ecf1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>Indexed Pages ({indexedPages.length})</h3>
-              <button onClick={() => setShowPagesModal(false)}
-                style={{ background: 'none', border: 'none', fontSize: '1.3rem', cursor: 'pointer', color: '#94a3b8' }}>×</button>
+              <OnboardingDialogCloseButton onClick={() => setShowPagesModal(false)} />
             </div>
             <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px' }}>
               {/* Page list */}

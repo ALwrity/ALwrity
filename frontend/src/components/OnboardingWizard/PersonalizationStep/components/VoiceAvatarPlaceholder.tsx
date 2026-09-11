@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { Box, Typography, Paper, Stack, Button, Alert, TextField, CircularProgress, Slider, FormControlLabel, Checkbox, MenuItem, Tooltip, Chip, Divider, Grid, IconButton, Modal, Fade, Backdrop, LinearProgress } from '@mui/material';
+import { OnboardingDialogCloseButton } from '../../common/OnboardingDialogCloseButton';
 import { keyframes } from '@mui/system';
 import Mic from '@mui/icons-material/Mic';
 import GraphicEq from '@mui/icons-material/GraphicEq';
@@ -1303,11 +1304,11 @@ export const VoiceAvatarPlaceholder: React.FC<{ domainName?: string; onVoiceSet?
             outline: 'none'
           }}>
             <Stack spacing={3}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 1 }}>
                 <Box sx={{ p: 1.5, borderRadius: '12px', bgcolor: 'rgba(124, 58, 237, 0.1)', color: '#7C3AED' }}>
                   <AutoAwesome fontSize="large" />
                 </Box>
-                <Box>
+                <Box sx={{ flex: 1 }}>
                   <Typography variant="h5" fontWeight="800" sx={{ color: '#111827' }}>
                     Voice Cloning: What, How & Why
                   </Typography>
@@ -1315,6 +1316,7 @@ export const VoiceAvatarPlaceholder: React.FC<{ domainName?: string; onVoiceSet?
                     Understanding the power of Alwrity AI Voice
                   </Typography>
                 </Box>
+                <OnboardingDialogCloseButton onClick={() => setShowInfoModal(false)} />
               </Box>
 
               <Divider />

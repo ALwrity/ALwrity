@@ -29,6 +29,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import CardViewIcon from '@mui/icons-material/ViewModule';
 import ListViewIcon from '@mui/icons-material/ViewList';
+import { OnboardingDialogCloseButton } from '../../common/OnboardingDialogCloseButton';
 
 export interface Competitor {
   url: string;
@@ -317,7 +318,18 @@ const CompetitorsGrid: React.FC<CompetitorsGridProps> = ({
 
       {/* Add Competitor Dialog */}
       <Dialog open={openAddDialog} onClose={() => setOpenAddDialog(false)}>
-        <DialogTitle>Add Competitor Manually</DialogTitle>
+        <DialogTitle
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1,
+            pr: 1.5,
+          }}
+        >
+          <span>Add Competitor Manually</span>
+          <OnboardingDialogCloseButton onClick={() => setOpenAddDialog(false)} />
+        </DialogTitle>
         <DialogContent>
             <Typography variant="body2" color="textSecondary" paragraph>
                 Enter the URL of a competitor website to include in the analysis.

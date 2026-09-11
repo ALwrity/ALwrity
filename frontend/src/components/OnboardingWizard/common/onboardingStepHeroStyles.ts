@@ -1,0 +1,32 @@
+import { WEBSITE_STEP_HEADER_TOP_MARGIN } from '../WebsiteStep/constants/websiteStepLayout';
+
+/** Shared hero header spacing — matches WebsiteStep "Where should I begin?" */
+export const ONBOARDING_STEP_HERO_TOP_MARGIN = WEBSITE_STEP_HEADER_TOP_MARGIN;
+
+export const onboardingStepHeroTitleSx = {
+  fontWeight: 700,
+  mb: 1,
+  fontSize: { xs: '1.75rem', sm: '2rem', md: '2.25rem' },
+  letterSpacing: '-0.02em',
+} as const;
+
+export const onboardingStepHeroSubtitleSx = {
+  fontWeight: 500,
+  color: '#64748B',
+  fontSize: { xs: '0.95rem', sm: '1.05rem', md: '1.15rem' },
+  lineHeight: 1.5,
+} as const;
+
+export const onboardingStepHeroGradientPrimarySx = {
+  background: 'linear-gradient(135deg, #667eea 0%, #6b75e3 100%)',
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  backgroundClip: 'text',
+} as const;
+
+export const onboardingStepHeroGradientSecondarySx = {
+  background: 'linear-gradient(135deg, #6f72db 0%, #764ba2 60%, #6a4190 100%)',
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  backgroundClip: 'text',
+} as const;
