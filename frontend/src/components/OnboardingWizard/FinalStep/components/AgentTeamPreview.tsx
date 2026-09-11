@@ -16,7 +16,7 @@ import {
   DialogActions,
   IconButton,
 } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
+import { OnboardingDialogCloseButton } from "../../common/OnboardingDialogCloseButton";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -636,9 +636,7 @@ export const AgentTeamPreview: React.FC = () => {
               {error ? "Preview Error" : "Today's Plan Preview"}
             </Typography>
           </Box>
-          <IconButton onClick={closeResultModal} size="small">
-            <CloseIcon />
-          </IconButton>
+          <OnboardingDialogCloseButton onClick={closeResultModal} />
         </DialogTitle>
         
         <DialogContent dividers>

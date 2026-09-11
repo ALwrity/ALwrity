@@ -50,6 +50,7 @@ import {
 } from '../../../../api/brandAssets';
 import { getApiUrl } from '../../../../api/client';
 import { ImageGenerationModal } from '../../../shared/ImageGenerationModal';
+import { OnboardingDialogCloseButton } from '../../common/OnboardingDialogCloseButton';
 import { 
   ImageGenerationSettings, 
   ImageModel 
@@ -956,7 +957,7 @@ export const BrandAvatarStudio: React.FC<{ domainName?: string; onAvatarSet?: ()
             }}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" fontWeight="bold">Brand Avatar Guide</Typography>
-                <IconButton onClick={() => setShowInfoModal(false)} size="small"><Close /></IconButton>
+                <OnboardingDialogCloseButton onClick={() => setShowInfoModal(false)} />
               </Stack>
               <Typography variant="body2" paragraph>
                 <strong>What is a Brand Avatar?</strong><br/>
@@ -999,7 +1000,7 @@ export const BrandAvatarStudio: React.FC<{ domainName?: string; onAvatarSet?: ()
             }}>
               <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" fontWeight="bold">Avatar Templates</Typography>
-                <IconButton onClick={() => setShowExamplesModal(false)} size="small"><Close /></IconButton>
+                <OnboardingDialogCloseButton onClick={() => setShowExamplesModal(false)} />
               </Stack>
               <Grid container spacing={2}>
                 {BRAND_AVATAR_PRESETS.map((preset) => (

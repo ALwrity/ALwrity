@@ -1,4 +1,5 @@
 import React from "react";
+import { OnboardingDialogCloseButton } from "../../common/OnboardingDialogCloseButton";
 import {
   Box,
   Button,
@@ -945,7 +946,18 @@ const AgentTeamSection: React.FC<Props> = ({ websiteName, agents, contextCard, c
       </Stack>
 
       <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle>Preview: {previewTitle}</DialogTitle>
+        <DialogTitle
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1,
+            pr: 1.5,
+          }}
+        >
+          <span>Preview: {previewTitle}</span>
+          <OnboardingDialogCloseButton onClick={() => setPreviewOpen(false)} />
+        </DialogTitle>
         <DialogContent dividers>
           <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
             {typeof previewData === "string" ? previewData : JSON.stringify(previewData, null, 2)}

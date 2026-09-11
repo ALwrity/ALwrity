@@ -7,7 +7,6 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
-  IconButton,
   LinearProgress,
   Switch,
   Typography,
@@ -15,9 +14,9 @@ import {
   Alert,
   Tooltip,
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { longRunningApiClient, apiClient } from '../../../api/client';
+import { OnboardingDialogCloseButton } from '../common/OnboardingDialogCloseButton';
 import { seoDashboardAPI } from '../../../api/seoDashboard';
 import type { OnboardingScheduledTaskHealthResponse, OnboardingScheduledTaskHealthItem } from '../../../api/seoDashboard';
 
@@ -443,9 +442,7 @@ const ResearchStepBackgroundSetupModal: React.FC<Props> = ({ open, onClose }) =>
             })()}
           </Typography>
         </Box>
-        <IconButton onClick={onClose} size="small">
-          <CloseIcon />
-        </IconButton>
+        <OnboardingDialogCloseButton onClick={onClose} />
       </DialogTitle>
 
       <DialogContent sx={{ p: 0, backgroundColor: '#ffffff' }}>
