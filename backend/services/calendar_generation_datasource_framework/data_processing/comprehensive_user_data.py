@@ -27,7 +27,7 @@ from services.content_gap_analyzer.ai_engine_service import AIEngineService
 from services.active_strategy_service import ActiveStrategyService
 from services.database import SessionLocal
 
-logger.info("✅ Successfully imported real data processing services")
+logger.trace("✅ Successfully imported real data processing services (comprehensive user data)")
 
 
 class ComprehensiveUserDataProcessor:

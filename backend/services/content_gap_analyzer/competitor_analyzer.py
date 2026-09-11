@@ -28,7 +28,7 @@ class CompetitorAnalyzer:
         self.website_analyzer = WebsiteAnalyzer()
         self.ai_engine = AIEngineService()
         
-        logger.info("CompetitorAnalyzer initialized")
+        logger.trace("CompetitorAnalyzer initialized (content-gap competitor comparison)")
     
     async def analyze_competitors(self, competitor_urls: List[str], industry: str) -> Dict[str, Any]:
         """

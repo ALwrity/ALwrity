@@ -63,10 +63,10 @@ class GapAnalysisService:
         current_user_id = user_id or "1"
         ai_db = get_session_for_user(str(current_user_id))
         try:
-            logger.info(f"🚀 Starting content gap analysis for user: {user_id}, strategy: {strategy_id}, force_refresh: {force_refresh}")
+            logger.trace(f"🚀 Starting content gap analysis for user: {user_id}, strategy: {strategy_id}, force_refresh: {force_refresh}")
 
             if not force_refresh:
-                logger.info(f"🔍 Checking database for existing gap analysis for user {current_user_id}")
+                logger.trace(f"🔍 Checking database for existing gap analysis for user {current_user_id}")
                 existing_analysis = await self.ai_analysis_db_service.get_latest_ai_analysis(
                     user_id=current_user_id,
                     analysis_type="gap_analysis",

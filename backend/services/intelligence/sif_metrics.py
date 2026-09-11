@@ -30,6 +30,10 @@ Counters (monotonic):
 - ``sif_cluster_total{outcome=success|error|fallback}``
 - ``sif_cache_total{operation=read|write, outcome=hit|miss|error}``
 - ``sif_sync_total{source=..., outcome=success|skipped|error}``
+- ``sif_strategy_index_total{outcome=success|failure|skipped}`` (strategy embeds)
+- ``sif_strategy_index_retry_total{outcome=retry}`` (Phase 5: per-attempt backoff)
+- ``sif_strategy_backfill_total{outcome=dispatched|already_indexed|no_active_strategy|error}``
+  (Phase 5: startup catch-up pass per-user outcomes)
 
 Gauges (point-in-time):
 - ``sif_index_count{user_id=...}`` — number of docs in the index
@@ -240,6 +244,8 @@ def log_sif_event(
         logger.error(line)
     elif level == "debug":
         logger.debug(line)
+    elif level == "trace":
+        logger.trace(line)
     else:
         logger.info(line)
 

@@ -165,7 +165,7 @@ class ClerkAuthMiddleware:
 
                     # Use cached PyJWKClient with pinned jwks_url (never derived from token)
                     if jwks_url not in self._jwks_client_cache:
-                        logger.debug(f"Creating new PyJWKClient for {jwks_url} (caching enabled)")
+                        logger.trace(f"Creating new PyJWKClient for {jwks_url} (caching enabled)")
                         # Create client with caching enabled (cache_keys=True keeps keys in memory)
                         self._jwks_client_cache[jwks_url] = PyJWKClient(
                             jwks_url,
@@ -195,7 +195,7 @@ class ClerkAuthMiddleware:
                     last_name = decoded_token.get('last_name') or decoded_token.get('family_name')
                     
                     if user_id:
-                        logger.debug(f"Token verified for user {user_id}")
+                        logger.trace(f"Token verified for user {user_id}")
                         return {
                             'id': user_id,
                             'email': email,
@@ -210,7 +210,7 @@ class ClerkAuthMiddleware:
                     # Expired tokens are expected - log at debug level to reduce noise
                     error_msg = str(e).lower()
                     if 'expired' in error_msg or 'signature has expired' in error_msg:
-                        logger.debug(f"Token expired (expected): {e}")
+                        logger.trace(f"Token expired (expected): {e}")
                     else:
                         logger.warning(f"fastapi-clerk-auth verification error: {e}. Attempting fallback decoding.")
 
@@ -225,7 +225,7 @@ class ClerkAuthMiddleware:
                         last_name = decoded_token.get('last_name') or decoded_token.get('family_name')
                         
                         if user_id and self.allow_unverified_dev:
-                            logger.debug(f"Unverified token accepted (dev) for user: {email or 'unknown'} (ID: {user_id})")
+                            logger.trace(f"Unverified token accepted (dev) for user: {email or 'unknown'} (ID: {user_id})")
                             return {
                                 'id': user_id,
                                 'email': email,
@@ -242,7 +242,7 @@ class ClerkAuthMiddleware:
                     return None
             else:
                 # Fallback to custom implementation (not secure for production)
-                logger.debug("Using fallback JWT decoding without signature verification")
+                logger.trace("Using fallback JWT decoding without signature verification")
                 try:
                     import jwt
                     # Decode the JWT without verification to get claims
@@ -265,7 +265,7 @@ class ClerkAuthMiddleware:
                         return None
                     
                     if self.allow_unverified_dev:
-                        logger.debug(f"Token decoded successfully (fallback dev) for user: {email} (ID: {user_id})")
+                        logger.trace(f"Token decoded successfully (fallback dev) for user: {email} (ID: {user_id})")
                         return {
                             'id': user_id,
                             'email': email,
@@ -356,7 +356,7 @@ async def get_current_user(
                 if token:
                     user = await clerk_auth.verify_token(token)
                     if user:
-                        logger.info(f"✅ Manual token extraction successful for endpoint: {endpoint_path}")
+                        logger.trace(f"✅ Manual token extraction successful for endpoint: {endpoint_path}")
                         return user
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

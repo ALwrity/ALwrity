@@ -21,7 +21,7 @@ if services_dir not in sys.path:
 # Import real services - NO FALLBACKS
 from services.content_planning_db import ContentPlanningDBService
 
-logger.info("✅ Successfully imported real data processing services")
+logger.trace("✅ Successfully imported real data processing services (strategy data)")
 
 
 class StrategyDataProcessor:

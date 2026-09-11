@@ -26,7 +26,7 @@ class KeywordResearcher:
         """Initialize the keyword researcher."""
         self.ai_engine = AIEngineService()
         
-        logger.info("KeywordResearcher initialized")
+        logger.trace("KeywordResearcher initialized (content-gap keyword research)")
     
     async def analyze_keywords(self, industry: str, url: str, target_keywords: Optional[List[str]] = None) -> Dict[str, Any]:
         """

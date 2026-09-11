@@ -46,7 +46,7 @@ async def restore_platform_insights_tasks(scheduler):
             try:
                 db = get_session_for_user(user_id)
                 if not db:
-                    logger.debug(f"[Platform Insights Restoration] Could not get database session for user {user_id}")
+                    logger.trace(f"[Platform Insights Restoration] Could not get database session for user {user_id}")
                     continue
                 
                 try:
@@ -99,12 +99,12 @@ async def restore_platform_insights_tasks(scheduler):
                                         f"  ├─ User {user_id[:20]}...: {platform.upper()} task created"
                                     )
                                 else:
-                                    logger.debug(
+                                    logger.trace(
                                         f"[Platform Insights Restoration] Failed to create {platform} task "
                                         f"for user {user_id}: {result.get('error')}"
                                     )
                             except Exception as e:
-                                logger.debug(
+                                logger.trace(
                                     f"[Platform Insights Restoration] Error creating {platform} task "
                                     f"for user {user_id}: {e}"
                                 )

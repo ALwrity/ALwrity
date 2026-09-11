@@ -29,7 +29,7 @@ from services.content_gap_analyzer.ai_engine_service import AIEngineService
 from services.content_gap_analyzer.keyword_researcher import KeywordResearcher
 from services.content_gap_analyzer.competitor_analyzer import CompetitorAnalyzer
 
-logger.info("✅ Successfully imported real data processing classes")
+logger.trace("✅ Successfully imported real data processing classes (phase 1 prompt chaining)")
 
 
 class ContentStrategyAnalysisStep(PromptStep):
