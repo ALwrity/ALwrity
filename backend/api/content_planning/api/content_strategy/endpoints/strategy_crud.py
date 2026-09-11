@@ -189,20 +189,20 @@ async def get_enhanced_strategies(
         
         authenticated_user_id = clerk_user_id
         
-        logger.info(f"Getting enhanced strategies for authenticated user: {authenticated_user_id}, strategy: {strategy_id}")
+        logger.trace(f"Getting enhanced strategies for authenticated user: {authenticated_user_id}, strategy: {strategy_id}")
 
         import time as _time
         _t_construct = _time.monotonic()
         db_service = EnhancedStrategyDBService(db)
         enhanced_service = EnhancedStrategyService(db_service)
         _t_call_start = _time.monotonic()
-        logger.info(f"⏱️ strategy services constructed in {_t_call_start - _t_construct:.2f}s")
+        logger.trace(f"⏱️ strategy services constructed in {_t_call_start - _t_construct:.2f}s")
 
         # Use authenticated user_id to ensure users can only see their own strategies
         strategies_data = await enhanced_service.get_enhanced_strategies(authenticated_user_id, strategy_id, db)
-        logger.info(f"⏱️ get_enhanced_strategies call took {_time.monotonic() - _t_call_start:.2f}s")
+        logger.trace(f"⏱️ get_enhanced_strategies call took {_time.monotonic() - _t_call_start:.2f}s")
 
-        logger.info(f"Retrieved {strategies_data.get('total_count', 0)} strategies")
+        logger.trace(f"Retrieved {strategies_data.get('total_count', 0)} strategies")
         return ResponseBuilder.create_success_response(
             data=strategies_data,
             message=SUCCESS_MESSAGES['strategies_retrieved']

@@ -16,18 +16,29 @@ Design (locked in ``docs/planning/sif-strategy-integration.md``):
 - ``dispatch_activation_indexing`` is the single entry point called by
   the ``POST /strategy/activate`` endpoint after commit + cache clear.
   It: (1) respects the feature flag, (2) mirrors the markdown, then
-  (3) schedules ``index_active_strategy_async`` (fire-and-forget).
+  (3) records a ``pending`` lifecycle row in ``strategy_sif_index_status``
+  and (4) schedules ``index_active_strategy_async`` (fire-and-forget).
+  The task drives ``pending → running → success|skipped|failed`` so the
+  UI always has a truthful status while embedding runs. Every DB/FS
+  write is best-effort and never raises.
 """
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Dict
 
 from loguru import logger
 
-from .sif_strategy_source_ids import STRATEGY_FORM_FIELDS, _stringify_value
+from models.strategy_sif_index_status import STATUS_PENDING
+from .sif_strategy_source_ids import (
+    STRATEGY_FORM_FIELDS,
+    _stringify_value,
+    active_strategy_source_id,
+)
 from .strategy_indexer import (
     _to_iso,
     index_active_strategy_async,
+    record_strategy_sif_status,
     strategy_sif_indexing_enabled,
 )
 
@@ -113,11 +124,14 @@ def dispatch_activation_indexing(
     activation_date: Any,
     sif_service=None,
 ):
-    """Post-activation hook: mirror markdown (sync, best-effort) then embed (async).
+    """Post-activation hook: mirror markdown (sync, best-effort), record a
+    ``pending`` lifecycle row, then embed (async fire-and-forget).
 
     Must be called AFTER ``db.commit()`` and cache clear in the activation
     endpoint. Returns the ``asyncio.Task`` when indexing is dispatched,
-    otherwise ``None`` (feature disabled). Never raises.
+    otherwise ``None`` (feature disabled). Never raises. The task itself
+    transitions the lifecycle to ``running`` → terminal and yields the
+    embedded-doc count when awaited.
     """
     if not strategy_sif_indexing_enabled():
         logger.info("SIF x Strategy indexing disabled via feature flag")
@@ -129,6 +143,10 @@ def dispatch_activation_indexing(
             logger.warning(f"VFS companion markdown not written for user {user_id}")
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning(f"VFS companion dispatch error for user {user_id}: {exc}")
+
+    record_strategy_sif_status(
+        db, user_id, active_strategy_source_id(user_id), STATUS_PENDING
+    )
 
     return index_active_strategy_async(
         db, user_id, strategy_data, activation_date=activation_date, sif_service=sif_service

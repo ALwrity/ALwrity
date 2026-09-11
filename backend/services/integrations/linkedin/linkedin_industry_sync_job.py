@@ -63,14 +63,14 @@ def resolve_sync_user_id(oauth: Optional[LinkedInOAuthService] = None) -> Option
             logger.info("{} resolved sync user_id={}", LOG_PREFIX, user_id)
             return user_id
 
-    logger.warning("{} no connected Unipile account found for industry sync", LOG_PREFIX)
+    logger.trace("{} no connected Unipile account found for industry sync", LOG_PREFIX)
     return None
 
 
 async def sync_linkedin_industries_scheduled() -> Dict[str, Any]:
     """Daily cron entry — refresh LinkedIn industry cache from Unipile."""
     started = time.monotonic()
-    logger.info("{} scheduled sync starting", LOG_PREFIX)
+    logger.trace("{} scheduled sync starting", LOG_PREFIX)
     user_id = resolve_sync_user_id()
     if not user_id:
         return {"success": False, "item_count": 0, "reason": "no_sync_account"}

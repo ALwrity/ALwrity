@@ -70,7 +70,7 @@ async def get_calendar_events(
         clerk_user_id = str(current_user.get('id', ''))
         if not clerk_user_id:
             raise HTTPException(status_code=401, detail="Invalid user ID in authentication token")
-        logger.info(f"Fetching calendar events for user: {clerk_user_id}")
+        logger.trace(f"Fetching calendar events for user: {clerk_user_id}")
         
         events = await calendar_service.get_calendar_events(strategy_id, user_id=clerk_user_id, db=db)
         return [CalendarEventResponse(**event) for event in events]

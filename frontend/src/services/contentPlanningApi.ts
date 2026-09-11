@@ -737,6 +737,29 @@ class ContentPlanningAPI {
     });
   }
 
+  // Read-only semantic-index status for the active strategy (Phase 1 endpoint).
+  // Returns the SIF indexing lifecycle, watermark, VFS mirror and document kinds.
+  // Uses apiClient (auth header passthrough) and never triggers a write.
+  async getStrategySifStatus(): Promise<any> {
+    return this.handleRequest(async () => {
+      const response = await apiClient.get(`${this.baseURL}/enhanced-strategies/strategy/sif-status`);
+      return response.data?.data || response.data || null;
+    });
+  }
+
+  // Semantic search over the active strategy's SIF documents (Phase SIF-Search).
+  // Returns matches restricted to the strategy contract (8 kinds), labeled with
+  // the canonical kind names. The Semantic Dashboard's preset questions call
+  // this so an end user can prove "SIF x Content strategy" is working.
+  async searchStrategySif(query: string, limit: number = 4): Promise<any> {
+    return this.handleRequest(async () => {
+      const response = await apiClient.get(`${this.baseURL}/enhanced-strategies/strategy/sif-search`, {
+        params: { query, limit },
+      });
+      return response.data?.data || response.data || null;
+    });
+  }
+
   // Clear enhanced strategy streaming/cache for a user (best-effort refresh)
   // Note: Endpoint gets user_id from authentication, query params are ignored
   async clearEnhancedCache(userId?: number): Promise<any> {

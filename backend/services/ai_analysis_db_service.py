@@ -123,7 +123,7 @@ class AIAnalysisDBService:
             logger.error("No database session available for retrieving AI analysis")
             return None
         try:
-            logger.info(f"🔍 Retrieving latest AI analysis for user {user_id}, type: {analysis_type}")
+            logger.trace(f"🔍 Retrieving latest AI analysis for user {user_id}, type: {analysis_type}")
             
             # Build query
             query = session.query(AIAnalysisResult).filter(
@@ -138,8 +138,8 @@ class AIAnalysisDBService:
             latest_result = query.order_by(AIAnalysisResult.created_at.desc()).first()
             
             if latest_result:
-                logger.info(f"✅ Found recent AI analysis result: {latest_result.id}")
-                
+                logger.trace(f"✅ Found recent AI analysis result: {latest_result.id}")
+
                 # Convert to dictionary and log details
                 result_dict = {
                     "id": latest_result.id,
@@ -152,48 +152,50 @@ class AIAnalysisDBService:
                     "personalized_data_used": latest_result.personalized_data_used,
                     "ai_service_status": latest_result.ai_service_status
                 }
-                
-                # Log the detailed structure
-                logger.info(f"📊 AI Analysis Result Details:")
-                logger.info(f"   - Result ID: {result_dict['id']}")
-                logger.info(f"   - User ID: {result_dict['user_id']}")
-                logger.info(f"   - Strategy ID: {result_dict['strategy_id']}")
-                logger.info(f"   - Analysis Type: {result_dict['analysis_type']}")
-                logger.info(f"   - Analysis Date: {result_dict['analysis_date']}")
-                logger.info(f"   - Personalized Data Used [{_summarize_personalized_data_tree(result_dict['personalized_data_used'])}]")
-                logger.info(f"   - AI Service Status: {result_dict['ai_service_status']}")
-                
+
+                # Detailed structure is TRACE: it dwarfs every other line in
+                # the request on a many-user fleet (a ~30-line dump per
+                # read).
+                logger.trace(f"📊 AI Analysis Result Details:")
+                logger.trace(f"   - Result ID: {result_dict['id']}")
+                logger.trace(f"   - User ID: {result_dict['user_id']}")
+                logger.trace(f"   - Strategy ID: {result_dict['strategy_id']}")
+                logger.trace(f"   - Analysis Type: {result_dict['analysis_type']}")
+                logger.trace(f"   - Analysis Date: {result_dict['analysis_date']}")
+                logger.trace(f"   - Personalized Data Used [{_summarize_personalized_data_tree(result_dict['personalized_data_used'])}]")
+                logger.trace(f"   - AI Service Status: {result_dict['ai_service_status']}")
+
                 # Log results structure
                 results = result_dict.get("results", {})
-                logger.info(f"   - Results Keys: {list(results.keys())}")
-                logger.info(f"   - Results Type: {type(results)}")
-                
+                logger.trace(f"   - Results Keys: {list(results.keys())}")
+                logger.trace(f"   - Results Type: {type(results)}")
+
                 # Log recommendations
                 recommendations = result_dict.get("recommendations", [])
-                logger.info(f"   - Recommendations Count: {len(recommendations)}")
-                logger.info(f"   - Recommendations Type: {type(recommendations)}")
-                
+                logger.trace(f"   - Recommendations Count: {len(recommendations)}")
+                logger.trace(f"   - Recommendations Type: {type(recommendations)}")
+
                 # Log specific data if available
                 if results:
-                    logger.info("🔍 RESULTS DATA BREAKDOWN:")
+                    logger.trace("🔍 RESULTS DATA BREAKDOWN:")
                     for key, value in results.items():
                         if isinstance(value, list):
-                            logger.info(f"     {key}: {len(value)} items")
+                            logger.trace(f"     {key}: {len(value)} items")
                         elif isinstance(value, dict):
-                            logger.info(f"     {key}: {len(value)} keys")
+                            logger.trace(f"     {key}: {len(value)} keys")
                         else:
-                            logger.info(f"     {key}: {value}")
-                
+                            logger.trace(f"     {key}: {value}")
+
                 if recommendations:
-                    logger.info("🔍 RECOMMENDATIONS DATA BREAKDOWN:")
+                    logger.trace("🔍 RECOMMENDATIONS DATA BREAKDOWN:")
                     for i, rec in enumerate(recommendations[:3]):  # Log first 3
                         if isinstance(rec, dict):
-                            logger.info(f"     Recommendation {i+1}: {rec.get('title', 'N/A')}")
-                            logger.info(f"       Type: {rec.get('type', 'N/A')}")
-                            logger.info(f"       Priority: {rec.get('priority', 'N/A')}")
+                            logger.trace(f"     Recommendation {i+1}: {rec.get('title', 'N/A')}")
+                            logger.trace(f"       Type: {rec.get('type', 'N/A')}")
+                            logger.trace(f"       Priority: {rec.get('priority', 'N/A')}")
                         else:
-                            logger.info(f"     Recommendation {i+1}: {rec}")
-                
+                            logger.trace(f"     Recommendation {i+1}: {rec}")
+
                 return result_dict
             else:
                 logger.warning(f"⚠️ No AI analysis result found for user {user_id}, type: {analysis_type}")

@@ -58,12 +58,12 @@ class APIKeyInjectionMiddleware:
         """
         try:
             if self._should_skip_missing_key_warning(request):
-                logger.debug(f"[API Key Injection] Missing keys for user {user_id} on non-AI route; skipping warning")
+                logger.trace(f"[API Key Injection] Missing keys for user {user_id} on non-AI route; skipping warning")
                 return
 
             log_mode = os.getenv('API_KEY_INJECTION_MISSING_KEYS_LOG_MODE', 'debug').lower()
             if log_mode != 'warn_once':
-                logger.debug(f"No API keys found for user {user_id}")
+                logger.trace(f"No API keys found for user {user_id}")
                 return
 
             interval_seconds = int(os.getenv('API_KEY_INJECTION_MISSING_KEYS_LOG_INTERVAL_SECONDS', '900'))
@@ -73,10 +73,10 @@ class APIKeyInjectionMiddleware:
                 logger.warning(f"No API keys found for user {user_id}")
                 self._missing_keys_log_timestamps[user_id] = now
             else:
-                logger.debug(f"No API keys found for user {user_id} (warning suppressed by interval)")
+                logger.trace(f"No API keys found for user {user_id} (warning suppressed by interval)")
         except Exception as log_error:
             # Logging should never block request processing
-            logger.debug(f"[API Key Injection] Failed to log missing keys state for user {user_id}: {log_error}")
+            logger.trace(f"[API Key Injection] Failed to log missing keys state for user {user_id}: {log_error}")
     
     async def __call__(self, request: Request, call_next: Callable):
         """
@@ -97,7 +97,7 @@ class APIKeyInjectionMiddleware:
                     # Try different possible keys for user_id
                     user_id = user.get('user_id') or user.get('clerk_user_id') or user.get('id')
                     if user_id:
-                        logger.debug(f"[API Key Injection] Extracted user_id: {user_id}")
+                        logger.trace(f"[API Key Injection] Extracted user_id: {user_id}")
                         
                         # Store user_id in request.state for monitoring middleware
                         request.state.user_id = user_id
@@ -105,7 +105,7 @@ class APIKeyInjectionMiddleware:
                         logger.warning(f"[API Key Injection] User object missing ID: {user}")
                 else:
                     # Token verification failed (likely expired) - log at debug level to reduce noise
-                    logger.debug("[API Key Injection] Token verification failed (likely expired token)")
+                    logger.trace("[API Key Injection] Token verification failed (likely expired token)")
             except Exception as e:
                 logger.error(f"[API Key Injection] Could not extract user from token: {e}")
         

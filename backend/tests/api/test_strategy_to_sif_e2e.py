@@ -32,6 +32,12 @@ from sqlalchemy.pool import StaticPool
 from models.enhanced_strategy_models import EnhancedContentStrategy
 from models.monitoring_models import StrategyActivationStatus
 from models.sif_indexing_watermark import SIFIndexingWatermark
+from models.strategy_sif_index_status import (
+    STATUS_PENDING,
+    STATUS_RUNNING,
+    STATUS_SUCCESS,
+    StrategySifIndexStatus,
+)
 from services.intelligence.strategy_indexer import compute_strategy_source_hash
 
 _BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -90,6 +96,7 @@ def ctx(tmp_path):
         poolclass=StaticPool,
     )
     SIFIndexingWatermark.__table__.create(engine)
+    StrategySifIndexStatus.__table__.create(engine)
     EnhancedContentStrategy.__table__.create(engine)
     StrategyActivationStatus.__table__.create(engine)
     Session = sessionmaker(bind=engine)
@@ -145,6 +152,14 @@ def _watermark_row(session):
     return (
         session.query(SIFIndexingWatermark)
         .filter(SIFIndexingWatermark.user_id == UID)
+        .one_or_none()
+    )
+
+
+def _lifecycle_row(session):
+    return (
+        session.query(StrategySifIndexStatus)
+        .filter(StrategySifIndexStatus.user_id == UID)
         .one_or_none()
     )
 
@@ -219,6 +234,28 @@ class TestDispatchE2E:
         content = ctx.active_md.read_text(encoding="utf-8")
         assert "# Active Content Strategy" in content
         assert "- strategy_id: 7" in content
+
+    def test_lifecycle_goes_pending_to_success(self, ctx, monkeypatch):
+        monkeypatch.setattr(WORKSPACE_ROOT, lambda: ctx.workspace)
+        monkeypatch.setattr(SIF_FACTORY_PATH, ctx.sif_factory)
+
+        from services.intelligence.strategy_vfs_companion import dispatch_activation_indexing
+
+        async def _go():
+            task = dispatch_activation_indexing(ctx.session, UID, make_strategy(), ACTIVATION)
+            assert task is not None
+            pending = _lifecycle_row(ctx.session)
+            assert pending is not None, "dispatch must record a pending row synchronously"
+            assert pending.status == STATUS_PENDING
+            return await task
+
+        count = asyncio.run(_go())
+        assert count == 8
+        row = _lifecycle_row(ctx.session)
+        assert row.status == STATUS_SUCCESS, "task must flip pending -> running -> success"
+        assert row.embedding_count == 8
+        assert row.started_at is not None
+        assert row.finished_at is not None
 
 
 class TestHttpE2E:

@@ -18,6 +18,8 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useContentPlanningStore } from '../../../stores/contentPlanningStore';
 import { useOnboardingTasksStatus } from '../../../hooks/useOnboardingTasksStatus';
+import SemanticIndexSnapshotRow from './SemanticIndexSnapshotRow';
+import { isStrategySifSnapshotEnabled } from '../../../config/strategySifConfig';
 
 interface StrategySnapshotProps {
   /** Current strategy status from ContentStrategyTab */
@@ -233,6 +235,13 @@ const ContentStrategySnapshot: React.FC<StrategySnapshotProps> = ({
               </Box>
             )}
           </Box>
+        )}
+
+        {/* Semantic Index — Phase 3: compact dashboard row for the active
+            strategy's read-only index status. Gated by a feature flag (off by
+            default); degrades gracefully (renders nothing) on endpoint error. */}
+        {isStrategySifSnapshotEnabled() && (strategyStatus === 'active' || strategyStatus === 'pending') && (
+          <SemanticIndexSnapshotRow />
         )}
 
         {/* Action Button */}

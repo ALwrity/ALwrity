@@ -378,7 +378,7 @@ async def monitoring_middleware(request: Request, call_next):
                         user_id = None
             
             if user_id:
-                logger.debug(f"Monitoring: Using user_id from request.state: {user_id}")
+                logger.trace(f"Monitoring: Using user_id from request.state: {user_id}")
         
         # PRIORITY 2: Check query parameters
         elif hasattr(request, 'query_params') and 'user_id' in request.query_params:

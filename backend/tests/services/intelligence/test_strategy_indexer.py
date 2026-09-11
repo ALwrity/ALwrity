@@ -274,6 +274,34 @@ class TestIndexPipeline:
         assert count == 8
         assert len(service.calls) == 1
 
+    def test_retry_attempts_are_metered(self):
+        db = MagicMock()
+        service = FakeSIF(fail_before_success=2)
+        events = []
+        with patch.object(idx.SIFIndexingWatermark, "is_fresh", return_value=False), \
+             patch.object(idx.SIFIndexingWatermark, "upsert"), \
+             patch("services.intelligence.strategy_indexer._record_strategy_event",
+                   side_effect=lambda *a, **k: events.append((a, k))):
+
+            async def _wait():
+                task = index_active_strategy_async(
+                    db, UID, make_strategy(), activation_date=ACTIVATION,
+                    sif_service=service, retries=3, base_delay=0.01)
+                return await task
+
+            count = asyncio.run(_wait())
+        assert count == 8
+        retries = [e for e in events if e[0][0] == "strategy_index_retry"]
+        assert len(retries) == 2, "each failed attempt before the last must be metered"
+        attempts = {kw["attempt"] for (_op,), kw in retries}
+        assert attempts == {1, 2}
+        delays = {round(kw["delay"], 4) for (_op,), kw in retries}
+        assert delays == {0.01, 0.02}, "metered delay must match the backoff applied"
+        for (_op,), kw in retries:
+            assert kw["user_id"] == UID
+            assert kw["outcome"] == "retry"
+            assert kw["value"] == 1
+
     def test_async_task_exhausts_retries_returns_zero(self):
         db = MagicMock()
         service = FakeSIF(fail_before_success=999)

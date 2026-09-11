@@ -34,7 +34,7 @@ async def get_lightweight_statistics(current_user: Dict[str, Any] = Depends(get_
     """Get lightweight stats for dashboard header."""
     try:
         user_id = current_user.get('id') or current_user.get('clerk_user_id')
-        logger.debug(f"Fetching lightweight stats for user {user_id}")
+        logger.trace(f"Fetching lightweight stats for user {user_id}")
         
         if not user_id:
             logger.error(f"User ID is missing from current_user: {current_user}")
@@ -54,7 +54,7 @@ async def get_lightweight_statistics(current_user: Dict[str, Any] = Depends(get_
         
         try:
             stats = await get_lightweight_stats(user_id)
-            logger.debug(f"Lightweight stats retrieved for user {user_id}")
+            logger.trace(f"Lightweight stats retrieved for user {user_id}")
         except Exception as e:
             logger.error(f"Error calling get_lightweight_stats: {str(e)}", exc_info=True)
             # Return empty stats instead of 500 to keep frontend alive

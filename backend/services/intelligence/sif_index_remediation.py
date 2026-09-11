@@ -21,9 +21,11 @@ logged but does not raise, so the init path always proceeds.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import shutil
+import sqlite3
 import time
 from typing import List, Optional
 
@@ -104,3 +106,93 @@ def remediate_corrupt_index(
         except OSError:
             pass
     return True
+
+
+def heal_index_consistency(
+    index_path: str,
+    user_id: str = "unknown",
+    db_name: str = "documents",
+) -> bool:
+    """Best-effort repair of orphaned ``sections`` rows in a txtai index.
+
+    txtai assigns ``sections.indexid`` (its primary key) by advancing
+    ``config.offset``. If an earlier indexing stream wrote sections
+    rows whose embeddings were never persisted to the ANN index (e.g.
+    an interrupted/racing ``upsert``), the ANN size stays behind the
+    sections table. The next ``upsert`` then starts assigning indexids
+    at ``config.offset`` and collides with the leftover rows, surfacing
+    as ``sqlite3.IntegrityError: UNIQUE constraint failed:
+    sections.indexid`` forever after (every retry re-fails and the
+    strategy watermark never records).
+
+    Orphaned rows have no matching ANN vectors, so they are not
+    searchable and can be safely pruned. This function deletes every
+    sections row with ``indexid >= offset`` (plus any matching
+    ``documents`` / ``objects`` rows) so ``offset == MAX(indexid) + 1``
+    and the next upsert proceeds cleanly.
+
+    Best-effort: any failure is logged but never raised, so the init
+    path always continues.
+
+    Args:
+        index_path: the on-disk path of the txtai index.
+        user_id: for logging only.
+        db_name: name of the embedded database file (default ``documents``).
+
+    Returns:
+        True if orphaned rows were pruned. False when there is no
+        detected drift or the check could not run.
+    """
+    config_path = os.path.join(index_path, "config.json")
+    db_path = os.path.join(index_path, db_name)
+    if not os.path.exists(config_path) or not os.path.exists(db_path):
+        return False
+
+    try:
+        with open(config_path, encoding="utf-8") as handle:
+            config = json.load(handle)
+        offset = config.get("offset")
+        if offset is None:
+            return False
+
+        connection = sqlite3.connect(db_path)
+        try:
+            has_sections = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='sections'"
+            ).fetchone()
+            if not has_sections:
+                return False
+
+            max_id = connection.execute("SELECT MAX(indexid) FROM sections").fetchone()[0]
+            # In sync (or reverse drift which is benign) — nothing to prune.
+            if max_id is None or max_id + 1 <= offset:
+                return False
+
+            orphan_ids = [
+                row[0]
+                for row in connection.execute(
+                    "SELECT id FROM sections WHERE indexid >= ?", (offset,)
+                )
+            ]
+            pruned = connection.execute(
+                "DELETE FROM sections WHERE indexid >= ?", (offset,)
+            ).rowcount
+            for oid in orphan_ids:
+                connection.execute("DELETE FROM documents WHERE id = ?", (oid,))
+                connection.execute("DELETE FROM objects WHERE id = ?", (oid,))
+            connection.commit()
+
+            logger.warning(
+                "Phase 3.1 auto-remediation: pruned %s orphaned sections rows for "
+                "user %s (offset=%s, max_indexid=%s)",
+                pruned, user_id, offset, max_id,
+            )
+            return pruned > 0
+        finally:
+            connection.close()
+    except Exception as cleanup_err:
+        logger.warning(
+            "Phase 3.1 index consistency check failed for user %s: %s",
+            user_id, cleanup_err,
+        )
+        return False

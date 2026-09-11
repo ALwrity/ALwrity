@@ -99,7 +99,7 @@ def _check_linkedin(user_id: str) -> bool:
         # Constructor may raise (missing key) or the status call may
         # hit a database error. Either way, treat as "not connected"
         # so we don't poison the whole detection.
-        logger.debug(
+        logger.trace(
             f"[OAuth Monitoring] LinkedIn check skipped for user {user_id}: {exc}"
         )
         return False
@@ -120,18 +120,12 @@ def _safe_check(platform: str, checker: Callable[[str], bool], user_id: str) -> 
     """Run a per-platform connection check, swallowing any exception.
 
     One platform's check must never abort the rest of the detection loop.
+    Per-platform success/failure is surfaced once per user by
+    ``get_connected_platforms`` (single tree block); only real check
+    failures are logged here.
     """
     try:
-        connected = bool(checker(user_id))
-        if connected:
-            logger.debug(
-                f"[OAuth Monitoring] \u2705 {platform} connected for user {user_id}"
-            )
-        else:
-            logger.debug(
-                f"[OAuth Monitoring] \u274c {platform} not connected for user {user_id}"
-            )
-        return connected
+        return bool(checker(user_id))
     except Exception as exc:
         logger.warning(
             f"[OAuth Monitoring] \u26a0\ufe0f {platform} check failed for user {user_id}: {exc}",
@@ -159,13 +153,25 @@ def get_connected_platforms(user_id: str) -> List[str]:
         List of connected platform identifiers: ['gsc', 'bing', 'wordpress', 'wix', 'youtube', 'linkedin']
     """
     connected: List[str] = []
-
-    # Use DEBUG level for routine checks (called frequently by dashboard)
-    logger.debug(f"[OAuth Monitoring] Checking connected platforms for user: {user_id}")
+    results: List[Tuple[str, bool]] = []
 
     for platform_id, checker in _PLATFORM_CHECKS:
-        if _safe_check(platform_id, checker, user_id):
+        ok = _safe_check(platform_id, checker, user_id)
+        results.append((platform_id, ok))
+        if ok:
             connected.append(platform_id)
+
+    # Single compact tree block per user instead of one line per platform —
+    # this function is called for every user by scheduler-startup scans
+    # (OAuth + platform-insights restoration) and by the dashboard, so
+    # per-platform lines flood the console. TRACE keeps the detail invisible
+    # in the default and verbose console handlers (both start above TRACE).
+    lines = [f"[OAuth Monitoring] Connected platforms for user: {user_id}"]
+    for idx, (platform, ok) in enumerate(results):
+        prefix = "   \u2514\u2500" if idx == len(results) - 1 else "   \u251c\u2500"
+        status = "\u2705 connected" if ok else "\u274c not connected"
+        lines.append(f"{prefix} {platform:.<11}: {status}")
+    logger.trace("\n".join(lines))
 
     # Don't log here - let the caller log a formatted summary if needed
     # This function is called frequently and should be silent

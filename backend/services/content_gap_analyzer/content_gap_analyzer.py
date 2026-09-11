@@ -36,7 +36,7 @@ class ContentGapAnalyzer:
         # Temporary directories for crawl data
         self.temp_dir = tempfile.mkdtemp()
         
-        logger.info("ContentGapAnalyzer initialized")
+        logger.trace("ContentGapAnalyzer initialized (websites, competitors, keywords, AI insights)")
     
     async def analyze_comprehensive_gap(self, target_url: str, competitor_urls: List[str], 
                                       target_keywords: List[str], user_id: str, industry: str = "general") -> Dict[str, Any]:

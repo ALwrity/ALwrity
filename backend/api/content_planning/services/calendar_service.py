@@ -68,7 +68,7 @@ class CalendarService:
     async def get_calendar_events(self, strategy_id: Optional[int] = None, user_id: Optional[str] = None, db: Session = None) -> List[Dict[str, Any]]:
         """Get calendar events, optionally filtered by strategy and scoped to user."""
         try:
-            logger.info("Fetching calendar events")
+            logger.trace("Fetching calendar events")
             
             db_service = ContentPlanningDBService(db)
             

@@ -22,7 +22,7 @@ class WebsiteAnalyzer:
         """Initialize the website analyzer."""
         self.ai_engine = AIEngineService()
         
-        logger.info("WebsiteAnalyzer initialized")
+        logger.trace("WebsiteAnalyzer initialized (content-gap website structure analysis)")
     
     async def analyze_website(self, url: str, industry: str = "general") -> Dict[str, Any]:
         """

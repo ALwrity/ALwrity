@@ -122,7 +122,7 @@ class StrategyActivationStatus(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     strategy_id = Column(Integer, ForeignKey("enhanced_content_strategies.id"), nullable=False)
-    user_id = Column(Integer, nullable=False)
+    user_id = Column(String(255), nullable=False)  # raw Clerk id (see b2c3d4e5f6a7)
     activation_date = Column(DateTime, default=datetime.utcnow)
     status = Column(String(50), default='active')  # 'active', 'inactive', 'paused'
     performance_score = Column(Integer, nullable=True)

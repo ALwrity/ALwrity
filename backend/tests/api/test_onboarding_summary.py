@@ -271,15 +271,15 @@ def test_activation_check_failure_degrades_to_false():
     assert result["all_done"] is True  # rest of the payload still intact
 
 
-def test_non_numeric_user_id_degrades_to_false():
-    """StrategyActivationStatus.user_id is an Integer; a non-numeric id
-    must degrade to False, not crash."""
+def test_non_numeric_user_id_resolves_active_strategy():
+    """Clerk ids are raw strings — a non-numeric id with an active
+    activation row must resolve to True (not degrade)."""
     db = _fake_db(
         task_status="completed",
         activation_row=SimpleNamespace(status="active"),
         session_row=_session(step=5, progress=100.0),
     )
     result = _run(user_id="clerk_nonnumeric", db=db)
-    assert result["has_active_strategy"] is False
+    assert result["has_active_strategy"] is True
     # Task tables (String user_id) still resolve fine
     assert result["completed_count"] == 6

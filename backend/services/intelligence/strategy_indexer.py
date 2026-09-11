@@ -35,6 +35,13 @@ from typing import Any, Dict, List, Optional, Tuple
 from loguru import logger
 
 from models.sif_indexing_watermark import SIFIndexingWatermark
+from models.strategy_sif_index_status import (
+    STATUS_FAILED,
+    STATUS_RUNNING,
+    STATUS_SKIPPED,
+    STATUS_SUCCESS,
+    StrategySifIndexStatus,
+)
 from services.intelligence.txtai_service import TxtaiIntelligenceService
 
 from .sif_strategy_source_ids import (
@@ -159,7 +166,10 @@ def _record_strategy_event(operation: str, user_id: str, outcome: str, **extra):
     from .sif_metrics import inc_counter, log_sif_event
 
     inc_counter(f"sif_{operation}_total", outcome, value=extra.pop("value", 1))
-    log_sif_event(operation, user_id=user_id, outcome=outcome, extra=extra or None)
+    level = extra.pop("level", "info")
+    log_sif_event(
+        operation, user_id=user_id, outcome=outcome, extra=extra or None, level=level
+    )
 
 
 def get_document_metadata(sif_service, doc_id: str) -> Dict[str, Any]:
@@ -258,14 +268,21 @@ async def _index_with_retries(
     sif_service,
     retries: int,
     base_delay: float,
-) -> int:
+) -> Tuple[int, bool, Optional[str]]:
+    """Run ``index_active_strategy`` with retry/backoff.
+
+    Returns ``(count, ok, last_error)``: ``ok=True`` means the pipeline
+    completed (count may be 0 for a fresh-watermark / zero-embed skip);
+    ``ok=False`` means every attempt raised (count is 0 and ``last_error``
+    holds the final exception text for the status row).
+    """
     for attempt in range(1, retries + 1):
         try:
             count = await index_active_strategy(
                 db, user_id, strategy_data,
                 activation_date=activation_date, sif_service=sif_service,
             )
-            return count
+            return count, True, None
         except Exception as exc:
             logger.warning(
                 f"SIF strategy index attempt {attempt}/{retries} failed for "
@@ -274,9 +291,95 @@ async def _index_with_retries(
             if attempt == retries:
                 _record_strategy_event("strategy_index", user_id=user_id,
                                        outcome="failure", reason=str(exc), value=1)
-                return 0
+                return 0, False, str(exc)
+            # Phase 5 hardening: meter each non-final attempt so the
+            # connectivity retry/backoff is visible to operators
+            # (sif_strategy_index_retry_total). Runs before the sleep so
+            # the metered delay matches the backoff actually applied.
+            _record_strategy_event(
+                "strategy_index_retry", user_id=user_id, outcome="retry",
+                attempt=attempt, delay=base_delay * (2 ** (attempt - 1)), value=1,
+                level="trace",
+            )
             await asyncio.sleep(base_delay * (2 ** (attempt - 1)))
-    return 0
+    return 0, False, "unknown indexing failure"
+
+
+def record_strategy_sif_status(
+    db,
+    user_id: str,
+    source_id: str,
+    status: str,
+    *,
+    embedding_count: int = 0,
+    error_message=None,
+) -> None:
+    """Best-effort persistence of the indexing lifecycle phase.
+
+    Used by the dispatch hook (``pending``) and the indexing task
+    (``running`` → terminal). A DB error is logged and swallowed —
+    indexing must never fail activation because status tracking broke.
+    Commits here; the caller still owns the session.
+    """
+    try:
+        StrategySifIndexStatus.set_status(
+            db, user_id, source_id, status,
+            embedding_count=embedding_count, error_message=error_message,
+        )
+        db.commit()
+    except Exception as exc:
+        logger.debug(
+            f"strategy_sif_index_status write skipped for user={user_id} "
+            f"status={status}: {exc}"
+        )
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+
+async def _run_indexing_lifecycle(
+    db,
+    user_id: str,
+    strategy_data: Dict[str, Any],
+    *,
+    activation_date: Any,
+    sif_service,
+    retries: int,
+    base_delay: float,
+) -> int:
+    """Run ``_index_with_retries`` while mirroring the phase into
+    ``strategy_sif_index_status`` (``running`` → ``success``/``skipped``/
+    ``failed``).
+
+    Returns the docs actually embedded (0 for fresh/skip/failure) — the
+    same contract as the previous task body, so ``await task`` still
+    yields a count. Never raises.
+    """
+    source_id = active_strategy_source_id(user_id)
+    record_strategy_sif_status(db, user_id, source_id, STATUS_RUNNING)
+    try:
+        count, ok, last_error = await _index_with_retries(
+            db, user_id, strategy_data,
+            activation_date=activation_date, sif_service=sif_service,
+            retries=retries, base_delay=base_delay,
+        )
+    except Exception as exc:  # pragma: no cover - `_index_with_retries` never raises
+        logger.exception(f"SIF strategy lifecycle failed for user {user_id}: {exc}")
+        _record_strategy_event("strategy_index", user_id=user_id,
+                               outcome="failure", reason=str(exc), value=1)
+        record_strategy_sif_status(db, user_id, source_id, STATUS_FAILED,
+                                   error_message=str(exc))
+        return 0
+    if not ok:
+        record_strategy_sif_status(db, user_id, source_id, STATUS_FAILED,
+                                   error_message=last_error)
+    elif count > 0:
+        record_strategy_sif_status(db, user_id, source_id, STATUS_SUCCESS,
+                                   embedding_count=count)
+    else:
+        record_strategy_sif_status(db, user_id, source_id, STATUS_SKIPPED)
+    return count
 
 
 def index_active_strategy_async(
@@ -291,12 +394,14 @@ def index_active_strategy_async(
 ) -> "asyncio.Task":
     """Fire-and-forget indexing task for the activation hook.
 
-    Returns the ``asyncio.Task`` immediately; the endpoint must NOT await
-    it. Failures are logged, metered via ``sif_strategy_index_total``,
-    and never propagate (activation already committed by the caller).
+    The task drives the ``strategy_sif_index_status`` lifecycle
+    (``running`` → terminal), meters via ``sif_strategy_index_total``,
+    and never propagates exceptions. Awaiting the returned task yields
+    the embedded-doc count. Returns the ``asyncio.Task`` immediately;
+    the endpoint must NOT await it (activation already committed).
     """
     return asyncio.create_task(
-        _index_with_retries(
+        _run_indexing_lifecycle(
             db, user_id, strategy_data,
             activation_date=activation_date,
             sif_service=sif_service,
