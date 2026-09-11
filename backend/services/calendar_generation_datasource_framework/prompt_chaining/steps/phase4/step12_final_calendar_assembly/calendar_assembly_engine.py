@@ -192,7 +192,7 @@ class CalendarAssemblyEngine:
         if "step_07" in all_steps_data:
             step7_data = all_steps_data["step_07"]["output"]
             structured_data["weekly_themes"] = {
-                "weekly_theme_schedule": step7_data.get("weekly_theme_schedule", []),
+                "weekly_theme_schedule": step7_data.get("weekly_themes", []),
                 "theme_variety_analysis": step7_data.get("theme_variety_analysis", {}),
                 "strategic_alignment": step7_data.get("strategic_alignment", {})
             }
@@ -201,7 +201,7 @@ class CalendarAssemblyEngine:
         if "step_08" in all_steps_data:
             step8_data = all_steps_data["step_08"]["output"]
             structured_data["daily_planning"] = {
-                "daily_content_schedule": step8_data.get("daily_content_schedule", []),
+                "daily_content_schedule": step8_data.get("daily_content_schedules", []),
                 "platform_optimizations": step8_data.get("platform_optimizations", {}),
                 "timeline_coordination": step8_data.get("timeline_coordination", {}),
                 "content_uniqueness": step8_data.get("content_uniqueness", {})

@@ -20,6 +20,7 @@ import { apiClient } from '../../../api/client';
 import { useStrategyCalendarContext } from '../../../contexts/StrategyCalendarContext';
 import { useContentPlanningStore } from '../../../stores/contentPlanningStore';
 import { buildStrategyDigest } from '../../../services/strategyCalendarMapper';
+import { buildGeneratedCalendarView } from '../../../services/calendarGenerationViewMapper';
 
 // Import types
 import { type CalendarConfig } from '../components/CalendarWizardSteps/types';
@@ -224,43 +225,21 @@ const CreateTab: React.FC = () => {
     setCurrentCalendarConfig(null);
     setSessionId('');
 
-    const calendarData = results?.calendar || {};
     const qualityScores = results?.qualityScores || {};
-    const insights = results?.insights || {};
+    const calendar = buildGeneratedCalendarView(results?.calendar || {}, {
+      userId: 0,
+      strategyId: strategyContext?.strategyId ? parseInt(strategyContext.strategyId) : undefined,
+      calendarType: currentCalendarConfig?.calendarType || 'monthly',
+      industry: userData?.industry || 'technology',
+      businessSize: 'sme'
+    });
 
     setGeneratedCalendar({
-      user_id: 0,
-      strategy_id: strategyContext?.strategyId ? parseInt(strategyContext.strategyId) : undefined,
-      calendar_type: currentCalendarConfig?.calendarType || 'monthly',
-      industry: userData?.industry || 'technology',
-      business_size: 'sme',
-      generated_at: new Date().toISOString(),
-      content_pillars: calendarData.themes?.map?.((t: any) => t.name) || [],
-      platform_strategies: calendarData.platforms || [],
-      content_mix: {},
-      daily_schedule: calendarData.content || [],
-      weekly_themes: calendarData.themes || [],
-      content_recommendations: [],
-      optimal_timing: {},
-      performance_predictions: {},
-      trending_topics: [],
-      repurposing_opportunities: [],
-      ai_insights: Array.isArray(insights) ? insights : insights?.contentGaps || [],
-      competitor_analysis: {},
-      gap_analysis_insights: {},
-      strategy_insights: {},
-      onboarding_insights: {},
-      processing_time: 0,
-      ai_confidence: qualityScores?.overall || 0,
-      quality_indicators: qualityScores,
-      metadata: {
-        generated_at: new Date().toISOString(),
-        user_id: 0,
-        strategy_id: strategyContext?.strategyId ? parseInt(strategyContext.strategyId) : undefined,
-        calendar_type: currentCalendarConfig?.calendarType || 'monthly',
-        industry: userData?.industry || 'technology',
-        business_size: 'sme',
-        version: '1.0'
+      ...calendar,
+      ai_confidence: qualityScores?.overall || calendar.ai_confidence,
+      quality_indicators: {
+        ...(calendar.quality_indicators || {}),
+        ...qualityScores
       }
     });
 

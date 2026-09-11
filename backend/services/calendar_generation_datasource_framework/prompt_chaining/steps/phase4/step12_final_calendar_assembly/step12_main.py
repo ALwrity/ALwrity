@@ -127,16 +127,51 @@ class FinalCalendarAssemblyStep(PromptStep):
             }
 
     def _extract_all_steps_data(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract data from all 11 previous steps from the context."""
+        """Extract data from all 11 previous steps from the context.
+
+        The orchestrator stores each wrapped step response in
+        ``context["step_results"][step_key]`` (see ``base_step.run()``).
+        The wrapped payload has a ``status`` field and the step result under
+        ``result``. Different step implementations return different shapes:
+
+        - Legacy steps (1-7, 9-11): the ``result`` IS the output dict.
+        - Step 8: the wrapper carries ``results`` (daily_content_schedules).
+        - New-style ``{completed, output, metadata}`` returns.
+
+        Each entry is normalized to ``{completed, output, status}`` so the
+        downstream assembly engine only needs those two keys.
+        """
         all_steps_data = {}
-        
-        # Extract data for each step (1-11)
+        step_results = context.get("step_results", {})
+
         for step_num in range(1, 12):
             step_key = f"step_{step_num:02d}"
-            if step_key in context:
-                all_steps_data[step_key] = context[step_key]
-            else:
+            wrapper = step_results.get(step_key)
+            if not isinstance(wrapper, dict):
                 logger.warning(f"⚠️ Missing data for {step_key}")
+                continue
+
+            payload = wrapper.get("result", wrapper)
+
+            # Determine completion: wrapper status is authoritative, but we
+            # also accept a completed flag inside the payload itself.
+            completed = wrapper.get("status") == "completed"
+            if isinstance(payload, dict) and payload.get("completed") is True:
+                completed = True
+
+            # Determine the output payload:
+            output = payload
+            if isinstance(payload, dict):
+                if "output" in payload:
+                    output = payload["output"]
+                elif step_key == "step_08" and isinstance(payload.get("results"), dict):
+                    output = payload["results"]
+
+            all_steps_data[step_key] = {
+                "completed": completed,
+                "status": wrapper.get("status"),
+                "output": output,
+            }
 
         return all_steps_data
 
@@ -262,6 +297,15 @@ class FinalCalendarAssemblyStep(PromptStep):
             True if validation passes, False otherwise
         """
         try:
+            # The orchestrator passes the step's ``{completed, output,
+            # metadata}`` return; the actual assembled output lives under
+            # ``output``. Tolerate a flattened result dict as well.
+            if not isinstance(result, dict):
+                return False
+            result_payload = result.get("output", result)
+            if not isinstance(result_payload, dict):
+                return False
+
             # Check if result contains required fields
             required_fields = [
                 "final_calendar",
@@ -272,31 +316,31 @@ class FinalCalendarAssemblyStep(PromptStep):
             ]
             
             for field in required_fields:
-                if field not in result:
+                if field not in result_payload:
                     logger.error(f"❌ Missing required field: {field}")
                     return False
             
             # Validate final calendar
-            final_calendar = result.get("final_calendar", {})
+            final_calendar = result_payload.get("final_calendar", {})
             if not final_calendar:
                 logger.error("❌ No final calendar generated")
                 return False
             
             # Validate calendar summary
-            calendar_summary = result.get("calendar_summary", {})
+            calendar_summary = result_payload.get("calendar_summary", {})
             if not calendar_summary:
                 logger.error("❌ No calendar summary generated")
                 return False
             
             # Validate quality metrics
-            quality_metrics = result.get("quality_metrics", {})
+            quality_metrics = result_payload.get("quality_metrics", {})
             if not quality_metrics:
                 logger.error("❌ No quality metrics generated")
                 return False
             
             # Validate overall quality score
             overall_quality = quality_metrics.get("overall_quality_score", 0.0)
-            if overall_quality < 0.0 or overall_quality > 1.0:
+            if overall_quality is None or overall_quality < 0.0 or overall_quality > 1.0:
                 logger.error(f"❌ Invalid overall quality score: {overall_quality}")
                 return False
             

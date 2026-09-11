@@ -66,6 +66,10 @@ interface CalendarGenerationProgress {
     timestamp: string;
     severity: 'warning' | 'info';
   }>;
+
+  // Final generated calendar payload (backend orchestrator result) — present
+  // only when generation reached a real 'completed' status.
+  result?: any;
   
   // Enhanced metadata
   metadata?: {
@@ -159,6 +163,9 @@ const useCalendarGenerationPolling = (sessionId: string) => {
           // Enhanced error handling
           errors: data.errors || [],
           warnings: data.warnings || [],
+
+          // Final generated calendar payload (real backend result)
+          result: data.result || undefined,
           
           // Enhanced metadata
           metadata: {
