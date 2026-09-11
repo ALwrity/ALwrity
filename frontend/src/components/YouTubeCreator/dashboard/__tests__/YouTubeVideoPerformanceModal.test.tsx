@@ -3,7 +3,7 @@
  * Does not open Stale Refresh HITL (Remarket).
  */
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { YouTubeVideoPerformanceModal } from "../modals/YouTubeVideoPerformanceModal";
 import { youtubeStudioApi } from "../../../../services/youtubeStudioApi";
 
@@ -52,6 +52,69 @@ function videoCard(title: string) {
 describe("YouTubeVideoPerformanceModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedStudioApi.listChannelVideos.mockReset();
+  });
+
+  it("shows Performance progress until listChannelVideos resolves", async () => {
+    let resolveList!: (value: { success: boolean; videos: typeof listedVideo[] }) => void;
+    mockedStudioApi.listChannelVideos.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveList = resolve;
+      }),
+    );
+    renderPerformance();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading video performance");
+    expect(screen.getByRole("progressbar")).toBeTruthy();
+    expect(screen.queryByRole("article")).toBeNull();
+    resolveList({ success: true, videos: [listedVideo] });
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Rank Videos in 7 Days" })).toBeTruthy();
+    });
+    expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
+  it("does not apply a late list after close", async () => {
+    let resolveList!: (value: { success: boolean; videos: typeof listedVideo[] }) => void;
+    mockedStudioApi.listChannelVideos.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveList = resolve;
+      }),
+    );
+    const { rerender } = renderPerformance();
+    expect(screen.getByRole("progressbar")).toBeTruthy();
+    rerender(<YouTubeVideoPerformanceModal open={false} onClose={vi.fn()} />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await act(async () => {
+      resolveList({ success: true, videos: [listedVideo] });
+    });
+    expect(screen.queryByRole("article")).toBeNull();
+  });
+
+  it("shows progress instead of the previous list when reopened before the next fetch resolves", async () => {
+    mockedStudioApi.listChannelVideos.mockResolvedValueOnce({
+      success: true,
+      videos: [listedVideo],
+    });
+    const { rerender } = renderPerformance();
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Rank Videos in 7 Days" })).toBeTruthy();
+    });
+    let resolveList!: (value: { success: boolean; videos: typeof listedVideo[] }) => void;
+    mockedStudioApi.listChannelVideos.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveList = resolve;
+      }),
+    );
+    rerender(<YouTubeVideoPerformanceModal open={false} onClose={vi.fn()} />);
+    rerender(<YouTubeVideoPerformanceModal open onClose={vi.fn()} />);
+    expect(screen.queryByRole("article")).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading video performance");
+    await act(async () => {
+      resolveList({ success: true, videos: [listedVideo] });
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Rank Videos in 7 Days" })).toBeTruthy();
+    });
   });
 
   it("does not list channel videos when closed", () => {

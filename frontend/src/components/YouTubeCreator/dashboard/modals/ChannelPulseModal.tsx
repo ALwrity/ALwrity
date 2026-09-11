@@ -1,3 +1,6 @@
+/**
+ * Channel Pulse leaf — lifetime Data API counts plus 28-day Analytics window.
+ */
 import React, { useEffect, useState } from "react";
 import { YouTubeActionModal } from "../YouTubeActionModal";
 import { youtubeStudioApi } from "../../../../services/youtubeStudioApi";
@@ -5,24 +8,88 @@ import {
   YOUTUBE_WEDGE_MODAL_MAX_WIDTH,
   type YouTubeModalShellProps,
 } from "../youtubeWedgeModalUi";
+import { YouTubeAnalysisWedgeProgressPanel } from "../YouTubeAnalysisWedgeProgressPanel";
+
+const PULSE_LOAD_FAILED = "Could not load channel pulse.";
+const PULSE_WINDOW_DAYS = 28;
+
+type YouTubeChannelPulsePayload = {
+  success?: boolean;
+  message?: string;
+  error_code?: string;
+  lifetime?: {
+    subscriber_count?: number;
+    view_count?: number;
+    hidden_subscriber_count?: boolean;
+  };
+  window?: {
+    available?: boolean;
+    views?: number;
+    estimated_minutes_watched?: number;
+  };
+};
 
 export const ChannelPulseModal: React.FC<{
   open: boolean;
   onClose: () => void;
   shell?: YouTubeModalShellProps;
 }> = ({ open, onClose, shell }) => {
-  const [data, setData] = useState<any>(null);
+  const [wasOpen, setWasOpen] = useState(open);
+  const [data, setData] = useState<YouTubeChannelPulsePayload | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(open);
+
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    setData(null);
+    setStatus(null);
+    setLoading(open);
+  }
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      return;
+    }
+    setStatus(null);
+    setData(null);
+    setLoading(true);
+    let cancelled = false;
+    console.info("[YouTubeChannelPulse] Load start", { days: PULSE_WINDOW_DAYS });
     youtubeStudioApi
-      .getChannelPulse({ days: 28 })
-      .then((res) => {
+      .getChannelPulse({ days: PULSE_WINDOW_DAYS })
+      .then((res: YouTubeChannelPulsePayload) => {
+        if (cancelled) {
+          return;
+        }
+        setLoading(false);
+        if (!res?.success) {
+          console.warn("[YouTubeChannelPulse] Load unsuccessful", {
+            error_code: res?.error_code || "unavailable",
+          });
+          setData(null);
+          setStatus(res?.message || PULSE_LOAD_FAILED);
+          return;
+        }
+        console.info("[YouTubeChannelPulse] Load complete", {
+          windowAvailable: Boolean(res.window?.available),
+        });
         setData(res);
-        if (!res.success) setStatus(res.message);
+        setStatus(null);
       })
-      .catch((e) => setStatus(e?.message || "Failed"));
+      .catch((loadError: unknown) => {
+        if (cancelled) {
+          return;
+        }
+        console.error("[YouTubeChannelPulse] Load failed", {
+          errorName: loadError instanceof Error ? loadError.name : "Error",
+        });
+        setData(null);
+        setLoading(false);
+        setStatus(PULSE_LOAD_FAILED);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   const life = data?.lifetime || {};
@@ -40,8 +107,9 @@ export const ChannelPulseModal: React.FC<{
       titleSize={shell?.titleSize}
       headerLayout={shell?.headerLayout}
     >
-      {status && <p className="yt-modal-intro">{status}</p>}
-      {data?.success && (
+      {loading ? <YouTubeAnalysisWedgeProgressPanel fetch="pulse" /> : null}
+      {!loading && status ? <p className="yt-modal-intro">{status}</p> : null}
+      {!loading && data?.success ? (
         <>
           <div className="yt-rail-stat-row">
             <span className="yt-rail-stat-label">Subscribers</span>
@@ -66,7 +134,7 @@ export const ChannelPulseModal: React.FC<{
             </span>
           </div>
         </>
-      )}
+      ) : null}
     </YouTubeActionModal>
   );
 };
