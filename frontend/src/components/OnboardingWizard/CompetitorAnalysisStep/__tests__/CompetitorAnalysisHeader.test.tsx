@@ -3,13 +3,13 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CompetitorAnalysisHeader } from '../CompetitorAnalysisHeader';
 import { WEBSITE_STEP_HEADER_TOP_MARGIN } from '../../WebsiteStep/constants/websiteStepLayout';
+import { RESEARCH_INFO_MODAL_TITLE, RESEARCH_INFO_PANEL_TITLE } from '../ResearchStepInfoModal';
 
 const theme = createTheme();
 
 const defaultProps = {
   isAnalyzing: false,
   onRunFreshAnalysis: vi.fn(),
-  onOpenBackgroundSetup: vi.fn(),
 };
 
 describe('CompetitorAnalysisHeader', () => {
@@ -43,7 +43,7 @@ describe('CompetitorAnalysisHeader', () => {
     expect(header).toHaveAttribute('data-top-spacing-md', String(WEBSITE_STEP_HEADER_TOP_MARGIN.md));
   });
 
-  it('places action buttons on the same row as the title', () => {
+  it('places action buttons on the same row as the title without background setup shortcut', () => {
     render(
       <ThemeProvider theme={theme}>
         <CompetitorAnalysisHeader {...defaultProps} />
@@ -53,39 +53,33 @@ describe('CompetitorAnalysisHeader', () => {
     const titleRow = screen.getByTestId('research-step-title-row');
     expect(within(titleRow).getByRole('heading', { level: 1 })).toBeInTheDocument();
     expect(within(titleRow).getByRole('button', { name: /Run Fresh Analysis/i })).toBeInTheDocument();
-    expect(within(titleRow).getByRole('button', { name: /Smart Background Setup/i })).toBeInTheDocument();
-    expect(within(titleRow).getByRole('button', { name: /What ALwrity does/i })).toBeInTheDocument();
+    expect(within(titleRow).getByRole('button', { name: RESEARCH_INFO_MODAL_TITLE })).toBeInTheDocument();
+    expect(within(titleRow).queryByRole('button', { name: /Smart Background Setup/i })).not.toBeInTheDocument();
   });
 
-  it('opens info modal on info click', () => {
+  it('toggles collapse info panel on info click with centered title', () => {
     render(
       <ThemeProvider theme={theme}>
         <CompetitorAnalysisHeader {...defaultProps} />
       </ThemeProvider>
     );
 
-    expect(screen.queryByText('What ALwrity does?')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /What ALwrity does/i }));
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getAllByText('What ALwrity does?').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('research-step-info-panel')).not.toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: RESEARCH_INFO_MODAL_TITLE }));
+    expect(screen.getByTestId('research-step-info-panel')).toBeVisible();
+    expect(screen.getByRole('heading', { level: 2, name: RESEARCH_INFO_PANEL_TITLE })).toBeInTheDocument();
+    expect(screen.getByText('We analyze top competitors in your niche.')).toBeInTheDocument();
   });
 
-  it('invokes analysis and background setup handlers', () => {
+  it('invokes fresh analysis handler', () => {
     const onRunFreshAnalysis = vi.fn();
-    const onOpenBackgroundSetup = vi.fn();
     render(
       <ThemeProvider theme={theme}>
-        <CompetitorAnalysisHeader
-          {...defaultProps}
-          onRunFreshAnalysis={onRunFreshAnalysis}
-          onOpenBackgroundSetup={onOpenBackgroundSetup}
-        />
+        <CompetitorAnalysisHeader {...defaultProps} onRunFreshAnalysis={onRunFreshAnalysis} />
       </ThemeProvider>
     );
 
     fireEvent.click(screen.getByRole('button', { name: /Run Fresh Analysis/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Smart Background Setup/i }));
     expect(onRunFreshAnalysis).toHaveBeenCalledTimes(1);
-    expect(onOpenBackgroundSetup).toHaveBeenCalledTimes(1);
   });
 });

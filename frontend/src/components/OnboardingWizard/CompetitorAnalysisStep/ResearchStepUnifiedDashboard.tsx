@@ -22,6 +22,8 @@ import { BenchmarkInsightsSection } from './BenchmarkInsightsSection';
 import { StrategicInsightsSection } from './StrategicInsightsSection';
 import { ResearchStepVerticalSubTabs } from './ResearchStepVerticalSubTabs';
 import { ResearchStepBackgroundSetupPanel } from './ResearchStepBackgroundSetupPanel';
+import { useResearchStepBackgroundSetup } from './useResearchStepBackgroundSetup';
+import { getBackgroundSetupTaskSummaryLines } from './researchStepBackgroundSetupConstants';
 import type { ResearchStepDashboardProps } from './researchStepDashboardTypes';
 import {
   folderTabCardSx,
@@ -49,7 +51,7 @@ const MAIN_TABS = [
   {
     id: 'automation',
     title: 'Smart Background Setup',
-    caption: 'Scheduled tasks that run while you finish setup',
+    caption: '',
     icon: SettingsIcon,
     color: '#2563EB',
   },
@@ -88,12 +90,14 @@ export const ResearchStepUnifiedDashboard: React.FC<ResearchStepDashboardProps> 
     onShowStrategy,
     onShowPublishing,
     onShowStructure,
-    onOpenBackgroundSetup,
   } = props;
 
   const [activeMainTab, setActiveMainTab] = useState<MainTabId>('intelligence');
   const [intelligenceSubTab, setIntelligenceSubTab] = useState('competitors');
   const [opportunitiesSubTab, setOpportunitiesSubTab] = useState('strategic');
+  const backgroundSetup = useResearchStepBackgroundSetup(true);
+
+  const automationTabSummary = getBackgroundSetupTaskSummaryLines(backgroundSetup.prefs);
 
   const mainTabIndex = useMemo(
     () => MAIN_TABS.findIndex((t) => t.id === activeMainTab),
@@ -192,7 +196,9 @@ export const ResearchStepUnifiedDashboard: React.FC<ResearchStepDashboardProps> 
       );
     }
 
-    return <ResearchStepBackgroundSetupPanel onOpenBackgroundSetup={onOpenBackgroundSetup} />;
+    return (
+      <ResearchStepBackgroundSetupPanel active setup={backgroundSetup} />
+    );
   };
 
   return (
@@ -241,16 +247,42 @@ export const ResearchStepUnifiedDashboard: React.FC<ResearchStepDashboardProps> 
                           {tab.title}
                         </Typography>
                       </Box>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: '#64748B',
-                          textTransform: 'none',
-                          display: { xs: 'none', md: 'block' },
-                        }}
-                      >
-                        {tab.caption}
-                      </Typography>
+                      {tab.id === 'automation' ? (
+                        <Box
+                          sx={{
+                            display: { xs: 'none', md: 'flex' },
+                            flexDirection: 'column',
+                            gap: 0.25,
+                            maxWidth: 360,
+                          }}
+                        >
+                          <Typography
+                            variant="caption"
+                            sx={{ color: '#64748B', textTransform: 'none', lineHeight: 1.35 }}
+                          >
+                            {automationTabSummary.line1}
+                          </Typography>
+                          {automationTabSummary.line2 && (
+                            <Typography
+                              variant="caption"
+                              sx={{ color: '#64748B', textTransform: 'none', lineHeight: 1.35 }}
+                            >
+                              {automationTabSummary.line2}
+                            </Typography>
+                          )}
+                        </Box>
+                      ) : (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: '#64748B',
+                            textTransform: 'none',
+                            display: { xs: 'none', md: 'block' },
+                          }}
+                        >
+                          {tab.caption}
+                        </Typography>
+                      )}
                     </Box>
                   }
                   sx={getFolderTabSx(isActive, index, MAIN_TABS.length)}

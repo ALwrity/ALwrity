@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Box, Typography, Button, Tooltip, IconButton } from '@mui/material';
+import { Box, Typography, Button, Tooltip, IconButton, Collapse } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import InfoIcon from '@mui/icons-material/Info';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import {
   ONBOARDING_STEP_HERO_TOP_MARGIN,
   onboardingStepHeroGradientPrimarySx,
@@ -9,7 +10,8 @@ import {
   onboardingStepHeroSubtitleSx,
   onboardingStepHeroTitleSx,
 } from '../common/onboardingStepHeroStyles';
-import { ResearchStepInfoModal, RESEARCH_INFO_MODAL_TITLE } from './ResearchStepInfoModal';
+import { RESEARCH_INFO_MODAL_TITLE } from './researchStepInfoConstants';
+import { ResearchStepInfoPanel } from './ResearchStepInfoPanel';
 
 export const RESEARCH_STEP_SUBTITLE =
   'ALwrity discovers your competitors, maps their content strategy, and highlights gaps you can own — so the rest of your setup is built on real market data.';
@@ -17,15 +19,13 @@ export const RESEARCH_STEP_SUBTITLE =
 interface CompetitorAnalysisHeaderProps {
   isAnalyzing: boolean;
   onRunFreshAnalysis: () => void;
-  onOpenBackgroundSetup: () => void;
 }
 
 export const CompetitorAnalysisHeader: React.FC<CompetitorAnalysisHeaderProps> = ({
   isAnalyzing,
   onRunFreshAnalysis,
-  onOpenBackgroundSetup,
 }) => {
-  const [infoModalOpen, setInfoModalOpen] = useState(false);
+  const [showHeaderInfo, setShowHeaderInfo] = useState(false);
 
   return (
     <Box
@@ -76,11 +76,12 @@ export const CompetitorAnalysisHeader: React.FC<CompetitorAnalysisHeaderProps> =
           <Tooltip title={RESEARCH_INFO_MODAL_TITLE}>
             <IconButton
               size="small"
-              onClick={() => setInfoModalOpen(true)}
+              onClick={() => setShowHeaderInfo((prev) => !prev)}
               aria-label={RESEARCH_INFO_MODAL_TITLE}
+              aria-expanded={showHeaderInfo}
               sx={{ color: '#64748b' }}
             >
-              <InfoIcon />
+              {showHeaderInfo ? <ExpandLessIcon /> : <InfoIcon />}
             </IconButton>
           </Tooltip>
           <Button
@@ -99,20 +100,6 @@ export const CompetitorAnalysisHeader: React.FC<CompetitorAnalysisHeaderProps> =
           >
             {isAnalyzing ? 'Analyzing...' : 'Run Fresh Analysis'}
           </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={onOpenBackgroundSetup}
-            sx={{
-              borderColor: '#3b82f6',
-              color: '#3b82f6',
-              textTransform: 'none',
-              whiteSpace: 'nowrap',
-              '&:hover': { borderColor: '#2563eb', bgcolor: 'rgba(59,130,246,0.08)' },
-            }}
-          >
-            ⚙️ Smart Background Setup
-          </Button>
         </Box>
       </Box>
 
@@ -120,7 +107,9 @@ export const CompetitorAnalysisHeader: React.FC<CompetitorAnalysisHeaderProps> =
         {RESEARCH_STEP_SUBTITLE}
       </Typography>
 
-      <ResearchStepInfoModal open={infoModalOpen} onClose={() => setInfoModalOpen(false)} />
+      <Collapse in={showHeaderInfo}>
+        <ResearchStepInfoPanel />
+      </Collapse>
     </Box>
   );
 };

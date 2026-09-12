@@ -20,5 +20,4 @@ export interface ResearchStepDashboardProps {
   onShowStrategy: () => void;
   onShowPublishing: () => void;
   onShowStructure: () => void;
-  onOpenBackgroundSetup: () => void;
 }

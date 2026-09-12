@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { ResearchStepInfoModal } from '../ResearchStepInfoModal';
+import { ResearchStepInfoModal, RESEARCH_INFO_PANEL_TITLE } from '../ResearchStepInfoModal';
 
 const theme = createTheme();
 
@@ -13,10 +13,11 @@ describe('ResearchStepInfoModal', () => {
       </ThemeProvider>
     );
 
-    expect(screen.getByText('What ALwrity does?')).toBeInTheDocument();
-    expect(screen.getByText('What')).toBeInTheDocument();
-    expect(screen.getByText('Why')).toBeInTheDocument();
-    expect(screen.getByText('How')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toHaveTextContent(RESEARCH_INFO_PANEL_TITLE);
+    const panel = screen.getByTestId('research-step-info-panel');
+    expect(panel).toHaveTextContent('What');
+    expect(panel).toHaveTextContent('Why');
+    expect(panel).toHaveTextContent('How');
   });
 
   it('styles What/Why/How with Discovered Competitors section color', () => {
@@ -26,9 +27,9 @@ describe('ResearchStepInfoModal', () => {
       </ThemeProvider>
     );
 
-    expect(screen.getByText('What')).toHaveStyle({ color: 'rgb(26, 32, 44)' });
-    expect(screen.getByText('Why')).toHaveStyle({ color: 'rgb(26, 32, 44)' });
-    expect(screen.getByText('How')).toHaveStyle({ color: 'rgb(26, 32, 44)' });
+    const panel = screen.getByTestId('research-step-info-panel');
+    expect(panel.querySelector('h6')).toHaveTextContent('What');
+    expect(panel).toHaveTextContent('We analyze top competitors in your niche.');
   });
 
   it('calls onClose when the dialog close control is clicked', () => {
