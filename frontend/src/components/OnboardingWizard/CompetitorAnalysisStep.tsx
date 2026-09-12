@@ -4,7 +4,6 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { useOnboardingStyles } from './common/useOnboardingStyles';
 import { SocialMediaPresenceSection } from './WebsiteStep/components';
 import type { Competitor } from './WebsiteStep/components';
-import ResearchStepBackgroundSetupModal from './CompetitorAnalysisStep/ResearchStepBackgroundSetupModal';
 import { InsightsModals } from './CompetitorAnalysisStep/InsightsModals';
 import { ProgressModal } from './CompetitorAnalysisStep/ProgressModal';
 import { useCompetitorDiscovery } from './CompetitorAnalysisStep/useCompetitorDiscovery';
@@ -54,8 +53,6 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   const [showStrategyModal, setShowStrategyModal] = useState(false);
   const [showPublishingModal, setShowPublishingModal] = useState(false);
   const [showStructureModal, setShowStructureModal] = useState(false);
-  const [backgroundSetupOpen, setBackgroundSetupOpen] = useState(false);
-
   const sitemapAutoTriggered = React.useRef(false);
   const crawlSocialMediaRef = React.useRef<Record<string, string>>({});
 
@@ -178,7 +175,6 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     onShowStrategy: () => setShowStrategyModal(true),
     onShowPublishing: () => setShowPublishingModal(true),
     onShowStructure: () => setShowStructureModal(true),
-    onOpenBackgroundSetup: () => setBackgroundSetupOpen(true),
   };
 
   if (isRestoring && competitors.length === 0 && !error) {
@@ -213,7 +209,6 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
       <CompetitorAnalysisHeader
         isAnalyzing={isAnalyzing}
         onRunFreshAnalysis={() => startCompetitorDiscovery(true)}
-        onOpenBackgroundSetup={() => setBackgroundSetupOpen(true)}
       />
 
       {error && (
@@ -274,10 +269,6 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         onClose={() => setShowHighlightsModal(false)}
       />
 
-      <ResearchStepBackgroundSetupModal
-        open={backgroundSetupOpen}
-        onClose={() => setBackgroundSetupOpen(false)}
-      />
     </Box>
   );
 };

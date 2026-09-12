@@ -30,6 +30,11 @@ import AddIcon from '@mui/icons-material/Add';
 import CardViewIcon from '@mui/icons-material/ViewModule';
 import ListViewIcon from '@mui/icons-material/ViewList';
 import { OnboardingDialogCloseButton } from '../../common/OnboardingDialogCloseButton';
+import {
+  onboardingDialogContentSx,
+  onboardingDialogPaperProps,
+  onboardingDialogTitleSx,
+} from '../../common/onboardingDialogStyles';
 
 export interface Competitor {
   url: string;
@@ -75,6 +80,9 @@ interface CompetitorsGridProps {
 }
 
 // Utility function to get favicon URL
+export const DISCOVERED_COMPETITORS_DESCRIPTION =
+  'ALwrity found competitors ranked by relevance — Add, remove, or inspect details';
+
 const getFaviconUrl = (url: string): string => {
   try {
     const domain = new URL(url).hostname;
@@ -135,16 +143,58 @@ const CompetitorsGrid: React.FC<CompetitorsGridProps> = ({
 
   return (
     <>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={1}>
-        <Typography variant="h6" fontWeight={600} sx={{ color: '#1a202c !important' }}>
-          <BusinessIcon sx={{ mr: 1, verticalAlign: 'middle', color: '#667eea !important' }} />
-          Discovered Competitors ({competitors.length})
-        </Typography>
-        <Box display="flex" gap={1}>
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems={{ xs: 'flex-start', sm: 'center' }}
+        mb={2}
+        flexWrap="wrap"
+        gap={1}
+      >
+        <Box sx={{ minWidth: 0, flex: '1 1 240px' }}>
+          <Typography variant="h6" fontWeight={600} sx={{ color: '#1a202c !important' }}>
+            <BusinessIcon sx={{ mr: 1, verticalAlign: 'middle', color: '#667eea !important' }} />
+            Discovered Competitors ({competitors.length})
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{ color: '#64748b', mt: 0.5, pl: { xs: 0, sm: 4 }, maxWidth: 560 }}
+          >
+            {DISCOVERED_COMPETITORS_DESCRIPTION}
+          </Typography>
+        </Box>
+        <Box display="flex" gap={1} flexShrink={0}>
           {competitors.length > 0 && (
-            <ToggleButtonGroup value={viewMode} exclusive onChange={(_, v) => v && setViewMode(v)} size="small">
-              <ToggleButton value="card"><CardViewIcon fontSize="small" /></ToggleButton>
-              <ToggleButton value="table"><ListViewIcon fontSize="small" /></ToggleButton>
+            <ToggleButtonGroup
+              value={viewMode}
+              exclusive
+              onChange={(_, v) => v && setViewMode(v)}
+              size="small"
+              aria-label="Competitor view mode"
+              sx={{
+                bgcolor: '#ffffff',
+                '& .MuiToggleButton-root': {
+                  color: '#475569',
+                  borderColor: '#cbd5e1',
+                  bgcolor: '#ffffff',
+                  px: 1.25,
+                  '&:hover': { bgcolor: '#f8fafc' },
+                  '&.Mui-selected': {
+                    color: '#2563eb',
+                    bgcolor: '#eff6ff',
+                    borderColor: '#93c5fd',
+                    '&:hover': { bgcolor: '#dbeafe' },
+                  },
+                  '& .MuiSvgIcon-root': { fontSize: 18 },
+                },
+              }}
+            >
+              <ToggleButton value="card" aria-label="Card view">
+                <CardViewIcon fontSize="small" />
+              </ToggleButton>
+              <ToggleButton value="table" aria-label="List view">
+                <ListViewIcon fontSize="small" />
+              </ToggleButton>
             </ToggleButtonGroup>
           )}
           {onAddCompetitor && (
@@ -273,20 +323,38 @@ const CompetitorsGrid: React.FC<CompetitorsGridProps> = ({
           ))}
         </Grid>
       ) : (
-        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, borderColor: 'divider' }}>
-          <Table size="small">
+        <TableContainer
+          component={Paper}
+          variant="outlined"
+          sx={{
+            borderRadius: 2,
+            borderColor: '#e2e8f0',
+            bgcolor: '#ffffff',
+            color: '#1e293b',
+            backgroundImage: 'none',
+          }}
+        >
+          <Table size="small" sx={{ bgcolor: '#ffffff' }}>
             <TableHead>
               <TableRow sx={{ bgcolor: '#f8fafc' }}>
-                <TableCell sx={{ fontWeight: 600, color: '#475569', fontSize: '0.75rem', py: 1.5 }}>Company</TableCell>
-                <TableCell sx={{ fontWeight: 600, color: '#475569', fontSize: '0.75rem', py: 1.5 }}>Domain</TableCell>
-                <TableCell sx={{ fontWeight: 600, color: '#475569', fontSize: '0.75rem', py: 1.5 }}>Match</TableCell>
-                <TableCell sx={{ fontWeight: 600, color: '#475569', fontSize: '0.75rem', py: 1.5, width: 100 }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#475569', fontSize: '0.75rem', py: 1.5, bgcolor: '#f8fafc' }}>Company</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#475569', fontSize: '0.75rem', py: 1.5, bgcolor: '#f8fafc' }}>Domain</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#475569', fontSize: '0.75rem', py: 1.5, bgcolor: '#f8fafc' }}>Match</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#475569', fontSize: '0.75rem', py: 1.5, width: 100, bgcolor: '#f8fafc' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {competitors.map((competitor, index) => (
-                  <TableRow key={index} hover sx={{ '&:last-child td': { border: 0 } }}>
-                  <TableCell sx={{ py: 1 }}>
+                  <TableRow
+                    key={index}
+                    hover
+                    sx={{
+                      bgcolor: '#ffffff',
+                      '&:hover': { bgcolor: '#f8fafc' },
+                      '&:last-child td': { border: 0 },
+                    }}
+                  >
+                  <TableCell sx={{ py: 1, bgcolor: 'inherit', color: '#1e293b' }}>
                     <Box display="flex" alignItems="center" gap={1}>
                       <Avatar sx={{ width: 28, height: 28, bgcolor: '#eef2ff', color: '#6366f1', fontSize: '0.7rem', fontWeight: 700 }}>
                         {(competitor.title || competitor.domain || '?').charAt(0).toUpperCase()}
@@ -294,18 +362,47 @@ const CompetitorsGrid: React.FC<CompetitorsGridProps> = ({
                       <Typography variant="body2" fontWeight={600} sx={{ color: '#1e293b' }}>{competitor.title || competitor.domain}</Typography>
                     </Box>
                   </TableCell>
-                  <TableCell sx={{ py: 1 }}><Typography variant="body2" sx={{ color: '#94a3b8', fontSize: '0.8rem' }}>{competitor.domain}</Typography></TableCell>
-                  <TableCell sx={{ py: 1 }}>
+                  <TableCell sx={{ py: 1, bgcolor: 'inherit' }}>
+                    <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.8rem' }}>{competitor.domain}</Typography>
+                  </TableCell>
+                  <TableCell sx={{ py: 1, bgcolor: 'inherit' }}>
                     <Chip 
                       label={`${Math.round(competitor.relevance_score * 100)}%`} 
                       size="small" 
                       sx={{ bgcolor: '#f0fdf4', color: '#15803d', fontWeight: 600, fontSize: '0.7rem', border: '1px solid #bbf7d0' }}
                     />
                   </TableCell>
-                  <TableCell sx={{ py: 1 }}>
+                  <TableCell sx={{ py: 1, bgcolor: 'inherit' }}>
                     <Box display="flex" gap={0.5}>
-                      <IconButton size="small" onClick={() => competitor.url && window.open(competitor.url, '_blank')} disabled={!competitor.url} title="Visit"><OpenInNewIcon fontSize="small" /></IconButton>
-                      {onRemoveCompetitor && <IconButton size="small" onClick={() => onRemoveCompetitor(index)} title="Remove" sx={{ color: '#94a3b8', '&:hover': { color: '#ef4444' } }}><DeleteIcon fontSize="small" /></IconButton>}
+                      <IconButton
+                        size="small"
+                        onClick={() => competitor.url && window.open(competitor.url, '_blank')}
+                        disabled={!competitor.url}
+                        title="Visit"
+                        sx={{ color: '#6366f1' }}
+                      >
+                        <OpenInNewIcon fontSize="small" />
+                      </IconButton>
+                      {competitor.highlights && competitor.highlights.length > 0 && (
+                        <Button
+                          size="small"
+                          variant="text"
+                          onClick={() => onShowHighlights(competitor)}
+                          sx={{ textTransform: 'none', fontSize: '0.7rem', color: '#64748b', minWidth: 0, px: 0.5 }}
+                        >
+                          Insights
+                        </Button>
+                      )}
+                      {onRemoveCompetitor && (
+                        <IconButton
+                          size="small"
+                          onClick={() => onRemoveCompetitor(index)}
+                          title="Remove"
+                          sx={{ color: '#94a3b8', '&:hover': { color: '#ef4444' } }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      )}
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -317,21 +414,21 @@ const CompetitorsGrid: React.FC<CompetitorsGridProps> = ({
 
 
       {/* Add Competitor Dialog */}
-      <Dialog open={openAddDialog} onClose={() => setOpenAddDialog(false)}>
-        <DialogTitle
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 1,
-            pr: 1.5,
-          }}
-        >
-          <span>Add Competitor Manually</span>
+      <Dialog
+        open={openAddDialog}
+        onClose={() => setOpenAddDialog(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={onboardingDialogPaperProps}
+      >
+        <DialogTitle sx={onboardingDialogTitleSx}>
+          <Typography component="span" variant="h6" fontWeight={700} sx={{ color: '#1e293b' }}>
+            Add Competitor Manually
+          </Typography>
           <OnboardingDialogCloseButton onClick={() => setOpenAddDialog(false)} />
         </DialogTitle>
-        <DialogContent>
-            <Typography variant="body2" color="textSecondary" paragraph>
+        <DialogContent sx={onboardingDialogContentSx}>
+            <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>
                 Enter the URL of a competitor website to include in the analysis.
             </Typography>
             <TextField
@@ -346,8 +443,8 @@ const CompetitorsGrid: React.FC<CompetitorsGridProps> = ({
                 placeholder="https://example.com"
             />
         </DialogContent>
-        <DialogActions>
-            <Button onClick={() => setOpenAddDialog(false)}>Cancel</Button>
+        <DialogActions sx={{ px: 3, pb: 2.5, bgcolor: '#ffffff' }}>
+            <Button onClick={() => setOpenAddDialog(false)} sx={{ color: '#64748b' }}>Cancel</Button>
             <Button onClick={handleAddSubmit} variant="contained" disabled={!newCompetitorUrl}>
                 Add Competitor
             </Button>

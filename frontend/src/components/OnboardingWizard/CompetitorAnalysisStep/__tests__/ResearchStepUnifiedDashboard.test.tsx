@@ -24,6 +24,36 @@ vi.mock('../StrategicInsightsSection', () => ({
   StrategicInsightsSection: () => <div data-testid="strategic-insights">Strategic</div>,
 }));
 
+vi.mock('../useResearchStepBackgroundSetup', () => ({
+  useResearchStepBackgroundSetup: () => ({
+    taskHealth: { last_updated: '2026-09-12T06:01:58.000Z', tasks: {} },
+    prefs: {
+      success: true,
+      tasks: {
+        deep_competitor_analysis: { enabled: true, delay_mins: 5, label: 'Deep', description: '' },
+        sif_indexing: { enabled: true, delay_mins: 5, label: 'SIF', description: '' },
+        market_trends: { enabled: true, delay_mins: 5, label: 'Trends', description: '' },
+      },
+    },
+    loading: false,
+    loadError: null,
+    running: {},
+    runError: {},
+    saving: {},
+    expanded: {},
+    polling: {},
+    fetchData: vi.fn(),
+    handleToggle: vi.fn(),
+    handleRunNow: vi.fn(),
+    toggleExpanded: vi.fn(),
+  }),
+}));
+
+vi.mock('../ResearchStepBackgroundSetupPanel', () => ({
+  ResearchStepBackgroundSetupPanel: ({ active }: { active: boolean }) =>
+    active ? <div data-testid="research-background-setup-panel">Background Setup</div> : null,
+}));
+
 const theme = createTheme();
 
 const baseProps: ResearchStepDashboardProps = {
@@ -45,7 +75,6 @@ const baseProps: ResearchStepDashboardProps = {
   onShowStrategy: vi.fn(),
   onShowPublishing: vi.fn(),
   onShowStructure: vi.fn(),
-  onOpenBackgroundSetup: vi.fn(),
 };
 
 function renderDashboard(overrides: Partial<ResearchStepDashboardProps> = {}) {
@@ -110,12 +139,16 @@ describe('ResearchStepUnifiedDashboard', () => {
     expect(screen.getByTestId('sif-indexing-panel')).toBeInTheDocument();
   });
 
-  it('opens background setup from Tab 3', () => {
-    const onOpenBackgroundSetup = vi.fn();
-    renderDashboard({ onOpenBackgroundSetup });
+  it('renders embedded background setup panel on Tab 3 with two-line task summary caption', () => {
+    renderDashboard();
+    expect(
+      screen.getByText(/3 of 3 tasks enabled — these run in the background so ALwrity keeps learning/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Run any task now to test immediately under Smart Background Setup/i)
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByText('Smart Background Setup'));
-    fireEvent.click(screen.getByRole('button', { name: /Open Smart Background Setup/i }));
-    expect(onOpenBackgroundSetup).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('research-background-setup-panel')).toBeInTheDocument();
   });
 
   it('does not mount ProgressModal inside dashboard', () => {

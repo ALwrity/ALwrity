@@ -12,6 +12,11 @@ import {
 import type { Competitor } from '../WebsiteStep/components';
 import { labelify, renderStringList } from './competitorStepUiHelpers';
 import { OnboardingDialogCloseButton } from '../common/OnboardingDialogCloseButton';
+import {
+  onboardingDialogContentSx,
+  onboardingDialogPaperProps,
+  onboardingDialogTitleSx,
+} from '../common/onboardingDialogStyles';
 
 interface CompetitorHighlightsDialogProps {
   open: boolean;
@@ -24,29 +29,27 @@ export const CompetitorHighlightsDialog: React.FC<CompetitorHighlightsDialogProp
   competitor,
   onClose,
 }) => (
-  <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+  <Dialog
+    open={open}
+    onClose={onClose}
+    maxWidth="md"
+    fullWidth
+    PaperProps={onboardingDialogPaperProps}
+  >
     {competitor && (
       <>
-        <DialogTitle
-          sx={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
-            gap: 1,
-            pr: 1.5,
-          }}
-        >
+        <DialogTitle sx={onboardingDialogTitleSx}>
           <Box>
-            <Typography variant="h6" component="span" fontWeight={700} sx={{ color: '#0B1220' }}>
+            <Typography variant="h6" component="span" fontWeight={700} sx={{ color: '#1e293b' }}>
               {competitor.title || competitor.domain}
             </Typography>
-            <Typography variant="caption" component="div" sx={{ color: '#6B7280', mt: 0.5 }}>
+            <Typography variant="caption" component="div" sx={{ color: '#64748b', mt: 0.5 }}>
               {competitor.domain}
             </Typography>
           </Box>
           <OnboardingDialogCloseButton onClick={onClose} />
         </DialogTitle>
-        <DialogContent dividers>
+        <DialogContent dividers sx={onboardingDialogContentSx}>
           <Stack spacing={2.5}>
             <Box display="flex" gap={1} flexWrap="wrap">
               <Chip
@@ -87,22 +90,22 @@ export const CompetitorHighlightsDialog: React.FC<CompetitorHighlightsDialogProp
                   size="small"
                   label={`Published: ${new Date(competitor.published_date).toLocaleDateString()}`}
                   variant="outlined"
-                  sx={{ fontSize: '0.7rem', height: 22, borderColor: '#E5E7EB', color: '#6B7280' }}
+                  sx={{ fontSize: '0.7rem', height: 22, borderColor: '#E5E7EB', color: '#64748b' }}
                 />
               )}
             </Box>
 
             {competitor.summary && (
               <Box>
-                <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#1e293b', mb: 0.5 }}>
                   Summary
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#4B5563' }}>{competitor.summary}</Typography>
+                <Typography variant="body2" sx={{ color: '#475569' }}>{competitor.summary}</Typography>
               </Box>
             )}
 
             <Box>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#1e293b', mb: 0.5 }}>
                 Business & Audience
               </Typography>
               <Box display="flex" gap={1} flexWrap="wrap">
@@ -153,7 +156,7 @@ export const CompetitorHighlightsDialog: React.FC<CompetitorHighlightsDialogProp
 
             {competitor.market_positioning && (
               <Box>
-                <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#1e293b', mb: 0.5 }}>
                   Market Positioning
                 </Typography>
                 <Box display="flex" gap={1} flexWrap="wrap">
@@ -170,7 +173,7 @@ export const CompetitorHighlightsDialog: React.FC<CompetitorHighlightsDialogProp
                     ))}
                   {(!competitor.market_positioning ||
                     !Object.values(competitor.market_positioning).some((v) => v && v !== 'unknown')) && (
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" sx={{ color: '#64748b' }}>
                       No market positioning data available.
                     </Typography>
                   )}
@@ -180,7 +183,7 @@ export const CompetitorHighlightsDialog: React.FC<CompetitorHighlightsDialogProp
 
             {competitor.content_insights && (
               <Box>
-                <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#1e293b', mb: 0.5 }}>
                   Content Insights
                 </Typography>
                 <Box display="flex" gap={1} flexWrap="wrap">
@@ -219,17 +222,18 @@ export const CompetitorHighlightsDialog: React.FC<CompetitorHighlightsDialogProp
                 </Box>
                 {competitor.content_insights.content_types &&
                   competitor.content_insights.content_types.length > 0 && (
-                    <Typography variant="body2" sx={{ color: '#4B5563', mt: 0.75 }}>
-                      <strong>Content types:</strong> {competitor.content_insights.content_types.join(', ')}
+                    <Typography variant="body2" sx={{ color: '#475569', mt: 0.75 }}>
+                      <strong style={{ color: '#1e293b' }}>Content types:</strong>{' '}
+                      {competitor.content_insights.content_types.join(', ')}
                     </Typography>
                   )}
               </Box>
             )}
 
-            <Divider />
+            <Divider sx={{ borderColor: '#e2e8f0' }} />
 
             <Box>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#1e293b', mb: 0.5 }}>
                 Key Highlights
               </Typography>
               {competitor.highlights && competitor.highlights.length > 0 ? (
@@ -240,29 +244,28 @@ export const CompetitorHighlightsDialog: React.FC<CompetitorHighlightsDialogProp
                       sx={{
                         p: 1.5,
                         mb: 1,
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        borderRadius: 1,
-                        backgroundColor: 'background.paper',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 2,
+                        backgroundColor: '#f8fafc',
                       }}
                     >
-                      <Typography variant="body2" color="text.secondary">{highlight}</Typography>
+                      <Typography variant="body2" sx={{ color: '#475569' }}>{highlight}</Typography>
                     </Box>
                   ))}
                 </Box>
               ) : (
-                <Typography variant="body2" color="text.secondary">No highlights available.</Typography>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>No highlights available.</Typography>
               )}
             </Box>
 
             {competitor.subpages && competitor.subpages.length > 0 && (
               <Box>
-                <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0B1220', mb: 0.5 }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#1e293b', mb: 0.5 }}>
                   Subpages ({competitor.subpages.length})
                 </Typography>
                 <Stack spacing={0.5}>
                   {competitor.subpages.map((sp, i) => (
-                    <Typography key={i} variant="body2" sx={{ color: '#4B5563', wordBreak: 'break-all' }}>
+                    <Typography key={i} variant="body2" sx={{ color: '#475569', wordBreak: 'break-all' }}>
                       • {sp}
                     </Typography>
                   ))}
