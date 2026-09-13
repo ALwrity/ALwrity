@@ -27,6 +27,9 @@ from services.seo_tools.pagespeed_service import PageSpeedService
 from services.seo_tools.sitemap_service import SitemapService
 from services.seo_tools.content_strategy_service import ContentStrategyService
 from services.llm_providers.main_text_generation import llm_text_gen
+# Phase 10 / B4: DeepCompetitorAnalysisService is imported lazily inside
+# _execute_competitive_analysis — a module-level import forms a cycle
+# (services.seo.__init__ -> dashboard_service -> ... -> this module).
 
 
 @dataclass
@@ -64,7 +67,8 @@ class EnterpriseSEOService:
         target_keywords: Optional[List[str]] = None,
         include_content_analysis: bool = True,
         include_competitive_analysis: bool = True,
-        generate_executive_report: bool = True
+        generate_executive_report: bool = True,
+        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Execute comprehensive enterprise SEO audit with full orchestration.
@@ -136,7 +140,7 @@ class EnterpriseSEOService:
             if include_competitive_analysis and competitors:
                 logger.info(f"[{audit_id}] Executing competitive analysis...")
                 competitive_analysis = await self._execute_competitive_analysis(
-                    website_url, competitors, audit_id
+                    website_url, competitors, audit_id, user_id=user_id
                 )
             
             # ============= CALCULATE OVERALL SCORES =============
@@ -353,62 +357,62 @@ class EnterpriseSEOService:
             logger.error(f"[{audit_id}] Content audit failed: {str(e)}")
             raise
     
-    async def _execute_competitive_analysis(self, website_url: str, competitors: List[str], audit_id: str) -> Dict[str, Any]:
-        """Perform competitive benchmarking across sites"""
+    async def _execute_competitive_analysis(
+        self,
+        website_url: str,
+        competitors: List[str],
+        audit_id: str,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Competitive benchmarking via the REAL DeepCompetitorAnalysisService.
+
+        Phase 10 (plan B4): this previously returned placeholder strings
+        ("Data from external API") plus invented advantages/gaps. It now calls
+        the real deep-competitor pipeline when a user + competitors exist and
+        otherwise returns an explicit no_data — no fabricated metrics.
+        """
         try:
-            logger.info(f"[{audit_id}] Executing competitive analysis across {len(competitors)} sites...")
-            
-            # This would typically fetch SEO metrics from external APIs
-            # For now, returning structured format
-            competitive_data = {
-                'primary_site': website_url,
-                'competitors_compared': competitors,
-                'benchmarking_metrics': {
-                    'domain_authority': 'Data from external API',
-                    'backlink_profile': 'Data from external API',
-                    'keyword_rankings': 'Data from external API',
-                    'content_volume': 'Data from external API',
-                    'estimated_traffic': 'Data from external API'
-                },
-                'competitive_advantages': self._identify_competitive_advantages(website_url, competitors),
-                'competitive_gaps': self._identify_competitive_gaps(website_url, competitors),
-                'market_position': 'Moderate - room for improvement'
+            logger.info(f"[{audit_id}] Executing competitive analysis across {len(competitors or [])} sites...")
+
+            if not competitors:
+                return {
+                    "status": "no_data",
+                    "data_source": "none",
+                    "primary_site": website_url,
+                    "message": "No competitors provided for comparison.",
+                }
+            if not user_id:
+                return {
+                    "status": "no_data",
+                    "data_source": "none",
+                    "primary_site": website_url,
+                    "message": "Authenticated user required for real competitor analysis.",
+                }
+
+            # Lazy import: avoids the services.seo package import cycle.
+            from services.seo.deep_competitor_analysis_service import (
+                DeepCompetitorAnalysisService,
+            )
+
+            deep_result = await DeepCompetitorAnalysisService().run(
+                user_id=user_id,
+                website_analysis={},
+                competitors=[{"url": c} for c in competitors],
+            )
+
+            return {
+                "status": "success",
+                "data_source": "deep_competitor_analysis",
+                "primary_site": website_url,
+                "competitors_compared": competitors,
+                "baseline": deep_result.get("baseline", {}),
+                "competitor_analyses": deep_result.get("competitors", []),
+                "aggregation": deep_result.get("aggregation", {}),
+                "metadata": deep_result.get("metadata", {}),
             }
-            
-            return competitive_data
         except Exception as e:
             logger.error(f"[{audit_id}] Competitive analysis failed: {str(e)}")
-            return {'status': 'failed', 'error': str(e)}
-    
-    def _identify_competitive_advantages(self, primary_url: str, competitors: List[str]) -> List[Dict[str, str]]:
-        """Identify competitive advantages"""
-        return [
-            {
-                'advantage': 'Unique content angle',
-                'potential_impact': 'High',
-                'description': f'{primary_url} has unique content perspectives competitors lack'
-            },
-            {
-                'advantage': 'Better technical SEO foundation',
-                'potential_impact': 'High',
-                'description': 'Stronger Core Web Vitals and mobile optimization'
-            }
-        ]
-    
-    def _identify_competitive_gaps(self, primary_url: str, competitors: List[str]) -> List[Dict[str, str]]:
-        """Identify competitive gaps"""
-        return [
-            {
-                'gap': 'Lower content volume',
-                'priority': 'Medium',
-                'recommendation': 'Increase content production to match or exceed competitors'
-            },
-            {
-                'gap': 'Fewer backlinks',
-                'priority': 'High',
-                'recommendation': 'Develop link-building strategy targeting high-authority domains'
-            }
-        ]
+            return {'status': 'failed', 'error': str(e), 'data_source': 'deep_competitor_analysis'}
     
     async def _aggregate_recommendations(self, components: Dict[str, Any], scores: Dict[str, float], audit_id: str) -> List[Dict[str, Any]]:
         """Aggregate and prioritize recommendations from all components"""

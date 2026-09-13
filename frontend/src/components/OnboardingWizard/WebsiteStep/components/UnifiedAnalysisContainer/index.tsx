@@ -84,12 +84,15 @@ const UnifiedAnalysisContainer: React.FC<UnifiedAnalysisContainerProps> = ({
   );
 
   const handleRunSEOAudit = async (url: string) => {
-    const response = await apiClient.post('/api/seo/on-page-analysis', {
-      url,
-      analyze_images: true,
-      analyze_content_quality: true,
+    // Phase 12 (plan C1): persists the result into the SEO SSOT
+    // (website_analyses.seo_audit['on_page_audit']) instead of the older
+    // volatile /api/seo/on-page-analysis call.
+    const response = await apiClient.post('/api/onboarding/seo-insights/on-page-audit', {
+      website_url: url,
+      target_keywords: [],
     });
-    return response.data;
+    // Backend returns { success, audit, persisted }.
+    return response.data?.audit ?? response.data;
   };
 
   const warningParts = warning

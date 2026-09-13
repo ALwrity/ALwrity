@@ -40,6 +40,8 @@ import DownloadIcon from '@mui/icons-material/Download';
 import { motion, AnimatePresence } from 'framer-motion';
 import { enterpriseSeoAPI, EnterpriseAuditResult, GSCAnalysisResult } from '../../api/enterpriseSeoApi';
 import { llmInsightsGenerator } from '../../api/llmInsightsGenerator';
+import { parseCommaList, parseDateRangeDays } from './seoFormParsers';
+import SeoAdvancedTools from './components/SeoAdvancedTools/SeoAdvancedTools';
 import { EnterpriseAuditResults } from './components/EnterpriseAuditResults';
 import { GSCAnalysisResults } from './components/GSCAnalysisResults';
 import { ActionableInsightsDisplay } from './components/ActionableInsightsDisplay';
@@ -89,7 +91,9 @@ export const SEOAnalysisController: React.FC = () => {
   // Loading & Error State
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
+  // Honest stage progress: derived from the stepper (0-4), never hard-coded.
+  // 0=Input, 1=Audit running, 2=GSC running, 3=Insights, 4=Review/done.
+  const progress = activeStep * 25;
 
   // Dialog State
   const [openOptionsDialog, setOpenOptionsDialog] = useState(false);
@@ -118,12 +122,11 @@ export const SEOAnalysisController: React.FC = () => {
 
     setLoading(true);
     setError(null);
-    setProgress(20);
     setActiveStep(1);
 
     try {
-      // Execute enterprise audit
-      console.log('Starting enterprise audit for', websiteUrl);
+      // Execute enterprise audit (log events, never URLs)
+      console.log('Starting enterprise audit.');
       const auditResponse = await enterpriseSeoAPI.executeEnterpriseAudit(websiteUrl, {
         competitors: competitors.filter(c => c.trim()),
         targetKeywords: targetKeywords.filter(k => k.trim()),
@@ -137,11 +140,10 @@ export const SEOAnalysisController: React.FC = () => {
       }
 
       setAuditResult(auditResponse.data);
-      setProgress(50);
       setActiveStep(2);
 
-      // Execute GSC analysis
-      console.log('Starting GSC analysis for', websiteUrl);
+      // Execute GSC analysis (log events, never URLs)
+      console.log('Starting GSC analysis.');
       const gscResponse = await enterpriseSeoAPI.analyzeGSCSearchPerformance(websiteUrl, {
         dateRangeDays: options.dateRangeDays,
         includeOpportunities: true,
@@ -153,11 +155,7 @@ export const SEOAnalysisController: React.FC = () => {
       }
 
       setGscResult(gscResponse.data);
-      setProgress(75);
-      setActiveStep(3);
-
-      // Skip insights generation for now - user can generate manually
-      setProgress(100);
+      // Insights are manual; land on the Review step once both stages finish.
       setActiveStep(4);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'An error occurred';
@@ -187,6 +185,7 @@ export const SEOAnalysisController: React.FC = () => {
       if (auditResult) {
         const auditInsights = await llmInsightsGenerator.generateEnterpriseAuditInsights(
           auditResult,
+          websiteUrl,
           { currentMonthlyTraffic: 1000 } // TODO: Get from user
         );
         insightResults.push(...auditInsights.insights);
@@ -195,7 +194,7 @@ export const SEOAnalysisController: React.FC = () => {
       if (gscResult) {
         const gscInsights = await llmInsightsGenerator.generateGSCAnalysisInsights(
           gscResult,
-          { currentMonthlyTraffic: 1000 } // TODO: Get from user
+          websiteUrl
         );
         insightResults.push(...gscInsights.insights);
       }
@@ -245,7 +244,6 @@ export const SEOAnalysisController: React.FC = () => {
     setGscResult(null);
     setInsights([]);
     setError(null);
-    setProgress(0);
     setActiveStep(0);
     setTabValue(0);
   };
@@ -345,7 +343,7 @@ export const SEOAnalysisController: React.FC = () => {
                   multiline
                   rows={2}
                   value={competitors.join(', ')}
-                  onChange={(e) => setCompetitors(e.target.value.split(',').map(c => c.trim()))}
+                  onChange={(e) => setCompetitors(parseCommaList(e.target.value))}
                   size="small"
                   sx={{ mb: 2 }}
                   disabled={loading}
@@ -359,7 +357,7 @@ export const SEOAnalysisController: React.FC = () => {
                   multiline
                   rows={2}
                   value={targetKeywords.join(', ')}
-                  onChange={(e) => setTargetKeywords(e.target.value.split(',').map(k => k.trim()))}
+                  onChange={(e) => setTargetKeywords(parseCommaList(e.target.value))}
                   size="small"
                   sx={{ mb: 3 }}
                   disabled={loading}
@@ -372,7 +370,9 @@ export const SEOAnalysisController: React.FC = () => {
                     variant="contained"
                     startIcon={<PlayArrowIcon />}
                     onClick={handleStartAudit}
-                    disabled={!isUrlValid || loading}
+                    // Fail fast: stay clickable so invalid URLs surface the
+                    // validation Alert instead of a dead disabled button.
+                    disabled={loading}
                   >
                     {loading ? 'Running...' : 'Start Analysis'}
                   </Button>
@@ -543,6 +543,15 @@ export const SEOAnalysisController: React.FC = () => {
             )}
           </Grid>
         </Grid>
+
+        {/* Advanced enterprise/GSC/LLM tools (Phase D): user-fired cards with
+            payloads prefilled from the audit context above. */}
+        <SeoAdvancedTools
+          websiteUrl={websiteUrl}
+          targetKeywords={targetKeywords}
+          auditResult={auditResult}
+          gscResult={gscResult}
+        />
       </motion.div>
 
       {/* Options Dialog */}
@@ -578,7 +587,7 @@ export const SEOAnalysisController: React.FC = () => {
               label="GSC Analysis Period (days)"
               type="number"
               value={options.dateRangeDays}
-              onChange={(e) => setOptions({ ...options, dateRangeDays: parseInt(e.target.value) })}
+              onChange={(e) => setOptions({ ...options, dateRangeDays: parseDateRangeDays(e.target.value) })}
               inputProps={{ min: 7, max: 365 }}
             />
           </Stack>

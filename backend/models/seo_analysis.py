@@ -96,6 +96,10 @@ class SEOAnalysis(Base):
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
     analysis_data = Column(JSON, nullable=True)  # Store complete analysis data
     session_id = Column(Integer, ForeignKey('seo_analysis_sessions.id'), nullable=True)
+    # Phase 8: per-user scoping. Follows the triggered_by_user_id column
+    # precedent on seo_analysis_sessions / seo_action_runs (nullable String)
+    # so legacy/global rows stay NULL instead of being backfilled.
+    triggered_by_user_id = Column(String(64), nullable=True)
     
     # Relationships
     critical_issues = relationship("SEOIssue", back_populates="analysis", cascade="all, delete-orphan")
@@ -192,6 +196,8 @@ class SEOAnalysisHistory(Base):
     overall_score = Column(Integer, nullable=False)
     health_status = Column(String(50), nullable=False)
     score_change = Column(Integer, default=0)  # Change from previous analysis
+    # Phase 8: per-user scoping (mirrors SEOAnalysis.triggered_by_user_id).
+    triggered_by_user_id = Column(String(64), nullable=True)
     
     # Category scores for tracking
     url_structure_score = Column(Integer, nullable=True)

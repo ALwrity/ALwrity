@@ -1133,48 +1133,6 @@ RETURN ONLY this JSON schema (minified, no markdown):
             logger.error(f"Error discovering sitemap for {website_url}: {e}")
             return None
 
-    async def _find_sitemap_on_homepage(self, base_url: str) -> Optional[str]:
-        """
-        Check homepage for sitemap links in HTML.
-        
-        Args:
-            base_url: Base URL of the website
-            
-        Returns:
-            Sitemap URL if found on homepage, None otherwise
-        """
-        try:
-            logger.debug(f"Checking homepage for sitemap links: {base_url}")
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.get(base_url, timeout=aiohttp.ClientTimeout(total=15), headers={"User-Agent": "ALwrity-SEO-Bot/1.0"}) as response:
-                    if response.status == 200:
-                        content = await response.text()
-                        
-                        # Look for sitemap links in href attributes
-                        # Matches: href="...sitemap.xml..." or href='...sitemap.xml...'
-                        # Simple regex to catch common variations
-                        sitemap_matches = re.findall(r'href=["\']([^"\']*[sS]itemap[^"\']*\.xml[^"\']*)["\']', content)
-                        
-                        for match in sitemap_matches:
-                            potential_url = match.strip()
-                            
-                            # Handle relative URLs
-                            if not potential_url.startswith(('http://', 'https://')):
-                                potential_url = urljoin(base_url, potential_url)
-                            
-                            logger.debug(f"Found potential sitemap link on homepage: {potential_url}")
-                            
-                            # Verify accessibility
-                            if await self._check_sitemap_url(potential_url, "homepage link"):
-                                return potential_url
-                                
-            return None
-            
-        except Exception as e:
-            logger.debug(f"Error checking homepage for sitemap: {e}")
-            return None
-
     async def _find_sitemap_in_robots_txt(self, base_url: str) -> Optional[str]:
         """
         Check robots.txt for sitemap directives.

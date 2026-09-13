@@ -230,7 +230,7 @@ export const enterpriseSeoAPI = {
 
       console.log('Starting enterprise audit request:', request);
       const response = await longRunningApiClient.post(
-        '/api/seo-tools/enterprise/complete-audit',
+        '/api/seo/enterprise/complete-audit',
         request
       );
       console.log('Enterprise audit response:', response.data);
@@ -242,23 +242,20 @@ export const enterpriseSeoAPI = {
   },
 
   /**
-   * Execute quick enterprise audit (faster version)
+   * Execute quick enterprise audit (faster version).
+   * Backend QuickAuditRequest takes website_url only — no extra keys.
    */
   async executeQuickAudit(
-    websiteUrl: string,
-    options?: {
-      targetKeywords?: string[];
-    }
+    websiteUrl: string
   ): Promise<BaseResponse<EnterpriseAuditResult>> {
     try {
       const request = {
         website_url: websiteUrl,
-        target_keywords: options?.targetKeywords || [],
       };
 
       console.log('Starting quick audit request:', request);
       const response = await longRunningApiClient.post(
-        '/api/seo-tools/enterprise/quick-audit',
+        '/api/seo/enterprise/quick-audit',
         request
       );
       console.log('Quick audit response:', response.data);
@@ -290,7 +287,7 @@ export const enterpriseSeoAPI = {
 
       console.log('Starting GSC analysis request:', request);
       const response = await longRunningApiClient.post(
-        '/api/seo-tools/gsc/analyze-search-performance',
+        '/api/seo/gsc/analyze-search-performance',
         request
       );
       console.log('GSC analysis response:', response.data);
@@ -320,7 +317,7 @@ export const enterpriseSeoAPI = {
 
       console.log('Starting content opportunities request:', request);
       const response = await longRunningApiClient.post(
-        '/api/seo-tools/gsc/content-opportunities',
+        '/api/seo/gsc/content-opportunities',
         request
       );
       console.log('Content opportunities response:', response.data);
@@ -332,11 +329,130 @@ export const enterpriseSeoAPI = {
   },
 
   /**
+   * Phase 8D: ROI-scored strategy insights from GSC data (dashboard context).
+   * Backend: GSCStrategyInsightsRequest — site_url + include_trends +
+   * include_competitive + top_n (ge=5, le=100).
+   */
+  async getGSCStrategyInsights(
+    siteUrl: string,
+    options?: {
+      includeTrends?: boolean;
+      includeCompetitive?: boolean;
+      topN?: number;
+    }
+  ): Promise<BaseResponse<any>> {
+    try {
+      const request = {
+        site_url: siteUrl,
+        include_trends: options?.includeTrends ?? true,
+        include_competitive: options?.includeCompetitive ?? false,
+        top_n: options?.topN || 20,
+      };
+      const response = await longRunningApiClient.post(
+        '/api/seo/gsc/strategy-insights',
+        request
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error getting GSC strategy insights:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Phase 8D: ROI-ranked opportunities from GSC data.
+   * Backend: GSCOpportunityRankingRequest — ranking_metric is
+   * roi_score/effort/impact/timeline; limit ge=5 le=100.
+   */
+  async getGSCOpportunityRanking(
+    siteUrl: string,
+    options?: {
+      rankingMetric?: string;
+      limit?: number;
+      severityFilter?: string;
+    }
+  ): Promise<BaseResponse<any>> {
+    try {
+      const request: Record<string, unknown> = {
+        site_url: siteUrl,
+        ranking_metric: options?.rankingMetric || 'roi_score',
+        limit: options?.limit || 20,
+      };
+      if (options?.severityFilter) request.severity_filter = options.severityFilter;
+      const response = await longRunningApiClient.post(
+        '/api/seo/gsc/opportunity-ranking',
+        request
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error getting GSC opportunity ranking:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Phase 8D: GSC health score, trend, and keyword distribution.
+   * Backend: GSCHealthMetricsRequest — NOTE the model explicitly dropped
+   * trend comparison (needs historical snapshots that don't exist yet), so
+   * no include_trends option is offered here.
+   */
+  async getGSCHealthMetrics(
+    siteUrl: string,
+    options?: {
+      includeDistribution?: boolean;
+    }
+  ): Promise<BaseResponse<any>> {
+    try {
+      const request = {
+        site_url: siteUrl,
+        include_distribution: options?.includeDistribution ?? true,
+      };
+      const response = await longRunningApiClient.post(
+        '/api/seo/gsc/health-metrics',
+        request
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error getting GSC health metrics:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Phase 8F: performance trend analysis over two equal-length GSC windows.
+   * Backend: GSCTrendAnalysisRequest — metric is
+   * position/impressions/clicks/ctr/all; days_back ge=7 le=365.
+   */
+  async getGSCPerformanceTrends(
+    siteUrl: string,
+    options?: {
+      metric?: string;
+      daysBack?: number;
+    }
+  ): Promise<BaseResponse<any>> {
+    try {
+      const request = {
+        site_url: siteUrl,
+        metric: options?.metric || 'all',
+        days_back: options?.daysBack || 90,
+      };
+      const response = await longRunningApiClient.post(
+        '/api/seo/gsc/trend-analysis',
+        request
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error getting GSC performance trends:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Check health of enterprise services
    */
   async checkServicesHealth(): Promise<BaseResponse<any>> {
     try {
-      const response = await apiClient.get('/api/seo-tools/enterprise/health');
+      const response = await apiClient.get('/api/seo/enterprise/health');
       return response.data;
     } catch (error) {
       console.error('Error checking enterprise services health:', error);
@@ -344,66 +460,6 @@ export const enterpriseSeoAPI = {
     }
   },
 
-  /**
-   * Generate LLM-powered actionable insights for audit results
-   */
-  async generateAuditInsights(
-    auditResult: EnterpriseAuditResult
-  ): Promise<{ insights: AIInsight[]; recommendations: string[] }> {
-    try {
-      const response = await apiClient.post('/api/seo-tools/generate-insights', {
-        audit_data: auditResult,
-        insight_type: 'enterprise_audit',
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error generating audit insights:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Generate LLM-powered actionable insights for GSC analysis results
-   */
-  async generateGSCInsights(
-    analysisResult: GSCAnalysisResult
-  ): Promise<{ insights: AIInsight[]; recommendations: string[] }> {
-    try {
-      const response = await apiClient.post('/api/seo-tools/generate-insights', {
-        gsc_data: analysisResult,
-        insight_type: 'gsc_analysis',
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error generating GSC insights:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get actionable traffic improvement strategies
-   */
-  async getTrafficImprovementStrategies(
-    siteUrl: string,
-    options?: {
-      currentTraffic?: number;
-      targetTraffic?: number;
-      timeframe?: 'month' | 'quarter' | 'year';
-    }
-  ): Promise<{ strategies: string[]; expected_growth: string; priority_actions: string[] }> {
-    try {
-      const request = {
-        site_url: siteUrl,
-        current_traffic: options?.currentTraffic,
-        target_traffic: options?.targetTraffic,
-        timeframe: options?.timeframe || 'quarter',
-      };
-
-      const response = await apiClient.post('/api/seo-tools/traffic-strategies', request);
-      return response.data;
-    } catch (error) {
-      console.error('Error getting traffic improvement strategies:', error);
-      throw error;
-    }
-  },
+  // Removed: the insight/traffic helpers that duplicated llmInsightsGenerator
+  // canonicals with wrong paths and bodies. Use llmInsightsGenerator instead.
 };

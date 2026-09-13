@@ -30,19 +30,30 @@ class SEOAnalysisService:
     def __init__(self, db_session: Session):
         self.db = db_session
     
-    def store_analysis_result(self, result: SEOAnalysisResult) -> Optional[SEOAnalysis]:
+    def store_analysis_result(
+        self,
+        result: SEOAnalysisResult,
+        triggered_by_user_id: Optional[str] = None,
+    ) -> Optional[SEOAnalysis]:
         """
         Store SEO analysis result in the database.
-        
+
         Args:
             result: SEOAnalysisResult from the analyzer
-            
+            triggered_by_user_id: Clerk user id that triggered the analysis.
+                Phase 8: threads the authenticated user into the storage so
+                analyses are per-user scoped (column precedent:
+                SEOAnalysisSession.triggered_by_user_id). Legacy/global callers
+                keep NULL.
+
         Returns:
             Stored SEOAnalysis record or None if failed
         """
         try:
             # Create main analysis record
             analysis_record = create_analysis_from_result(result)
+            # Phase 8: bind the triggering user on the persisted row.
+            analysis_record.triggered_by_user_id = triggered_by_user_id
             self.db.add(analysis_record)
             self.db.flush()  # Get the ID
             
@@ -69,6 +80,9 @@ class SEOAnalysisService:
                 overall_score=result.overall_score,
                 health_status=result.health_status,
                 score_change=0,  # Will be calculated later
+                # Phase 8: history rows carry the user too, so per-user
+                # trend reads can scope without joining analyses.
+                triggered_by_user_id=triggered_by_user_id,
                 critical_issues_count=len(result.critical_issues),
                 warnings_count=len(result.warnings),
                 recommendations_count=len(result.recommendations)
@@ -97,7 +111,10 @@ class SEOAnalysisService:
             self.db.add(history_record)
             self.db.commit()
             
-            logger.info(f"Stored SEO analysis for {result.url} with score {result.overall_score}")
+            logger.info(
+                f"Stored SEO analysis for {result.url} with score {result.overall_score} "
+                f"user_id={triggered_by_user_id or 'anonymous'}"
+            )
             return analysis_record
             
         except Exception as e:

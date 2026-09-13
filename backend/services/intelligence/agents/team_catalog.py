@@ -172,7 +172,10 @@ AGENT_TEAM_CATALOG: List[AgentCatalogEntry] = [
         "defaults": {
             "display_name_template": "{website_name} SEO Specialist",
             "enabled": True,
-            "schedule": {"mode": "weekly", "days": ["fri"], "time": "11:00"},
+            # Phase 15 (plan D4): the SEO specialist now participates in the
+            # DAILY committee (was weekly Friday) so SEO evidence/alerts drive
+            # every day's plan, not once a week.
+            "schedule": {"mode": "daily", "time": "11:00"},
             "system_prompt_template": (
                 "You are the SEO Optimization Agent for {website_name}.\n\n"
                 "Mission: continuously improve technical SEO and on-page basics for {website_url} while preserving user experience.\n\n"
@@ -191,7 +194,7 @@ AGENT_TEAM_CATALOG: List[AgentCatalogEntry] = [
                 "- Only assert what the provided context supports; never invent metrics or data."
             ),
             "task_prompt_template": (
-                "Task: Produce a weekly SEO fix list for {website_name}.\n\n"
+                "Task: Produce a daily SEO fix list for {website_name}.\n\n"
                 "Return JSON with a tasks array. Every task must include title, description, pillar_id, priority, estimated_time, action_type, action_url, reasoning, evidence, expected_impact, effort, risk_level, measurement, and action_parameters.\n"
             ),
         },

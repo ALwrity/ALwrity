@@ -26,7 +26,7 @@ CORE_ROUTER_REGISTRY = [
     {"name": "bing_oauth", "module": "routers.bing_oauth", "attr": "router", "features": {"all", "core"}},
     {"name": "bing_analytics", "module": "routers.bing_analytics", "attr": "router", "features": {"all", "core"}},
     {"name": "bing_analytics_storage", "module": "routers.bing_analytics_storage", "attr": "router", "features": {"all", "core"}},
-    {"name": "seo_tools", "module": "routers.seo_tools", "attr": "router", "features": {"all", "core", "seo"}},
+    {"name": "seo_tools", "module": "routers.seo_tools", "attr": "router", "features": {"all"}},  # Phase 2: full-mode-only — /api/seo/* is 503 stubbed in slim modes; feature-only 'core'/'seo' must not import the heavy router
     {"name": "facebook_writer", "module": "api.facebook_writer.routers", "attr": "facebook_router", "features": {"all", "core", "facebook"}},
     {"name": "linkedin", "module": "routers.linkedin", "attr": "router", "features": {"all", "core", "linkedin"}},
     {"name": "linkedin_profile_acquire", "module": "api.linkedin_profile_acquire_routes", "attr": "router", "features": {"all", "core", "linkedin"}},

@@ -6,12 +6,14 @@ and CopilotKit integration for real-time progress updates.
 """
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Dict, Any, Optional, List
 from loguru import logger
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+import json
 
 from services.blog_writer.seo.blog_content_seo_analyzer import BlogContentSEOAnalyzer
 from services.blog_writer.core.blog_writer_service import BlogWriterService
@@ -194,53 +196,56 @@ async def analyze_blog_seo_with_progress(
         import uuid
         analysis_id = str(uuid.uuid4())
         
-        # Yield progress updates
+        def _sse(payload: Dict[str, Any]) -> str:
+            return f"data: {json.dumps(payload)}\n\n"
+
+        # Yield SSE-encoded progress updates
         async def progress_generator():
             try:
                 # Stage 1: Initialization
-                yield SEOAnalysisProgress(
+                yield _sse(SEOAnalysisProgress(
                     analysis_id=analysis_id,
                     stage="initialization",
                     progress=10,
                     message="Initializing SEO analysis...",
                     timestamp=datetime.utcnow().isoformat()
-                )
-                
+                ).model_dump())
+
                 # Stage 2: Keyword extraction
-                yield SEOAnalysisProgress(
+                yield _sse(SEOAnalysisProgress(
                     analysis_id=analysis_id,
                     stage="keyword_extraction",
                     progress=20,
                     message="Extracting keywords from research data...",
                     timestamp=datetime.utcnow().isoformat()
-                )
-                
+                ).model_dump())
+
                 # Stage 3: Non-AI analysis
-                yield SEOAnalysisProgress(
+                yield _sse(SEOAnalysisProgress(
                     analysis_id=analysis_id,
                     stage="non_ai_analysis",
                     progress=40,
                     message="Running content structure and readability analysis...",
                     timestamp=datetime.utcnow().isoformat()
-                )
-                
+                ).model_dump())
+
                 # Stage 4: AI analysis
-                yield SEOAnalysisProgress(
+                yield _sse(SEOAnalysisProgress(
                     analysis_id=analysis_id,
                     stage="ai_analysis",
                     progress=70,
                     message="Generating AI-powered insights...",
                     timestamp=datetime.utcnow().isoformat()
-                )
-                
+                ).model_dump())
+
                 # Stage 5: Results compilation
-                yield SEOAnalysisProgress(
+                yield _sse(SEOAnalysisProgress(
                     analysis_id=analysis_id,
                     stage="compilation",
                     progress=90,
                     message="Compiling analysis results...",
                     timestamp=datetime.utcnow().isoformat()
-                )
+                ).model_dump())
                 
                 # Perform actual analysis
                 analysis_results = await seo_analyzer.analyze_blog_content(
@@ -280,29 +285,29 @@ async def analyze_blog_seo_with_progress(
                     # Continue without failing
                 
                 # Final result
-                yield SEOAnalysisProgress(
+                yield _sse(SEOAnalysisProgress(
                     analysis_id=analysis_id,
                     stage="completed",
                     progress=100,
                     message="SEO analysis completed successfully!",
                     timestamp=datetime.utcnow().isoformat()
-                )
-                
+                ).model_dump())
+
                 # Yield final results (can't return in async generator)
-                yield analysis_results
-                
+                yield _sse({"type": "result", "analysis_id": analysis_id, "data": analysis_results})
+
             except Exception as e:
                 logger.error(f"Progress generator error: {e}", exc_info=True)
-                yield SEOAnalysisProgress(
+                yield _sse(SEOAnalysisProgress(
                     analysis_id=analysis_id,
                     stage="error",
                     progress=0,
                     message=f"Analysis failed: {str(e)}",
                     timestamp=datetime.utcnow().isoformat()
-                )
+                ).model_dump())
                 raise
-        
-        return progress_generator()
+
+        return StreamingResponse(progress_generator(), media_type="text/event-stream")
         
     except HTTPException:
         raise
@@ -314,6 +319,7 @@ async def analyze_blog_seo_with_progress(
 @router.get("/analysis/{analysis_id}")
 async def get_analysis_result(
     analysis_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),  # Phase 8: matches sibling /analyze routes
     db: Session = Depends(get_db)
 ):
     """
@@ -321,6 +327,11 @@ async def get_analysis_result(
     
     Args:
         analysis_id: Unique identifier for the analysis
+        current_user: Authenticated Clerk user. Phase 8: the sibling /analyze
+            routes require auth, this detail GET did not — closing the gap.
+            TODO(next): stored analysis_data has no owner id yet; once a
+            user column lands on the blog draft analysis record, enforce
+            ownership here too (auth-only for now).
         db: Database session
         
     Returns:

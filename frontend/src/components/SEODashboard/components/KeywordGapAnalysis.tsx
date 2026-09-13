@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Box,
+  Button,
   Typography,
   Chip,
   CircularProgress,
@@ -16,6 +17,7 @@ import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import DescriptionIcon from '@mui/icons-material/Description';
 import { GlassCard } from '../../shared/styled';
 import { apiClient } from '../../../api/client';
+import { useAbortableRequest, isCancelError } from '../useAbortableRequest';
 
 interface KeywordGapItem {
   keyword: string;
@@ -149,20 +151,31 @@ const KeywordGapAnalysis: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const nextSignal = useAbortableRequest();
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const resp = await apiClient.get('/api/seo-dashboard/keyword-gaps', {
+        signal: nextSignal(),
+      });
+      setData(resp?.data ?? null);
+      setError(resp?.data?.error || null);
+    } catch (err: any) {
+      // Cancellation on unmount/refresh is not a failure — stay silent.
+      if (isCancelError(err)) return;
+      setError(err?.response?.data?.detail || 'Failed to load keyword gap data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const resp = await apiClient.get('/api/seo-dashboard/keyword-gaps');
-        setData(resp.data);
-        setError(resp.data.error || null);
-      } catch (err: any) {
-        setError(err?.response?.data?.detail || 'Failed to load keyword gap data');
-      } finally {
-        setLoading(false);
-      }
-    };
+    // Mount fetch from the external API (documented exception: external sync).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (loading) {
@@ -194,10 +207,36 @@ const KeywordGapAnalysis: React.FC = () => {
     );
   }
 
-  if (!data) return null;
+  const summary = data?.summary as KeywordGapSummary | undefined;
+  const hasData = !!summary && summary.total_keywords_analyzed > 0;
 
-  const summary = data.summary as KeywordGapSummary;
-  const hasData = summary?.total_keywords_analyzed > 0;
+  // Fail fast: never render blank. Empty means GSC has no keywords yet —
+  // say so with a retry (re-runs the fetch above).
+  if (!hasData && !loading) {
+    return (
+      <GlassCard sx={{ p: 3 }}>
+        <Box display="flex" alignItems="center" gap={1} mb={2}>
+          <TrendingUpIcon sx={{ fontSize: 20 }} />
+          <Typography variant="h6" fontWeight={700} sx={{ color: 'white' }}>
+            Keyword Gap Analysis
+          </Typography>
+        </Box>
+        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', mb: 2 }}>
+          No keyword data yet. Connect Google Search Console and allow the scheduled analysis to run.
+        </Typography>
+        <Button
+          size="small"
+          variant="outlined"
+          onClick={fetchData}
+          sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}
+        >
+          Retry
+        </Button>
+      </GlassCard>
+    );
+  }
+
+  if (!data) return null;
 
   return (
     <Box sx={{ mb: 4 }}>

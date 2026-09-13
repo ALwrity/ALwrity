@@ -50,20 +50,23 @@ class LLMInsightsGenerator {
    */
   async generateEnterpriseAuditInsights(
     auditResult: EnterpriseAuditResult,
+    websiteUrl: string,
     websiteContext?: {
       currentMonthlyTraffic?: number;
       targetAudience?: string;
       primaryGoal?: string;
       budget?: 'startup' | 'small' | 'medium' | 'enterprise';
+      targetKeywords?: string[];
     }
   ): Promise<InsightGenerationResult> {
     try {
-      const prompt = this.buildAuditInsightPrompt(auditResult, websiteContext);
-
-      const response = await apiClient.post('/api/seo-tools/llm/generate-audit-insights', {
-        audit_data: auditResult,
-        context: websiteContext,
-        prompt_template: 'enterprise_audit_insights',
+      // Note: buildAuditInsightPrompt is a client-side preview helper; the
+      // backend generates insights from the payload below (prompt not sent).
+      // Body matches backend EnterpriseAuditInsightsRequest (fail fast on 422).
+      const response = await apiClient.post('/api/seo/llm/generate-audit-insights', {
+        audit_results: auditResult,
+        website_url: websiteUrl,
+        target_keywords: websiteContext?.targetKeywords,
       });
 
       return response.data;
@@ -79,19 +82,14 @@ class LLMInsightsGenerator {
    */
   async generateGSCAnalysisInsights(
     analysisResult: GSCAnalysisResult,
-    websiteContext?: {
-      currentMonthlyTraffic?: number;
-      targetKeywords?: string[];
-      primaryGoal?: string;
-    }
+    websiteUrl: string
   ): Promise<InsightGenerationResult> {
     try {
-      const prompt = this.buildGSCInsightPrompt(analysisResult, websiteContext);
-
-      const response = await apiClient.post('/api/seo-tools/llm/generate-gsc-insights', {
-        gsc_data: analysisResult,
-        context: websiteContext,
-        prompt_template: 'gsc_analysis_insights',
+      // Backend GSCAnalysisInsightsRequest takes only gsc_analysis + website_url.
+      // Body matches backend GSCAnalysisInsightsRequest.
+      const response = await apiClient.post('/api/seo/llm/generate-gsc-insights', {
+        gsc_analysis: analysisResult,
+        website_url: websiteUrl,
       });
 
       return response.data;
@@ -106,11 +104,11 @@ class LLMInsightsGenerator {
    * Provides specific content ideas and gaps to address
    */
   async generateContentStrategy(
-    auditOrAnalysisResult: EnterpriseAuditResult | GSCAnalysisResult,
-    options?: {
-      focusArea?: 'keywords' | 'content_gaps' | 'long_tail' | 'featured_snippets';
-      contentType?: 'blog' | 'guides' | 'product_pages' | 'mixed';
-      targetTraffic?: number;
+    params: {
+      currentContent: Record<string, unknown>;
+      contentGaps: string[];
+      targetKeywords: string[];
+      competitorContent?: Record<string, unknown>;
     }
   ): Promise<{
     contentIdeas: string[];
@@ -123,9 +121,12 @@ class LLMInsightsGenerator {
     }[];
   }> {
     try {
-      const response = await apiClient.post('/api/seo-tools/llm/generate-content-strategy', {
-        data: auditOrAnalysisResult,
-        options,
+      // Body matches backend ContentStrategyRequest (all required keys sent).
+      const response = await apiClient.post('/api/seo/llm/generate-content-strategy', {
+        current_content: params.currentContent,
+        content_gaps: params.contentGaps,
+        target_keywords: params.targetKeywords,
+        competitor_content: params.competitorContent,
       });
 
       return response.data;
@@ -140,9 +141,11 @@ class LLMInsightsGenerator {
    * Provides phased approach to increasing organic traffic
    */
   async generateTrafficRoadmap(
-    auditOrAnalysisResult: EnterpriseAuditResult | GSCAnalysisResult,
-    targetTraffic: number,
-    timeframe: 'quarter' | 'semi_annual' | 'annual'
+    params: {
+      currentMetrics: Record<string, unknown>;
+      opportunities: Record<string, unknown>[];
+      timelineWeeks?: number;
+    }
   ): Promise<{
     currentTraffic: number;
     targetTraffic: number;
@@ -158,10 +161,11 @@ class LLMInsightsGenerator {
     opportunities: string[];
   }> {
     try {
-      const response = await apiClient.post('/api/seo-tools/llm/generate-traffic-roadmap', {
-        data: auditOrAnalysisResult,
-        target_traffic: targetTraffic,
-        timeframe,
+      // Body matches backend TrafficRoadmapRequest (weeks clamped 4-52 server-side).
+      const response = await apiClient.post('/api/seo/llm/generate-traffic-roadmap', {
+        current_metrics: params.currentMetrics,
+        identified_opportunities: params.opportunities,
+        implementation_timeline_weeks: params.timelineWeeks ?? 12,
       });
 
       return response.data;
@@ -176,11 +180,14 @@ class LLMInsightsGenerator {
    * Ranks all possible improvements by impact vs effort
    */
   async generatePrioritizedRecommendations(
-    auditOrAnalysisResult: EnterpriseAuditResult | GSCAnalysisResult
+    recommendations: Record<string, unknown>[],
+    businessContext: Record<string, unknown>
   ): Promise<ActionableInsight[]> {
     try {
-      const response = await apiClient.post('/api/seo-tools/llm/prioritized-recommendations', {
-        data: auditOrAnalysisResult,
+      // Body matches backend PrioritizedRecommendationsRequest.
+      const response = await apiClient.post('/api/seo/llm/prioritized-recommendations', {
+        all_recommendations: recommendations,
+        business_context: businessContext,
       });
 
       return response.data.recommendations || [];
@@ -195,12 +202,14 @@ class LLMInsightsGenerator {
    * Focus on 1-2 week implementation timeline
    */
   async generateQuickWins(
-    auditOrAnalysisResult: EnterpriseAuditResult | GSCAnalysisResult
+    auditData: Record<string, unknown>,
+    maxDays: number = 7
   ): Promise<ActionableInsight[]> {
     try {
-      const response = await apiClient.post('/api/seo-tools/llm/quick-wins', {
-        data: auditOrAnalysisResult,
-        filter: 'quick_wins',
+      // Body matches backend QuickWinsRequest (days clamped 1-30 server-side).
+      const response = await apiClient.post('/api/seo/llm/quick-wins', {
+        audit_data: auditData,
+        max_days_to_implement: maxDays,
       });
 
       return response.data.insights || [];
@@ -215,8 +224,8 @@ class LLMInsightsGenerator {
    * Helps understand how to outrank competitors
    */
   async generateCompetitiveInsights(
-    auditOrAnalysisResult: EnterpriseAuditResult | GSCAnalysisResult,
-    competitors?: string[]
+    primarySiteAnalysis: Record<string, unknown>,
+    competitorAnalyses: Record<string, unknown>[]
   ): Promise<{
     positioning: string;
     whiteSpaceOpportunities: string[];
@@ -224,9 +233,10 @@ class LLMInsightsGenerator {
     recommendedActions: string[];
   }> {
     try {
-      const response = await apiClient.post('/api/seo-tools/llm/competitive-insights', {
-        data: auditOrAnalysisResult,
-        competitors,
+      // Body matches backend CompetitiveInsightsRequest.
+      const response = await apiClient.post('/api/seo/llm/generate-competitive-insights', {
+        primary_site_analysis: primarySiteAnalysis,
+        competitor_analyses: competitorAnalyses,
       });
 
       return response.data;
@@ -242,7 +252,8 @@ class LLMInsightsGenerator {
    */
   async generateKeywordExpansion(
     targetKeywords: string[],
-    analysisData?: GSCAnalysisResult | EnterpriseAuditResult
+    contentAnalysis: Record<string, unknown>,
+    targetDifficulty?: 'low' | 'medium' | 'high'
   ): Promise<{
     expandedKeywords: KeywordAnalysis[];
     longTailVariations: string[];
@@ -251,9 +262,11 @@ class LLMInsightsGenerator {
     recommendedContent: string[];
   }> {
     try {
-      const response = await apiClient.post('/api/seo-tools/llm/keyword-expansion', {
-        target_keywords: targetKeywords,
-        analysis_data: analysisData,
+      // Body matches backend KeywordExpansionRequest (content_analysis required).
+      const response = await apiClient.post('/api/seo/llm/keyword-expansion', {
+        current_keywords: targetKeywords,
+        content_analysis: contentAnalysis,
+        target_difficulty: targetDifficulty,
       });
 
       return response.data;
@@ -263,60 +276,9 @@ class LLMInsightsGenerator {
     }
   }
 
-  /**
-   * Generate content optimization recommendations
-   * Provides specific guidance on improving existing content
-   */
-  async generateContentOptimization(
-    pageUrl: string,
-    currentContent: string,
-    analysisContext?: GSCAnalysisResult | EnterpriseAuditResult
-  ): Promise<{
-    currentPerformance: string;
-    optimizationPriorities: string[];
-    keywordInsertions: { keyword: string; placement: string; context: string }[];
-    contentExpansionIdeas: string[];
-    structuredDataRecommendations: string[];
-    estimatedImpact: string;
-  }> {
-    try {
-      const response = await apiClient.post('/api/seo-tools/llm/content-optimization', {
-        page_url: pageUrl,
-        current_content: currentContent,
-        analysis_context: analysisContext,
-      });
-
-      return response.data;
-    } catch (error) {
-      console.error('Error generating content optimization:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Generate technical SEO improvement plan
-   * Addresses technical issues with actionable steps
-   */
-  async generateTechnicalImprovementPlan(
-    auditResult: EnterpriseAuditResult
-  ): Promise<{
-    criticalFixes: { issue: string; solution: string; timeToFix: string; impact: string }[];
-    performanceOptimizations: string[];
-    mobileOptimizations: string[];
-    implementationSequence: string[];
-    expectedImpactOnRankings: string;
-  }> {
-    try {
-      const response = await apiClient.post('/api/seo-tools/llm/technical-improvement-plan', {
-        audit_result: auditResult,
-      });
-
-      return response.data;
-    } catch (error) {
-      console.error('Error generating technical improvement plan:', error);
-      throw error;
-    }
-  }
+  // Removed: generateContentOptimization + generateTechnicalImprovementPlan.
+  // No backend routes exist for these (verified route table) and no callers.
+  // Re-add alongside a backend endpoint if the features are planned.
 
   // ============================================================================
   // Helper Methods - Prompt Building

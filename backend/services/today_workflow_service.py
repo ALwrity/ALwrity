@@ -345,6 +345,38 @@ def build_grounding_context(db: Session, user_id: str, date: str) -> Dict[str, A
             "limitations": [f"Strategy context could not be loaded: {exc}"],
         }
 
+    # ── SEO evidence (Phase 13 / plan D) ────────────────────────
+    # Real persisted SEO signals (on-page health, GSC highlights, page-audit
+    # aggregates, content trend) so the committee — and specifically the SEO
+    # specialist — proposes tasks from actual data. Never raises: failures
+    # degrade to an {status:'error'} envelope like the other evidence blocks.
+    seo_evidence: Dict[str, Any] = {}
+    try:
+        from services.intelligence.agents.seo_evidence import build_seo_evidence
+
+        seo_evidence = build_seo_evidence(db, user_id)
+        if not isinstance(seo_evidence, dict):
+            seo_evidence = {
+                "status": "error",
+                "limitations": ["SEO evidence returned an unexpected shape."],
+            }
+    except Exception as exc:
+        logger.warning(f"Failed to build SEO evidence for user {user_id}: {exc}")
+        seo_evidence = {
+            "status": "error",
+            "limitations": [f"SEO evidence could not be loaded: {exc}"],
+        }
+
+    # Phase 14 / D3: raise CTA'd SEO alerts from the evidence. Best-effort;
+    # dedupe keeps this from spamming, and they surface in the huddle feed +
+    # the next grounding's recent_agent_alerts.
+    try:
+        from services.intelligence.agents.seo_alert_producer import produce_seo_alerts
+
+        produce_seo_alerts(db, user_id, seo_evidence)
+    except Exception as exc:
+        logger.debug(f"SEO alert production skipped for user {user_id}: {exc}")
+
     return {
         "recent_agent_alerts": [
             {
@@ -358,6 +390,7 @@ def build_grounding_context(db: Session, user_id: str, date: str) -> Dict[str, A
         ],
         "strategy_monitoring": strategy_monitoring,
         "strategy_context": strategy_context,
+        "seo_evidence": seo_evidence,
         "onboarding_data": onboarding_context,
         "workflow_config": onboarding_context.get("workflow_config", {}),
         "calendar_events_today": [

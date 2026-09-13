@@ -83,9 +83,19 @@ class TestEnterpriseSEOService:
     
     @pytest.mark.asyncio
     async def test_quick_audit(self, service):
-        """Test quick 5-minute audit execution"""
-        result = await service.execute_quick_audit("https://example.com")
-        
+        """Test quick 5-minute audit execution (sub-audits mocked: no network)."""
+        with (
+            patch.object(
+                EnterpriseSEOService, "_execute_technical_audit",
+                new=AsyncMock(return_value={"score": 80, "critical_issues": ["Missing title"]}),
+            ),
+            patch.object(
+                EnterpriseSEOService, "_execute_pagespeed_audit",
+                new=AsyncMock(return_value={"score": 70, "recommendations": ["Compress images"]}),
+            ),
+        ):
+            result = await service.execute_quick_audit("https://example.com")
+
         assert result['audit_type'] == 'quick_audit'
         assert result['website_url'] == "https://example.com"
         assert 'quick_score' in result
@@ -183,9 +193,54 @@ class TestGSCAnalyzerService:
     """Test suite for GSCAnalyzerService"""
     
     @pytest.fixture
-    def service(self):
-        """Initialize GSC service for tests"""
-        return GSCAnalyzerService()
+    def service(self, monkeypatch):
+        """Initialize GSC service with EXPLICIT test-fixture GSC data.
+
+        Phase 9 / A4 removed the production mock generators from
+        GSCAnalyzerService. These tests exercise the analysis math, so the
+        synthetic dataset now lives here, injected via the real seam
+        (`_fetch_gsc_data`), and is marked data_source='test_fixture'.
+        """
+        service = GSCAnalyzerService()
+
+        async def _gsc_fixture(site_url, days, user_id):
+            return {
+                'site_url': site_url,
+                'date_range_days': days,
+                'keywords': [
+                    {'keyword': 'AI content creation', 'impressions': 2500, 'clicks': 450, 'ctr': 18.0, 'position': 2.5},
+                    {'keyword': 'SEO tools', 'impressions': 1800, 'clicks': 198, 'ctr': 11.0, 'position': 4.2},
+                    {'keyword': 'content optimization', 'impressions': 1200, 'clicks': 144, 'ctr': 12.0, 'position': 5.1},
+                    {'keyword': 'meta description generator', 'impressions': 950, 'clicks': 190, 'ctr': 20.0, 'position': 1.8},
+                    {'keyword': 'blog writing AI', 'impressions': 850, 'clicks': 102, 'ctr': 12.0, 'position': 6.5},
+                    {'keyword': 'keyword research tool', 'impressions': 750, 'clicks': 67, 'ctr': 8.9, 'position': 8.2},
+                    {'keyword': 'technical SEO', 'impressions': 680, 'clicks': 81, 'ctr': 11.9, 'position': 7.1},
+                    {'keyword': 'SERP analysis', 'impressions': 620, 'clicks': 43, 'ctr': 6.9, 'position': 11.5},
+                    {'keyword': 'content strategy', 'impressions': 580, 'clicks': 64, 'ctr': 11.0, 'position': 8.9},
+                    {'keyword': 'on-page optimization', 'impressions': 520, 'clicks': 52, 'ctr': 10.0, 'position': 9.2},
+                ],
+                'pages': [
+                    {'url': f'{site_url}/meta-description', 'clicks': 250, 'impressions': 1250, 'ctr': 20.0, 'position': 1.8},
+                    {'url': f'{site_url}/seo-tools', 'clicks': 180, 'impressions': 1640, 'ctr': 11.0, 'position': 4.2},
+                    {'url': f'{site_url}/content-optimization', 'clicks': 150, 'impressions': 1250, 'ctr': 12.0, 'position': 5.1},
+                    {'url': f'{site_url}/', 'clicks': 500, 'impressions': 3200, 'ctr': 15.6, 'position': 3.5},
+                    {'url': f'{site_url}/blog/ai-content', 'clicks': 125, 'impressions': 1045, 'ctr': 12.0, 'position': 6.5},
+                    {'url': f'{site_url}/technical-seo', 'clicks': 95, 'impressions': 800, 'ctr': 11.9, 'position': 7.1},
+                    {'url': f'{site_url}/competitor-analysis', 'clicks': 85, 'impressions': 920, 'ctr': 9.2, 'position': 8.5},
+                    {'url': f'{site_url}/keyword-research', 'clicks': 70, 'impressions': 780, 'ctr': 9.0, 'position': 9.1},
+                ],
+                'devices': {
+                    'desktop': {'clicks': 2500, 'impressions': 15000, 'ctr': 16.7, 'position': 4.5},
+                    'mobile': {'clicks': 3200, 'impressions': 18000, 'ctr': 17.8, 'position': 5.2},
+                    'tablet': {'clicks': 600, 'impressions': 4000, 'ctr': 15.0, 'position': 5.8},
+                },
+                'countries': {},
+                'search_types': {},
+                'data_source': 'test_fixture',
+            }
+
+        monkeypatch.setattr(service, '_fetch_gsc_data', _gsc_fixture)
+        return service
     
     @pytest.mark.asyncio
     async def test_service_initialization(self, service):

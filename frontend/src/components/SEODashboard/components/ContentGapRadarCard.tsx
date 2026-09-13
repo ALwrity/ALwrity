@@ -31,6 +31,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { useNavigate } from 'react-router-dom';
 import { GlassCard } from '../../shared/styled';
 import { apiClient } from '../../../api/client';
+import { useAbortableRequest, isCancelError } from '../useAbortableRequest';
 
 interface ScoringBreakdown {
   gap_size: number;
@@ -112,20 +113,28 @@ const ContentGapRadarCard: React.FC = () => {
   const [generatingTopic, setGeneratingTopic] = useState<string | null>(null);
   const [briefResult, setBriefResult] = useState<{ brief: ContentBrief; asset_id: number | null } | null>(null);
 
+  const nextSignal = useAbortableRequest();
+
   const fetchData = useCallback(async (bypassCache = false) => {
     try {
       setLoading(true);
       setError(null);
       const params: any = {};
       if (bypassCache) params.bypass_cache = 'true';
-      const resp = await apiClient.get('/api/seo-dashboard/content-gap-radar', { params });
+      const resp = await apiClient.get('/api/seo-dashboard/content-gap-radar', {
+        params,
+        signal: nextSignal(),
+      });
       setData(resp.data);
       if (resp.data.error) setError(resp.data.error);
     } catch (err: any) {
+      // Cancellation on unmount/refresh is not a failure — stay silent.
+      if (isCancelError(err)) return;
       setError(err?.response?.data?.detail || 'Failed to load content gap radar');
     } finally {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -140,13 +149,17 @@ const ContentGapRadarCard: React.FC = () => {
         scoring: gap.scoring,
         serp_evidence: gap.serp_evidence,
         sif_gap: gap.sif_gap,
+      }, {
+        signal: nextSignal(),
       });
       setBriefResult(resp.data);
     } catch (err: any) {
+      if (isCancelError(err)) return;
       setError(err?.response?.data?.detail || 'Failed to generate content brief');
     } finally {
       setGeneratingTopic(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleOpenBlogWriter = useCallback(() => {

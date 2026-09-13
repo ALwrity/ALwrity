@@ -5,7 +5,7 @@ This module provides FastAPI endpoints for all AI SEO tools migrated from ToBeMi
 Includes intelligent logging, exception handling, and structured responses.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, HttpUrl, Field, validator
 from typing import Dict, Any, List, Optional, Union
@@ -163,6 +163,10 @@ class EnterpriseAuditRequest(BaseModel):
     include_competitive_analysis: bool = Field(default=True, description="Include competitive benchmarking")
     generate_executive_report: bool = Field(default=True, description="Generate executive summary")
 
+class QuickAuditRequest(BaseModel):
+    """Request model for quick enterprise SEO audit (JSON body)."""
+    website_url: HttpUrl = Field(..., description="Primary website URL to audit")
+
 class GSCAnalysisRequest(BaseModel):
     """Request model for advanced GSC analysis"""
     site_url: HttpUrl = Field(..., description="Website URL registered in Google Search Console")
@@ -246,10 +250,13 @@ class GSCTrendAnalysisRequest(BaseModel):
     days_back: int = Field(default=90, ge=7, le=365, description="Days of historical data to analyze")
 
 class GSCHealthMetricsRequest(BaseModel):
-    """Request model for health metrics calculation"""
+    """Request model for health metrics calculation.
+
+    NOTE: trend comparison was removed — it requires historical snapshots
+    that do not exist yet. Extra keys from old clients are ignored.
+    """
     site_url: HttpUrl = Field(..., description="Website URL registered in GSC")
     include_distribution: bool = Field(default=True, description="Include keyword distribution breakdown")
-    include_trends: bool = Field(default=True, description="Include trend comparison")
 
 # Exception Handler
 async def handle_seo_tool_exception(func_name: str, error: Exception, request_data: Dict) -> ErrorResponse:
@@ -430,77 +437,139 @@ async def analyze_sitemap(
     except Exception as e:
         return await handle_seo_tool_exception("analyze_sitemap", e, request.dict())
 
+def _parse_keywords_field(raw: Any) -> Optional[List[str]]:
+    """Parse multipart keywords field: JSON list, comma string, or absent."""
+    if raw is None:
+        return None
+    if isinstance(raw, list):
+        return [str(k) for k in raw]
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return None
+        if text.startswith("["):
+            try:
+                import json as _json
+
+                parsed = _json.loads(text)
+                if isinstance(parsed, list):
+                    return [str(k) for k in parsed]
+            except Exception:
+                pass
+        return [k.strip() for k in text.split(",") if k.strip()]
+    return None
+
+
 @router.post("/image-alt-text", response_model=BaseResponse)
 @log_api_call
 async def generate_image_alt_text(
-    request: ImageAltRequest = None,
-    image_file: UploadFile = File(None),
-    background_tasks: BackgroundTasks = BackgroundTasks()
+    request: Request,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user)
 ) -> Union[BaseResponse, ErrorResponse]:
     """
     Generate AI-powered alt text for images
-    
+
     Creates SEO-optimized alt text for images using advanced AI vision
     models with context-aware keyword integration.
+
+    Accepts two content types (parsed explicitly because a typed Body model
+    plus a File param cannot serve both):
+    - application/json: {"image_url": ..., "context"?, "keywords"?}
+    - multipart/form-data: image_file + optional context/keywords fields
     """
     start_time = datetime.utcnow()
-    
+    parsed: Dict[str, Any] = {}
+
     try:
         service = ImageAltService()
-        
+        image_file: Optional[UploadFile] = None
+        image_url: Optional[str] = None
+        context: Optional[str] = None
+        keywords: Optional[List[str]] = None
+
+        content_type = request.headers.get("content-type", "")
+        if "multipart/form-data" in content_type:
+            form = await request.form()
+            maybe_file = form.get("image_file")
+            # Duck-typed on purpose: the env can carry two UploadFile class
+            # objects (fastapi vs starlette installs), so isinstance is
+            # unreliable here. A real upload has filename + read().
+            if (
+                maybe_file is not None
+                and not isinstance(maybe_file, str)
+                and hasattr(maybe_file, "filename")
+                and hasattr(maybe_file, "read")
+            ):
+                image_file = maybe_file
+            else:
+                image_file = None
+            context = form.get("context")
+            if not isinstance(context, str):
+                context = None
+            keywords = _parse_keywords_field(form.get("keywords"))
+        else:
+            body = ImageAltRequest(**(await request.json()))
+            image_url = str(body.image_url) if body.image_url else None
+            context = body.context
+            keywords = body.keywords
+        parsed = {"image_url": image_url, "context": context, "keywords": keywords}
+
         if image_file:
             # Handle uploaded file
-            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{image_file.filename.split('.')[-1]}") as tmp_file:
+            suffix = (image_file.filename or "upload").split('.')[-1]
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{suffix}") as tmp_file:
                 content = await image_file.read()
                 tmp_file.write(content)
                 tmp_file_path = tmp_file.name
-            
-            result = await service.generate_alt_text_from_file(
-                image_path=tmp_file_path,
-                context=request.context if request else None,
-                keywords=request.keywords if request else None
-            )
-            
-            # Cleanup
-            os.unlink(tmp_file_path)
-            
-        elif request and request.image_url:
+
+            try:
+                result = await service.generate_alt_text_from_file(
+                    image_path=tmp_file_path,
+                    context=context,
+                    keywords=keywords
+                )
+            finally:
+                # Cleanup
+                os.unlink(tmp_file_path)
+
+        elif image_url:
             result = await service.generate_alt_text_from_url(
-                image_url=str(request.image_url),
-                context=request.context,
-                keywords=request.keywords
+                image_url=image_url,
+                context=context,
+                keywords=keywords
             )
         else:
             raise ValueError("Either image_file or image_url must be provided")
-        
+
         execution_time = (datetime.utcnow() - start_time).total_seconds()
-        
+
         # Log successful operation
         log_data = {
             "operation": "image_alt_text_generation",
             "has_image_file": image_file is not None,
-            "has_image_url": request.image_url is not None if request else False,
+            "has_image_url": image_url is not None,
             "execution_time": execution_time,
             "success": True
         }
         background_tasks.add_task(save_to_file, f"{LOG_DIR}/operations.jsonl", log_data)
-        
+
         return BaseResponse(
             success=True,
             message="Image alt text generated successfully",
             execution_time=execution_time,
             data=result
         )
-        
+
     except Exception as e:
-        return await handle_seo_tool_exception("generate_image_alt_text", e, 
-                                              request.dict() if request else {})
+        return await handle_seo_tool_exception("generate_image_alt_text", e, parsed)
 
 @router.post("/opengraph-tags", response_model=BaseResponse)
 @log_api_call
 async def generate_opengraph_tags(
     request: OpenGraphRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user)
 ) -> Union[BaseResponse, ErrorResponse]:
     """
     Generate OpenGraph tags for social media optimization
@@ -545,7 +614,8 @@ async def generate_opengraph_tags(
 @log_api_call
 async def analyze_on_page_seo(
     request: OnPageSEORequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user)
 ) -> Union[BaseResponse, ErrorResponse]:
     """
     Comprehensive on-page SEO analysis
@@ -591,7 +661,8 @@ async def analyze_on_page_seo(
 @log_api_call
 async def analyze_technical_seo(
     request: TechnicalSEORequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user)
 ) -> Union[BaseResponse, ErrorResponse]:
     """
     Technical SEO analysis and crawling
@@ -640,7 +711,8 @@ async def analyze_technical_seo(
 @log_api_call
 async def execute_website_audit(
     request: WorkflowRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user)
 ) -> Union[BaseResponse, ErrorResponse]:
     """
     Complete website SEO audit workflow
@@ -1052,7 +1124,9 @@ async def execute_enterprise_audit(
             target_keywords=request.target_keywords or [],
             include_content_analysis=request.include_content_analysis,
             include_competitive_analysis=request.include_competitive_analysis,
-            generate_executive_report=request.generate_executive_report
+            generate_executive_report=request.generate_executive_report,
+            # Phase 10 / B4: real competitive benchmarking is user-scoped.
+            user_id=str(current_user.get("id")) if current_user else None,
         )
         
         execution_time = (datetime.utcnow() - start_time).total_seconds()
@@ -1072,12 +1146,12 @@ async def execute_enterprise_audit(
 @router.post("/enterprise/quick-audit", response_model=BaseResponse)
 @log_api_call
 async def execute_quick_enterprise_audit(
-    website_url: HttpUrl,
+    request: QuickAuditRequest,
     current_user: dict = Depends(get_current_user)
 ) -> Union[BaseResponse, ErrorResponse]:
     """
     Execute quick 5-minute enterprise audit focusing on critical issues.
-    
+
     Provides rapid assessment of most critical SEO problems:
     - Technical SEO critical issues
     - PageSpeed performance bottlenecks
@@ -1085,24 +1159,24 @@ async def execute_quick_enterprise_audit(
     - Estimated business impact
     """
     start_time = datetime.utcnow()
-    
+
     try:
-        logger.info(f"Starting quick audit for {website_url}")
-        
+        logger.info(f"Starting quick audit for {request.website_url}")
+
         enterprise_service = EnterpriseSEOService()
-        audit_result = await enterprise_service.execute_quick_audit(str(website_url))
-        
+        audit_result = await enterprise_service.execute_quick_audit(str(request.website_url))
+
         execution_time = (datetime.utcnow() - start_time).total_seconds()
-        
+
         return BaseResponse(
             success=True,
             message="Quick audit completed",
             execution_time=execution_time,
             data=audit_result
         )
-        
+
     except Exception as e:
-        return await handle_seo_tool_exception("execute_quick_enterprise_audit", e, {"website_url": str(website_url)})
+        return await handle_seo_tool_exception("execute_quick_enterprise_audit", e, request.dict())
 
 
 # ==================== ADVANCED GSC ANALYSIS ENDPOINTS ====================
@@ -1297,7 +1371,7 @@ async def get_ranked_opportunities(
         user_id = str(current_user.get("id")) if current_user else None
         
         service = GSCStrategyInsightsService()
-        opportunities = await service._get_ranked_opportunities(
+        opportunities = await service.get_ranked_opportunities(
             site_url=str(request.site_url),
             top_n=request.limit
         )
@@ -1366,8 +1440,9 @@ async def get_health_metrics(
         user_id = str(current_user.get("id")) if current_user else None
         
         service = GSCStrategyInsightsService()
-        metrics = await service._calculate_health_metrics(
-            site_url=str(request.site_url)
+        metrics = await service.calculate_health_metrics(
+            site_url=str(request.site_url),
+            include_distribution=request.include_distribution
         )
         
         execution_time = (datetime.utcnow() - start_time).total_seconds()
@@ -1419,8 +1494,11 @@ async def analyze_gsc_trends(
         user_id = str(current_user.get("id")) if current_user else None
         
         service = GSCStrategyInsightsService()
-        trends = await service._analyze_performance_trends(
-            site_url=str(request.site_url)
+        trends = await service.analyze_performance_trends(
+            site_url=str(request.site_url),
+            user_id=user_id,  # Phase 8F: trends are scoped to the authenticated user's GSC data
+            metric=request.metric,
+            days_back=request.days_back
         )
         
         execution_time = (datetime.utcnow() - start_time).total_seconds()

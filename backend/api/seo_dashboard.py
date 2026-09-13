@@ -108,108 +108,6 @@ class SEOMetricsResponse(BaseModel):
     timestamp: str
     url: str
 
-# Mock data for Phase 1
-def get_mock_seo_data() -> SEODashboardData:
-    """Get mock SEO dashboard data for Phase 1."""
-    # Try to get the user's website URL from the database
-    website_url = None
-    db_session = get_db_session()
-    if db_session:
-        try:
-            user_data_service = UserDataService(db_session)
-            website_url = user_data_service.get_user_website_url()
-            logger.info(f"Retrieved website URL from database: {website_url}")
-        except Exception as e:
-            logger.error(f"Error fetching website URL from database: {e}")
-        finally:
-            db_session.close()
-    
-    return SEODashboardData(
-        health_score=SEOHealthScore(
-            score=78,
-            change=12,
-            trend="up",
-            label="Good",
-            color="#FF9800"
-        ),
-        key_insight="Your content strategy is working! Focus on technical SEO to reach 90+ score",
-        priority_alert="Mobile speed needs attention - 2.8s load time",
-        website_url=website_url,  # Include the user's website URL
-        metrics={
-            "traffic": SEOMetric(
-                value=23450,
-                change=23,
-                trend="up",
-                description="Strong growth!",
-                color="#4CAF50"
-            ),
-            "rankings": SEOMetric(
-                value=8,
-                change=8,
-                trend="up",
-                description="Great work on content",
-                color="#2196F3"
-            ),
-            "mobile": SEOMetric(
-                value=2.8,
-                change=-0.3,
-                trend="down",
-                description="Needs attention",
-                color="#FF9800"
-            ),
-            "keywords": SEOMetric(
-                value=156,
-                change=5,
-                trend="up",
-                description="5 new opportunities",
-                color="#9C27B0"
-            )
-        },
-        platforms={
-            "google_search_console": PlatformStatus(
-                status="excellent",
-                connected=True,
-                last_sync="2024-01-15T10:30:00Z",
-                data_points=1250
-            ),
-            "google_analytics": PlatformStatus(
-                status="good",
-                connected=True,
-                last_sync="2024-01-15T10:25:00Z",
-                data_points=890
-            ),
-            "bing_webmaster": PlatformStatus(
-                status="needs_attention",
-                connected=False,
-                last_sync=None,
-                data_points=0
-            )
-        },
-        ai_insights=[
-            AIInsight(
-                insight="Your mobile page speed is 2.8s - optimize images and enable compression",
-                priority="high",
-                category="performance",
-                action_required=True,
-                tool_path="/seo-tools/page-speed-optimizer"
-            ),
-            AIInsight(
-                insight="Add structured data to improve rich snippet opportunities",
-                priority="medium",
-                category="technical",
-                action_required=False,
-                tool_path="/seo-tools/schema-generator"
-            ),
-            AIInsight(
-                insight="Content quality score improved by 15% - great work!",
-                priority="low",
-                category="content",
-                action_required=False
-            )
-        ],
-        last_updated="2024-01-15T10:30:00Z"
-    )
-
 def calculate_health_score(metrics: Dict[str, Any]) -> SEOHealthScore:
     """Calculate SEO health score based on metrics."""
     # This would be replaced with actual calculation logic
@@ -265,97 +163,6 @@ def generate_ai_insights(metrics: Dict[str, Any], platforms: Dict[str, Any]) -> 
 from services.seo.deep_competitor_analysis_service import DeepCompetitorAnalysisService
 
 # API Endpoints
-async def run_strategic_insights(
-    current_user: dict = Depends(get_current_user)
-) -> Dict[str, Any]:
-    """
-    Manually trigger AI-Powered Competitive Insights (Weekly Strategy Brief).
-    """
-    try:
-        user_id = str(current_user.get('id'))
-        db_session = get_db_session(user_id)
-        
-        if not db_session:
-            raise HTTPException(status_code=500, detail="Database connection unavailable")
-            
-        try:
-            # 1. Get Website Analysis (with fallback)
-            website_analysis_data = None
-            analysis_id = None
-            
-            # Try SSOT first
-            integration_service = OnboardingDataIntegrationService()
-            integrated_data = integration_service.get_integrated_data_sync(user_id, db_session)
-            if integrated_data and integrated_data.get("website_analysis"):
-                 website_analysis_data = integrated_data.get("website_analysis")
-                 analysis_id = website_analysis_data.get("id")
-            
-            # Fallback: Find latest WebsiteAnalysis across sessions
-            if not website_analysis_data:
-                latest_analysis = db_session.query(WebsiteAnalysis).join(
-                    OnboardingSession, WebsiteAnalysis.session_id == OnboardingSession.id
-                ).filter(
-                    OnboardingSession.user_id == user_id
-                ).order_by(WebsiteAnalysis.updated_at.desc()).first()
-                
-                if latest_analysis:
-                    # Convert to dict
-                    from fastapi.encoders import jsonable_encoder
-                    website_analysis_data = jsonable_encoder(latest_analysis)
-                    analysis_id = latest_analysis.id
-            
-            if not website_analysis_data:
-                raise HTTPException(status_code=400, detail="No website analysis found. Please complete Onboarding Step 2.")
-
-            # 2. Get Competitors
-            competitors = []
-            if integrated_data:
-                competitors = integrated_data.get("competitor_analysis", [])
-                
-            if not competitors:
-                 # Fallback to research preferences
-                 research_prefs = integrated_data.get("research_preferences", {})
-                 competitors = research_prefs.get("competitors", [])
-
-            if not competitors:
-                 raise HTTPException(status_code=400, detail="No competitors found. Please complete Onboarding Step 3.")
-
-            # 3. Run Analysis
-            service = DeepCompetitorAnalysisService()
-            report = await service.generate_weekly_strategy_brief(
-                user_id=user_id,
-                website_analysis=website_analysis_data,
-                competitors=competitors
-            )
-            
-            # 4. Persist to History
-            if analysis_id:
-                wa = db_session.query(WebsiteAnalysis).filter(WebsiteAnalysis.id == analysis_id).first()
-                if wa:
-                    history = wa.strategic_insights_history or []
-                    # Ensure history is a list
-                    if not isinstance(history, list):
-                        history = []
-                    
-                    # Prepend new report
-                    history.insert(0, report)
-                    
-                    # Keep last 52 weeks
-                    wa.strategic_insights_history = history[:52]
-                    flag_modified(wa, "strategic_insights_history")
-                    db_session.commit()
-            
-            return report
-
-        finally:
-            db_session.close()
-
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        logger.error(f"Error running strategic insights: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to run analysis: {str(e)}")
-
 async def get_seo_dashboard_data(current_user: dict = Depends(get_current_user)) -> SEODashboardData:
     """Get comprehensive SEO dashboard data."""
     try:
@@ -363,9 +170,10 @@ async def get_seo_dashboard_data(current_user: dict = Depends(get_current_user))
         db_session = get_db_session(user_id)
         
         if not db_session:
-            logger.error("No database session available")
-            return get_mock_seo_data()
-        
+            # Fail fast: no mock fallback. The UI renders this 503 as an
+            # error state (Phase 1E) instead of fake metrics.
+            raise HTTPException(status_code=503, detail="Database unavailable for SEO dashboard")
+
         try:
             # Use new SEO dashboard service
             dashboard_service = SEODashboardService(db_session)
@@ -387,10 +195,12 @@ async def get_seo_dashboard_data(current_user: dict = Depends(get_current_user))
         finally:
             db_session.close()
             
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting SEO dashboard data: {e}")
-        # Fallback to mock data
-        return get_mock_seo_data()
+        # Fail fast: surface the outage, never substitute mock metrics.
+        raise HTTPException(status_code=500, detail=f"SEO dashboard failed: {e}")
 
 async def get_seo_health_score(current_user: dict = Depends(get_current_user)) -> SEOHealthScore:
     """Get current SEO health score."""
@@ -1203,28 +1013,32 @@ async def get_onboarding_task_health(
         raise HTTPException(status_code=500, detail="Failed to get onboarding scheduled task health")
 
 # New comprehensive SEO analysis endpoints
-async def analyze_seo_comprehensive(request: SEOAnalysisRequest) -> SEOAnalysisResponse:
+async def analyze_seo_comprehensive(request: SEOAnalysisRequest, current_user: dict) -> SEOAnalysisResponse:
     """
     Analyze a URL for comprehensive SEO performance (progressive mode)
     
     Args:
         request: SEOAnalysisRequest containing URL and optional target keywords
+        current_user: Authenticated Clerk user dict. Phase 8: threaded from the
+            app.py handler (analyze_urls_ai signature convention) so the stored
+            analysis is user-scoped and every log line names the user.
         
     Returns:
         SEOAnalysisResponse with detailed analysis results
     """
     try:
-        logger.info(f"Starting progressive SEO analysis for URL: {request.url}")
+        user_id = str(current_user.get('id'))  # Phase 8: established id extraction
+        logger.info(f"Starting progressive SEO analysis for URL: {request.url} user_id={user_id}")
         
         # Use progressive analysis for comprehensive results with timeout handling
         result = seo_analyzer.analyze_url_progressive(request.url, request.target_keywords)
         
-        # Store result in database
+        # Store result in database (user-scoped, Phase 8)
         db_session = get_db_session()
         if db_session:
             try:
                 seo_service = SEOAnalysisService(db_session)
-                stored_analysis = seo_service.store_analysis_result(result)
+                stored_analysis = seo_service.store_analysis_result(result, triggered_by_user_id=user_id)
                 if stored_analysis:
                     logger.info(f"Stored progressive SEO analysis in database with ID: {stored_analysis.id}")
                 else:
@@ -1248,7 +1062,7 @@ async def analyze_seo_comprehensive(request: SEOAnalysisRequest) -> SEOAnalysisR
             'message': f"Progressive SEO analysis completed successfully for {result.url}"
         }
         
-        logger.info(f"Progressive SEO analysis completed for {request.url}. Overall score: {result.overall_score}")
+        logger.info(f"Progressive SEO analysis completed for {request.url}. Overall score: {result.overall_score} user_id={user_id}")
         return SEOAnalysisResponse(**response_data)
         
     except Exception as e:
@@ -1258,77 +1072,31 @@ async def analyze_seo_comprehensive(request: SEOAnalysisRequest) -> SEOAnalysisR
             detail=f"Error analyzing SEO: {str(e)}"
         )
 
-async def analyze_seo_full(request: SEOAnalysisRequest) -> SEOAnalysisResponse:
-    """
-    Analyze a URL for comprehensive SEO performance (full analysis)
-    
-    Args:
-        request: SEOAnalysisRequest containing URL and optional target keywords
-        
-    Returns:
-        SEOAnalysisResponse with detailed analysis results
-    """
-    try:
-        logger.info(f"Starting full SEO analysis for URL: {request.url}")
-        
-        # Use progressive analysis for comprehensive results
-        result = seo_analyzer.analyze_url_progressive(request.url, request.target_keywords)
-        
-        # Store result in database
-        db_session = get_db_session()
-        if db_session:
-            try:
-                seo_service = SEOAnalysisService(db_session)
-                stored_analysis = seo_service.store_analysis_result(result)
-                if stored_analysis:
-                    logger.info(f"Stored full SEO analysis in database with ID: {stored_analysis.id}")
-                else:
-                    logger.warning("Failed to store SEO analysis in database")
-            except Exception as db_error:
-                logger.error(f"Database error during analysis storage: {str(db_error)}")
-            finally:
-                db_session.close()
-        
-        # Convert to response format
-        response_data = {
-            'url': result.url,
-            'timestamp': result.timestamp,
-            'overall_score': result.overall_score,
-            'health_status': result.health_status,
-            'critical_issues': result.critical_issues,
-            'warnings': result.warnings,
-            'recommendations': result.recommendations,
-            'data': result.data,
-            'success': True,
-            'message': f"Full SEO analysis completed successfully for {result.url}"
-        }
-        
-        logger.info(f"Full SEO analysis completed for {request.url}. Overall score: {result.overall_score}")
-        return SEOAnalysisResponse(**response_data)
-        
-    except Exception as e:
-        logger.error(f"Error in full SEO analysis for {request.url}: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error in full SEO analysis: {str(e)}"
-        )
+# Phase 8C: the deprecated full-analysis alias wrapper (and its /analyze-full
+# route) are retired — the alias had zero frontend callers (analyzeSEOFull was
+# never invoked) and duplicated surface. The canonical comprehensive pipeline
+# above is the only entry.
 
-async def get_seo_metrics_detailed(url: str) -> SEOMetricsResponse:
+async def get_seo_metrics_detailed(url: str, current_user: dict) -> SEOMetricsResponse:
     """
     Get detailed SEO metrics for dashboard display
     
     Args:
         url: The URL to analyze
+        current_user: Authenticated Clerk user dict. Phase 8: this is a pure
+            compute (no persistence), so the user is bound for scoped logging
+            and auth enforcement only.
         
     Returns:
         Detailed SEO metrics for React dashboard
     """
     try:
+        user_id = str(current_user.get('id')) if current_user else 'anonymous'  # Phase 8
         # Ensure URL has protocol
         if not url.startswith(('http://', 'https://')):
             url = f"https://{url}"
         
-        logger.info(f"Getting detailed SEO metrics for URL: {url}")
+        logger.info(f"Getting detailed SEO metrics for URL: {url} user_id={user_id}")
         
         # Perform analysis
         result = seo_analyzer.analyze_url_progressive(url)
@@ -1378,22 +1146,25 @@ async def get_seo_metrics_detailed(url: str) -> SEOMetricsResponse:
             detail=f"Error getting SEO metrics: {str(e)}"
         )
 
-async def get_analysis_summary(url: str) -> Dict[str, Any]:
+async def get_analysis_summary(url: str, current_user: dict) -> Dict[str, Any]:
     """
     Get a quick summary of SEO analysis for a URL
     
     Args:
         url: The URL to analyze
+        current_user: Authenticated Clerk user dict (Phase 8: scoped logging
+            only — this is a pure compute with no persistence).
         
     Returns:
         Summary of SEO analysis
     """
     try:
+        user_id = str(current_user.get('id')) if current_user else 'anonymous'  # Phase 8
         # Ensure URL has protocol
         if not url.startswith(('http://', 'https://')):
             url = f"https://{url}"
         
-        logger.info(f"Getting analysis summary for URL: {url}")
+        logger.info(f"Getting analysis summary for URL: {url} user_id={user_id}")
         
         # Perform analysis
         result = seo_analyzer.analyze_url_progressive(url)
@@ -1421,18 +1192,22 @@ async def get_analysis_summary(url: str) -> Dict[str, Any]:
             detail=f"Error getting analysis summary: {str(e)}"
         )
 
-async def batch_analyze_urls(urls: List[str]) -> Dict[str, Any]:
+async def batch_analyze_urls(urls: List[str], current_user: dict) -> Dict[str, Any]:
     """
     Analyze multiple URLs in batch
     
     Args:
         urls: List of URLs to analyze
+        current_user: Authenticated Clerk user dict. Phase 8: bound for scoped
+            logging only today — batch rows are NOT persisted here; per-user
+            batch persistence arrives with the Phase 7 batch UI plan.
         
     Returns:
         Batch analysis results
     """
     try:
-        logger.info(f"Starting batch analysis for {len(urls)} URLs")
+        user_id = str(current_user.get('id')) if current_user else 'anonymous'  # Phase 8
+        logger.info(f"Starting batch analysis for {len(urls)} URLs user_id={user_id}")
         
         results = []
         
@@ -1583,6 +1358,184 @@ async def get_analyzed_pages(current_user: dict = Depends(get_current_user)) -> 
         return {"results": results}
     finally:
         db_session.close()
+
+
+def _derive_health_delta(timeseries: Any) -> Optional[float]:
+    """Phase 8G: real trend delta from the GSC/Bing timeseries.
+
+    The health-score endpoint hardcodes `change: 0`. For the summary card we
+    derive a delta from the normalized daily timeseries: total clicks in the
+    first half vs the second half of the window. None when either half is
+    empty/zero — never a fabricated percentage, never a division crash.
+    """
+    try:
+        buckets = [float(b.get("clicks", 0) or 0) for b in (timeseries or []) if isinstance(b, dict)]
+        if len(buckets) < 2:
+            return None
+        half = len(buckets) // 2
+        first_half = sum(buckets[:half])
+        second_half = sum(buckets[half:])
+        if first_half <= 0:
+            return None
+        return round((second_half - first_half) / first_half * 100.0, 2)
+    except Exception as e:
+        logger.error(f"Error deriving health delta: {e}")
+        return None
+
+
+def _aggregate_page_audits(user_id: str) -> Optional[Dict[str, Any]]:
+    """Phase 8G: count / average score / needs-fix from seo_page_audits.
+
+    SEOPageAudit rows are Clerk-user-scoped (established storage model). A
+    score below 70 counts as 'needs fix' — mirrors the page-audit UI color
+    thresholds. Returns None when no DB session is available (fault-isolated
+    by the caller, same contract as the other sub-pieces).
+    """
+    db_session = get_db_session()
+    if not db_session:
+        return None
+    try:
+        rows = (
+            db_session.query(SEOPageAudit)
+            .filter(SEOPageAudit.user_id == user_id)
+            .all()
+        )
+        scores = [float(r.overall_score) for r in rows if r.overall_score is not None]
+        last_audit_at = None
+        for r in rows:
+            if r.last_analyzed_at:
+                iso = r.last_analyzed_at.isoformat() if hasattr(r.last_analyzed_at, "isoformat") else str(r.last_analyzed_at)
+                if last_audit_at is None or iso > last_audit_at:
+                    last_audit_at = iso
+        return {
+            "audited": len(rows),
+            "avg_score": round(sum(scores) / len(scores), 1) if scores else None,
+            "needs_fix": len([s for s in scores if s < 70]),
+            "last_audit_at": last_audit_at,
+        }
+    except Exception as e:
+        logger.error(f"Error aggregating page audits for summary card: {e}")
+        return None
+    finally:
+        db_session.close()
+
+
+async def get_seo_summary_card(current_user: dict) -> Dict[str, Any]:
+    """Phase 6B (8G): unified SEO summary for the Main Dashboard card.
+
+    ONE call that composes what the SEO dashboard stitches over 6 requests —
+    each piece is an existing, persisted, per-user aggregate (no recomputation
+    except the timeseries-derived health delta). Conventions: auth enforced at
+    the app.py route (Phase-1 binding); every sub-source is fault-isolated into
+    `errors` so one failing piece degrades the card, never 500s it. Null-state
+    safe for fresh users (no fabricated zeros).
+    """
+    user_id = str(current_user.get('id'))
+    errors: List[Dict[str, str]] = []
+
+    async def _piece(source: str, coro):
+        """Isolate each sub-source: failure → logged error, missing piece."""
+        try:
+            return await coro
+        except Exception as e:
+            logger.error(f"seo-summary-card: {source} failed: {e}")
+            errors.append({"source": source, "error": str(e)})
+            return None
+
+    platforms = await _piece("platforms", get_platform_status(current_user))
+    overview = await _piece("overview", get_seo_dashboard_overview(current_user))
+    task_health = await _piece("task_health", get_onboarding_task_health(current_user))
+    guardian = await _piece("guardian", get_guardian_audit(current_user))
+    history = await _piece("strategic_insights", get_strategic_insights_history(current_user))
+    competitor = await _piece("deep_competitor", get_deep_competitor_analysis(current_user))
+
+    # Pages are a sync DB aggregation, isolated the same way.
+    try:
+        pages = _aggregate_page_audits(user_id)
+    except Exception as e:
+        logger.error(f"seo-summary-card: page aggregation failed: {e}")
+        errors.append({"source": "page_audits", "error": str(e)})
+        pages = None
+
+    overview_health = (overview or {}).get("health_score") or {}
+    change_pct = _derive_health_delta((overview or {}).get("timeseries"))
+    health_score = {
+        "score": overview_health.get("score"),
+        "change_pct": change_pct,
+        "trend": (
+            "stable" if change_pct is None
+            else ("up" if change_pct >= 5 else ("down" if change_pct <= -5 else "stable"))
+        ),
+        "label": overview_health.get("label"),
+    }
+
+    # Background task matrix → overall status
+    background_tasks = None
+    if task_health is not None:
+        tasks = (task_health.get("tasks") or {})
+        failing_count = 0
+        max_consecutive = 0
+        next_execution = None
+        for task in tasks.values():
+            latest = (task.get("latest_execution") or {})
+            if latest.get("status") == "failed":
+                failing_count += 1
+            cf = task.get("consecutive_failures") or 0
+            max_consecutive = max(max_consecutive, cf)
+            ne = task.get("next_execution")
+            if ne and (next_execution is None or ne < next_execution):
+                next_execution = ne
+        if max_consecutive > 2:
+            overall = "failing"
+        elif max_consecutive >= 1 or failing_count >= 1:
+            overall = "degraded"
+        else:
+            overall = "ok"
+        background_tasks = {
+            "overall_status": overall,
+            "failing_count": failing_count,
+            "max_consecutive_failures": max_consecutive,
+            "next_execution": next_execution,
+        }
+
+    has_data = bool(
+        pages and pages.get("audited", 0) > 0
+        or (overview_health or {}).get("score")
+        or (history or [])
+    )
+
+    competitor_status = competitor or {}
+    benchmark_status = None
+    if competitor_status.get("status") in ("success", "failed"):
+        benchmark_status = {
+            "status": competitor_status.get("status"),
+            "last_run": competitor_status.get("last_run"),
+        }
+
+    latest_insight = (history or [None])[0] if history else None
+    if latest_insight:
+        latest_insight = {
+            "generated_at": latest_insight.get("generated_at"),
+            "metrics": latest_insight.get("metrics"),
+            "insights": latest_insight.get("insights"),
+        }
+
+    guardian_report = guardian if (guardian or {}).get("has_audit") else None
+
+    return {
+        "status": "ok",
+        "has_data": has_data,
+        "website_url": (overview or {}).get("website_url", ""),
+        "platform_connections": platforms,
+        "health_score": health_score,
+        "pages": pages,
+        "background_tasks": background_tasks,
+        "last_guardian_audit": guardian_report,
+        "latest_strategic_insight": latest_insight,
+        "benchmark_status": benchmark_status,
+        "last_updated": (overview or {}).get("last_updated") or datetime.utcnow().isoformat(),
+        "errors": errors or [],
+    }
 
 
 # New SEO Dashboard Endpoints with Real Data
@@ -1819,7 +1772,8 @@ async def run_strategic_insights(
         raise HTTPException(status_code=500, detail=f"Failed to run strategic insights: {str(e)}")
 
 
-@router.post("/refresh-data")
+# NOTE: no @router decorator here on purpose — this module's router is never
+# included; app.py wires refresh_analytics_data directly at POST /refresh.
 async def refresh_analytics_data(current_user: dict = Depends(get_current_user), site_url: str = None):
     """Force refresh of analytics data from GSC/Bing."""
     # This would trigger background jobs to fetch fresh data
@@ -1840,7 +1794,8 @@ async def refresh_analytics_data(current_user: dict = Depends(get_current_user),
         logger.error(f"Error refreshing analytics data: {e}")
         return {"status": "error", "message": str(e)}
 
-@router.get("/strategic-insights-history")
+# NOTE: no @router decorator here on purpose — app.py wires
+# get_strategic_insights_history directly at GET /strategic-insights/history.
 async def get_strategic_insights_history(
     current_user: dict = Depends(get_current_user)
 ) -> List[Dict[str, Any]]:

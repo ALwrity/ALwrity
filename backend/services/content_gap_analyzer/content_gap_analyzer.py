@@ -124,153 +124,148 @@ class ContentGapAnalyzer:
     
     async def _analyze_serp_landscape(self, keywords: List[str], competitor_urls: List[str]) -> Dict[str, Any]:
         """
-        Analyze SERP landscape using adv.serp_goog.
-        
-        Args:
-            keywords: List of keywords to analyze
-            competitor_urls: List of competitor URLs
-            
-        Returns:
-            SERP analysis results
+        Analyze SERP landscape via the real SerpGapService (Phase 9 / plan A2).
+
+        Previously this fabricated search volumes, difficulties and competitor
+        positions with hash()-based placeholders while claiming adv.serp_goog.
+        It now delegates to the real service and, when SERP access is not
+        available, returns an explicit data_source="unavailable" with EMPTY
+        results — never invented metrics.
+
+        Response keys are kept shape-compatible for the content-planning
+        consumer (gap_analysis_service mapping -> ContentGapAnalysisFullResponse).
         """
+        unavailable = {
+            'keyword_rankings': {},
+            'competitor_presence': {},
+            'serp_features': {},
+            'ranking_opportunities': [],
+            'data_source': 'unavailable',
+        }
         try:
             logger.info(f"Analyzing SERP landscape for {len(keywords)} keywords")
-            
-            serp_results = {
+
+            domains = [
+                urlparse(url).netloc
+                for url in (competitor_urls or [])
+                if url and urlparse(url).netloc
+            ]
+            if not keywords or not domains:
+                logger.info("SERP analysis skipped: no keywords or competitor domains")
+                return dict(unavailable)
+
+            # Lazy-init so a missing SERP provider never breaks the analyzer at
+            # construction time (and stays injectable for tests).
+            service = getattr(self, 'serp_gap_service', None)
+            if service is None:
+                from services.seo_tools.serp_gap_service import SerpGapService
+                service = SerpGapService()
+                self.serp_gap_service = service
+
+            gap_result = await service.analyze_topic_gaps(
+                topics=list(keywords[:10]),
+                competitor_domains=domains,
+                max_results_per_site=5,
+            )
+
+            gaps = (gap_result or {}).get('gaps') or []
+            if not gaps:
+                return dict(unavailable)
+
+            serp_results: Dict[str, Any] = {
                 'keyword_rankings': {},
                 'competitor_presence': {},
                 'serp_features': {},
-                'ranking_opportunities': []
+                'ranking_opportunities': [],
+                'data_source': 'serp_gap',
             }
-            
-            # Note: adv.serp_goog requires API key setup
-            # For demo purposes, we'll simulate SERP analysis with structured data
-            for keyword in keywords[:10]:  # Limit to prevent API overuse
-                try:
-                    # In production, use: serp_data = adv.serp_goog(q=keyword, cx='your_cx', key='your_key')
-                    # For now, we'll create structured placeholder data that mimics real SERP analysis
-                    
-                    # Simulate SERP data structure
-                    serp_data = {
-                        'keyword': keyword,
-                        'search_volume': f"{1000 + hash(keyword) % 50000}",
-                        'difficulty': ['Low', 'Medium', 'High'][hash(keyword) % 3],
-                        'competition': ['Low', 'Medium', 'High'][hash(keyword) % 3],
-                        'serp_features': ['featured_snippet', 'people_also_ask', 'related_searches'],
-                        'top_10_domains': [urlparse(url).netloc for url in competitor_urls[:5]],
-                        'competitor_positions': {
-                            urlparse(url).netloc: f"Position {i+3}" for i, url in enumerate(competitor_urls[:5])
-                        }
-                    }
-                    
-                    serp_results['keyword_rankings'][keyword] = serp_data
-                    
-                    # Identify ranking opportunities
-                    target_domain = urlparse(competitor_urls[0] if competitor_urls else "").netloc
-                    if target_domain not in serp_data.get('competitor_positions', {}):
-                        serp_results['ranking_opportunities'].append({
-                            'keyword': keyword,
-                            'opportunity': 'Not ranking in top 10',
-                            'serp_features': serp_data.get('serp_features', []),
-                            'estimated_traffic': serp_data.get('search_volume', 'Unknown'),
-                            'competition_level': serp_data.get('difficulty', 'Unknown')
-                        })
-                    
-                    logger.info(f"• Analyzed keyword: '{keyword}'")
-                    
-                except Exception as e:
-                    logger.warning(f"Could not analyze SERP for '{keyword}': {str(e)}")
+
+            domain_counts: Counter = Counter()
+            for gap in gaps:
+                topic = gap.get('topic')
+                if not topic:
                     continue
-            
-            # Analyze competitor SERP presence
-            domain_counts = Counter()
-            for keyword_data in serp_results['keyword_rankings'].values():
-                for domain in keyword_data.get('top_10_domains', []):
+                domains_with_content = list(gap.get('domains_with_content') or [])
+                serp_results['keyword_rankings'][topic] = {
+                    'keyword': topic,
+                    'domains_with_content': domains_with_content,
+                    'competitor_count': gap.get('competitor_count', len(domains_with_content)),
+                    'total_domains_checked': gap.get('total_domains_checked', len(domains)),
+                    # NOTE: no search_volume / difficulty / competitor_positions:
+                    # those were fabricated before this phase.
+                }
+                for domain in domains_with_content:
                     domain_counts[domain] += 1
-            
+
+                if not domains_with_content:
+                    serp_results['ranking_opportunities'].append({
+                        'keyword': topic,
+                        'opportunity': 'No competitor content found for this topic',
+                        'total_domains_checked': gap.get('total_domains_checked', len(domains)),
+                    })
+
             serp_results['competitor_presence'] = dict(domain_counts.most_common(10))
-            
-            logger.info(f"SERP analysis completed for {len(keywords)} keywords")
+
+            logger.info(f"SERP analysis completed for {len(gaps)} topics (real SerpGapService)")
             return serp_results
-            
+
         except Exception as e:
-            logger.error(f"Error in SERP analysis: {str(e)}")
-            return {}
+            logger.warning(f"SERP analysis unavailable (no fabricated fallback): {str(e)}")
+            return dict(unavailable)
     
     async def _expand_keyword_research(self, seed_keywords: List[str], industry: str) -> Dict[str, Any]:
         """
-        Expand keyword research using adv.kw_generate.
-        
-        Args:
-            seed_keywords: Initial keywords to expand from
-            industry: Industry category
-            
-        Returns:
-            Expanded keyword research results
+        Expand keyword research via the real LLMInsightsService (Phase 9 / A3).
+
+        Previously this fabricated "{seed} guide / best {seed} / how to {seed}"
+        variants with f-string templates. It now delegates to the LLM keyword
+        expansion endpoint implementation and degrades to an explicit
+        data_source="unavailable" with EMPTY results.
         """
+        unavailable = {
+            'seed_keywords': list(seed_keywords or []),
+            'expanded_keywords': [],
+            'keyword_categories': {},
+            'search_intent_analysis': {},
+            'long_tail_opportunities': [],
+            'data_source': 'unavailable',
+        }
         try:
             logger.info(f"Expanding keyword research for {industry} industry")
-            
-            expanded_results = {
-                'seed_keywords': seed_keywords,
-                'expanded_keywords': [],
-                'keyword_categories': {},
-                'search_intent_analysis': {},
-                'long_tail_opportunities': []
-            }
-            
-            # Use adv.kw_generate for keyword expansion
-            all_expanded = []
-            
-            for seed_keyword in seed_keywords[:5]:  # Limit to prevent overload
-                try:
-                    # Generate keyword variations using advertools
-                    # In production, use actual adv.kw_generate
-                    # For demo, we'll simulate the expansion
-                    
-                    # Simulate broad keyword generation
-                    broad_keywords = [
-                        f"{seed_keyword} guide",
-                        f"best {seed_keyword}",
-                        f"how to {seed_keyword}",
-                        f"{seed_keyword} tips",
-                        f"{seed_keyword} tutorial",
-                        f"{seed_keyword} examples",
-                        f"{seed_keyword} vs",
-                        f"{seed_keyword} review",
-                        f"{seed_keyword} comparison"
-                    ]
-                    
-                    # Simulate phrase match keywords
-                    phrase_keywords = [
-                        f"{industry} {seed_keyword}",
-                        f"{seed_keyword} {industry} strategy",
-                        f"{seed_keyword} {industry} analysis",
-                        f"{seed_keyword} {industry} optimization",
-                        f"{seed_keyword} {industry} techniques"
-                    ]
-                    
-                    all_expanded.extend(broad_keywords)
-                    all_expanded.extend(phrase_keywords)
-                    
-                    logger.info(f"• Generated variations for: '{seed_keyword}'")
-                    
-                except Exception as e:
-                    logger.warning(f"Could not expand keyword '{seed_keyword}': {str(e)}")
-                    continue
-            
-            # Remove duplicates and clean
-            expanded_results['expanded_keywords'] = list(set(all_expanded))
-            
-            # Categorize keywords by intent
-            intent_categories = {
+
+            if not seed_keywords:
+                return dict(unavailable)
+
+            service = getattr(self, 'llm_insights', None)
+            if service is None:
+                from services.seo_tools.llm_insights_service import LLMInsightsService
+                service = LLMInsightsService()
+                self.llm_insights = service
+
+            expansion = await service.generate_keyword_expansion(
+                current_keywords=list(seed_keywords[:5]),
+                content_analysis={},
+            )
+
+            new_keywords = [
+                kw for kw in (expansion or {}).get('new_keywords') or []
+                if isinstance(kw, str) and kw.strip()
+            ]
+            expanded_keywords = list(dict.fromkeys(new_keywords))  # dedupe, order-preserving
+            # Expansion means NEW terms: drop echoes of the seeds (case-insensitive).
+            seed_set = {s.strip().lower() for s in seed_keywords if isinstance(s, str)}
+            expanded_keywords = [kw for kw in expanded_keywords if kw.strip().lower() not in seed_set]
+            if not expanded_keywords:
+                return dict(unavailable)
+
+            # Generic intent bucketing of REAL keywords (derived, not fabricated).
+            intent_categories: Dict[str, List[str]] = {
                 'informational': [],
                 'commercial': [],
                 'navigational': [],
-                'transactional': []
+                'transactional': [],
             }
-            
-            for keyword in expanded_results['expanded_keywords']:
+            for keyword in expanded_keywords:
                 keyword_lower = keyword.lower()
                 if any(word in keyword_lower for word in ['how', 'what', 'why', 'guide', 'tips', 'tutorial']):
                     intent_categories['informational'].append(keyword)
@@ -280,19 +275,25 @@ class ContentGapAnalyzer:
                     intent_categories['transactional'].append(keyword)
                 else:
                     intent_categories['navigational'].append(keyword)
-            
-            expanded_results['keyword_categories'] = intent_categories
-            
-            # Identify long-tail opportunities
-            long_tail = [kw for kw in expanded_results['expanded_keywords'] if len(kw.split()) >= 3]
-            expanded_results['long_tail_opportunities'] = long_tail[:20]  # Top 20 long-tail
-            
-            logger.info(f"Keyword expansion completed: {len(expanded_results['expanded_keywords'])} keywords generated")
+
+            long_tail = [kw for kw in expanded_keywords if len(kw.split()) >= 3]
+
+            expanded_results = {
+                'seed_keywords': list(seed_keywords),
+                'expanded_keywords': expanded_keywords,
+                'keyword_categories': intent_categories,
+                'search_intent_analysis': expansion.get('categorized_by_difficulty', {}),
+                'long_tail_opportunities': long_tail[:20],
+                'data_source': 'llm',
+            }
+
+            logger.info(f"Keyword expansion completed: {len(expanded_keywords)} real keywords")
             return expanded_results
-            
+
         except Exception as e:
-            logger.error(f"Error in keyword expansion: {str(e)}")
-            return {}
+            logger.warning(f"Keyword expansion unavailable (no fabricated fallback): {str(e)}")
+            return dict(unavailable)
+
     
     async def _analyze_competitor_content_deep(self, competitor_urls: List[str]) -> Dict[str, Any]:
         """

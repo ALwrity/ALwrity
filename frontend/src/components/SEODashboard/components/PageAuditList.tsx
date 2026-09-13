@@ -22,7 +22,8 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import WarningIcon from '@mui/icons-material/Warning';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import axios from 'axios';
+import { apiClient } from '../../../api/client';
+import { useAbortableRequest, isCancelError } from '../useAbortableRequest';
 import { GlassCard } from '../../shared/styled';
 
 interface PageAudit {
@@ -42,17 +43,24 @@ const PageAuditList: React.FC = () => {
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const nextSignal = useAbortableRequest();
+
   useEffect(() => {
     fetchPages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchPages = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get('/api/seo-dashboard/pages');
+      const response = await apiClient.get('/api/seo-dashboard/pages', {
+        signal: nextSignal(),
+      });
       setPages(response.data);
     } catch (error) {
+      // Cancellation on unmount/refresh is not a failure — stay silent.
+      if (isCancelError(error)) return;
       console.error('Error fetching pages:', error);
       setError('Failed to load analyzed pages.');
     } finally {
@@ -92,10 +100,13 @@ const PageAuditList: React.FC = () => {
     
     setAiLoading(true);
     try {
-      await axios.post('/api/seo-dashboard/analyze-urls-ai', { urls: selected });
+      await apiClient.post('/api/seo-dashboard/analyze-urls-ai', { urls: selected }, {
+        signal: nextSignal(),
+      });
       await fetchPages(); // Refresh to show updates
       setSelected([]);
     } catch (error) {
+      if (isCancelError(error)) return;
       console.error('Error running AI analysis:', error);
       setError('Failed to run AI analysis.');
     } finally {

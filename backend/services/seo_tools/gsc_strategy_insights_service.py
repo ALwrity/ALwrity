@@ -158,14 +158,18 @@ class GSCStrategyInsightsService:
             
             # Execute parallel analysis tasks
             tasks = {
-                'opportunities': self._get_ranked_opportunities(site_url, top_n),
-                'health_metrics': self._calculate_health_metrics(site_url),
+                'opportunities': self.get_ranked_opportunities(site_url, top_n),
+                'health_metrics': self.calculate_health_metrics(site_url),
                 'quick_summary': self._generate_quick_summary(site_url),
             }
-            
+
             # Conditional tasks
             if include_trends:
-                tasks['trends'] = self._analyze_performance_trends(site_url)
+                # Phase 8F: trends now compute real window comparisons and
+                # need the user's GSC scope.
+                tasks["trends"] = self.analyze_performance_trends(
+                    site_url, user_id=user_id
+                )
             if include_competitive:
                 tasks['competitive'] = self._analyze_competitive_positioning(site_url)
             
@@ -199,13 +203,13 @@ class GSCStrategyInsightsService:
                 'generated_at': datetime.utcnow().isoformat(),
             }
     
-    async def _get_ranked_opportunities(
+    async def get_ranked_opportunities(
         self,
         site_url: str,
         top_n: int = 20
     ) -> Dict[str, Any]:
         """
-        Get ROI-weighted ranked opportunities.
+        Get ROI-weighted ranked opportunities (public API for routers).
         
         Scoring formula (0-100):
         ROI = 0.40 × (traffic_impact) + 
@@ -357,13 +361,17 @@ class GSCStrategyInsightsService:
             logger.error(f"Error ranking opportunities: {str(e)}")
             return {'status': 'error', 'error': str(e)}
     
-    async def _calculate_health_metrics(self, site_url: str) -> Dict[str, Any]:
+    async def calculate_health_metrics(
+        self,
+        site_url: str,
+        include_distribution: bool = True,
+    ) -> Dict[str, Any]:
         """
-        Calculate comprehensive health metrics for dashboard.
-        
+        Calculate comprehensive health metrics for dashboard (public API).
+
         Metrics include:
         - Health score (0-100)
-        - Keyword position distribution
+        - Keyword position distribution (when include_distribution)
         - Average CTR vs benchmark
         - Growth trends
         - Overall assessment
@@ -375,15 +383,16 @@ class GSCStrategyInsightsService:
                 keywords="all",
                 site_url=site_url
             )
-            
+
             summary = brainstorm_result.get('summary', {})
-            
-            return {
+            distribution = summary.get('keyword_distribution', {})
+
+            result: Dict[str, Any] = {
                 'status': 'success',
                 'health_score': summary.get('health_score', 0),
                 'health_trend': 'stable',  # TODO: Compare with historical
                 'total_keywords': summary.get('total_keywords_analyzed', 0),
-                'page_1_keywords': summary.get('keyword_distribution', {}).get('positions_1_3', 0),
+                'page_1_keywords': distribution.get('positions_1_3', 0),
                 'avg_position': summary.get('avg_position', 0),
                 'avg_ctr': summary.get('avg_ctr', 0),
                 'ctr_vs_benchmark': summary.get('ctr_vs_benchmark', 0),
@@ -391,7 +400,10 @@ class GSCStrategyInsightsService:
                 'total_clicks': summary.get('total_clicks', 0),
                 'timestamp': datetime.utcnow().isoformat(),
             }
-            
+            if include_distribution:
+                result['keyword_distribution'] = distribution
+            return result
+
         except Exception as e:
             logger.error(f"Error calculating health metrics: {str(e)}")
             return {'status': 'error', 'error': str(e)}
@@ -433,15 +445,167 @@ class GSCStrategyInsightsService:
             logger.error(f"Error generating quick summary: {str(e)}")
             return {'status': 'error', 'error': str(e)}
     
-    async def _analyze_performance_trends(self, site_url: str) -> Dict[str, Any]:
-        """Analyze performance trends over time."""
-        # TODO: Implement historical trend analysis
-        # This would require storing historical GSC snapshots
-        return {
-            'status': 'pending',
-            'message': 'Trend analysis requires historical data collection',
-            'note': 'To be implemented in Phase 2'
-        }
+    async def analyze_performance_trends(
+        self,
+        site_url: str,
+        user_id: str,
+        metric: str = "all",
+        days_back: int = 90,
+    ) -> Dict[str, Any]:
+        """Analyze performance trends over two equal-length GSC windows.
+
+        Phase 8F (build decision): this was the only true stub in seo_tools.py —
+        it always returned status 'pending'. The review showed GSCService already
+        provides date-windowed searchanalytics access, so the real implementation
+        is clean: query the date dimension for the current window AND the
+        immediately preceding equal-length window, then compute per-metric
+        totals, delta percentage and an up/down/stable classification.
+
+        Semantics:
+        - clicks / impressions: window SUM.
+        - ctr: window-weighted (sum(clicks) / sum(impressions)).
+        - position: impressions-weighted average. NOTE direction reverses:
+          a DECREASING position (closer to 1) is an improvement.
+        - delta_pct is None when the previous window has no data — never a
+          fabricated 0, never a division crash.
+        - ±5% classifies as stable; beyond that 'up' (better) / 'down'.
+        - days_back clamps to the router model bounds (7..365).
+
+        user_id is REQUIRED — the trend math is scoped to the authenticated
+        user's GSC connection (established Phase-1 context-binding rule).
+        """
+        try:
+            days_back = max(7, min(int(days_back), 365))
+            metric_names = ("clicks", "impressions", "ctr", "position")
+
+            end_dt = datetime.utcnow()
+            start_dt = end_dt - timedelta(days=days_back)
+            prev_end_dt = start_dt - timedelta(days=1)
+            prev_start_dt = prev_end_dt - timedelta(days=days_back - 1)
+
+            def fmt(dt: datetime) -> str:
+                return dt.strftime("%Y-%m-%d")
+
+            current_window = (
+                fmt(start_dt), fmt(end_dt)
+            )
+            previous_window = (
+                fmt(prev_start_dt), fmt(prev_end_dt)
+            )
+
+            current = self.gsc_service.get_daily_metrics(
+                user_id=user_id, site_url=site_url,
+                start_date=current_window[0], end_date=current_window[1],
+            )
+            previous = self.gsc_service.get_daily_metrics(
+                user_id=user_id, site_url=site_url,
+                start_date=previous_window[0], end_date=previous_window[1],
+            )
+
+            if current.get("status") == "no_data" or previous.get("status") == "no_data":
+                return {
+                    "status": "no_data",
+                    "error": current.get("error") or previous.get("error"),
+                    "metric": metric,
+                    "days_back": days_back,
+                }
+            if current.get("status") == "error" or previous.get("status") == "error":
+                return {
+                    "status": "error",
+                    "error": current.get("error") or previous.get("error"),
+                    "metric": metric,
+                }
+
+            cur_rows: List[Dict[str, Any]] = current.get("rows", []) or []
+            prev_rows: List[Dict[str, Any]] = previous.get("rows", []) or []
+
+            selected = [
+                m for m in metric_names
+                if metric == "all" or m == metric
+            ]
+            if not selected:
+                logger.warning(
+                    f"Unknown trend metric '{metric}'; falling back to all metrics"
+                )
+                selected = list(metric_names)
+
+            def window_total(rows: List[Dict[str, Any]], name: str) -> float:
+                if name in ("clicks", "impressions"):
+                    return float(sum(r.get(name, 0) for r in rows))
+                impressions = float(sum(r.get("impressions", 0) for r in rows))
+                if impressions <= 0:
+                    return 0.0
+                if name == "ctr":
+                    return float(sum(r.get("clicks", 0) for r in rows)) / impressions
+                # position: impressions-weighted average
+                return float(
+                    sum(r.get("position", 0) * r.get("impressions", 0) for r in rows)
+                ) / impressions
+
+            def classify(name: str, delta_pct: Optional[float]) -> str:
+                if delta_pct is None:
+                    return "stable"
+                if name == "position":
+                    # Lower position (closer to 1) is better: improvement when
+                    # the position value DECREASED.
+                    if delta_pct <= -5:
+                        return "up"
+                    if delta_pct >= 5:
+                        return "down"
+                    return "stable"
+                if delta_pct >= 5:
+                    return "up"
+                if delta_pct <= -5:
+                    return "down"
+                return "stable"
+
+            totals: Dict[str, Any] = {}
+            for name in selected:
+                cur_t = window_total(cur_rows, name)
+                prev_t = window_total(prev_rows, name)
+                delta_pct = (
+                    (cur_t - prev_t) / prev_t * 100.0 if prev_t > 0 else None
+                )
+                totals[name] = {
+                    "current": cur_t,
+                    "previous": prev_t,
+                    "delta_pct": None if delta_pct is None else round(delta_pct, 2),
+                    "trend": classify(name, delta_pct),
+                }
+
+            daily = [
+                {
+                    "date": r.get("keys", [""])[0],
+                    "clicks": r.get("clicks", 0),
+                    "impressions": r.get("impressions", 0),
+                    "ctr": r.get("ctr", 0),
+                    "position": r.get("position", 0),
+                }
+                for r in cur_rows
+            ]
+
+            return {
+                "status": "success",
+                "site_url": site_url,
+                "metric": metric,
+                "days_back": days_back,
+                "window": {
+                    "start": current_window[0],
+                    "end": current_window[1],
+                    "days": days_back,
+                },
+                "previous_window": {
+                    "start": previous_window[0],
+                    "end": previous_window[1],
+                    "days": days_back,
+                },
+                "totals": totals,
+                "daily": daily,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        except Exception as e:
+            logger.error(f"Error analyzing performance trends: {str(e)}")
+            return {"status": "error", "error": str(e), "metric": metric}
     
     async def _analyze_competitive_positioning(self, site_url: str) -> Dict[str, Any]:
         """Analyze competitive positioning."""

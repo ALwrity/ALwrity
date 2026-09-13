@@ -115,6 +115,18 @@ export const useGSCConnection = () => {
                 // Force refresh analytics to ensure we have data for the newly connected account
                 cachedAnalyticsAPI.invalidatePlatformStatus();
                 cachedAnalyticsAPI.forceRefreshAnalyticsData(['gsc']).catch(console.error);
+
+                // Phase 12 (plan C2): persist the post-connect GSC snapshot
+                // (striking distance / low CTR) so onboarding data informs the
+                // SEO dashboard. Best-effort — never blocks the connect flow.
+                const siteUrl =
+                  (status.connected && status.sites && status.sites[0]) || '';
+                if (siteUrl) {
+                  const { onboardingSeoInsightsApi } = await import('../../../api/onboardingSeoInsights');
+                  onboardingSeoInsightsApi
+                    .requestGscSnapshot(String(siteUrl))
+                    .catch(console.error);
+                }
               } catch {}
             })();
           }

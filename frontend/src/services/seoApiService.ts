@@ -8,47 +8,33 @@ import {
   SitemapResponse, 
   PersonalizationData,
   DashboardLayout,
-  CopilotActionResponse,
-  CopilotSuggestion
+  CopilotActionResponse
 } from '../types/seoCopilotTypes';
-import { getApiBaseUrl } from '../utils/apiUrl';
-
-const API_BASE_URL = getApiBaseUrl();
+import { apiClient } from '../api/client';
 
 class SEOApiService {
-  private baseUrl: string;
-
-  constructor() {
-    this.baseUrl = API_BASE_URL;
-  }
-
-  // Generic API request method
+  // Generic API request method — delegates to the shared apiClient so every
+  // SEO call carries the Clerk auth token (raw fetch bypassed it → 401).
+  // Accepts an AbortSignal so callers cancel in-flight requests on unmount;
+  // callers must swallow ERR_CANCELED (cancellation is not a failure).
   private async makeRequest<T>(
-    endpoint: string, 
+    endpoint: string,
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
-    data?: any
+    data?: any,
+    config?: { signal?: AbortSignal }
   ): Promise<T> {
     try {
-      const url = `${this.baseUrl}${endpoint}`;
-      const options: RequestInit = {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      };
-
-      if (data && method !== 'GET') {
-        options.body = JSON.stringify(data);
+      switch (method) {
+        case 'POST':
+          return (await apiClient.post(endpoint, data, { signal: config?.signal })).data as T;
+        case 'PUT':
+          return (await apiClient.put(endpoint, data, { signal: config?.signal })).data as T;
+        case 'DELETE':
+          return (await apiClient.delete(endpoint, { signal: config?.signal })).data as T;
+        case 'GET':
+        default:
+          return (await apiClient.get(endpoint, { signal: config?.signal })).data as T;
       }
-
-      const response = await fetch(url, options);
-      
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-      }
-
-      return await response.json();
     } catch (error) {
       console.error(`SEO API Error (${endpoint}):`, error);
       throw error;
@@ -56,18 +42,11 @@ class SEOApiService {
   }
 
   // SEO Analysis Methods
-  async analyzeSEO(url: string, options?: any): Promise<SEOAnalysisData> {
+  async analyzeSEO(url: string, options?: any, config?: { signal?: AbortSignal }): Promise<SEOAnalysisData> {
     return this.makeRequest<SEOAnalysisData>('/api/seo-dashboard/analyze-comprehensive', 'POST', {
       url,
       ...options
-    });
-  }
-
-  async analyzeSEOFull(url: string, options?: any): Promise<SEOAnalysisData> {
-    return this.makeRequest<SEOAnalysisData>('/api/seo-dashboard/analyze-full', 'POST', {
-      url,
-      ...options
-    });
+    }, config);
   }
 
   async getSEOHealthScore(): Promise<{ health_score: number }> {
@@ -94,8 +73,8 @@ class SEOApiService {
     search_intent?: string;
     language?: string;
     custom_prompt?: string;
-  }): Promise<MetaDescriptionResponse> {
-    return this.makeRequest<MetaDescriptionResponse>('/api/seo/meta-description', 'POST', params);
+  }, config?: { signal?: AbortSignal }): Promise<MetaDescriptionResponse> {
+    return this.makeRequest<MetaDescriptionResponse>('/api/seo/meta-description', 'POST', params, config);
   }
 
   // PageSpeed Analysis
@@ -104,8 +83,8 @@ class SEOApiService {
     strategy?: 'DESKTOP' | 'MOBILE';
     locale?: string;
     categories?: string[];
-  }): Promise<PageSpeedResponse> {
-    return this.makeRequest<PageSpeedResponse>('/api/seo/pagespeed-analysis', 'POST', params);
+  }, config?: { signal?: AbortSignal }): Promise<PageSpeedResponse> {
+    return this.makeRequest<PageSpeedResponse>('/api/seo/pagespeed-analysis', 'POST', params, config);
   }
 
   // Sitemap Analysis
@@ -113,17 +92,29 @@ class SEOApiService {
     sitemap_url: string;
     analyze_content_trends?: boolean;
     analyze_publishing_patterns?: boolean;
-  }): Promise<SitemapResponse> {
-    return this.makeRequest<SitemapResponse>('/api/seo/sitemap-analysis', 'POST', params);
+  }, config?: { signal?: AbortSignal }): Promise<SitemapResponse> {
+    return this.makeRequest<SitemapResponse>('/api/seo/sitemap-analysis', 'POST', params, config);
   }
 
   // Image Alt Text Generation
+  // Accepts either image_url (JSON body) or image_file (multipart/form-data),
+  // mirroring the backend which parses the two content types explicitly.
   async generateImageAltText(params: {
     image_url?: string;
+    image_file?: File;
     context?: string;
     keywords?: string[];
-  }): Promise<any> {
-    return this.makeRequest('/api/seo/image-alt-text', 'POST', params);
+  }, config?: { signal?: AbortSignal }): Promise<any> {
+    if (params.image_file) {
+      // Multipart path: the backend reads image_file + optional text fields
+      // from the form (JSON and multipart can't be combined in one request).
+      const form = new FormData();
+      form.append('image_file', params.image_file);
+      if (params.context) form.append('context', params.context);
+      if (params.keywords?.length) form.append('keywords', JSON.stringify(params.keywords));
+      return this.makeRequest('/api/seo/image-alt-text', 'POST', form, config);
+    }
+    return this.makeRequest('/api/seo/image-alt-text', 'POST', params, config);
   }
 
   // OpenGraph Tag Generation
@@ -132,8 +123,8 @@ class SEOApiService {
     title_hint?: string;
     description_hint?: string;
     platform?: string;
-  }): Promise<any> {
-    return this.makeRequest('/api/seo/opengraph-tags', 'POST', params);
+  }, config?: { signal?: AbortSignal }): Promise<any> {
+    return this.makeRequest('/api/seo/opengraph-tags', 'POST', params, config);
   }
 
   // On-Page SEO Analysis
@@ -142,8 +133,8 @@ class SEOApiService {
     target_keywords?: string[];
     analyze_images?: boolean;
     analyze_content_quality?: boolean;
-  }): Promise<any> {
-    return this.makeRequest('/api/seo/on-page-analysis', 'POST', params);
+  }, config?: { signal?: AbortSignal }): Promise<any> {
+    return this.makeRequest('/api/seo/on-page-analysis', 'POST', params, config);
   }
 
   // Technical SEO Analysis
@@ -152,8 +143,8 @@ class SEOApiService {
     analyze_core_web_vitals?: boolean;
     analyze_mobile_friendliness?: boolean;
     analyze_security?: boolean;
-  }): Promise<any> {
-    return this.makeRequest('/api/seo/technical-seo', 'POST', params);
+  }, config?: { signal?: AbortSignal }): Promise<any> {
+    return this.makeRequest('/api/seo/technical-seo', 'POST', params, config);
   }
 
   // Enterprise SEO Analysis
@@ -203,12 +194,16 @@ class SEOApiService {
     });
   }
 
-  // SEO Health Check
+  // Phase 8C: forwards the url as a QUERY param (getSEOMetrics style).
+  // The previous makeRequest(endpoint, 'GET', params) call silently dropped
+  // `params` — apiClient.get only accepts (url, config) — so the url never
+  // reached the backend on the health branch.
   async checkSEOHealth(url?: string, options?: any): Promise<{ health_score: number; status: string; tools_status?: any }> {
-    const endpoint = url ? '/api/seo/health' : '/api/seo/tools/status';
-    const params = url ? { url } : {};
-    
-    return this.makeRequest(endpoint, 'GET', params);
+    const endpoint = url
+      ? `/api/seo/health?url=${encodeURIComponent(url)}`
+      : `/api/seo/tools/status`;
+
+    return this.makeRequest(endpoint);
   }
 
   // Personalization Data
@@ -243,24 +238,9 @@ class SEOApiService {
     });
   }
 
-  // SEO Suggestions
-  async getSEOSuggestions(context: string): Promise<CopilotSuggestion[]> {
-    // This would typically call an AI service for contextual suggestions
-    // For now, return mock suggestions
-    return Promise.resolve([
-      {
-        id: '1',
-        title: 'Optimize Page Speed',
-        description: 'Your page speed could be improved for better user experience',
-        message: 'Consider optimizing your page speed for better user experience and SEO rankings',
-        category: 'optimization',
-        priority: 'high',
-        action: 'analyzePageSpeed',
-        icon: '⚡',
-        severity: 'medium'
-      }
-    ]);
-  }
+  // Removed: getSEOSuggestions (mock-only, zero callers). The mounted Copilot
+  // flow reads suggestions from seoCopilotStore.generateContextualSuggestions.
+  // Re-add alongside a real suggestions endpoint if one ships.
 
   // CopilotKit Specific Methods
   async executeCopilotAction(action: string, params: any): Promise<CopilotActionResponse> {
