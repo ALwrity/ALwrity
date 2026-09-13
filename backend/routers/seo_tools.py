@@ -1124,7 +1124,9 @@ async def execute_enterprise_audit(
             target_keywords=request.target_keywords or [],
             include_content_analysis=request.include_content_analysis,
             include_competitive_analysis=request.include_competitive_analysis,
-            generate_executive_report=request.generate_executive_report
+            generate_executive_report=request.generate_executive_report,
+            # Phase 10 / B4: real competitive benchmarking is user-scoped.
+            user_id=str(current_user.get("id")) if current_user else None,
         )
         
         execution_time = (datetime.utcnow() - start_time).total_seconds()

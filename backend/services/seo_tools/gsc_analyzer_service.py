@@ -102,6 +102,9 @@ class GSCAnalyzerService:
                 'analysis_period': f"Last {date_range_days} days",
                 'analysis_timestamp': datetime.utcnow().isoformat(),
                 'execution_time_seconds': execution_time,
+                # Phase 9 / A4: provenance marker. 'gsc' = real rows,
+                # 'no_data' = not connected / empty (no fabricated fallback).
+                'data_source': gsc_data.get('data_source', 'unknown'),
                 
                 # Core analyses
                 'performance_overview': analysis_results.get('performance_overview', {}),
@@ -128,70 +131,99 @@ class GSCAnalyzerService:
     
     async def _fetch_gsc_data(self, site_url: str, days: int, user_id: Optional[str]) -> Dict[str, Any]:
         """
-        Fetch GSC data for analysis.
-        In production, this would fetch real data from Google Search Console API.
+        Fetch REAL GSC data for analysis (Phase 9 / plan A4).
+
+        Previously this returned a hardcoded mock dataset (keywords/pages/
+        devices/countries with realistic-looking numbers) and silently fed it
+        into every analysis, with no marker. It now reads the authenticated
+        user's GSC search analytics via GSCService and maps rows minimally:
+          - keywords: query -> {keyword, impressions, clicks, ctr, position}
+          - pages:    page  -> {url, impressions, clicks, ctr, position}
+        ctr is converted from the GSC fraction to percentage.
+
+        When there is no user, no GSC connection, or no rows, it returns an
+        explicit data_source="no_data" with EMPTY lists — never fabricated
+        metrics.
         """
+        no_data = {
+            'site_url': site_url,
+            'date_range_days': days,
+            'keywords': [],
+            'pages': [],
+            'devices': {},
+            'countries': {},
+            'search_types': {},
+            'data_source': 'no_data',
+        }
         try:
-            logger.info(f"Fetching GSC data for {site_url} ({days} days)")
-            
-            # Mock GSC data for demonstration
-            # In production, replace with actual GSC API calls via gsc_service
-            
-            gsc_data = {
+            if not user_id:
+                logger.info("GSC data requested without user_id; returning no_data (no mock)")
+                return dict(no_data)
+
+            end_dt = datetime.utcnow()
+            start_dt = end_dt - timedelta(days=days)
+            analytics = self.gsc_service.get_search_analytics(
+                user_id,
+                site_url,
+                start_dt.strftime('%Y-%m-%d'),
+                end_dt.strftime('%Y-%m-%d'),
+            )
+
+            if not analytics or analytics.get('error'):
+                logger.info(
+                    f"GSC data unavailable for user {user_id} "
+                    f"({(analytics or {}).get('error', 'empty response')}); no_data"
+                )
+                return dict(no_data)
+
+            def _rows(section: str) -> List[Dict[str, Any]]:
+                return (analytics.get(section) or {}).get('rows') or []
+
+            keywords = [
+                {
+                    'keyword': (row.get('keys') or [''])[0],
+                    'impressions': row.get('impressions', 0),
+                    'clicks': row.get('clicks', 0),
+                    'ctr': round(float(row.get('ctr', 0) or 0) * 100, 2),
+                    'position': round(float(row.get('position', 0) or 0), 1),
+                }
+                for row in _rows('query_data')
+                if (row.get('keys') or [''])[0]
+            ]
+            pages = [
+                {
+                    'url': (row.get('keys') or [''])[0],
+                    'impressions': row.get('impressions', 0),
+                    'clicks': row.get('clicks', 0),
+                    'ctr': round(float(row.get('ctr', 0) or 0) * 100, 2),
+                    'position': round(float(row.get('position', 0) or 0), 1),
+                }
+                for row in _rows('page_data')
+                if (row.get('keys') or [''])[0]
+            ]
+
+            data_source = 'gsc' if (keywords or pages) else 'no_data'
+            logger.info(
+                f"Fetched real GSC data for user {user_id}: "
+                f"{len(keywords)} keyword rows, {len(pages)} page rows"
+            )
+            return {
                 'site_url': site_url,
                 'date_range_days': days,
-                'keywords': await self._generate_mock_keywords(site_url),
-                'pages': await self._generate_mock_pages(site_url),
-                'devices': {
-                    'desktop': {'clicks': 2500, 'impressions': 15000, 'ctr': 16.7, 'position': 4.5},
-                    'mobile': {'clicks': 3200, 'impressions': 18000, 'ctr': 17.8, 'position': 5.2},
-                    'tablet': {'clicks': 600, 'impressions': 4000, 'ctr': 15.0, 'position': 5.8}
-                },
-                'search_types': {
-                    'web': {'clicks': 5100, 'impressions': 32500, 'ctr': 15.7, 'position': 4.9},
-                    'news': {'clicks': 50, 'impressions': 3500, 'ctr': 1.4, 'position': 8.2},
-                    'image': {'clicks': 51, 'impressions': 1000, 'ctr': 5.1, 'position': 15.0}
-                },
-                'countries': {
-                    'United States': {'clicks': 4200, 'impressions': 25000, 'ctr': 16.8},
-                    'United Kingdom': {'clicks': 800, 'impressions': 8000, 'ctr': 10.0},
-                    'Canada': {'clicks': 300, 'impressions': 5000, 'ctr': 6.0}
-                }
+                'keywords': keywords,
+                'pages': pages,
+                # Breakdowns were fabricated before; until real dimension
+                # queries are wired they stay honestly empty.
+                'devices': {},
+                'countries': {},
+                'search_types': {},
+                'data_source': data_source,
             }
-            
-            return gsc_data
-            
+
         except Exception as e:
             logger.error(f"Failed to fetch GSC data: {str(e)}")
-            raise
-    
-    async def _generate_mock_keywords(self, site_url: str) -> List[Dict[str, Any]]:
-        """Generate mock keyword performance data"""
-        return [
-            {'keyword': 'AI content creation', 'impressions': 2500, 'clicks': 450, 'ctr': 18.0, 'position': 2.5},
-            {'keyword': 'SEO tools', 'impressions': 1800, 'clicks': 198, 'ctr': 11.0, 'position': 4.2},
-            {'keyword': 'content optimization', 'impressions': 1200, 'clicks': 144, 'ctr': 12.0, 'position': 5.1},
-            {'keyword': 'meta description generator', 'impressions': 950, 'clicks': 190, 'ctr': 20.0, 'position': 1.8},
-            {'keyword': 'blog writing AI', 'impressions': 850, 'clicks': 102, 'ctr': 12.0, 'position': 6.5},
-            {'keyword': 'keyword research tool', 'impressions': 750, 'clicks': 67, 'ctr': 8.9, 'position': 8.2},
-            {'keyword': 'technical SEO', 'impressions': 680, 'clicks': 81, 'ctr': 11.9, 'position': 7.1},
-            {'keyword': 'SERP analysis', 'impressions': 620, 'clicks': 43, 'ctr': 6.9, 'position': 11.5},
-            {'keyword': 'content strategy', 'impressions': 580, 'clicks': 64, 'ctr': 11.0, 'position': 8.9},
-            {'keyword': 'on-page optimization', 'impressions': 520, 'clicks': 52, 'ctr': 10.0, 'position': 9.2}
-        ]
-    
-    async def _generate_mock_pages(self, site_url: str) -> List[Dict[str, Any]]:
-        """Generate mock page performance data"""
-        return [
-            {'url': f'{site_url}/meta-description', 'clicks': 250, 'impressions': 1250, 'ctr': 20.0, 'position': 1.8},
-            {'url': f'{site_url}/seo-tools', 'clicks': 180, 'impressions': 1640, 'ctr': 11.0, 'position': 4.2},
-            {'url': f'{site_url}/content-optimization', 'clicks': 150, 'impressions': 1250, 'ctr': 12.0, 'position': 5.1},
-            {'url': f'{site_url}/', 'clicks': 500, 'impressions': 3200, 'ctr': 15.6, 'position': 3.5},
-            {'url': f'{site_url}/blog/ai-content', 'clicks': 125, 'impressions': 1045, 'ctr': 12.0, 'position': 6.5},
-            {'url': f'{site_url}/technical-seo', 'clicks': 95, 'impressions': 800, 'ctr': 11.9, 'position': 7.1},
-            {'url': f'{site_url}/competitor-analysis', 'clicks': 85, 'impressions': 920, 'ctr': 9.2, 'position': 8.5},
-            {'url': f'{site_url}/keyword-research', 'clicks': 70, 'impressions': 780, 'ctr': 9.0, 'position': 9.1}
-        ]
+            return dict(no_data)
+
     
     async def _analyze_performance_overview(self, gsc_data: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze overall search performance metrics"""

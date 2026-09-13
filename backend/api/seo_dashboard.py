@@ -1039,7 +1039,6 @@ async def analyze_seo_comprehensive(request: SEOAnalysisRequest, current_user: d
             try:
                 seo_service = SEOAnalysisService(db_session)
                 stored_analysis = seo_service.store_analysis_result(result, triggered_by_user_id=user_id)
-                stored_analysis = seo_service.store_analysis_result(result)
                 if stored_analysis:
                     logger.info(f"Stored progressive SEO analysis in database with ID: {stored_analysis.id}")
                 else:
