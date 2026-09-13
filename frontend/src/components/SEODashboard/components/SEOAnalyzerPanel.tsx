@@ -11,7 +11,6 @@ import {
   Stack
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import LanguageIcon from '@mui/icons-material/Language';
 import HelpIcon from '@mui/icons-material/Help';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -44,7 +43,10 @@ const SEOAnalyzerPanel: React.FC<SEOAnalyzerPanelProps> = ({
   error
 }) => {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [showError, setShowError] = useState(true);
+  // Derived visibility: a dismissed error resurfaces only when a NEW error
+  // arrives (never silent, no sync effect needed).
+  const [dismissedError, setDismissedError] = useState<string | null>(null);
+  const showError = !!error && error !== dismissedError;
   const [selectedIssue, setSelectedIssue] = useState<any>(null);
   const [showIssueDialog, setShowIssueDialog] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
@@ -92,34 +94,8 @@ const SEOAnalyzerPanel: React.FC<SEOAnalyzerPanelProps> = ({
           </Typography>
           
           <Stack direction="row" spacing={2}>
-            {/* Index Entire Website Button - Region 1 */}
-            <Tooltip 
-              title="Pro Feature: Index your entire website with AI-powered analysis. Get comprehensive insights across all pages, blog posts, and content. Coming soon!"
-              placement="top"
-            >
-              <span>
-                <Button
-                  variant="outlined"
-                  startIcon={<LanguageIcon />}
-                  disabled
-                  sx={{
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    '&:hover': {
-                      borderColor: 'rgba(255, 255, 255, 0.5)',
-                      backgroundColor: 'rgba(255, 255, 255, 0.05)'
-                    },
-                    '&.Mui-disabled': {
-                      borderColor: 'rgba(255, 255, 255, 0.2)',
-                      color: 'rgba(255, 255, 255, 0.5)'
-                    }
-                  }}
-                >
-                  Index Entire Website
-                </Button>
-              </span>
-            </Tooltip>
-            
+            {/* Removed: dead permanently-disabled pro-teaser button that could
+                never fire. Re-add when whole-site indexing ships. */}
             <Button
               variant="contained"
               startIcon={<RefreshIcon />}
@@ -138,11 +114,15 @@ const SEOAnalyzerPanel: React.FC<SEOAnalyzerPanelProps> = ({
           </Stack>
         </Box>
 
-        {/* Error Display */}
-        <SEOAnalysisError 
+        {/* Error Display (retry re-runs the analysis) */}
+        <SEOAnalysisError
           error={error}
           showError={showError}
-          onCloseError={() => setShowError(false)}
+          onCloseError={() => setDismissedError(error)}
+          onRetry={() => {
+            setDismissedError(null);
+            onRunAnalysis();
+          }}
         />
 
         {/* Loading State */}

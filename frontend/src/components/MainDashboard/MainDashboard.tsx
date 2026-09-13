@@ -105,6 +105,7 @@ import EnhancedBillingDashboard from '../billing/EnhancedBillingDashboard';
 import CompactSidebar from './components/CompactSidebar';
 import TeamHuddleWidget from './components/TeamHuddleWidget';
 import ContentGuardianCard from './components/ContentGuardianCard';
+import SeoSummaryCard from './components/SeoSummaryCard';
 import OnboardingCompletionCTA from './OnboardingCompletionCTA';
 
 // Shared types and utilities
@@ -112,7 +113,6 @@ import { Tool } from '../shared/types';
 import { getToolsForCategory } from '../shared/utils';
 
 // Zustand stores
-import { useDashboardStore } from '../../stores/dashboardStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
 
 // Data
@@ -126,7 +126,9 @@ const MainDashboard: React.FC = () => {
   // Sidebar state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   
-  // Zustand store hooks
+  // Zustand store hooks — single destructure (fixes the pre-existing
+  // duplicated useDashboardStore() calls; phantom fields removed — they do
+  // not exist on DashboardStore and had no consumers below)
   const {
     loading,
     error,
@@ -638,6 +640,9 @@ const MainDashboard: React.FC = () => {
 
                 {/* Content Guardian Audit Card */}
                 <ContentGuardianCard />
+
+                {/* Phase 6B: unified SEO summary — health/progress/task signals (realtime 60s) */}
+                <SeoSummaryCard />
 
                 {/* Analytics Insights - Good/Bad/Ugly */}
                 <AnalyticsInsights />

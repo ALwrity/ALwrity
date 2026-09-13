@@ -4,20 +4,31 @@ import { SEODashboardData } from '../api/seoDashboard';
 import { SEOAnalysisData } from '../components/shared/types';
 import { seoAnalysisAPI } from '../api/seoAnalysis';
 
-// Simple localStorage cache for analysis data
-const ANALYSIS_CACHE_KEY = 'seo-dashboard-analysis-cache';
+// SEO-owned analysis cache scheme (Phase 5): versioned key + 60m TTL enforced
+// on every read. Stale or legacy-versioned payloads are a MISS (fail fast),
+// never silently served. Out of scope by design: onboarding-owned keys
+// (competitor_analysis_*, backgroundSetupCache, seo_cache:*) — owned and
+// tested by onboarding; do not rename them here.
+const ANALYSIS_CACHE_KEY = 'seo-dashboard-analysis-cache:v1';
+const ANALYSIS_CACHE_TTL_MS = 60 * 60 * 1000;
+const LEGACY_ANALYSIS_CACHE_KEY = 'seo-dashboard-analysis-cache';
+
 type AnalysisCache = {
   data: SEOAnalysisData;
   updatedAt: number;
   url?: string;
 };
 
+function isFresh(updatedAt: number): boolean {
+  return Date.now() - updatedAt <= ANALYSIS_CACHE_TTL_MS;
+}
+
 function loadAnalysisCache(): AnalysisCache | null {
   try {
     const raw = localStorage.getItem(ANALYSIS_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as AnalysisCache;
-    if (parsed && parsed.data && typeof parsed.updatedAt === 'number') {
+    if (parsed && parsed.data && typeof parsed.updatedAt === 'number' && isFresh(parsed.updatedAt)) {
       return parsed;
     }
     return null;
@@ -28,6 +39,8 @@ function loadAnalysisCache(): AnalysisCache | null {
 
 function saveAnalysisCache(payload: AnalysisCache | null) {
   try {
+    // One-time migration: drop the legacy unversioned entry if present.
+    localStorage.removeItem(LEGACY_ANALYSIS_CACHE_KEY);
     if (!payload) {
       localStorage.removeItem(ANALYSIS_CACHE_KEY);
       return;
@@ -50,8 +63,8 @@ export interface SEODashboardStore {
   analysisUpdatedAt: number | null;
   analysisUrl?: string;
 
-  // Actions
-  setData: (data: SEODashboardData) => void;
+  // Actions (data is null while loading or after a failed fetch — fail fast)
+  setData: (data: SEODashboardData | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setAnalysisData: (data: SEOAnalysisData | null) => void;
@@ -113,7 +126,6 @@ export const useSEODashboardStore = create<SEODashboardStore>()(
             const { userDataAPI } = await import('../api/userData');
             const userData = await userDataAPI.getUserData();
             url = userData?.website_url || userData?.website_analysis?.website_url;
-            console.log('Fetched URL from user data:', url);
           } catch (error) {
             console.warn('Could not fetch URL from user data:', error);
           }
@@ -126,32 +138,32 @@ export const useSEODashboardStore = create<SEODashboardStore>()(
             const websiteUrl = await userDataAPI.getWebsiteURL();
             if (websiteUrl) {
               url = websiteUrl;
-              console.log('Fetched URL from dedicated endpoint:', url);
             }
           } catch (error) {
             console.warn('Could not fetch URL from dedicated endpoint:', error);
           }
         }
         
-        // Final fallback - only use if no URL was found from database
+        // Fail fast: never analyze a placeholder URL as the user's site.
+        // A missing URL means onboarding is incomplete or user-data fetch
+        // failed — report it so the UI shows an error instead of fake results.
         if (!url) {
-          url = 'https://example.com';
-          console.warn('Using fallback URL:', url);
+          set({
+            analysisError: 'No website URL found. Complete onboarding Step 1 to connect your site, then retry.',
+            analysisLoading: false,
+            hasRunInitialAnalysis: true,
+          });
+          return;
         }
-        
-        console.log('Starting SEO analysis with URL:', url);
-        console.log('Current store state:', get());
-        
+
+        // Prod hardening: log events, never URLs, payloads, or store dumps.
+        console.log('Starting SEO analysis.');
         set({ analysisLoading: true, analysisError: null });
-        
+
         try {
-          console.log(`Starting SEO analysis for URL: ${url}`);
           const result = await seoAnalysisAPI.analyzeURL(url);
-          
-          console.log('API result received:', result);
-          
+
           if (result) {
-            console.log('SEO analysis completed successfully:', result);
             const updatedAt = Date.now();
             set({ 
               analysisData: result,
@@ -161,9 +173,7 @@ export const useSEODashboardStore = create<SEODashboardStore>()(
               hasRunInitialAnalysis: true 
             });
             saveAnalysisCache({ data: result, updatedAt, url });
-            
-            console.log('Store state after setting analysis data:', get());
-            
+
             // Update main dashboard data based on analysis
             if (currentData) {
               const updatedData = {
@@ -247,6 +257,8 @@ export const useSEODashboardStore = create<SEODashboardStore>()(
     }),
     {
       name: 'seo-dashboard-store',
+      // Prod hardening: Redux DevTools integration off in production builds.
+      enabled: import.meta.env.DEV,
     }
   )
 ); 

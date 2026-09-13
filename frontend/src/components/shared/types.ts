@@ -231,10 +231,16 @@ export interface AnalysisDetailsDialogProps {
 
 export interface SEOAnalysisLoadingProps {
   loading: boolean;
+  /** 0-100 completion when known; omit for indeterminate. */
+  progress?: number;
+  /** Current stage label (e.g. "GSC analysis"); shown with progress. */
+  stage?: string;
 }
 
 export interface SEOAnalysisErrorProps {
   error: string | null;
   showError: boolean;
   onCloseError: () => void;
+  /** Optional retry action — renders a Retry button that fires without dismissing. */
+  onRetry?: () => void;
 }

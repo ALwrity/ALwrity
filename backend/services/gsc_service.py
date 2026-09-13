@@ -403,6 +403,52 @@ class GSCService:
         except Exception:
             return None, None
 
+    def get_daily_metrics(
+        self, user_id: str, site_url: str, start_date: str, end_date: str
+    ) -> Dict[str, Any]:
+        """Date-dimension analytics for exactly one window (Phase 8F).
+
+        Trend analysis building block: returns rows with one entry per day
+        (dimensions=['date']), carrying clicks / impressions / ctr / position.
+        Sibling incident shape to get_search_analytics: no_data when the user
+        is not connected, error on API failure, never raises. Decided against
+        caching here — trend calls compare two fresh equal-length windows and
+        GSC date rows are cheap.
+        """
+        try:
+            service = self.get_authenticated_service(user_id)
+        except ValueError:
+            logger.warning(f"User {user_id} not connected to GSC. No daily metrics.")
+            return {"status": "no_data", "rows": [], "error": "User not connected to GSC"}
+        if not service:
+            return {"status": "no_data", "rows": [], "error": "Authentication failed"}
+
+        request = {
+            "startDate": start_date,
+            "endDate": end_date,
+            "dimensions": ["date"],
+        }
+        try:
+            response = service.searchanalytics().query(
+                siteUrl=site_url, body=request
+            ).execute()
+            rows = response.get("rows", [])
+            logger.info(
+                f"Daily metrics for user {user_id} site {site_url} "
+                f"({start_date}..{end_date}): {len(rows)} rows"
+            )
+            return {
+                "status": "success",
+                "rows": rows,
+                "startDate": start_date,
+                "endDate": end_date,
+            }
+        except Exception as query_error:
+            logger.error(
+                f"Daily metrics query failed for user {user_id}: {query_error}"
+            )
+            return {"status": "error", "rows": [], "error": str(query_error)}
+
     def get_search_analytics(self, user_id: str, site_url: str, 
                            start_date: str = None, end_date: str = None) -> Dict[str, Any]:
         """Get search analytics data from GSC."""

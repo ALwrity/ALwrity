@@ -118,7 +118,34 @@ export const EnterpriseAuditResults: React.FC<EnterpriseAuditResultsProps> = ({
     );
   }
 
-  const { executive_summary, technical_audit, on_page_analysis, keyword_research, competitive_analysis, ai_insights } = auditResult;
+  // Prod hardening: partial backend payloads degrade to empty sections,
+  // never a white-screen. Each section defaults independently below.
+  const {
+    executive_summary: _executive_summary,
+    technical_audit: _technical_audit,
+    keyword_research: _keyword_research,
+  } = auditResult ?? {};
+  const executive_summary = {
+    ...(_executive_summary ?? {}),
+    critical_issues: _executive_summary?.critical_issues ?? [],
+    key_findings: _executive_summary?.key_findings ?? [],
+    top_opportunities: _executive_summary?.top_opportunities ?? [],
+  };
+  const technical_audit = {
+    ...(_technical_audit ?? {}),
+    issues: _technical_audit?.issues ?? [],
+  };
+  const keyword_research = {
+    ...(_keyword_research ?? {}),
+    target_keywords: _keyword_research?.target_keywords ?? [],
+    long_tail_opportunities: _keyword_research?.long_tail_opportunities ?? [],
+  };
+  const implementation_roadmap = {
+    ...(auditResult?.implementation_roadmap ?? {}),
+    phase1_quick_wins: auditResult?.implementation_roadmap?.phase1_quick_wins ?? [],
+    phase2_medium_term: auditResult?.implementation_roadmap?.phase2_medium_term ?? [],
+    phase3_long_term: auditResult?.implementation_roadmap?.phase3_long_term ?? [],
+  };
 
   return (
     <motion.div
@@ -597,7 +624,7 @@ export const EnterpriseAuditResults: React.FC<EnterpriseAuditResultsProps> = ({
                       🚀 Phase 1: Quick Wins (1-2 weeks)
                     </Typography>
                     <Stack spacing={1}>
-                      {auditResult.implementation_roadmap.phase1_quick_wins.map((item, idx) => (
+                      {implementation_roadmap.phase1_quick_wins.map((item, idx) => (
                         <Box key={idx} sx={{ display: 'flex', gap: 1 }}>
                           <CheckCircleIcon sx={{ color: '#4caf50', fontSize: 20 }} />
                           <Typography variant="body2">{item}</Typography>
@@ -616,7 +643,7 @@ export const EnterpriseAuditResults: React.FC<EnterpriseAuditResultsProps> = ({
                       📈 Phase 2: Medium Term (1-3 months)
                     </Typography>
                     <Stack spacing={1}>
-                      {auditResult.implementation_roadmap.phase2_medium_term.map((item, idx) => (
+                      {implementation_roadmap.phase2_medium_term.map((item, idx) => (
                         <Box key={idx} sx={{ display: 'flex', gap: 1 }}>
                           <CheckCircleIcon sx={{ color: '#2196f3', fontSize: 20 }} />
                           <Typography variant="body2">{item}</Typography>
@@ -635,7 +662,7 @@ export const EnterpriseAuditResults: React.FC<EnterpriseAuditResultsProps> = ({
                       🎯 Phase 3: Long Term (3+ months)
                     </Typography>
                     <Stack spacing={1}>
-                      {auditResult.implementation_roadmap.phase3_long_term.map((item, idx) => (
+                      {implementation_roadmap.phase3_long_term.map((item, idx) => (
                         <Box key={idx} sx={{ display: 'flex', gap: 1 }}>
                           <CheckCircleIcon sx={{ color: '#ff9800', fontSize: 20 }} />
                           <Typography variant="body2">{item}</Typography>

@@ -83,9 +83,19 @@ class TestEnterpriseSEOService:
     
     @pytest.mark.asyncio
     async def test_quick_audit(self, service):
-        """Test quick 5-minute audit execution"""
-        result = await service.execute_quick_audit("https://example.com")
-        
+        """Test quick 5-minute audit execution (sub-audits mocked: no network)."""
+        with (
+            patch.object(
+                EnterpriseSEOService, "_execute_technical_audit",
+                new=AsyncMock(return_value={"score": 80, "critical_issues": ["Missing title"]}),
+            ),
+            patch.object(
+                EnterpriseSEOService, "_execute_pagespeed_audit",
+                new=AsyncMock(return_value={"score": 70, "recommendations": ["Compress images"]}),
+            ),
+        ):
+            result = await service.execute_quick_audit("https://example.com")
+
         assert result['audit_type'] == 'quick_audit'
         assert result['website_url'] == "https://example.com"
         assert 'quick_score' in result

@@ -5,7 +5,6 @@ Comprehensive on-page SEO analyzer with AI-enhanced insights
 for content optimization and technical improvements.
 """
 
-import aiohttp
 from bs4 import BeautifulSoup
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -13,28 +12,20 @@ from loguru import logger
 import re
 from urllib.parse import urlparse
 
+from services.seo_tools.page_audit_common import fetch_page, normalize_url
+
 class OnPageSEOService:
     """Service for comprehensive on-page SEO analysis"""
-    
+
     def __init__(self):
         """Initialize the on-page SEO service"""
         self.service_name = "on_page_seo_analyzer"
         logger.info(f"Initialized {self.service_name}")
-    
+
     async def _fetch_page(self, url: str) -> tuple[Optional[str], int]:
-        """Fetch page content"""
-        try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (compatible; ALwritySEO/1.0; +https://alwrity.com)'
-            }
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers, timeout=10) as response:
-                    if response.status == 200:
-                        return await response.text(), 200
-                    return None, response.status
-        except Exception as e:
-            logger.error(f"Error fetching {url}: {str(e)}")
-            return None, 500
+        """Fetch page content via the shared helper (timeout 10s)."""
+        html, status, _load_time = await fetch_page(url, timeout=10)
+        return html, status
 
     def _analyze_meta_tags(self, soup: BeautifulSoup) -> Dict[str, Any]:
         """Analyze meta tags"""

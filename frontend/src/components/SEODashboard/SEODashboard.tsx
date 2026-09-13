@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -40,10 +40,11 @@ import { Tabs, Tab as MuiTab } from '@mui/material';
 // Shared components
 import { DashboardContainer, GlassCard } from '../shared/styled';
 import SEOAnalyzerPanel from './components/SEOAnalyzerPanel';
-import { SEOCopilotSuggestions } from './index';
-import SEOCopilot from './SEOCopilot';
-// Removed SEOCopilotTest
-import useSEOCopilotStore from '../../stores/seoCopilotStore';
+import DashboardLoadingSkeleton from './components/DashboardLoadingSkeleton';
+import SeoToolsPanel from './components/SeoToolsPanel/SeoToolsPanel';
+// Copilot chat disabled in this dashboard (Phase B): its single-call tool
+// capabilities are provided by user-fired panels instead. Copilot files stay
+// on disk for potential re-use; nothing here may import or mount them.
 
 // Zustand store
 import { useSEODashboardStore } from '../../stores/seoDashboardStore';
@@ -67,7 +68,6 @@ import { AdvertoolsInsights } from './components/AdvertoolsInsights';
 
 // Phase 2B: Semantic Dashboard components
 import SemanticHealthCard from './components/SemanticHealthCard';
-import SemanticInsights from './components/SemanticInsights';
 import KeywordGapAnalysis from './components/KeywordGapAnalysis';
 import ContentGapRadarCard from './components/ContentGapRadarCard';
 
@@ -93,6 +93,7 @@ const SEODashboard: React.FC = () => {
     analysisError,
     setData,
     setLoading,
+    setError,
     runSEOAnalysis,
     refreshSEOAnalysis,
     getAnalysisFreshness,
@@ -120,8 +121,7 @@ const SEODashboard: React.FC = () => {
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const [statusMenuAnchor, setStatusMenuAnchor] = useState<null | HTMLElement>(null);
   
-  // Dashboard Tab State for Enterprise Analysis
-  const [dashboardTab, setDashboardTab] = useState<number>(0);
+
   const location = useLocation();
 
   // Hash-based deep-link scroll (e.g. #content-gap-radar from workflow tasks)
@@ -140,9 +140,14 @@ const SEODashboard: React.FC = () => {
   const [deepCompetitorAnalysisData, setDeepCompetitorAnalysisData] = useState<any>(null);
   const [strategicInsightsHistory, setStrategicInsightsHistory] = useState<any[]>([]);
   const [strategicInsightsLoading, setStrategicInsightsLoading] = useState(false);
+  // Fail fast: history fetch failures surface an Alert with retry (never a silent warn).
+  const [strategicInsightsError, setStrategicInsightsError] = useState<string | null>(null);
   const [competitiveSitemapBenchmarkingReport, setCompetitiveSitemapBenchmarkingReport] = useState<any>(null);
   const [competitiveSitemapBenchmarkingLoading, setCompetitiveSitemapBenchmarkingLoading] = useState(false);
   const [competitiveSitemapBenchmarkingError, setCompetitiveSitemapBenchmarkingError] = useState<string | null>(null);
+  // Prod hardening: paginate the per-competitor accordion dump (8 + show-more).
+  const COMPETITOR_PAGE_SIZE = 8;
+  const [visibleCompetitorCount, setVisibleCompetitorCount] = useState(COMPETITOR_PAGE_SIZE);
   const [onboardingTaskHealth, setOnboardingTaskHealth] = useState<OnboardingScheduledTaskHealthResponse | null>(null);
 
   // Saved Website Analysis modal visibility (lazy-loads on first open)
@@ -153,17 +158,6 @@ const SEODashboard: React.FC = () => {
   const analyticsPlatforms = useMemo(() => ['gsc', 'bing'], []);
   const [websiteUrl, setWebsiteUrl] = useState<string>('');
 
-  // Sync dashboard analysis to Copilot store so readables have URL/context
-  const setCopilotAnalysisData = useSEOCopilotStore(state => state.setAnalysisData);
-  useEffect(() => {
-    if (analysisData) {
-      setCopilotAnalysisData(analysisData as any);
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[CopilotSync] Pushed analysis to Copilot store', analysisData?.url);
-      }
-    }
-  }, [analysisData, setCopilotAnalysisData]);
-
   // Load competitor analysis data on component mount
   useEffect(() => {
     loadCompetitorAnalysisData();
@@ -173,13 +167,17 @@ const SEODashboard: React.FC = () => {
 
   const fetchStrategicInsightsHistory = async () => {
     setStrategicInsightsLoading(true);
+    setStrategicInsightsError(null);
     try {
       const res = await apiClient.get('/api/seo-dashboard/strategic-insights/history');
       if (res.data?.history?.length > 0) {
         setStrategicInsightsHistory(res.data.history);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to fetch strategic insights history", e);
+      setStrategicInsightsError(
+        e?.response?.data?.detail || e?.message || 'Failed to load strategic insights history.'
+      );
     } finally {
       setStrategicInsightsLoading(false);
     }
@@ -257,34 +255,38 @@ const SEODashboard: React.FC = () => {
     dataFetchedRef.current = true;
 
     const fetchAllData = async () => {
-      let websiteUrl = 'https://alwrity.com'; // Default fallback
-      
       try {
         setLoading(true);
-        
+        setError(null);
+
         // Fetch platform status and user data in parallel
         const [platformResponse, userData, onboardingTaskHealthResponse] = await Promise.all([
           apiClient.get('/api/seo-dashboard/platforms'),
           userDataAPI.getUserData(),
           longRunningApiClient.get('/api/seo-dashboard/onboarding-task-health')
         ]);
-        
-        console.log('Platform status response:', platformResponse.status, platformResponse.statusText);
-        console.log('Platform status data:', platformResponse.data);
+
+        // Prod hardening: log status codes only, never response payloads (PII).
+        console.log('Platform status response:', platformResponse.status);
         setPlatformStatus(platformResponse.data);
         setOnboardingTaskHealth(onboardingTaskHealthResponse.data);
-        
-        websiteUrl = userData?.website_url || 'https://alwrity.com';
+
+        // No silent fallback: never analyze a placeholder site as the user's own.
+        const websiteUrl = userData?.website_url;
+        if (!websiteUrl) {
+          setError('No website URL found. Complete onboarding Step 1 to connect your site.');
+          setData(null);
+          setWebsiteUrl('');
+          return;
+        }
         setWebsiteUrl(websiteUrl);
         
         // Fetch real data from backend using authenticated API client
-        console.log('Fetching SEO dashboard overview...');
         const response = await apiClient.get('/api/seo-dashboard/overview', {
           params: { site_url: websiteUrl }
         });
-        
-        console.log('SEO overview response:', response.status, response.statusText);
-        console.log('Real SEO data received:', response.data);
+
+        console.log('SEO overview response:', response.status);
         setData(response.data);
 
         try {
@@ -306,64 +308,13 @@ const SEODashboard: React.FC = () => {
           setCompetitiveSitemapBenchmarkingReport(null);
         }
 
-        try {
-          setStrategicInsightsLoading(true);
-          const strategicHistoryRes = await apiClient.get('/api/seo-dashboard/strategic-insights/history');
-          setStrategicInsightsHistory(strategicHistoryRes.data?.history || []);
-        } catch (e) {
-          console.warn('Strategic insights history not available yet:', e);
-        } finally {
-          setStrategicInsightsLoading(false);
-        }
+        // Shared fetcher surfaces failures via strategicInsightsError Alert (never silent).
+        await fetchStrategicInsightsHistory();
       } catch (error) {
         console.error('Error fetching SEO dashboard data:', error);
-        // Fallback to mock data on error
-        const mockData = {
-          health_score: {
-            score: 84,
-            change: 5,
-            trend: 'up',
-            label: 'EXCELLENT',
-            color: '#4CAF50'
-          },
-          key_insight: 'Your website has excellent technical SEO foundation with room for improvement',
-          priority_alert: 'Mobile page speed could be optimized further',
-          metrics: {
-            traffic: { value: 12500, change: 15, trend: 'up', description: 'Organic traffic', color: '#4CAF50' },
-            rankings: { value: 8.5, change: 2.3, trend: 'up', description: 'Average ranking', color: '#2196F3' },
-            mobile: { value: 92, change: -3, trend: 'down', description: 'Mobile speed', color: '#FF9800' },
-            keywords: { value: 150, change: 12, trend: 'up', description: 'Keywords tracked', color: '#9C27B0' }
-          },
-          platforms: {
-            google: { status: 'connected', connected: true, last_sync: '2024-01-15T10:30:00Z', data_points: 1250 },
-            bing: { status: 'connected', connected: true, last_sync: '2024-01-15T09:45:00Z', data_points: 850 },
-            yandex: { status: 'disconnected', connected: false }
-          },
-          ai_insights: [
-            {
-              insight: 'Your website has excellent technical SEO foundation',
-              priority: 'low',
-              category: 'technical',
-              action_required: false
-            },
-            {
-              insight: 'Consider adding more internal links to improve page authority',
-              priority: 'medium',
-              category: 'content',
-              action_required: false
-            },
-            {
-              insight: 'Mobile page speed could be optimized further',
-              priority: 'high',
-              category: 'performance',
-              action_required: true,
-              tool_path: '/seo-dashboard'
-            }
-          ],
-          last_updated: new Date().toISOString(),
-          website_url: websiteUrl || undefined // Convert null to undefined for TypeScript
-        };
-        setData(mockData);
+        // Surface the outage — never substitute mock data for real metrics.
+        setError('Failed to load SEO dashboard data. Check your connection and retry.');
+        setData(null);
         setDeepCompetitorAnalysisData(null);
         setCompetitiveSitemapBenchmarkingReport(null);
       } finally {
@@ -372,7 +323,7 @@ const SEODashboard: React.FC = () => {
     };
 
     fetchAllData();
-  }, [isSignedIn, setLoading, setData]);
+  }, [isSignedIn, setLoading, setData, setError]);
 
   useEffect(() => {
     // Run initial SEO analysis if no data exists
@@ -406,8 +357,12 @@ const SEODashboard: React.FC = () => {
     setStatusMenuAnchor(null);
   };
 
+  const navigate = useNavigate();
+
+  // Client-side back navigation to the main dashboard (no full-page reload,
+  // and never a self-navigation loop back to /seo-dashboard).
   const handleBackToDashboard = () => {
-    window.location.href = '/seo-dashboard';
+    navigate('/dashboard');
   };
 
   const handleRefreshData = async () => {
@@ -442,10 +397,8 @@ const SEODashboard: React.FC = () => {
   // Platform status fetching function
   const fetchPlatformStatus = async () => {
     try {
-      console.log('Fetching platform status...');
       const response = await apiClient.get('/api/seo-dashboard/platforms');
-      console.log('Platform status response:', response.status, response.statusText);
-      console.log('Platform status data:', response.data);
+      console.log('Platform status response:', response.status);
       setPlatformStatus(response.data);
     } catch (error) {
       console.error('Error fetching platform status:', error);
@@ -457,7 +410,7 @@ const SEODashboard: React.FC = () => {
     try {
       const result = await apiClient.get('/api/onboarding/competitor-analysis');
       if (result?.data?.competitors?.length > 0) {
-        console.log('Loading competitor analysis data from API:', result.data);
+        console.log('Competitor analysis loaded from API.');
         setCompetitorAnalysisData(result.data);
         return;
       }
@@ -476,7 +429,7 @@ const SEODashboard: React.FC = () => {
         const isRecent = (Date.now() - timestamp) < (7 * 24 * 60 * 60 * 1000); // 7 days
         
         if (isRecent) {
-          console.log('Loading competitor analysis data from localStorage (fallback):', analysisData);
+          console.log('Competitor analysis loaded from localStorage fallback.');
           setCompetitorAnalysisData(analysisData);
         } else {
           console.log('Competitor analysis data is too old, not loading');
@@ -505,11 +458,10 @@ const SEODashboard: React.FC = () => {
   };
 
 
-  if (loading) {
-    return <Skeleton variant="rectangular" height={200} />;
-  }
-
-  if (error || !data) {
+  // Fail fast, persist chrome: while loading, the header/tabs stay mounted
+  // and the content area shows per-card skeletons (no page wipe).
+  // Errors render below once loading settles (data stays null on failure).
+  if (error || (!loading && !data)) {
     return <Alert severity="error">Failed to load dashboard data</Alert>;
   }
 
@@ -821,38 +773,13 @@ const SEODashboard: React.FC = () => {
 
               {/* CopilotKit Test Panel removed */}
 
-              {/* Dashboard Tabs */}
-              <Box sx={{ mb: 4, display: 'flex', gap: 1, borderBottom: '1px solid rgba(255, 255, 255, 0.1)', pb: 1 }}>
-                <Button
-                  variant={dashboardTab === 0 ? 'contained' : 'text'}
-                  onClick={() => setDashboardTab(0)}
-                  sx={{
-                    color: dashboardTab === 0 ? 'white' : 'rgba(255, 255, 255, 0.7)',
-                    bgcolor: dashboardTab === 0 ? 'rgba(33, 150, 243, 0.3)' : 'transparent',
-                    borderBottom: dashboardTab === 0 ? '2px solid #2196F3' : 'none',
-                    borderRadius: 0,
-                    '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.05)' }
-                  }}
-                >
-                  📊 Overview
-                </Button>
-                <Button
-                  variant={dashboardTab === 1 ? 'contained' : 'text'}
-                  onClick={() => setDashboardTab(1)}
-                  sx={{
-                    color: dashboardTab === 1 ? 'white' : 'rgba(255, 255, 255, 0.7)',
-                    bgcolor: dashboardTab === 1 ? 'rgba(33, 150, 243, 0.3)' : 'transparent',
-                    borderBottom: dashboardTab === 1 ? '2px solid #2196F3' : 'none',
-                    borderRadius: 0,
-                    '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.05)' }
-                  }}
-                >
-                  🔍 Enterprise Analysis
-                </Button>
-              </Box>
-
-              {/* Tab Content: Overview */}
-              {dashboardTab === 0 && (
+              {/* Unified dashboard (Phase D): no Overview/Enterprise tab split —
+                  everything flows inline so every tool is one scroll away. */}
+              {(loading ? (
+                <DashboardLoadingSkeleton />
+              ) : !data ? (
+                <Alert severity="error">Failed to load dashboard data</Alert>
+              ) : (
               <>
 
               {/* Search Performance Overview */}
@@ -1258,19 +1185,15 @@ const SEODashboard: React.FC = () => {
                   </Tooltip>
                 </Box>
 
-                {/* Semantic Health Overview */}
+                {/* Semantic Health Overview (live API via SemanticHealthCard).
+                    The mock-data insights container stays unmounted until a
+                    live semantic endpoint exists — no mock sections. Restore
+                    its preview mount here once the API is wired. */}
                 <Grid container spacing={2} sx={{ mb: 3 }}>
                   <Grid item xs={12} md={6}>
                     <SemanticHealthCard compact />
                   </Grid>
-                  <Grid item xs={12} md={6}>
-                    {/* Placeholder for additional semantic metrics */}
-                    <SemanticInsights maxInsights={2} />
-                  </Grid>
                 </Grid>
-
-                {/* Full Semantic Dashboard */}
-                <SemanticInsights />
               </Box>
 
               {/* Deep Competitor Analysis (auto-scheduled) */}
@@ -1391,7 +1314,7 @@ const SEODashboard: React.FC = () => {
                       <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 2 }}>
                         Per-Competitor Details
                       </Typography>
-                      {deepCompetitorAnalysisData.report.competitors.slice(0, 25).map((c: any, idx: number) => {
+                      {deepCompetitorAnalysisData.report.competitors.slice(0, visibleCompetitorCount).map((c: any, idx: number) => {
                         const input = c?.input || {};
                         const extraction = c?.extraction || {};
                         const ai = c?.ai_analysis || {};
@@ -1454,9 +1377,43 @@ const SEODashboard: React.FC = () => {
                           </Accordion>
                         );
                       })}
+                      {deepCompetitorAnalysisData.report.competitors.length > visibleCompetitorCount && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => setVisibleCompetitorCount((n) => n + COMPETITOR_PAGE_SIZE)}
+                          sx={{ mt: 1, color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}
+                        >
+                          Show more ({deepCompetitorAnalysisData.report.competitors.length - visibleCompetitorCount} remaining)
+                        </Button>
+                      )}
+                      {visibleCompetitorCount > COMPETITOR_PAGE_SIZE && (
+                        <Button
+                          size="small"
+                          variant="text"
+                          onClick={() => setVisibleCompetitorCount(COMPETITOR_PAGE_SIZE)}
+                          sx={{ mt: 1, ml: 1, color: 'rgba(255,255,255,0.7)' }}
+                        >
+                          Show less
+                        </Button>
+                      )}
                     </Box>
                   )}
                 </Box>
+              )}
+
+              {strategicInsightsError && (
+                <Alert
+                  severity="error"
+                  sx={{ mb: 2 }}
+                  action={
+                    <Button color="inherit" size="small" onClick={fetchStrategicInsightsHistory}>
+                      Retry
+                    </Button>
+                  }
+                >
+                  {strategicInsightsError}
+                </Alert>
               )}
 
               {/* Weekly Strategic Brief */}
@@ -1560,21 +1517,9 @@ const SEODashboard: React.FC = () => {
                 </Box>
               )}
 
-              {/* Strategic Insights Section */}
-              {strategicInsightsHistory.length > 0 && (
-                <Box sx={{ mb: 4 }} id="strategic-insights-results">
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-                    <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
-                      🧠 AI-Powered Strategic Insights
-                    </Typography>
-                    <Tooltip title="Weekly strategic briefs generated by AI analysis of competitor content moves and market shifts.">
-                      <InfoIcon sx={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 18 }} />
-                    </Tooltip>
-                  </Box>
-                  <StrategicInsightsResults report={strategicInsightsHistory[0]} />
-                </Box>
-              )}
-
+              {/* Removed duplicate Strategic Insights render (Winning Moves above
+                  already shows the latest report; the Weekly Brief below owns
+                  the run/empty states). */}
 
 
               {onboardingTaskHealth && (
@@ -1692,20 +1637,15 @@ const SEODashboard: React.FC = () => {
                 error={analysisError}
               />
 
-              {/* Copilot Suggestions Panel */}
-              <Box sx={{ mt: 4 }}>
-                <SEOCopilotSuggestions />
-              </Box>
-              
-              {/* SEO Copilot Component for data loading and error handling */}
-              <SEOCopilot />
+              {/* User-fired single-call SEO tools (Phase C) */}
+              <SeoToolsPanel siteUrl={websiteUrl} />
+
               </>
+              )
               )}
 
-              {/* Tab Content: Enterprise Analysis */}
-              {dashboardTab === 1 && (
-                <SEOAnalysisController />
-              )}
+              {/* Enterprise analysis flows inline (Phase D: no tab gating) */}
+              <SEOAnalysisController />
             </motion.div>
           </AnimatePresence>
         </Container>

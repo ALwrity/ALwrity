@@ -280,10 +280,10 @@ if _is_full_mode():
         get_ai_insights,
         seo_dashboard_health_check,
         analyze_seo_comprehensive,
-        analyze_seo_full,
         get_seo_metrics_detailed,
         get_analysis_summary,
         batch_analyze_urls,
+        get_seo_summary_card,
         SEOAnalysisRequest,
         get_seo_dashboard_overview,
         get_gsc_raw_data,
@@ -305,6 +305,8 @@ if _is_full_mode():
         get_content_gap_radar,
         generate_content_from_gap,
         GenerateContentRequest,
+        get_serp_gaps,
+        get_competitor_content,
     )
 else:
     get_seo_dashboard_data = None
@@ -314,10 +316,10 @@ else:
     get_ai_insights = None
     seo_dashboard_health_check = None
     analyze_seo_comprehensive = None
-    analyze_seo_full = None
     get_seo_metrics_detailed = None
     get_analysis_summary = None
     batch_analyze_urls = None
+    get_seo_summary_card = None
     SEOAnalysisRequest = None
     get_seo_dashboard_overview = None
     get_gsc_raw_data = None
@@ -612,19 +614,19 @@ if _is_full_mode():
 # SEO Dashboard endpoints (skip in feature-only modes)
 if _is_full_mode():
     @app.get("/api/seo-dashboard/data")
-    async def seo_dashboard_data():
+    async def seo_dashboard_data(current_user: dict = Depends(get_current_user)):
         """Get complete SEO dashboard data."""
-        return await get_seo_dashboard_data()
+        return await get_seo_dashboard_data(current_user)
 
     @app.get("/api/seo-dashboard/health-score")
-    async def seo_health_score():
+    async def seo_health_score(current_user: dict = Depends(get_current_user)):
         """Get SEO health score."""
-        return await get_seo_health_score()
+        return await get_seo_health_score(current_user)
 
     @app.get("/api/seo-dashboard/metrics")
-    async def seo_metrics():
+    async def seo_metrics(current_user: dict = Depends(get_current_user)):
         """Get SEO metrics."""
-        return await get_seo_metrics()
+        return await get_seo_metrics(current_user)
 
     @app.get("/api/seo-dashboard/platforms")
     async def seo_platforms(current_user: dict = Depends(get_current_user)):
@@ -632,9 +634,9 @@ if _is_full_mode():
         return await get_platform_status(current_user)
 
     @app.get("/api/seo-dashboard/insights")
-    async def seo_insights():
+    async def seo_insights(current_user: dict = Depends(get_current_user)):
         """Get AI insights."""
-        return await get_ai_insights()
+        return await get_ai_insights(current_user)
 
     @app.get("/api/seo-dashboard/overview")
     async def seo_dashboard_overview_endpoint(current_user: dict = Depends(get_current_user), site_url: str = None):
@@ -754,6 +756,22 @@ if _is_full_mode():
         """Get keyword gaps between the user's site and competitors."""
         return await get_keyword_gaps(current_user)
 
+    @app.get("/api/seo-dashboard/serp-gaps")
+    async def serp_gaps_endpoint(
+        current_user: dict = Depends(get_current_user),
+        topics: Optional[list[str]] = None,
+    ):
+        """SERP gap analysis — which competitors rank for given topics."""
+        return await get_serp_gaps(current_user, topics)
+
+    @app.get("/api/seo-dashboard/competitor-content")
+    async def competitor_content_endpoint(
+        current_user: dict = Depends(get_current_user),
+        topics: Optional[list[str]] = None,
+    ):
+        """Competitor content deep-dive for gap topics using Exa."""
+        return await get_competitor_content(current_user, topics)
+
     @app.get("/api/seo-dashboard/content-gap-radar")
     async def content_gap_radar_endpoint(current_user: dict = Depends(get_current_user)):
         """Get content gap radar analysis for the user."""
@@ -772,40 +790,57 @@ if _is_full_mode():
         return await get_analyzed_pages(current_user)
 
     @app.get("/api/seo-dashboard/summary")
-    async def seo_analysis_summary_short(url: str):
+    async def seo_analysis_summary_short(
+        url: str, current_user: dict = Depends(get_current_user)
+    ):
         """Quick summary of SEO analysis for a URL (short-path alias)."""
-        return await get_analysis_summary(url)
+        # Phase 8: analyzer routes bind the authenticated user (scoped logging).
+        return await get_analysis_summary(url, current_user)
 
     @app.get("/api/seo-dashboard/metrics/{url:path}")
-    async def seo_metrics_by_url(url: str):
+    async def seo_metrics_by_url(
+        url: str, current_user: dict = Depends(get_current_user)
+    ):
         """Detailed SEO metrics for a URL (path-parameter alias)."""
-        return await get_seo_metrics_detailed(url)
+        return await get_seo_metrics_detailed(url, current_user)
 
-    # Comprehensive SEO Analysis endpoints
+    # Comprehensive SEO Analysis endpoints (Phase 8: auth + user forwarding)
     @app.post("/api/seo-dashboard/analyze-comprehensive")
-    async def analyze_seo_comprehensive_endpoint(request: SEOAnalysisRequest):
+    async def analyze_seo_comprehensive_endpoint(
+        request: SEOAnalysisRequest, current_user: dict = Depends(get_current_user)
+    ):
         """Analyze a URL for comprehensive SEO performance."""
-        return await analyze_seo_comprehensive(request)
-
-    @app.post("/api/seo-dashboard/analyze-full")
-    async def analyze_seo_full_endpoint(request: SEOAnalysisRequest):
-        """Analyze a URL for comprehensive SEO performance."""
-        return await analyze_seo_full(request)
+        return await analyze_seo_comprehensive(request, current_user)
 
     @app.get("/api/seo-dashboard/metrics-detailed")
-    async def seo_metrics_detailed(url: str):
+    async def seo_metrics_detailed(
+        url: str, current_user: dict = Depends(get_current_user)
+    ):
         """Get detailed SEO metrics for a URL."""
-        return await get_seo_metrics_detailed(url)
+        return await get_seo_metrics_detailed(url, current_user)
 
     @app.get("/api/seo-dashboard/analysis-summary")
-    async def seo_analysis_summary(url: str):
+    async def seo_analysis_summary(
+        url: str, current_user: dict = Depends(get_current_user)
+    ):
         """Get a quick summary of SEO analysis for a URL."""
-        return await get_analysis_summary(url)
+        return await get_analysis_summary(url, current_user)
 
     @app.post("/api/seo-dashboard/batch-analyze")
-    async def batch_analyze_urls_endpoint(urls: list[str]):
+    async def batch_analyze_urls_endpoint(
+        urls: list[str], current_user: dict = Depends(get_current_user)
+    ):
         """Analyze multiple URLs in batch."""
-        return await batch_analyze_urls(urls)
+        return await batch_analyze_urls(urls, current_user)
+
+    # Phase 6B (8G): unified SEO summary for the Main Dashboard card — one
+    # authenticated composer call over persisted, per-user aggregates.
+    @app.get("/api/seo-dashboard/seo-summary-card")
+    async def get_seo_summary_card_endpoint(
+        current_user: dict = Depends(get_current_user)
+    ):
+        """SEO summary card: health + progress + background task signals."""
+        return await get_seo_summary_card(current_user)
 
     @app.post("/api/seo-dashboard/analyze-urls-ai")
     async def analyze_urls_ai_endpoint(request: AnalyzeURLsRequest, current_user: dict = Depends(get_current_user)):
@@ -819,9 +854,9 @@ if _is_full_mode():
     # Include Bing Analytics Storage router to expose storage-backed endpoints
     from routers.bing_analytics_storage import router as bing_analytics_storage_router
     app.include_router(bing_analytics_storage_router)
-    # Include SEO Tools router with enterprise audit and GSC analysis
-    if seo_tools_router:
-        app.include_router(seo_tools_router)
+    # Phase 2: seo_tools is mounted ONCE via include_core_routers() above;
+    # the previous explicit include registered duplicate routes. The guarded
+    # import at the top stays for early import-error surfacing in full mode.
     if images_router:
         app.include_router(images_router)
     if image_studio_router:
@@ -839,6 +874,23 @@ else:
     router_group_status["platform_extensions"] = {
         "mounted": False,
         "reason": "Skipped in feature-only mode",
+    }
+    # Fail fast: explicit 503 JSON for /api/seo/* instead of silent 404.
+    # The stub is dependency-free (real seo_tools router needs full mode).
+    from routers.seo_unavailable import build_seo_unavailable_router
+    app.include_router(build_seo_unavailable_router())
+    # Phase 2 (mount parity): /api/seo-dashboard/* was a silent 404 in slim
+    # modes; give it the same actionable fail-fast 503.
+    app.include_router(
+        build_seo_unavailable_router(
+            prefix="/api/seo-dashboard",
+            tag="SEO Dashboard",
+            feature_label="SEO dashboard endpoints",
+        )
+    )
+    router_group_status["seo_tools_stub"] = {
+        "mounted": True,
+        "reason": "Slim mode: explicit 503 full-mode-only (/api/seo + /api/seo-dashboard)",
     }
 
 # Include content assets router (always — core utility, not feature-specific)
