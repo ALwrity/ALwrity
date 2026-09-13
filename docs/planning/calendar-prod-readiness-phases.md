@@ -82,7 +82,7 @@ TDD (new `backend/tests/api/test_calendar_start_e2e.py`):
 Done: user-flow produces durable events + SIF status row `running`/`success`.
 Touch: `calendar_generation_service.py`, new test file.
 
-### R1.2 SIF indexer performs a real, awaited index (C2)
+### R1.2 SIF indexer performs a real, awaited index (C2) ✅ DONE
 Problem: `calendar_sif_indexer.py:292-297` builds `TxtaiIntelligenceService()`
 without the required `user_id` (`txtai_service.py:64` → `TypeError`) and calls
 the **async** `index_content()` (`txtai_service.py:457`) without `await` — the
@@ -98,6 +98,11 @@ fake service):
 - service returning 0 embeddings → status `failed`, no watermark.
 - `TxtaiIntelligenceService(user_id)` constructs successfully (smoke, real class).
 Done: real indexing provably upserts embeddings or records `failed`.
+**DONE 2026-09-13:** `calendar_sif_indexer.py` — default service constructed
+as `TxtaiIntelligenceService(user_id)`; `index_content` now awaited and its
+returned count drives watermark + success; 0/unparseable embeddings raise →
+`failed`, no watermark. Tests: `TestIndexingLifecycle` (5) in
+`test_calendar_sif_indexer.py`; full calendar SIF suite **79 passed**.
 Touch: `calendar_sif_indexer.py`, indexer tests.
 
 ### R1.3 Alembic: single head + calendar SIF migration + model registration (C3, C4)

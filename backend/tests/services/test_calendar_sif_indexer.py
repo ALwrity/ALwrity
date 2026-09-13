@@ -7,19 +7,30 @@ Phase A revalidates end-to-end with a real sqlite session.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 _BACKEND_ROOT = Path(__file__).resolve().parents[2]
 if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
 
+from models.calendar_sif_index_status import (
+    STATUS_FAILED,
+    STATUS_SUCCESS,
+    CalendarSifIndexStatus,
+)
+from models.calendar_sif_watermark import CalendarSifWatermark
 from services.calendar_sif_indexer import (
     CALENDAR_KINDS,
+    _run_indexing_lifecycle,
     build_calendar_chunks,
     compute_calendar_source_hash,
     calendar_sif_indexing_enabled,
@@ -247,3 +258,149 @@ class TestSourceHashContract:
 class TestFeatureFlag:
     def test_enabled_by_default(self):
         assert calendar_sif_indexing_enabled() is True
+
+
+class FakeAsyncSif:
+    """Async stand-in mirroring ``TxtaiIntelligenceService.index_content``.
+
+    Returns the number of items upserted (like the real service) unless a
+    fixed ``return_count`` or ``error`` is forced.
+    """
+
+    def __init__(self, *, return_count=None, error=None):
+        self.calls: list = []
+        self.return_count = return_count
+        self.error = error
+
+    async def index_content(self, items):
+        self.calls.append(list(items))
+        if self.error is not None:
+            raise self.error
+        return len(items) if self.return_count is None else self.return_count
+
+
+class TestIndexingLifecycle:
+    """R1.2 / finding C2: the lifecycle must actually embed.
+
+    - the default ``TxtaiIntelligenceService`` is constructed **with the
+      user_id** (it is a required argument);
+    - ``index_content`` is **awaited** and its returned count — not
+      ``len(chunks)`` — drives the watermark + success status;
+    - a raising service → ``failed`` and **no watermark**;
+    - zero embeddings → ``failed`` and no watermark (never a false-positive
+      success on an un-executed coroutine).
+    """
+
+    @pytest.fixture()
+    def db(self):
+        engine = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        CalendarSifIndexStatus.__table__.create(engine)
+        CalendarSifWatermark.__table__.create(engine)
+        session = sessionmaker(bind=engine)()
+        yield session
+        session.close()
+        engine.dispose()
+
+    def test_success_awaits_embed_and_records_watermark(self, db):
+        calendar = make_calendar()
+        fake = FakeAsyncSif()
+
+        asyncio.run(
+            _run_indexing_lifecycle(db, UID, calendar, GENERATED_AT, sif_service=fake)
+        )
+
+        chunks = build_calendar_chunks(calendar, UID, GENERATED_AT)
+        assert len(fake.calls) == 1, (
+            "index_content must be awaited exactly once with the built chunks"
+        )
+        assert [c[0] for c in fake.calls[0]] == [c[0] for c in chunks]
+
+        source_id = calendar_latest_source_id(UID)
+        expected_hash = compute_calendar_source_hash(UID, calendar, GENERATED_AT)
+
+        status = CalendarSifIndexStatus.get(db, UID, source_id)
+        assert status is not None
+        assert status.status == STATUS_SUCCESS
+        assert status.embedding_count == len(chunks)
+
+        wm = (
+            db.query(CalendarSifWatermark)
+            .filter_by(user_id=UID, source_id=source_id)
+            .one()
+        )
+        assert wm.embedding_count == len(chunks)
+        assert wm.source_hash == expected_hash
+
+    def test_default_service_is_constructed_with_user_id(self, db, monkeypatch):
+        constructed: list = []
+        calls: list = []
+
+        class FakeSifClass:
+            def __init__(self, user_id, *args, **kwargs):
+                constructed.append(user_id)
+                self.user_id = user_id
+
+            async def index_content(self, items):
+                calls.append(list(items))
+                return len(items)
+
+        monkeypatch.setattr(
+            "services.intelligence.txtai_service.TxtaiIntelligenceService",
+            FakeSifClass,
+        )
+
+        asyncio.run(_run_indexing_lifecycle(db, UID, make_calendar(), GENERATED_AT))
+
+        assert constructed == [UID], (
+            "the default service must be constructed with user_id "
+            "(TxtaiIntelligenceService.__init__ requires it)"
+        )
+        assert len(calls) == 1
+
+    def test_index_failure_records_failed_and_never_writes_watermark(self, db):
+        asyncio.run(
+            _run_indexing_lifecycle(
+                db, UID, make_calendar(), GENERATED_AT,
+                sif_service=FakeAsyncSif(error=RuntimeError("txtai exploded")),
+            )
+        )
+
+        status = CalendarSifIndexStatus.get(db, UID, calendar_latest_source_id(UID))
+        assert status is not None
+        assert status.status == STATUS_FAILED
+        assert "txtai exploded" in (status.error_message or "")
+        assert status.embedding_count == 0
+        watermark_rows = (
+            db.query(CalendarSifWatermark)
+            .filter_by(user_id=UID, source_id=calendar_latest_source_id(UID))
+            .count()
+        )
+        assert watermark_rows == 0, "a failed embed must never write the watermark"
+
+    def test_zero_embeddings_records_failed_without_watermark(self, db):
+        asyncio.run(
+            _run_indexing_lifecycle(
+                db, UID, make_calendar(), GENERATED_AT,
+                sif_service=FakeAsyncSif(return_count=0),
+            )
+        )
+
+        status = CalendarSifIndexStatus.get(db, UID, calendar_latest_source_id(UID))
+        assert status is not None
+        assert status.status == STATUS_FAILED
+        watermark_rows = (
+            db.query(CalendarSifWatermark)
+            .filter_by(user_id=UID, source_id=calendar_latest_source_id(UID))
+            .count()
+        )
+        assert watermark_rows == 0, "zero embeddings must never write the watermark"
+
+    def test_real_txtai_service_constructs_with_user_id(self):
+        from services.intelligence.txtai_service import TxtaiIntelligenceService
+
+        svc = TxtaiIntelligenceService("smoke-user")
+        assert svc.user_id == "smoke-user"
