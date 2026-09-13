@@ -55,7 +55,7 @@ class ContextManager:
                 "status"
             ],
             "data_types": {
-                "user_id": int,
+                "user_id": (int, str),
                 "strategy_id": (int, type(None)),
                 "calendar_type": str,
                 "industry": str,

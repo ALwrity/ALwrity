@@ -66,8 +66,8 @@ class ContentStrategyAnalysisStep(PromptStep):
             if not user_id or not strategy_id:
                 raise ValueError("Missing required user_id or strategy_id in context")
             
-            # Get real strategy data - NO MOCK DATA
-            strategy_data = await self.strategy_processor.get_strategy_data(strategy_id)
+            # Get real strategy data - NO MOCK DATA (per-user DB, user-scoped)
+            strategy_data = await self.strategy_processor.get_strategy_data(strategy_id, user_id=user_id)
             
             if not strategy_data:
                 raise ValueError(f"No strategy data found for strategy_id: {strategy_id}")
@@ -82,7 +82,7 @@ class ContentStrategyAnalysisStep(PromptStep):
             ai_insights = await self.ai_engine.generate_strategic_insights({
                 "strategy_data": strategy_data,
                 "analysis_type": "content_strategy"
-            })
+            }, user_id=user_id)
             
             # Handle AI insights response - could be dict or list
             if isinstance(ai_insights, list):
@@ -257,17 +257,19 @@ class GapAnalysisStep(PromptStep):
             keyword_analysis = await self.keyword_researcher.analyze_keywords(
                 industry="technology",  # Default industry
                 url="https://example.com",  # Default URL for testing
-                target_keywords=None
+                target_keywords=None,
+                user_id=user_id
             )
             
             # Get competitor analysis using real service
             competitor_analysis = await self.competitor_analyzer.analyze_competitors(
                 competitor_urls=["https://competitor1.com", "https://competitor2.com"],
-                industry="technology"  # Default industry
+                industry="technology",  # Default industry
+                user_id=user_id
             )
             
             # Get AI-powered gap analysis
-            ai_gap_analysis = await self.ai_engine.analyze_content_gaps(gap_data)
+            ai_gap_analysis = await self.ai_engine.analyze_content_gaps(gap_data, user_id=user_id)
             
             # Build comprehensive gap analysis
             gap_analysis = {
@@ -415,19 +417,19 @@ class AudiencePlatformStrategyStep(PromptStep):
             strategic_insights = await self.ai_engine.generate_strategic_insights({
                 "user_data": user_data,
                 "strategy_id": strategy_id
-            })
+            }, user_id=user_id)
             
             # Get content recommendations using real AI service
             content_recommendations = await self.ai_engine.generate_content_recommendations({
                 "user_data": user_data,
                 "strategy_id": strategy_id
-            })
+            }, user_id=user_id)
             
             # Get performance predictions using real AI service
             performance_predictions = await self.ai_engine.predict_content_performance({
                 "user_data": user_data,
                 "strategy_id": strategy_id
-            })
+            }, user_id=user_id)
             
             # Build comprehensive audience and platform strategy
             audience_platform_strategy = {

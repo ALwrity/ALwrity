@@ -97,6 +97,7 @@ class CalendarGenerationRequest(BaseModel):
 class ContentOptimizationRequest(BaseModel):
     user_id: Optional[str] = None
     event_id: Optional[int] = None
+    strategy_id: Optional[int] = None
     title: str
     description: str
     content_type: str

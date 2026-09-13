@@ -45,7 +45,9 @@ class ComprehensiveUserDataProcessor:
             logger.info(f"Getting comprehensive user data for user {user_id}")
             
             # Get onboarding data (async via SSOT)
-            db = self.db_session if self.db_session else SessionLocal()
+            db = self.db_session
+            if not db:
+                raise ValueError("No database session available for comprehensive user data")
             try:
                 integrated_data = await self.integration_service.process_onboarding_data(str(user_id), db)
                 # E.3 (deferred): STRUCTURED consumer — read canonical_profile.brand_voice ONLY
@@ -97,7 +99,7 @@ class ComprehensiveUserDataProcessor:
             # Get gap analysis data from the working endpoint
             try:
                 ai_engine = AIEngineService()
-                gap_analysis_data = await ai_engine.generate_content_recommendations(onboarding_data)
+                gap_analysis_data = await ai_engine.generate_content_recommendations(onboarding_data, str(user_id))
                 
                 if not gap_analysis_data:
                     raise ValueError("AI engine service returned no gap analysis data")
@@ -106,31 +108,19 @@ class ComprehensiveUserDataProcessor:
                 logger.error(f"AI engine service failed: {str(e)}")
                 raise ValueError(f"Failed to get gap analysis data: {str(e)}")
             
-            # Get active strategy data with 3-tier caching for Phase 1 and Phase 2
-            strategy_data = {}
-            active_strategy = await self.active_strategy_service.get_active_strategy(user_id)
-            
-            if active_strategy:
-                strategy_data = active_strategy
-                logger.info(f"🎯 Retrieved ACTIVE strategy {active_strategy.get('id')} with {len(active_strategy)} fields for user {user_id}")
-                logger.info(f"📊 Strategy activation status: {active_strategy.get('activation_status', {}).get('activation_date', 'Not activated')}")
-            elif strategy_id:
-                # Fallback to specific strategy ID if provided
-                from .strategy_data import StrategyDataProcessor
-                strategy_processor = StrategyDataProcessor()
-                
-                # Inject database service if available
-                if self.content_planning_db_service:
-                    strategy_processor.content_planning_db_service = self.content_planning_db_service
-                
-                strategy_data = await strategy_processor.get_strategy_data(strategy_id)
-                
-                if not strategy_data:
-                    raise ValueError(f"No strategy data found for strategy_id: {strategy_id}")
-                    
-                logger.warning(f"⚠️ No active strategy found, using fallback strategy {strategy_id}")
-            else:
-                raise ValueError("No active strategy found and no strategy ID provided")
+            # Get strategy data always through StrategyDataProcessor so every
+            # step shares the same enriched shape (pillars, audience, quality data)
+            # instead of raw active-strategy dicts missing derived fields.
+            from .strategy_data import StrategyDataProcessor
+            strategy_processor = StrategyDataProcessor()
+            if self.content_planning_db_service:
+                strategy_processor.content_planning_db_service = self.content_planning_db_service
+
+            strategy_data = await strategy_processor.get_strategy_data(strategy_id, user_id=str(user_id))
+            if not strategy_data:
+                raise ValueError("No strategy data found")
+
+            logger.info(f"🎯 Retrieved strategy {strategy_data.get('strategy_id')} with {len(strategy_data)} fields for user {user_id}")
             
             # Get content recommendations
             recommendations_data = await self._get_recommendations_data(user_id, strategy_id)

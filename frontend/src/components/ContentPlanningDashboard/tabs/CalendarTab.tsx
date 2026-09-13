@@ -50,6 +50,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 import DescriptionIcon from '@mui/icons-material/Description';
+import CalendarSifStatusCard from '../components/CalendarSifStatusCard';
 import { useContentPlanningStore } from '../../../stores/contentPlanningStore';
 
 interface TabPanelProps {
@@ -598,7 +599,10 @@ const CalendarTab: React.FC = () => {
             <CircularProgress />
           </Box>
         ) : (
-          renderGeneratedCalendar()
+          <>
+            <CalendarSifStatusCard />
+            {renderGeneratedCalendar()}
+          </>
         )}
       </TabPanel>
 

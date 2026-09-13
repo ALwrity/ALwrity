@@ -46,7 +46,7 @@ def _build_app(monkeypatch, payload):
     monkeypatch.setattr(
         CalendarGenerationService,
         "get_orchestrator_progress",
-        lambda self, session_id: payload,
+        lambda self, session_id, *args, **kwargs: payload,
     )
     app = FastAPI()
     app.include_router(calendar_generation_router)

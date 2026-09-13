@@ -13,7 +13,6 @@ from collections import Counter, defaultdict
 
 # Import AI providers
 from services.llm_providers.main_text_generation import llm_text_gen
-from services.llm_providers.gemini_provider import gemini_structured_json_response
 
 # Import services
 from services.ai_service_manager import AIServiceManager, AIServiceType
@@ -625,12 +624,13 @@ class AIEngineService:
                 ]
             }
     
-    async def generate_strategic_insights(self, analysis_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def generate_strategic_insights(self, analysis_data: Dict[str, Any], user_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Generate strategic insights using AI.
         
         Args:
             analysis_data: Analysis data
+            user_id: User ID for subscription checking
             
         Returns:
             List of AI-generated strategic insights
@@ -654,31 +654,34 @@ class AIEngineService:
             Format as structured JSON with detailed insights.
             """
             
-            # Use structured JSON response for better parsing
-            response = gemini_structured_json_response(
-                prompt=prompt,
-                schema={
-                    "type": "object",
-                    "properties": {
-                        "strategic_insights": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "type": {"type": "string"},
-                                    "insight": {"type": "string"},
-                                    "reasoning": {"type": "string"},
-                                    "priority": {"type": "string"},
-                                    "estimated_impact": {"type": "string"},
-                                    "implementation_time": {"type": "string"}
-                                }
+            schema = {
+                "type": "object",
+                "properties": {
+                    "strategic_insights": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "type": {"type": "string"},
+                                "insight": {"type": "string"},
+                                "reasoning": {"type": "string"},
+                                "priority": {"type": "string"},
+                                "estimated_impact": {"type": "string"},
+                                "implementation_time": {"type": "string"}
                             }
                         }
                     }
                 }
-            )
+            }
             
-            # Handle response - gemini_structured_json_response returns dict directly
+            # Use structured JSON response for better parsing
+            response = llm_text_gen(
+                prompt=prompt,
+                json_struct=schema,
+                user_id=user_id
+            )
+
+            # Handle response - llm_text_gen returns structured dict when json_struct is provided
             if isinstance(response, dict):
                 result = response
             elif isinstance(response, str):
@@ -742,12 +745,13 @@ class AIEngineService:
                 }
             ]
     
-    async def analyze_content_quality(self, content_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def analyze_content_quality(self, content_data: Dict[str, Any], user_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Analyze content quality and provide improvement suggestions.
         
         Args:
             content_data: Content data to analyze
+            user_id: User ID for subscription checking
             
         Returns:
             Content quality analysis
@@ -772,9 +776,9 @@ class AIEngineService:
             """
             
             # Use structured JSON response for better parsing
-            response = gemini_structured_json_response(
+            response = llm_text_gen(
                 prompt=prompt,
-                schema={
+                json_struct={
                     "type": "object",
                     "properties": {
                         "overall_score": {"type": "number"},
@@ -787,10 +791,11 @@ class AIEngineService:
                         },
                         "timestamp": {"type": "string"}
                     }
-                }
+                },
+                user_id=user_id
             )
             
-            # Handle response - gemini_structured_json_response returns dict directly
+            # Handle response - llm_text_gen returns structured dict when json_struct is provided
             if isinstance(response, dict):
                 quality_analysis = response
             elif isinstance(response, str):

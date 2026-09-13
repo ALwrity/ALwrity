@@ -109,7 +109,8 @@ class WeeklyThemeDevelopmentStep(PromptStep):
                 content_gaps=content_gaps,
                 platform_strategies=platform_strategies,
                 num_weeks=num_weeks,
-                user_data=user_data
+                user_data=user_data,
+                user_id=user_id
             )
             
             # Calculate theme diversity and variety
@@ -154,7 +155,8 @@ class WeeklyThemeDevelopmentStep(PromptStep):
         content_gaps: List[Dict],
         platform_strategies: Dict,
         num_weeks: int,
-        user_data: Dict
+        user_data: Dict,
+        user_id: Optional[str] = None
     ) -> List[Dict]:
         """
         Generate weekly themes based on content pillars and strategy.
@@ -206,7 +208,7 @@ class WeeklyThemeDevelopmentStep(PromptStep):
                 "platform_strategies": platform_strategies,
                 "prompt": prompt
             }
-            ai_response = await self.ai_engine.generate_content_recommendations(analysis_data)
+            ai_response = await self.ai_engine.generate_content_recommendations(analysis_data, user_id=user_id)
             
             # Parse AI response and structure themes
             generated_themes = self._parse_ai_theme_response(ai_response, num_weeks)

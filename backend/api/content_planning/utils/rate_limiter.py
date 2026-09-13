@@ -22,6 +22,7 @@ from loguru import logger
 # (max_requests, window_seconds)
 CREATE_STRATEGY_LIMITS: Tuple[int, int] = (10, 600)    # 10 creates per 10 min
 GENERATE_STRATEGY_LIMITS: Tuple[int, int] = (3, 600)   # 3 AI generations per 10 min
+GENERATE_CALENDAR_LIMITS: Tuple[int, int] = (3, 3600)  # 3 calendar generations per hour
 
 _now = time.time  # module-level so tests can advance the clock
 

@@ -115,6 +115,7 @@ class ContentOptimizationResponse(BaseModel):
     performance_prediction: Dict[str, Any]
     optimization_score: float
     created_at: datetime
+    sources: Optional[Dict[str, Any]] = None
 
 class PerformancePredictionResponse(BaseModel):
     user_id: str
@@ -128,6 +129,7 @@ class PerformancePredictionResponse(BaseModel):
     confidence_score: float
     recommendations: List[str]
     created_at: datetime
+    sources: Optional[Dict[str, Any]] = None
 
 class ContentRepurposingResponse(BaseModel):
     user_id: str
@@ -138,6 +140,7 @@ class ContentRepurposingResponse(BaseModel):
     implementation_tips: List[str]
     gap_addresses: List[str]
     created_at: datetime
+    sources: Optional[Dict[str, Any]] = None
 
 class TrendingTopicsResponse(BaseModel):
     user_id: str
@@ -145,4 +148,5 @@ class TrendingTopicsResponse(BaseModel):
     trending_topics: List[Dict[str, Any]]
     gap_relevance_scores: Dict[str, float]
     audience_alignment_scores: Dict[str, float]
-    created_at: datetime 
+    created_at: datetime
+    sources: Optional[Dict[str, Any]] = None 

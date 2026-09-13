@@ -760,6 +760,26 @@ class ContentPlanningAPI {
     });
   }
 
+  // Read-only semantic-index status for the latest calendar (Phase A endpoint).
+  // Returns the SIF indexing lifecycle, watermark, and document kinds.
+  async getCalendarSifStatus(): Promise<any> {
+    return this.handleRequest(async () => {
+      const response = await apiClient.get(`${this.baseURL}/calendar-generation/calendar/sif-status`);
+      return response.data?.data || response.data || null;
+    });
+  }
+
+  // Semantic search over the latest calendar's SIF documents (Phase A endpoint).
+  // Scoped to user:{uid}:calendar_latest:*; hits filtered and kind-labeled.
+  async searchCalendarSif(query: string, limit: number = 4): Promise<any> {
+    return this.handleRequest(async () => {
+      const response = await apiClient.get(`${this.baseURL}/calendar-generation/calendar/sif-search`, {
+        params: { query, limit },
+      });
+      return response.data?.data || response.data || null;
+    });
+  }
+
   // Clear enhanced strategy streaming/cache for a user (best-effort refresh)
   // Note: Endpoint gets user_id from authentication, query params are ignored
   async clearEnhancedCache(userId?: number): Promise<any> {

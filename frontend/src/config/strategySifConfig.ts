@@ -32,3 +32,9 @@ export const STRATEGY_SIF_EDUCATION_ENABLED: boolean = true;
 export function isStrategySifEducationEnabled(): boolean {
   return STRATEGY_SIF_EDUCATION_ENABLED;
 }
+
+export const CALENDAR_SIF_CARD_ENABLED: boolean = true;
+
+export function isCalendarSifCardEnabled(): boolean {
+  return CALENDAR_SIF_CARD_ENABLED;
+}

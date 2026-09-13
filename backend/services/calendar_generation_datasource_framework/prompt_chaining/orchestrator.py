@@ -59,7 +59,7 @@ class PromptChainOrchestrator:
         self.db_session = db_session
         
         # Data processing modules for 12-step preparation
-        self.comprehensive_user_processor = ComprehensiveUserDataProcessor()
+        self.comprehensive_user_processor = ComprehensiveUserDataProcessor(db_session=db_session)
         
         # Inject database service if available
         if db_session:

@@ -420,8 +420,10 @@ class PerformanceAnalyzer:
             Return only the score as a float.
             """
             
-            response = await self.ai_engine.generate_response(prompt)
-            score = float(response.strip())
+            response = await self.ai_engine.predict_content_performance(
+                {"prompt": prompt}, user_id=user_id
+            )
+            score = float(response.get("overall_prediction", {}).get("performance_score", 0.5))
             return min(max(score, 0.0), 1.0)
             
         except Exception as e:
@@ -446,8 +448,10 @@ class PerformanceAnalyzer:
             Return only the score as a float.
             """
             
-            response = await self.ai_engine.generate_response(prompt)
-            score = float(response.strip())
+            response = await self.ai_engine.predict_content_performance(
+                {"prompt": prompt}, user_id=user_id
+            )
+            score = float(response.get("overall_prediction", {}).get("performance_score", 0.5))
             return min(max(score, 0.0), 1.0)
             
         except Exception as e:
@@ -479,8 +483,10 @@ class PerformanceAnalyzer:
             Return only the score as a float.
             """
             
-            response = await self.ai_engine.generate_response(prompt)
-            score = float(response.strip())
+            response = await self.ai_engine.predict_content_performance(
+                {"prompt": prompt}, user_id=user_id
+            )
+            score = float(response.get("overall_prediction", {}).get("performance_score", 0.5))
             return min(max(score, 0.0), 1.0)
             
         except Exception as e:
@@ -512,8 +518,10 @@ class PerformanceAnalyzer:
             Return only the score as a float.
             """
             
-            response = await self.ai_engine.generate_response(prompt)
-            score = float(response.strip())
+            response = await self.ai_engine.predict_content_performance(
+                {"prompt": prompt}, user_id=user_id
+            )
+            score = float(response.get("overall_prediction", {}).get("performance_score", 0.5))
             return min(max(score, 0.0), 1.0)
             
         except Exception as e:

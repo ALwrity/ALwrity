@@ -6,6 +6,7 @@ in content calendar generation. Ensures Phase 1 and Phase 2 use the correct
 active strategy from the database.
 """
 
+import json
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -184,50 +185,72 @@ class ActiveStrategyService:
             Strategy dictionary
         """
         try:
-            strategy_dict = {
-                'id': strategy.id,
-                'user_id': strategy.user_id,
-                'name': strategy.name,
-                'industry': strategy.industry,
-                'target_audience': strategy.target_audience,
-                'content_pillars': strategy.content_pillars,
-                'business_objectives': strategy.business_objectives,
-                'brand_voice': strategy.brand_voice,
-                'editorial_guidelines': strategy.editorial_guidelines,
-                'content_frequency': strategy.content_frequency,
-                'preferred_formats': strategy.preferred_formats,
-                'content_mix': strategy.content_mix,
-                'competitive_analysis': strategy.competitive_analysis,
-                'market_positioning': strategy.market_positioning,
-                'kpi_targets': strategy.kpi_targets,
-                'success_metrics': strategy.success_metrics,
-                'audience_segments': strategy.audience_segments,
-                'content_themes': strategy.content_themes,
-                'seasonal_focus': strategy.seasonal_focus,
-                'campaign_integration': strategy.campaign_integration,
-                'platform_strategy': strategy.platform_strategy,
-                'engagement_goals': strategy.engagement_goals,
-                'conversion_objectives': strategy.conversion_objectives,
-                'brand_guidelines': strategy.brand_guidelines,
-                'content_standards': strategy.content_standards,
-                'quality_thresholds': strategy.quality_thresholds,
-                'performance_benchmarks': strategy.performance_benchmarks,
-                'optimization_focus': strategy.optimization_focus,
-                'trend_alignment': strategy.trend_alignment,
-                'innovation_areas': strategy.innovation_areas,
-                'risk_mitigation': strategy.risk_mitigation,
-                'scalability_plans': strategy.scalability_plans,
-                'measurement_framework': strategy.measurement_framework,
-                'continuous_improvement': strategy.continuous_improvement,
-                'ai_recommendations': strategy.ai_recommendations,
-                'comprehensive_ai_analysis': strategy.comprehensive_ai_analysis,
-                'created_at': strategy.created_at.isoformat() if strategy.created_at else None,
-                'updated_at': strategy.updated_at.isoformat() if strategy.updated_at else None,
-                'completion_percentage': getattr(strategy, 'completion_percentage', 0)
+            strategy_dict = strategy.to_dict()
+
+            # Flatten the AI-generated JSON so the aliases below can surface
+            # the sections that live inside it rather than staying None.
+            ai = strategy_dict.get("ai_recommendations") or {}
+            if isinstance(ai, str):
+                try:
+                    ai = json.loads(ai)
+                except Exception:
+                    ai = {}
+            if not isinstance(ai, dict):
+                ai = {}
+            base = ai.get("base_strategy") or {}
+            insights = ai.get("strategic_insights") or {}
+            roadmap = ai.get("implementation_roadmap") or {}
+            predictions = ai.get("performance_predictions") or {}
+            swot = insights.get("swot_summary") or {}
+
+            target_metrics = strategy_dict.get("target_metrics") or base.get("target_metrics") or {}
+            target_audience = strategy_dict.get("target_audience") or base.get("target_audience") or {}
+
+            # Consumers reach for a number of legacy/alias keys; keep them
+            # populated from the real columns + flat AI JSON when derivable.
+            aliases = {
+                "competitive_analysis": strategy_dict.get("competitive_advantages")
+                    or ai.get("competitive_analysis"),
+                "kpi_targets": target_metrics,
+                "success_metrics": strategy_dict.get("content_roi_targets") or target_metrics,
+                "audience_segments": target_audience,
+                "content_themes": strategy_dict.get("content_pillars")
+                    or insights.get("content_opportunities"),
+                "seasonal_focus": strategy_dict.get("seasonal_trends")
+                    or base.get("seasonal_trends"),
+                "platform_strategy": strategy_dict.get("preferred_formats") or base.get("preferred_formats"),
+                "engagement_goals": strategy_dict.get("engagement_metrics")
+                    or base.get("engagement_metrics"),
+                "conversion_objectives": strategy_dict.get("conversion_rates")
+                    or strategy_dict.get("business_objectives"),
+                "brand_guidelines": strategy_dict.get("brand_voice") or base.get("brand_voice"),
+                "content_standards": strategy_dict.get("editorial_guidelines")
+                    or base.get("editorial_guidelines"),
+                "quality_thresholds": strategy_dict.get("quality_metrics") or base.get("quality_metrics"),
+                "performance_benchmarks": strategy_dict.get("content_roi_targets")
+                    or base.get("content_roi_targets"),
+                "trend_alignment": strategy_dict.get("industry_trends") or base.get("industry_trends"),
+                "innovation_areas": strategy_dict.get("emerging_trends") or base.get("emerging_trends"),
+                "risk_mitigation": strategy_dict.get("strategic_risks")
+                    or ai.get("risk_assessment"),
+                "optimization_focus": predictions.get("optimization_focus"),
+                "scalability_plans": roadmap.get("scalability_plans"),
+                "measurement_framework": predictions,
+                "continuous_improvement": None,
+                "strategic_insights": insights,
+                "risk_assessment": ai.get("risk_assessment"),
+                "summary": ai.get("summary"),
+                "implementation_roadmap": roadmap,
+                "market_positioning": strategy_dict.get("market_positioning")
+                    or insights.get("market_positioning"),
             }
-            
+
+            for key, value in aliases.items():
+                if value not in (None, {}):
+                    strategy_dict[key] = value
+
             return strategy_dict
-            
+
         except Exception as e:
             logger.error(f"Error converting strategy to dictionary: {str(e)}")
             return {}

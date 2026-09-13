@@ -31,6 +31,15 @@ from ..models.responses import (
     TrendingTopicsResponse
 )
 
+# Import calendar SIF
+from services.calendar_sif_source_ids import (
+    CALENDAR_KINDS,
+    calendar_latest_source_id,
+    calendar_latest_doc_id,
+)
+from models.calendar_sif_index_status import CalendarSifIndexStatus
+from models.calendar_sif_watermark import CalendarSifWatermark
+
 # Import utilities
 from ...utils.error_handlers import ContentPlanningErrorHandler
 from ...utils.response_builders import ResponseBuilder
@@ -45,11 +54,68 @@ from services.subscription.preflight_validator import validate_calendar_generati
 from services.subscription.pricing_service import PricingService
 from models.onboarding import OnboardingSession
 from models.content_planning import ContentStrategy
+from ...utils.rate_limiter import enforce_rate_limit, GENERATE_CALENDAR_LIMITS
 
 # Create router
 router = APIRouter(prefix="/calendar-generation", tags=["calendar-generation"])
 
-# Helper function removed - using Clerk ID string directly
+
+def _resolve_strategy_for_user(db: Session, strategy_id: int, clerk_user_id: str) -> None:
+    """Verify strategy ownership across enhanced + legacy tables.
+
+    Raises HTTPException 404/403. Resolves enhanced-first (String user_id),
+    then legacy (Integer user_id with str coercion).
+    """
+    try:
+        from models.enhanced_strategy_models import EnhancedContentStrategy
+
+        enhanced = (
+            db.query(EnhancedContentStrategy)
+            .filter(EnhancedContentStrategy.id == strategy_id)
+            .first()
+        )
+        if enhanced is not None:
+            if str(enhanced.user_id) != clerk_user_id:
+                raise HTTPException(status_code=403, detail="Not authorized to access this strategy.")
+            return
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # table may not exist in older per-user DBs; fall through to legacy
+    strategy = db.query(ContentStrategy).filter(ContentStrategy.id == strategy_id).first()
+    if not strategy:
+        raise HTTPException(status_code=404, detail="Content Strategy not found.")
+    if str(strategy.user_id) != clerk_user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this strategy.")
+
+
+def _require_calendar_preflight(
+    db: Session,
+    clerk_user_id: str,
+    strategy_id: Optional[int] = None,
+    check_onboarding: bool = True,
+) -> None:
+    """Phase 3: shared gate for all calendar AI routes.
+
+    Order: onboarding (400) → strategy ownership (404/403) → rate limit (429)
+    → subscription preflight (429/402). HTTPExceptions propagate verbatim.
+    """
+    if check_onboarding:
+        onboarding = (
+            db.query(OnboardingSession)
+            .filter(OnboardingSession.user_id == clerk_user_id)
+            .first()
+        )
+        if not onboarding:
+            raise HTTPException(
+                status_code=400,
+                detail="Onboarding data not found. Please complete onboarding first.",
+            )
+    if strategy_id is not None:
+        _resolve_strategy_for_user(db, strategy_id, clerk_user_id)
+    enforce_rate_limit("calendar_generate", clerk_user_id, GENERATE_CALENDAR_LIMITS)
+    pricing_service = PricingService(db)
+    validate_calendar_generation_operations(pricing_service, clerk_user_id)
 
 @router.post("/generate-calendar", response_model=CalendarGenerationResponse)
 async def generate_comprehensive_calendar(
@@ -68,27 +134,8 @@ async def generate_comprehensive_calendar(
         
         logger.info(f"🎯 Generating comprehensive calendar for authenticated user {clerk_user_id}")
 
-        # Preflight Checks
-        # 1. Check Onboarding Data
-        onboarding = db.query(OnboardingSession).filter(OnboardingSession.user_id == clerk_user_id).first()
-        if not onboarding:
-            raise HTTPException(status_code=400, detail="Onboarding data not found. Please complete onboarding first.")
-
-        # 2. Check Strategy (if provided)
-        if request.strategy_id:
-            # Assuming migration to string user_id
-            # Note: If migration hasn't run for ContentStrategy, this might fail if user_id column is Integer.
-            # But we are proceeding with the assumption of full string ID support.
-            strategy = db.query(ContentStrategy).filter(ContentStrategy.id == request.strategy_id).first()
-            if not strategy:
-                 raise HTTPException(status_code=404, detail="Content Strategy not found.")
-            # Verify ownership
-            if str(strategy.user_id) != clerk_user_id:
-                 raise HTTPException(status_code=403, detail="Not authorized to access this strategy.")
-
-        # 3. Subscription/Limits Check
-        pricing_service = PricingService(db)
-        validate_calendar_generation_operations(pricing_service, clerk_user_id)
+        # Phase 3: shared preflight (onboarding → strategy → rate limit → billing).
+        _require_calendar_preflight(db, clerk_user_id, request.strategy_id)
         
         # Initialize service with database session for active strategy access
         calendar_service = CalendarGenerationService(db)
@@ -104,6 +151,8 @@ async def generate_comprehensive_calendar(
         
         return CalendarGenerationResponse(**calendar_data)
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Error generating comprehensive calendar: {str(e)}")
         logger.error(f"Exception type: {type(e)}")
@@ -126,7 +175,10 @@ async def optimize_content_for_platform(
     try:
         clerk_user_id = str(current_user.get('id'))
         logger.info(f"🔧 Starting content optimization for authenticated user {clerk_user_id}")
-        
+
+        # Phase 3: close the billing bypass (was unguarded).
+        _require_calendar_preflight(db, clerk_user_id)
+
         # Initialize service with database session for active strategy access
         calendar_service = CalendarGenerationService(db)
         
@@ -136,7 +188,8 @@ async def optimize_content_for_platform(
             description=request.description,
             content_type=request.content_type,
             target_platform=request.target_platform,
-            event_id=request.event_id
+            event_id=request.event_id,
+            strategy_id=request.strategy_id
         )
         
         return ContentOptimizationResponse(**result)
@@ -162,7 +215,10 @@ async def predict_content_performance(
     try:
         clerk_user_id = str(current_user.get('id'))
         logger.info(f"📊 Starting performance prediction for authenticated user {clerk_user_id}")
-        
+
+        # Phase 3: close the billing bypass (was unguarded).
+        _require_calendar_preflight(db, clerk_user_id, request.strategy_id)
+
         # Initialize service with database session for active strategy access
         calendar_service = CalendarGenerationService(db)
         
@@ -175,7 +231,9 @@ async def predict_content_performance(
         )
         
         return PerformancePredictionResponse(**result)
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Error predicting content performance: {str(e)}")
         raise HTTPException(
@@ -195,7 +253,10 @@ async def repurpose_content_across_platforms(
     try:
         clerk_user_id = str(current_user.get('id'))
         logger.info(f"🔄 Starting content repurposing for authenticated user {clerk_user_id}")
-        
+
+        # Phase 3: close the billing bypass (was unguarded).
+        _require_calendar_preflight(db, clerk_user_id, request.strategy_id)
+
         # Initialize service with database session for active strategy access
         calendar_service = CalendarGenerationService(db)
         
@@ -207,7 +268,9 @@ async def repurpose_content_across_platforms(
         )
         
         return ContentRepurposingResponse(**result)
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Error repurposing content: {str(e)}")
         raise HTTPException(
@@ -236,7 +299,10 @@ async def get_trending_topics(
         clerk_user_id = str(current_user.get('id'))
         
         logger.info(f"📈 Getting trending topics for authenticated user {clerk_user_id} in {industry}")
-        
+
+        # Phase 3: close the billing bypass (was unguarded).
+        _require_calendar_preflight(db, clerk_user_id)
+
         # Initialize service with database session for active strategy access
         calendar_service = CalendarGenerationService(db)
         
@@ -247,7 +313,9 @@ async def get_trending_topics(
         )
         
         return TrendingTopicsResponse(**result)
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Error getting trending topics: {str(e)}")
         raise HTTPException(
@@ -297,7 +365,9 @@ async def get_comprehensive_user_data(
         
         logger.info(f"Successfully retrieved comprehensive user data for user_id: {clerk_user_id} (cache: {'HIT' if is_cached else 'MISS'})")
         return result
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting comprehensive user data for user_id {clerk_user_id}: {str(e)}")
         logger.error(f"Exception type: {type(e)}")
@@ -307,6 +377,16 @@ async def get_comprehensive_user_data(
             status_code=500,
             detail=f"Error retrieving comprehensive user data: {str(e)}"
         )
+
+@router.get("/health/live")
+async def calendar_generation_liveness() -> Dict[str, Any]:
+    """Public liveness probe (no auth, no DB) for load balancers."""
+    return {
+        "service": "calendar_generation",
+        "status": "up",
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
 
 @router.get("/health")
 async def calendar_generation_health_check(
@@ -351,12 +431,18 @@ async def get_calendar_generation_progress(
         clerk_user_id = str(current_user.get('id'))
         # Initialize service with database session for active strategy access
         calendar_service = CalendarGenerationService(db)
-        
-        # Get progress from orchestrator only - no fallbacks
-        orchestrator_progress = calendar_service.get_orchestrator_progress(session_id)
-        
+
+        # Get progress from orchestrator only - no fallbacks (Phase 1: owner-checked)
+        orchestrator_progress = calendar_service.get_orchestrator_progress(
+            session_id, requester_user_id=clerk_user_id
+        )
+
         if not orchestrator_progress:
             raise HTTPException(status_code=404, detail="Session not found")
+        if orchestrator_progress.get("forbidden"):
+            raise HTTPException(
+                status_code=403, detail="Not authorized to view this session"
+            )
         
         # Return orchestrator progress (data is already in the correct format)
         return {
@@ -376,6 +462,8 @@ async def get_calendar_generation_progress(
             "result": orchestrator_progress.get("result")
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting calendar generation progress: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to get progress")
@@ -395,7 +483,10 @@ async def start_calendar_generation(
         clerk_user_id = str(current_user.get('id'))
         
         logger.info(f"🎯 Starting calendar generation for authenticated user {clerk_user_id}")
-        
+
+        # Phase 3: the async path previously skipped onboarding + billing.
+        _require_calendar_preflight(db, clerk_user_id, request.strategy_id)
+
         # Initialize service with database session for active strategy access
         calendar_service = CalendarGenerationService(db)
         
@@ -434,7 +525,9 @@ async def start_calendar_generation(
             "message": "Calendar generation started successfully with 12-step orchestrator",
             "estimated_duration": "2-3 minutes"
         }
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error starting calendar generation: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to start calendar generation")
@@ -452,19 +545,32 @@ async def cancel_calendar_generation(
         clerk_user_id = str(current_user.get('id'))
         # Initialize service with database session for active strategy access
         calendar_service = CalendarGenerationService(db)
-        
+
+        # Phase 1: distinguish missing (404) from forbidden (403).
+        owner = calendar_service.get_session_owner(session_id)
+        if owner is None:
+            raise HTTPException(status_code=404, detail="Session not found")
+        if str(owner) != clerk_user_id:
+            raise HTTPException(
+                status_code=403, detail="Not authorized to cancel this session"
+            )
+
         # Cancel orchestrator session (persists to DB)
-        success = calendar_service.cancel_orchestrator_session(session_id)
-        
+        success = calendar_service.cancel_orchestrator_session(
+            session_id, requester_user_id=clerk_user_id
+        )
+
         if not success:
             raise HTTPException(status_code=404, detail="Session not found")
-        
+
         return {
             "session_id": session_id,
             "status": "cancelled",
             "message": "Calendar generation cancelled successfully"
         }
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error cancelling calendar generation: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to cancel calendar generation")
@@ -496,6 +602,10 @@ async def invalidate_user_cache(
     """Invalidate cache for the authenticated user."""
     try:
         clerk_user_id = str(current_user.get('id'))
+        if str(user_id) != clerk_user_id:
+            raise HTTPException(
+                status_code=403, detail="Not authorized to invalidate another user's cache."
+            )
         from services.comprehensive_user_data_cache_service import ComprehensiveUserDataCacheService
         cache_service = ComprehensiveUserDataCacheService(db)
         success = cache_service.invalidate_cache(clerk_user_id, strategy_id)
@@ -510,6 +620,8 @@ async def invalidate_user_cache(
         else:
             raise HTTPException(status_code=500, detail="Failed to invalidate cache")
             
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error invalidating cache: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to invalidate cache")
@@ -584,11 +696,13 @@ async def cleanup_old_sessions(
         # Initialize service with database session for active strategy access
         calendar_service = CalendarGenerationService(db)
         
-        # Clean up old sessions for all users
+        # Phase 1: only remove the requester's own sessions (no cross-user GC).
         current_time = datetime.now()
         sessions_to_remove = []
-        
+
         for session_id, session_data in list(calendar_service.orchestrator_sessions.items()):
+            if str(session_data.get("user_id", "")) != clerk_user_id:
+                continue
             start_time = session_data.get("start_time")
             if start_time:
                 # Remove sessions older than 1 hour
@@ -613,3 +727,186 @@ async def cleanup_old_sessions(
     except Exception as e:
         logger.error(f"Error cleaning up sessions: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to cleanup sessions")
+
+
+KIND_LABELS: Dict[str, str] = {
+    "calendar_overview": "Calendar overview",
+    "daily_schedule": "Daily schedule",
+    "weekly_themes": "Weekly themes",
+    "content_recommendations": "Content recommendations",
+    "performance_predictions": "Performance predictions",
+    "ai_insights": "AI insights",
+    "strategy_alignment": "Strategy alignment",
+    "calendar_events": "Calendar events",
+}
+
+
+@router.get("/calendar/sif-status")
+async def get_calendar_sif_status(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Read-only semantic-index status for the user's latest calendar.
+
+    Tells the UI what happened to the SIF embedding for the latest
+    calendar: the durable ``calendar_sif_index_status`` lifecycle
+    (pending / running / success / skipped / failed), the successful-embed
+    watermark, and the 8 canonical document kinds. Never writes and
+    never loads txtai — safe to poll while indexing runs.
+    """
+    try:
+        user_id = str(current_user.get("id"))
+        source_id = calendar_latest_source_id(user_id)
+
+        status_row = CalendarSifIndexStatus.get(db, user_id, source_id)
+        watermark_row = CalendarSifWatermark.is_fresh(db, user_id, source_id, "") or _get_watermark(db, user_id, source_id)
+
+        if status_row is not None:
+            indexing = {
+                "phase": _status_phase(status_row.status),
+                "status": status_row.status,
+                "embedding_count": status_row.embedding_count,
+                "error_message": status_row.error_message,
+                "started_at": status_row.started_at.isoformat() if status_row.started_at else None,
+                "finished_at": status_row.finished_at.isoformat() if status_row.finished_at else None,
+            }
+        else:
+            indexing = {
+                "phase": "not_indexed",
+                "status": None,
+                "embedding_count": 0,
+                "error_message": None,
+                "started_at": None,
+                "finished_at": None,
+            }
+
+        if watermark_row is not None:
+            watermark = {
+                "embedding_count": watermark_row.embedding_count,
+                "indexed_at": watermark_row.indexed_at.isoformat() if watermark_row.indexed_at else None,
+                "source_hash": watermark_row.source_hash,
+            }
+        else:
+            watermark = None
+
+        doc_ids = [calendar_latest_doc_id(user_id, k) for k in CALENDAR_KINDS]
+        document_kinds = {
+            "names": list(CALENDAR_KINDS),
+            "doc_ids": doc_ids,
+            "count": len(doc_ids),
+        }
+
+        return {
+            "status": "success",
+            "data": {
+                "indexing": indexing,
+                "watermark": watermark,
+                "document_kinds": document_kinds,
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving calendar SIF status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve calendar SIF status")
+
+
+@router.get("/calendar/sif-search")
+async def search_calendar_sif(
+    query: str = "",
+    limit: int = Query(4, ge=1, le=20),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """Semantic search over the user's latest calendar SIF documents.
+
+    Scoped to ``user:{uid}:calendar_latest:*`` — hits are filtered to
+    that prefix, enriched with kind labels and stored document text.
+    On failure returns empty hits with an explicit error (never
+    fabricated).
+    """
+    try:
+        user_id = str(current_user.get("id"))
+        source_id = calendar_latest_source_id(user_id)
+        prefix = f"{source_id}:"
+
+        from services.intelligence.txtai_service import TxtaiIntelligenceService
+
+        svc = TxtaiIntelligenceService(user_id)
+        raw = await svc.search(query, limit=max(limit * 4, 12))
+
+        hits: list = []
+        for result in raw or []:
+            if isinstance(result, dict):
+                doc_id = result.get("id")
+                score = result.get("score") or 0
+                text = result.get("text") or ""
+            elif isinstance(result, (list, tuple)):
+                doc_id = result[0] if len(result) > 0 else None
+                score = result[1] if len(result) > 1 else 0
+                text = ""
+            else:
+                continue
+            doc_id = str(doc_id) if doc_id is not None else ""
+            if not doc_id.startswith(prefix):
+                continue
+            if not text or text == doc_id:
+                try:
+                    text = svc.get_document_text(doc_id)
+                except Exception:
+                    text = ""
+            kind = doc_id[len(prefix):] if doc_id.startswith(prefix) else ""
+            kind_label = KIND_LABELS.get(kind, kind)
+            hits.append({
+                "id": doc_id,
+                "kind": kind,
+                "kind_label": kind_label,
+                "score": float(score),
+                "text": text,
+            })
+
+        hits.sort(key=lambda h: h["score"], reverse=True)
+        hits = hits[:limit]
+
+        return {
+            "status": "success",
+            "data": {
+                "query": query,
+                "source_id": source_id,
+                "hits": hits,
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error searching calendar SIF: {str(e)}")
+        return {
+            "status": "error",
+            "data": {
+                "query": query,
+                "source_id": calendar_latest_source_id(str(current_user.get("id"))),
+                "hits": [],
+                "error": str(e),
+            },
+        }
+
+
+def _status_phase(status: Optional[str]) -> str:
+    if status is None:
+        return "not_indexed"
+    if status == "failed":
+        return "failed"
+    return status
+
+
+def _get_watermark(db: Session, user_id: str, source_id: str):
+    try:
+        return (
+            db.query(CalendarSifWatermark)
+            .filter(CalendarSifWatermark.user_id == user_id, CalendarSifWatermark.source_id == source_id)
+            .one_or_none()
+        )
+    except Exception:
+        return None
