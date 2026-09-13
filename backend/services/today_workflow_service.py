@@ -367,6 +367,16 @@ def build_grounding_context(db: Session, user_id: str, date: str) -> Dict[str, A
             "limitations": [f"SEO evidence could not be loaded: {exc}"],
         }
 
+    # Phase 14 / D3: raise CTA'd SEO alerts from the evidence. Best-effort;
+    # dedupe keeps this from spamming, and they surface in the huddle feed +
+    # the next grounding's recent_agent_alerts.
+    try:
+        from services.intelligence.agents.seo_alert_producer import produce_seo_alerts
+
+        produce_seo_alerts(db, user_id, seo_evidence)
+    except Exception as exc:
+        logger.debug(f"SEO alert production skipped for user {user_id}: {exc}")
+
     return {
         "recent_agent_alerts": [
             {

@@ -136,9 +136,51 @@ class SEOOptimizationAgent(BaseALwrityAgent):
     
     async def perform_seo_audit(self, website_url: str) -> Dict[str, Any]:
         """
-        Perform a comprehensive SEO audit by searching the SIF index.
-        Returns real data about indexed content, keyword coverage, and gaps.
+        Perform a comprehensive SEO audit.
+
+        Phase 14 (plan D slice 2): reads the REAL persisted SEO evidence
+        (on-page health, page-audit aggregates, GSC highlights, trend) via
+        build_seo_evidence. Falls back to the SIF search only when no persisted
+        evidence exists — never invents results.
         """
+        # Real evidence first.
+        try:
+            from services.database import get_db_session
+            from services.intelligence.agents.seo_evidence import build_seo_evidence
+
+            db = get_db_session()
+            evidence = None
+            if db:
+                try:
+                    evidence = build_seo_evidence(db, self.user_id)
+                finally:
+                    db.close()
+
+            if isinstance(evidence, dict) and evidence.get("status") == "ok":
+                issues: List[str] = []
+                if evidence.get("pages_needing_fix"):
+                    issues.append(
+                        f"{evidence['pages_needing_fix']} page(s) score below 70"
+                    )
+                if evidence.get("striking_distance"):
+                    issues.append(
+                        f"{len(evidence['striking_distance'])} striking-distance keyword(s)"
+                    )
+                if evidence.get("low_ctr"):
+                    issues.append(
+                        f"{len(evidence['low_ctr'])} low-CTR keyword(s)"
+                    )
+                return {
+                    "health": "reviewed",
+                    "website_url": website_url,
+                    "evidence": evidence,
+                    "issues": issues,
+                    "audit_timestamp": datetime.utcnow().isoformat(),
+                }
+        except Exception as e:
+            logger.warning(f"[SEOOptimizationAgent] Persisted SEO evidence unavailable: {e}")
+
+        # Fallback: SIF similarity search (existing behaviour).
         if not self.sif_service:
             return {"health": "unknown", "issues": [], "error": "SIF service not initialized"}
         try:
@@ -165,14 +207,75 @@ class SEOOptimizationAgent(BaseALwrityAgent):
 
     async def propose_daily_tasks(self, context: Dict[str, Any]) -> List[TaskProposal]:
         """
-        Propose SEO-focused tasks based on real SIF index data.
+        Propose SEO-focused tasks from REAL persisted evidence (plan D slice 2).
+
+        Prioritises the seo_evidence grounding block (pages needing fixes,
+        striking distance, low CTR). Falls back to the existing SIF issue scan
+        only when evidence is absent; both paths stay honest (empty/decline
+        instead of filler).
         """
         self._remember_grounding(context)
-        default_proposals = []
+        default_proposals: List[TaskProposal] = []
+
+        evidence = context.get("seo_evidence") or {}
+        if isinstance(evidence, dict) and evidence.get("status") == "ok":
+            pages_needing_fix = int(evidence.get("pages_needing_fix") or 0)
+            if pages_needing_fix > 0:
+                default_proposals.append(TaskProposal(
+                    title=f"Fix {pages_needing_fix} underperforming page(s)",
+                    description=(
+                        f"{pages_needing_fix} audited page(s) score below 70 "
+                        f"(avg {evidence.get('avg_page_score')}). Prioritize the lowest scorers."
+                    ),
+                    pillar_id="analyze",
+                    priority="high",
+                    estimated_time=45,
+                    source_agent="SEOOptimizationAgent",
+                    reasoning="Pages scoring below 70 limit organic visibility and conversions.",
+                    action_type="navigate",
+                    action_url="/seo-dashboard",
+                ))
+
+            striking = evidence.get("striking_distance") or []
+            if striking:
+                top = striking[0] or {}
+                default_proposals.append(TaskProposal(
+                    title=f'Push "{top.get("keyword")}" to page 1',
+                    description=(
+                        f"Position {top.get('position')} with {top.get('impressions')} impressions "
+                        "(striking distance). Add supporting content + internal links."
+                    ),
+                    pillar_id="analyze",
+                    priority="medium",
+                    estimated_time=30,
+                    source_agent="SEOOptimizationAgent",
+                    reasoning="Striking-distance keywords convert with small ranking gains.",
+                    action_type="navigate",
+                    action_url="/seo-dashboard",
+                ))
+
+            low_ctr = evidence.get("low_ctr") or []
+            if low_ctr:
+                top = low_ctr[0] or {}
+                default_proposals.append(TaskProposal(
+                    title=f'Rewrite title/meta for "{top.get("keyword")}" (low CTR)',
+                    description=(
+                        f"{top.get('ctr')}% CTR at {top.get('impressions')} impressions — "
+                        "improve the snippet to capture existing visibility."
+                    ),
+                    pillar_id="analyze",
+                    priority="medium",
+                    estimated_time=20,
+                    source_agent="SEOOptimizationAgent",
+                    reasoning="High impressions with low CTR indicate a snippet/intent mismatch.",
+                    action_type="navigate",
+                    action_url="/seo-dashboard",
+                ))
+
         issues_found = 0
         website_url = context.get("website_url", "")
 
-        if self.sif_service:
+        if not default_proposals and self.sif_service:
             try:
                 intelligence = getattr(self.sif_service, "intelligence_service", None)
                 if intelligence:
@@ -198,10 +301,6 @@ class SEOOptimizationAgent(BaseALwrityAgent):
                 action_type="navigate",
                 action_url="/seo-dashboard"
             ))
-        # NOTE: the old else-branch "Run SEO Audit" filler was removed per the
-        # honest-absence policy — with no SIF issue evidence this agent
-        # declines or returns empty instead of shipping identical-for-everyone
-        # advice.
 
         return await self._synthesize_task_proposals(
             context,
