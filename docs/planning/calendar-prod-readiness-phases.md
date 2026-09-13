@@ -100,7 +100,7 @@ fake service):
 Done: real indexing provably upserts embeddings or records `failed`.
 Touch: `calendar_sif_indexer.py`, indexer tests.
 
-### R1.3 Alembic: single head + calendar SIF migration + model registration (C3, C4)
+### R1.3 Alembic: single head + calendar SIF migration + model registration (C3, C4) ✅ DONE
 Problem: no migration creates the two SIF tables; `alembic heads` shows two heads
 (`c2d3e4f5a6b7_add_calendar_session_key`, `d8a1c2e4f5b6_add_seo_analysis_user_columns`)
 while `init_user_database()` upgrades to `"head"` (`init_db.py:147-156`) — ambiguous,
@@ -120,6 +120,13 @@ TDD (extend `backend/tests/framework/test_alembic_migrations.py`):
 - upgrade from each former head → same result; `downgrade` then re-upgrade works.
 - exactly one head assertion (update stale expected-head constant).
 Done: `alembic heads` == 1; migrated DB serves sif-status without `no such table`.
+**DONE 2026-09-13:** merge revision `d1e2f3a4b5c6` collapses
+`c2d3e4f5a6b7` + `d8a1c2e4f5b6`; `e2f3a4b5c6d7` creates both SIF tables
+(inspector-guarded, reversible). Both models registered in `env.py` +
+`init_db.py`. `alembic heads` == `e2f3a4b5c6d7` (single head); a migrated DB
+round-trips the `CalendarSif*` models. Tests: `test_alembic_migrations.py`
+**20 passed** (was 10 failing). Item 4 (engine fail-loud) deferred to a
+follow-up slice.
 Touch: `alembic_migrations/versions/*`, `env.py`, `init_db.py`, `engine.py`, migration tests.
 
 ### R1.4 Frontend suites load and assert correctly (F1, F6, F7)

@@ -65,6 +65,8 @@ import models.scheduler_models  # noqa: E402, F401
 import models.semantic_health_check  # noqa: E402, F401
 import models.semantic_monitoring_snapshot  # noqa: E402, F401
 import models.seo_analysis  # noqa: E402, F401
+import models.calendar_sif_index_status  # noqa: E402, F401
+import models.calendar_sif_watermark  # noqa: E402, F401
 import models.sif_indexing_watermark  # noqa: E402, F401
 import models.strategy_sif_index_status  # noqa: E402, F401
 import models.story_project_models  # noqa: E402, F401

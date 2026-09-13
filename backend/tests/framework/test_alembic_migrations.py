@@ -57,6 +57,16 @@ def _alembic_version_row(engine) -> str | None:
         return result[0] if result else None
 
 
+def _current_head() -> str:
+    """Return the single current Alembic head; fail if the graph has >1 head."""
+    from alembic.script import ScriptDirectory
+
+    cfg = AlembicConfig(str(_ALEMBIC_INI))
+    heads = ScriptDirectory.from_config(cfg).get_heads()
+    assert len(heads) == 1, f"Expected exactly one Alembic head, got {sorted(heads)}"
+    return heads[0]
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -358,9 +368,9 @@ class TestLegacyFleetHeadUpgrade:
         """Upgrade to the legacy fleet head, then continue to the current head.
 
         Mirrors startup: a fleet DB stamped at ``b2c3d4e5f6a7`` must resolve
-        that revision and advance to ``f102a3b4c5d6``, gaining only the
-        strategy SIF status table and the already-stringified activation
-        column.
+        that revision and advance to the current single head, gaining the
+        strategy SIF status table, the calendar session_key column, and the
+        already-stringified activation column.
         """
         cfg = _alembic_cfg(engine._db_path)
 
@@ -368,7 +378,7 @@ class TestLegacyFleetHeadUpgrade:
         assert _alembic_version_row(engine) == "b2c3d4e5f6a7"
 
         command.upgrade(cfg, "head")
-        assert _alembic_version_row(engine) == "f102a3b4c5d6"
+        assert _alembic_version_row(engine) == _current_head()
 
         tables = _table_names(engine)
         assert "strategy_sif_index_status" in tables
@@ -378,3 +388,148 @@ class TestLegacyFleetHeadUpgrade:
         assert "VARCHAR" in str(cols["user_id"]["type"]).upper(), (
             f"activation user_id must be VARCHAR after migration, got {cols['user_id']['type']}"
         )
+
+
+class TestSingleAlembicHead:
+    """The migration graph must resolve to exactly one head.
+
+    Regression for the two-head state after the calendar/session_key branch
+    (``c2d3e4f5a6b7``) and the seo-analysis branch (``d8a1c2e4f5b6``) merged
+    independently: ``upgrade head`` raised MultipleHeads and broke every
+    per-user database initialization.
+    """
+
+    def test_exactly_one_head(self):
+        from alembic.script import ScriptDirectory
+
+        cfg = AlembicConfig(str(_ALEMBIC_INI))
+        heads = ScriptDirectory.from_config(cfg).get_heads()
+        assert len(heads) == 1, f"Expected exactly one head, got {sorted(heads)}"
+
+
+class TestCalendarSifTables:
+    """calendar_sif_index_status + calendar_sif_indexing_watermarks migration."""
+
+    @pytest.fixture
+    def engine(self):
+        eng = _fresh_engine()
+        yield eng
+        _cleanup(eng)
+
+    def test_fresh_upgrade_creates_calendar_sif_tables(self, engine):
+        cfg = _alembic_cfg(engine._db_path)
+        command.upgrade(cfg, "head")
+
+        tables = _table_names(engine)
+        assert "calendar_sif_index_status" in tables
+        assert "calendar_sif_indexing_watermarks" in tables
+
+        insp = inspect(engine)
+        status_cols = {c["name"] for c in insp.get_columns("calendar_sif_index_status")}
+        assert {
+            "id", "user_id", "source_id", "status", "embedding_count",
+            "attempt", "started_at", "finished_at", "error_message", "updated_at",
+        } <= status_cols
+
+        watermark_cols = {
+            c["name"] for c in insp.get_columns("calendar_sif_indexing_watermarks")
+        }
+        assert {
+            "id", "user_id", "source_id", "source_hash",
+            "embedding_count", "indexed_at", "notes",
+        } <= watermark_cols
+
+        status_uq = {
+            u["name"] for u in insp.get_unique_constraints("calendar_sif_index_status")
+        }
+        assert "uq_calendar_sif_status_user_source" in status_uq
+        watermark_uq = {
+            u["name"]
+            for u in insp.get_unique_constraints("calendar_sif_indexing_watermarks")
+        }
+        assert "uq_calendar_sif_watermark_user_source" in watermark_uq
+
+        status_ix = {i["name"] for i in insp.get_indexes("calendar_sif_index_status")}
+        assert "ix_calendar_sif_status_user_status" in status_ix
+        watermark_ix = {
+            i["name"] for i in insp.get_indexes("calendar_sif_indexing_watermarks")
+        }
+        assert "ix_calendar_sif_watermark_user_indexed" in watermark_ix
+
+    @pytest.mark.parametrize("former_head", ["c2d3e4f5a6b7", "d8a1c2e4f5b6"])
+    def test_upgrade_from_each_former_head_adds_sif_tables(self, former_head):
+        eng = _fresh_engine()
+        try:
+            cfg = _alembic_cfg(eng._db_path)
+            command.upgrade(cfg, former_head)
+            assert _alembic_version_row(eng) == former_head
+
+            command.upgrade(cfg, "head")
+            assert _alembic_version_row(eng) == _current_head()
+            tables = _table_names(eng)
+            assert "calendar_sif_index_status" in tables
+            assert "calendar_sif_indexing_watermarks" in tables
+        finally:
+            _cleanup(eng)
+
+    def test_sif_tables_downgrade_and_reupgrade(self, engine):
+        cfg = _alembic_cfg(engine._db_path)
+        command.upgrade(cfg, "head")
+        assert "calendar_sif_index_status" in _table_names(engine)
+
+        from alembic.script import ScriptDirectory
+
+        merge_rev = ScriptDirectory.from_config(cfg).get_revision(
+            _current_head()
+        ).down_revision
+
+        command.downgrade(cfg, merge_rev)
+        tables = _table_names(engine)
+        assert "calendar_sif_index_status" not in tables
+        assert "calendar_sif_indexing_watermarks" not in tables
+
+        command.upgrade(cfg, "head")
+        tables = _table_names(engine)
+        assert "calendar_sif_index_status" in tables
+        assert "calendar_sif_indexing_watermarks" in tables
+
+    def test_sif_models_are_registered_with_metadata(self):
+        import services.database.init_db  # noqa: F401 — triggers model imports
+        from models.base import Base
+
+        assert "calendar_sif_index_status" in Base.metadata.tables
+        assert "calendar_sif_indexing_watermarks" in Base.metadata.tables
+
+    def test_migrated_db_serves_calendar_sif_models(self, engine):
+        """Alembic-migrated schema backs the CalendarSif* models (no 'no such table')."""
+        from sqlalchemy.orm import sessionmaker
+
+        from models.calendar_sif_index_status import (
+            STATUS_SUCCESS,
+            CalendarSifIndexStatus,
+        )
+        from models.calendar_sif_watermark import CalendarSifWatermark
+
+        cfg = _alembic_cfg(engine._db_path)
+        command.upgrade(cfg, "head")
+
+        session = sessionmaker(bind=engine)()
+        try:
+            source_id = "user:u1:calendar_latest"
+            CalendarSifIndexStatus.set_status(
+                session, "u1", source_id, STATUS_SUCCESS, embedding_count=8
+            )
+            CalendarSifWatermark.upsert(
+                session, "u1", source_id, "a" * 64, embedding_count=8
+            )
+            session.commit()
+
+            row = CalendarSifIndexStatus.get(session, "u1", source_id)
+            assert row is not None
+            assert row.status == STATUS_SUCCESS
+            assert row.embedding_count == 8
+            assert CalendarSifWatermark.is_fresh(
+                session, "u1", source_id, "a" * 64
+            ) is True
+        finally:
+            session.close()
