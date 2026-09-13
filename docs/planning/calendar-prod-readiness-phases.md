@@ -125,8 +125,13 @@ Done: `alembic heads` == 1; migrated DB serves sif-status without `no such table
 (inspector-guarded, reversible). Both models registered in `env.py` +
 `init_db.py`. `alembic heads` == `e2f3a4b5c6d7` (single head); a migrated DB
 round-trips the `CalendarSif*` models. Tests: `test_alembic_migrations.py`
-**20 passed** (was 10 failing). Item 4 (engine fail-loud) deferred to a
-follow-up slice.
+**20 passed** (was 10 failing).
+**Item 4 DONE 2026-09-13:** `engine.py` `get_engine_for_user` re-raises (after
+logging) when `init_user_database` fails — no silent engine. Tests:
+`backend/tests/framework/test_engine_fail_loud.py` (2) — migration failure
+raises, success returns+caches the engine; framework regression
+**28 passed** (incl. migration + db_regression). Note: the branch is based on
+the R1.3 migration commit — fail-loud presupposes migrations being green.
 Touch: `alembic_migrations/versions/*`, `env.py`, `init_db.py`, `engine.py`, migration tests.
 
 ### R1.4 Frontend suites load and assert correctly (F1, F6, F7)

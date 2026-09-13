@@ -55,7 +55,11 @@ def get_engine_for_user(user_id: str):
 
         init_user_database(user_id)
     except Exception as e:
-        logger.error(f"Failed to auto-initialize database for user {user_id}: {e}")
+        # R1.3 item 4: fail LOUDLY. A database whose migrations failed must
+        # not be handed to callers as if it were usable — silent engines turn
+        # one migration error into confusing per-query failures later.
+        logger.error(f"Failed to initialize database for user {user_id}: {e}")
+        raise
 
     return engine
 
