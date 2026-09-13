@@ -62,7 +62,7 @@ Principles:
 
 ## Phase R1 — Release blockers (critical path, must precede any prod rollout)
 
-### R1.1 `/start` completion persists the calendar and dispatches SIF (C1)
+### R1.1 `/start` completion persists the calendar and dispatches SIF (C1) ✅ DONE
 Problem: the user-facing flows (`CreateTab.tsx:174`, `CalendarProgressView.tsx:129`)
 call `POST /calendar-generation/start`. `start_orchestrator_generation()`
 (`calendar_generation_service.py:1198-1221`) marks the session completed and calls
@@ -80,6 +80,17 @@ TDD (new `backend/tests/api/test_calendar_start_e2e.py`):
 - Orchestrator error dict → no events, no dispatch, session `failed`.
 - `_save_calendar_to_db` raising → generation still completes, error logged.
 Done: user-flow produces durable events + SIF status row `running`/`success`.
+**DONE 2026-09-13:** `start_orchestrator_generation(..., persist_completed=True)`
+now calls `await self._save_calendar_to_db(...)` on a real calendar
+(non-fatal: persistence failure logged, generation stays completed); the
+legacy sync path passes `persist_completed=False` so it still saves exactly
+once. Tests: `backend/tests/api/test_calendar_start_e2e.py` (5) — service
+level (completed → events + dispatched SIF; error dict → failed, no
+events/dispatch; persistence raise → generation stays completed; sync path
+saves exactly once) + HTTP `/start` level (background coroutine captured and
+run deterministically). Note: 5 pre-existing failures in
+`test_calendar_handoff_digest.py` were verified unrelated (fail on pristine
+main too).
 Touch: `calendar_generation_service.py`, new test file.
 
 ### R1.2 SIF indexer performs a real, awaited index (C2)

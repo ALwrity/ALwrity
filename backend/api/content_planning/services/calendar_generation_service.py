@@ -124,8 +124,12 @@ class CalendarGenerationService:
             if not success:
                 raise Exception("Failed to initialize orchestrator session")
             
-            # Start the 12-step generation process
-            await self.start_orchestrator_generation(session_id, request_data)
+            # Start the 12-step generation process. The sync path persists the
+            # calendar itself below (with processing_time injected), so the
+            # /start completion hook must not persist a second time.
+            await self.start_orchestrator_generation(
+                session_id, request_data, persist_completed=False
+            )
             
             # Wait for completion and get final result
             max_wait_time = 300  # 5 minutes
@@ -1155,8 +1159,22 @@ class CalendarGenerationService:
         except Exception as e:
             logger.error(f"❌ Error loading sessions from DB: {e}")
 
-    async def start_orchestrator_generation(self, session_id: str, request_data: Dict[str, Any]) -> None:
-        """Start the 12-step calendar generation process."""
+    async def start_orchestrator_generation(
+        self,
+        session_id: str,
+        request_data: Dict[str, Any],
+        *,
+        persist_completed: bool = True,
+    ) -> None:
+        """Start the 12-step calendar generation process.
+
+        ``persist_completed`` (R1.1): when True — the user-facing ``/start``
+        flow — a completed generation is persisted through
+        ``_save_calendar_to_db`` (CalendarEvent rows + the post-commit SIF
+        dispatch), so the async flow is not a persistence dead-end. The
+        legacy sync path passes False: it persists the calendar itself after
+        injecting ``processing_time``, and must not save twice.
+        """
         try:
             if not self.orchestrator:
                 logger.error("❌ Orchestrator not initialized")
@@ -1200,6 +1218,26 @@ class CalendarGenerationService:
                 session["result"] = result
                 session["end_time"] = datetime.now()
                 logger.info(f"✅ Orchestrator generation completed for session {session_id}")
+
+                # R1.1 (C1): persist the completed calendar through the same
+                # pipeline as the legacy sync path — CalendarEvent rows +
+                # post-commit SIF dispatch. Non-fatal: a persistence failure
+                # must not flip the user-visible generation to failed (the
+                # in-memory result already exists); R6.2 will surface these
+                # errors on /progress.
+                if persist_completed:
+                    try:
+                        await self._save_calendar_to_db(
+                            user_id,
+                            request_data.get("strategy_id"),
+                            result,
+                            session_id,
+                        )
+                    except Exception as save_exc:
+                        logger.error(
+                            f"❌ Calendar persistence failed for session {session_id} "
+                            f"(non-fatal): {save_exc}"
+                        )
             else:
                 error_message = (
                     result.get("error_message")
