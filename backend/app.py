@@ -896,6 +896,13 @@ else:
 # Include content assets router (always — core utility, not feature-specific)
 from api.content_assets.router import router as content_assets_router
 
+# Phase 12 (plan Phase C): SEO-informed onboarding persistence + prefill.
+# Light router (services imported lazily inside handlers) — always available.
+from api.onboarding_utils.seo_insights_routes import (
+    router as onboarding_seo_insights_router,
+)
+app.include_router(onboarding_seo_insights_router)
+
 # Include LinkedIn Industry Watchdog router (always — background service)
 from routers.linkedin_watchdog import router as linkedin_watchdog_router
 app.include_router(linkedin_watchdog_router)
