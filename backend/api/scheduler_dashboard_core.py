@@ -612,6 +612,47 @@ async def get_scheduler_dashboard(
         except Exception as e:
             logger.error(f"Error loading advertools tasks: {e}", exc_info=True)
 
+        # Load strategy monitoring tasks (Phase 3: deterministic real-tool runs).
+        # User id comes via the strategy join — MonitoringTask has no user_id
+        # column of its own. Same per-type cap + user filter as every block.
+        try:
+            from models.enhanced_strategy_models import EnhancedContentStrategy
+            mon_query = (
+                db.query(MonitoringTask, EnhancedContentStrategy.user_id)
+                .join(
+                    EnhancedContentStrategy,
+                    MonitoringTask.strategy_id == EnhancedContentStrategy.id,
+                )
+                .filter(MonitoringTask.status.in_(['active', 'pending', 'failed', 'paused']))
+            )
+            if user_id_str:
+                mon_query = mon_query.filter(EnhancedContentStrategy.user_id == user_id_str)
+            monitoring_tasks = mon_query.limit(DASHBOARD_TASKS_PER_TYPE_LIMIT).all()
+
+            for task, owner_id in monitoring_tasks:
+                database_tasks.append(_build_db_task_entry(
+                    task_id_prefix='monitoring',
+                    user_id=owner_id,
+                    task_db_id=task.id,
+                    trigger_type='CronTrigger',
+                    next_execution_attr='next_execution',
+                    task=task,
+                    user_job_store=_job_store_for(owner_id),
+                    function_name='monitoring_task_executor.execute_task',
+                    frequency=task.frequency or 'Weekly',
+                    task_category='strategy_monitoring',
+                    extra={
+                        'strategy_id': task.strategy_id,
+                        'component': task.component_name,
+                        'metric': task.metric,
+                        'assignee': task.assignee,
+                        'status': task.status,
+                        'last_executed': task.last_executed.isoformat() if task.last_executed else None,
+                    },
+                ))
+        except Exception as e:
+            logger.error(f"Error loading monitoring tasks: {e}", exc_info=True)
+
         # ── Aggregate / cumulative stats ─────────────────────────
         active_strategies = stats.get('active_strategies_count', 0)
         last_update = stats.get('last_update')
