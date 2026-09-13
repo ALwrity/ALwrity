@@ -45,7 +45,8 @@ class DailyScheduleGenerator:
         business_goals: List[str],
         target_audience: Dict,
         posting_preferences: Dict,
-        calendar_duration: int
+        calendar_duration: int,
+        user_id: Optional[str] = None
     ) -> List[Dict]:
         """
         Generate comprehensive daily content schedule.
@@ -57,6 +58,7 @@ class DailyScheduleGenerator:
             target_audience: Target audience information
             posting_preferences: User posting preferences
             calendar_duration: Calendar duration in days
+            user_id: User ID for subscription-checked AI calls
             
         Returns:
             List of daily content schedules
@@ -101,7 +103,8 @@ class DailyScheduleGenerator:
                     platform_strategies=platform_strategies,
                     business_goals=business_goals,
                     target_audience=target_audience,
-                    posting_preferences=posting_preferences
+                    posting_preferences=posting_preferences,
+                    user_id=user_id
                 )
                 
                 daily_schedules.append(daily_content)
@@ -185,7 +188,8 @@ class DailyScheduleGenerator:
         platform_strategies: Dict,
         business_goals: List[str],
         target_audience: Dict,
-        posting_preferences: Dict
+        posting_preferences: Dict,
+        user_id: Optional[str] = None
     ) -> Dict:
         """Generate content for a specific day."""
         try:
@@ -216,7 +220,7 @@ class DailyScheduleGenerator:
             }
             
             # Call AI service - NO FALLBACKS
-            ai_response = await self.ai_engine.generate_content_recommendations(analysis_data)
+            ai_response = await self.ai_engine.generate_content_recommendations(analysis_data, user_id=user_id)
             
             # ENHANCED VALIDATION: Check for unexpected types (including float)
             if ai_response is None:

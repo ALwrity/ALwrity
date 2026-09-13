@@ -1,4 +1,113 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { longRunningApiClient } from '../../../../../api/client';
+import {
+  clearCalendarSession,
+  syncCalendarSessionStorage,
+} from '../../../../../services/calendarStorageKeys';
+import type { CalendarSessionIdentity } from '../../../../../services/calendarSessionKey';
+
+/** Backend session statuses (Phase 2 canonical + legacy aliases). */
+export type CalendarSessionStatus =
+  | 'initializing'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'error'
+  | 'processing';
+
+/** Terminal statuses: polling stops immediately. */
+export const CALENDAR_TERMINAL_STATUSES: ReadonlySet<string> = new Set([
+  'completed',
+  'error',
+  'failed',
+  'cancelled',
+]);
+
+/** Non-retryable HTTP statuses: auth/ownership/missing. */
+const TERMINAL_HTTP_STATUSES = new Set([401, 403, 404]);
+
+/**
+ * Surface the most useful message from backend errors, including structured
+ * 422 details ({message, next_step}) emitted by strategy-grounded endpoints.
+ */
+export function extractPollErrorMessage(error: any, fallback: string): string {
+  const detail = error?.response?.data?.detail ?? error?.response?.data?.message;
+  if (typeof detail === 'string' && detail.trim()) return detail;
+  if (detail && typeof detail === 'object') {
+    const message = typeof detail.message === 'string' ? detail.message : '';
+    const nextStep = typeof detail.next_step === 'string' ? detail.next_step : '';
+    const combined = [message, nextStep].filter(Boolean).join(' ');
+    if (combined.trim()) return combined;
+  }
+  const firstError = error?.response?.data?.errors?.[0];
+  if (typeof firstError === 'string' && firstError.trim()) return firstError;
+  if (firstError && typeof firstError.message === 'string' && firstError.message.trim()) {
+    return firstError.message;
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
+
+export interface CalendarPollingContext extends CalendarSessionIdentity {
+  /** Persist resume state on start (default true). */
+  persistResume?: boolean;
+}
+
+// Pure step-analysis helpers (module scope so the poll loop can use them).
+function calculateOverallQualityScore(qualityScores: any): number {
+  const stepScores = [];
+  for (let i = 1; i <= 12; i++) {
+    const stepKey = `step_${i.toString().padStart(2, '0')}`;
+    const score = Number(qualityScores[stepKey] || qualityScores[`step${i}`] || 0);
+    if (score > 0) {
+      stepScores.push(score);
+    }
+  }
+  return stepScores.length > 0 ? stepScores.reduce((a, b) => a + b, 0) / stepScores.length : 0;
+}
+
+function calculateCompletedSteps(stepResults: any): number {
+  let completed = 0;
+  for (const stepKey in stepResults) {
+    if (stepResults[stepKey]?.status === 'completed') {
+      completed++;
+    }
+  }
+  return completed;
+}
+
+function calculateFailedSteps(stepResults: any): number {
+  let failed = 0;
+  for (const stepKey in stepResults) {
+    if (stepResults[stepKey]?.status === 'error' || stepResults[stepKey]?.status === 'failed') {
+      failed++;
+    }
+  }
+  return failed;
+}
+
+/**
+ * Normalize backend step-result keys (`step_01`, `step1`) to numeric keys
+ * (`1`) so existing numeric lookups (`stepResults[12]`, `getStepStatus(7)`)
+ * hit. Unknown keys pass through untouched.
+ */
+export function normalizeStepResults(stepResults: any): Record<number, StepResult> {
+  const normalized: Record<string | number, StepResult> = {};
+  if (!stepResults || typeof stepResults !== 'object') {
+    return normalized as Record<number, StepResult>;
+  }
+  for (const key of Object.keys(stepResults)) {
+    const match = /^step_?(\d{1,2})$/i.exec(key);
+    if (match) {
+      normalized[Number(match[1])] = stepResults[key];
+    } else {
+      const numeric = Number(key);
+      normalized[Number.isInteger(numeric) ? numeric : key] = stepResults[key];
+    }
+  }
+  return normalized as Record<number, StepResult>;
+}
 
 // Enhanced types for 12-step support
 interface StepResult {
@@ -38,8 +147,11 @@ interface QualityScores {
 }
 
 interface CalendarGenerationProgress {
-  // Enhanced status to support all 12 steps
-  status: 'initializing' | 'step1' | 'step2' | 'step3' | 'step4' | 'step5' | 'step6' | 'step7' | 'step8' | 'step9' | 'step10' | 'step11' | 'step12' | 'completed' | 'error';
+  // Backend session status (canonical enum) plus legacy step labels.
+  status:
+    | CalendarSessionStatus
+    | 'step1' | 'step2' | 'step3' | 'step4' | 'step5' | 'step6'
+    | 'step7' | 'step8' | 'step9' | 'step10' | 'step11' | 'step12';
   currentStep: number;
   stepProgress: number;
   overallProgress: number;
@@ -106,29 +218,85 @@ export const STEP_INFO = {
   12: { name: 'Final Calendar Assembly', description: 'Assembling final calendar with all components' }
 } as const;
 
-// Polling hook for calendar generation progress with enhanced 12-step support
-const useCalendarGenerationPolling = (sessionId: string) => {
+// Polling hook for calendar generation progress with enhanced 12-step support.
+// Single canonical poller: long-running client, abort + unmount guards,
+// backend status enum, persisted resume key. Server remains source of truth.
+const useCalendarGenerationPolling = (
+  sessionId: string,
+  sessionContext?: CalendarPollingContext
+) => {
   const [progress, setProgress] = useState<CalendarGenerationProgress | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  
+  // Guards against duplicate poll loops: the modal effect re-invoking
+  // startPolling (e.g. when its deps change) must not spawn parallel loops.
+  const pollLoopRef = useRef<{ running: boolean }>({ running: false });
+  // Phase 5: pending timer, in-flight request, and mount guards so unmount
+  // never leaves a live loop or a setState-after-unmount behind.
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      pollLoopRef.current.running = false;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  const schedulePoll = useCallback((fn: () => void, delayMs: number) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      if (pollLoopRef.current.running && mountedRef.current) fn();
+    }, delayMs);
+  }, []);
+
+  const finishPolling = useCallback((message: string | null) => {
+    pollLoopRef.current.running = false;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    abortRef.current?.abort();
+    if (!mountedRef.current) return;
+    setIsPolling(false);
+    if (message !== null) setError(message);
+  }, []);
+
   const startPolling = useCallback(async () => {
     console.log('🎯 Starting polling for session:', sessionId);
+    if (pollLoopRef.current.running) {
+      console.log('⏭️ Poll loop already running, skipping duplicate start');
+      return;
+    }
+    pollLoopRef.current.running = true;
+    if (!mountedRef.current) return;
     setIsPolling(true);
     setError(null);
     setRetryCount(0);
-    
+    if (sessionContext?.persistResume !== false && sessionId) {
+      syncCalendarSessionStorage(sessionId, {
+        strategyId: sessionContext?.strategyId,
+        calendarType: sessionContext?.calendarType,
+        strategyDigest: sessionContext?.strategyDigest,
+      });
+    }
+
+    let localRetryCount = 0;
+
     const poll = async () => {
       try {
         console.log('🔄 Polling session:', sessionId);
-        const response = await fetch(`/api/content-planning/calendar-generation/progress/${sessionId}`);
+        abortRef.current?.abort();
+        abortRef.current = new AbortController();
+        const response = await longRunningApiClient.get(
+          `/api/content-planning/calendar-generation/progress/${sessionId}`,
+          { signal: abortRef.current.signal }
+        );
         
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
+        const data = response.data;
         console.log('📊 Received progress data:', data);
         
         // Transform backend data to frontend format
@@ -138,8 +306,9 @@ const useCalendarGenerationPolling = (sessionId: string) => {
           stepProgress: data.step_progress || 0,
           overallProgress: data.overall_progress || 0,
           
-          // Transform step results - handle both formats
-          stepResults: data.step_results || {},
+          // Transform step results - backend sends step_01 strings;
+          // normalize to numeric keys for existing panel lookups.
+          stepResults: normalizeStepResults(data.step_results),
           
           // Transform quality scores - calculate overall from individual steps
           qualityScores: {
@@ -181,52 +350,86 @@ const useCalendarGenerationPolling = (sessionId: string) => {
           }
         };
         
+        if (!mountedRef.current || !pollLoopRef.current.running) return;
         console.log('✅ Transformed progress:', transformedProgress);
         setProgress(transformedProgress);
         setRetryCount(0); // Reset retry count on successful response
-        
-        // Check for completion or error
-        if (data.status === 'completed' || data.status === 'error') {
+
+        // Terminal states use the backend session enum (failed/cancelled unified).
+        if (CALENDAR_TERMINAL_STATUSES.has(String(data.status))) {
           console.log('🏁 Process completed with status:', data.status);
-          setIsPolling(false);
-          if (data.status === 'error') {
-            const errorMessage = data.errors?.[0]?.message || 'Unknown error occurred';
-            setError(errorMessage);
+          if (data.status !== 'completed') {
+            const firstError =
+              data.errors?.[0]?.message ||
+              (data.status === 'cancelled'
+                ? 'Calendar generation was cancelled.'
+                : 'Unknown error occurred');
+            finishPolling(firstError);
+          } else {
+            finishPolling(null);
           }
           return;
         }
-        
+
         // Continue polling every 2 seconds
-        setTimeout(poll, 2000);
+        schedulePoll(poll, 2000);
       } catch (error) {
+        if (!mountedRef.current || !pollLoopRef.current.running) return;
         console.error('❌ Calendar generation polling error:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Polling failed';
-        setError(errorMessage);
-        
+
+        // Aborted by stop/unmount: stay quiet, the loop is already over.
+        if ((error as any)?.code === 'ERR_CANCELED' || (error as any)?.name === 'CanceledError') {
+          return;
+        }
+
+        // Permanent auth/ownership/missing failures are terminal (no retry).
+        const pollStatus = (error as any)?.response?.status;
+        if (TERMINAL_HTTP_STATUSES.has(pollStatus)) {
+          if (pollStatus === 404) clearCalendarSession();
+          const terminalMessage =
+            pollStatus === 401
+              ? 'Session expired. Please refresh the page.'
+              : pollStatus === 403
+                ? 'Not authorized to view this session.'
+                : 'Session not found or expired. Please start a new generation.';
+          console.error(`⛔ Terminal polling status ${pollStatus} — stopping polling`);
+          finishPolling(extractPollErrorMessage(error, terminalMessage));
+          return;
+        }
+
         // Implement exponential backoff for retries
-        const newRetryCount = retryCount + 1;
-        setRetryCount(newRetryCount);
-        
-        if (newRetryCount <= 5) {
+        localRetryCount += 1;
+        setRetryCount(localRetryCount);
+
+        if (localRetryCount <= 5) {
           // Retry with exponential backoff: 5s, 10s, 20s, 40s, 80s
-          const retryDelay = Math.min(5000 * Math.pow(2, newRetryCount - 1), 80000);
-          console.log(`🔄 Retrying in ${retryDelay}ms (attempt ${newRetryCount}/5)`);
-          setTimeout(poll, retryDelay);
+          const retryDelay = Math.min(5000 * Math.pow(2, localRetryCount - 1), 80000);
+          console.log(`🔄 Retrying in ${retryDelay}ms (attempt ${localRetryCount}/5)`);
+          schedulePoll(poll, retryDelay);
         } else {
-          setIsPolling(false);
-          setError('Maximum retry attempts reached. Please refresh the page.');
+          finishPolling(
+            extractPollErrorMessage(error, 'Maximum retry attempts reached. Please refresh the page.')
+          );
         }
       }
     };
-    
+
     poll();
-  }, [sessionId, retryCount]);
-  
+  }, [sessionId, sessionContext, finishPolling, schedulePoll]);
+
   const stopPolling = useCallback(() => {
-    setIsPolling(false);
+    pollLoopRef.current.running = false;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    abortRef.current?.abort();
+    if (mountedRef.current) setIsPolling(false);
   }, []);
-  
+
   const resetPolling = useCallback(() => {
+    pollLoopRef.current.running = false;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    abortRef.current?.abort();
+    clearCalendarSession();
+    if (!mountedRef.current) return;
     setIsPolling(false);
     setError(null);
     setRetryCount(0);
@@ -264,40 +467,7 @@ const useCalendarGenerationPolling = (sessionId: string) => {
     return progress.stepResults[stepNumber]?.warnings || [];
   }, [progress]);
   
-  // Helper functions for data transformation
-  const calculateOverallQualityScore = (qualityScores: any): number => {
-    const stepScores = [];
-    for (let i = 1; i <= 12; i++) {
-      const stepKey = `step_${i.toString().padStart(2, '0')}`;
-      const score = Number(qualityScores[stepKey] || qualityScores[`step${i}`] || 0);
-      if (score > 0) {
-        stepScores.push(score);
-      }
-    }
-    return stepScores.length > 0 ? stepScores.reduce((a, b) => a + b, 0) / stepScores.length : 0;
-  };
-  
-  const calculateCompletedSteps = (stepResults: any): number => {
-    let completed = 0;
-    for (const stepKey in stepResults) {
-      if (stepResults[stepKey]?.status === 'completed') {
-        completed++;
-      }
-    }
-    return completed;
-  };
-  
-  const calculateFailedSteps = (stepResults: any): number => {
-    let failed = 0;
-    for (const stepKey in stepResults) {
-      if (stepResults[stepKey]?.status === 'error' || stepResults[stepKey]?.status === 'failed') {
-        failed++;
-      }
-    }
-    return failed;
-  };
-  
-  return { 
+  return {
     progress, 
     isPolling, 
     error, 

@@ -22,6 +22,7 @@ import DataUsageIcon from '@mui/icons-material/DataUsage';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import DevicesIcon from '@mui/icons-material/Devices';
 import { motion, AnimatePresence } from 'framer-motion';
+import { apiClient } from '../../../../api/client';
 
 // Import existing components for reuse
 // Note: DataSourceTransparency and ProgressIndicator are imported but may be used by child components
@@ -39,6 +40,7 @@ import {
 
 // Import new StepProgressTracker component
 import StepProgressTracker from './calendarGenerationModalPanels/StepProgressTracker';
+import { buildCompletionResults } from './calendarGenerationModalPanels/calendarCompletionResults';
 
 // Import styles (only used ones)
 import {
@@ -226,17 +228,22 @@ const CalendarGenerationModal: React.FC<CalendarGenerationModalProps> = ({
   const [activeTab, setActiveTab] = useState(0);
   const [educationalPanelExpanded, setEducationalPanelExpanded] = useState(false);
 
-  // Use polling hook for real backend data only
-  const { 
-    progress, 
-    isPolling, 
-    startPolling, 
+  // Use polling hook for real backend data only (Phase 5: canonical poller
+  // with resume key scoped to the strategy/config).
+  const {
+    progress,
+    isPolling,
+    error: pollingError,
+    startPolling,
     stopPolling,
     getStepStatus,
     getStepQualityScore,
     getStepErrors,
     getStepWarnings
-  } = useCalendarGenerationPolling(sessionId);
+  } = useCalendarGenerationPolling(sessionId, {
+    strategyId: initialConfig?.strategyId,
+    calendarType: initialConfig?.calendarType,
+  });
   
   // Use only real progress data - no fallback to mock data
   const currentProgress = progress;
@@ -260,66 +267,31 @@ const CalendarGenerationModal: React.FC<CalendarGenerationModalProps> = ({
     if (currentProgress?.status === 'completed') {
       // Handle completion
       console.log('🎉 Calendar generation completed');
-    } else if (currentProgress?.status === 'error') {
+    } else if (
+      currentProgress?.status === 'error' ||
+      currentProgress?.status === 'failed' ||
+      currentProgress?.status === 'cancelled'
+    ) {
       console.log('❌ Calendar generation error:', currentProgress.errors);
-      onError(currentProgress.errors[0]?.message || 'Unknown error');
+      const firstError = currentProgress.errors[0];
+      onError(
+        (typeof firstError === 'string' ? firstError : firstError?.message) ||
+          pollingError ||
+          'Unknown error'
+      );
     }
-  }, [currentProgress, onError]);
+  }, [currentProgress, pollingError, onError]);
 
-  // Build the onComplete payload. Prefers the real backend result delivered
-  // via progress.result; falls back to the legacy step-12 derivation so the
-  // flow stays functional for pre-result payloads.
-  const buildCompletionResults = (progressData: any): CalendarGenerationResults => {
-    const result =
-      progressData?.result && typeof progressData.result === 'object'
-        ? progressData.result
-        : null;
-
-    const step12Result = progressData?.stepResults?.[12];
-    const step12Data = step12Result?.data ?? step12Result?.results ?? {};
-
-    const calendar = result ?? {
-      id: sessionId,
-      title: step12Data?.title || 'Generated Calendar',
-      description: step12Data?.description || '',
-      startDate: step12Data?.start_date || '',
-      endDate: step12Data?.end_date || '',
-      content: step12Data?.daily_schedule?.map?.((item: any, i: number) => ({
-        id: item.id || `event_${i}`,
-        title: item.title || '',
-        description: item.description || '',
-        contentType: item.content_type || item.contentType || 'post',
-        platform: item.platform || '',
-        scheduledDate: item.scheduled_date || item.date || '',
-        theme: item.theme || '',
-        keywords: item.keywords || []
-      })) || [],
-      themes: progressData?.stepResults?.[7]?.data?.themes?.map?.((t: any, i: number) => ({
-        id: t.id || `theme_${i}`,
-        name: t.name || '',
-        description: t.description || '',
-        weekNumber: t.week_number || i + 1,
-        contentTypes: t.content_types || []
-      })) || [],
-      platforms: step12Data?.platform_strategies?.map?.((p: any, i: number) => ({
-        id: p.id || `platform_${i}`,
-        name: p.name || p.platform || '',
-        contentCount: p.content_count || 0,
-        postingSchedule: p.schedule || []
-      })) || []
-    };
-
+  // onComplete payload prefers the real backend result (see
+  // calendarCompletionResults); legacy step-12 derivation is the fallback.
+  const buildModalResults = (progressData: any): CalendarGenerationResults => {
+    const built = buildCompletionResults(progressData, sessionId);
     return {
-      calendar: calendar as unknown as CalendarData,
-      qualityScores: progressData?.qualityScores,
-      insights: result?.ai_insights ?? step12Data?.insights ?? {},
-      recommendations: result?.content_recommendations ?? step12Data?.recommendations ?? {},
-      exportData: {
-        calendarJson: JSON.stringify(result ?? step12Data),
-        insightsCsv: '',
-        recommendationsPdf: '',
-        qualityReport: ''
-      }
+      calendar: built.calendar as unknown as CalendarData,
+      qualityScores: built.qualityScores,
+      insights: built.insights,
+      recommendations: built.recommendations,
+      exportData: built.exportData,
     };
   };
 
@@ -706,9 +678,7 @@ const CalendarGenerationModal: React.FC<CalendarGenerationModalProps> = ({
                 color="error"
                 onClick={async () => {
                   try {
-                     await fetch(`/api/content-planning/calendar-generation/cancel/${sessionId}`, {
-                      method: 'DELETE',
-                    });
+                     await apiClient.delete(`/api/content-planning/calendar-generation/cancel/${sessionId}`);
                     onClose();
                   } catch (error) {
                     console.error('Error cancelling generation:', error);
@@ -742,7 +712,7 @@ const CalendarGenerationModal: React.FC<CalendarGenerationModalProps> = ({
                 variant="contained"
                 onClick={() => {
                   console.log('Calendar generation completed');
-                  onComplete(buildCompletionResults(currentProgress));
+                  onComplete(buildModalResults(currentProgress));
                 }}
               >
                 View Calendar

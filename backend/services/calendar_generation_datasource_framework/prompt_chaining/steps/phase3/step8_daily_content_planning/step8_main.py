@@ -104,11 +104,14 @@ class DailyContentPlanningStep:
             })
             calendar_duration = calendar_framework.get("duration_weeks", 4) * 7  # Convert weeks to days
             
+            # Get user_id from context for subscription-checked AI calls
+            user_id = context.get("user_id")
+            
             # Step 1: Generate daily schedules
             logger.info("📅 Step 8.1: Generating daily content schedules")
             daily_schedules = await self.daily_schedule_generator.generate_daily_schedules(
                 weekly_themes, platform_strategies, content_pillars, calendar_framework,
-                posting_preferences, calendar_duration
+                posting_preferences, calendar_duration, user_id=user_id
             )
             
             # Step 2: Optimize for platforms

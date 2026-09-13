@@ -19,7 +19,7 @@ class ComprehensiveUserDataCacheService:
     
     def __init__(self, db_session: Session):
         self.db = db_session
-        self.data_processor = ComprehensiveUserDataProcessor()
+        self.data_processor = ComprehensiveUserDataProcessor(db_session=db_session)
         
     async def get_cached_data(
         self, 

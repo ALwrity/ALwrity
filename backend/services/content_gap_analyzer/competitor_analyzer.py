@@ -13,7 +13,6 @@ from collections import Counter, defaultdict
 
 # Import AI providers
 from services.llm_providers.main_text_generation import llm_text_gen
-from services.llm_providers.gemini_provider import gemini_structured_json_response
 
 # Import existing modules (will be updated to use FastAPI services)
 from services.database import get_db_session
@@ -27,21 +26,28 @@ class CompetitorAnalyzer:
         """Initialize the competitor analyzer."""
         self.website_analyzer = WebsiteAnalyzer()
         self.ai_engine = AIEngineService()
+        self._user_id: Optional[str] = None
         
         logger.trace("CompetitorAnalyzer initialized (content-gap competitor comparison)")
-    
-    async def analyze_competitors(self, competitor_urls: List[str], industry: str) -> Dict[str, Any]:
+
+    def _structured_generation(self, prompt: str, schema: Dict[str, Any]) -> Any:
+        """Generate structured JSON via the common LLM provider layer."""
+        return llm_text_gen(prompt=prompt, json_struct=schema, user_id=self._user_id)
+
+    async def analyze_competitors(self, competitor_urls: List[str], industry: str, user_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Analyze competitor websites.
         
         Args:
             competitor_urls: List of competitor URLs to analyze
             industry: Industry category
+            user_id: User ID for subscription checking
             
         Returns:
             Dictionary containing competitor analysis results
         """
         try:
+            self._user_id = user_id
             logger.info(f"Starting competitor analysis for {len(competitor_urls)} competitors in {industry} industry")
             
             results = {
@@ -158,7 +164,7 @@ class CompetitorAnalyzer:
             """
             
             # Use structured JSON response for better parsing
-            response = gemini_structured_json_response(
+            response = self._structured_generation(
                 prompt=prompt,
                 schema={
                     "type": "object",
@@ -194,7 +200,7 @@ class CompetitorAnalyzer:
                 }
             )
             
-            # Handle response - gemini_structured_json_response returns dict directly
+            # Handle response - structured generation returns dict directly
             if isinstance(response, dict):
                 market_position = response
             elif isinstance(response, str):
@@ -290,7 +296,7 @@ class CompetitorAnalyzer:
             """
             
             # Use structured JSON response for better parsing
-            response = gemini_structured_json_response(
+            response = self._structured_generation(
                 prompt=prompt,
                 schema={
                     "type": "object",
@@ -317,7 +323,7 @@ class CompetitorAnalyzer:
                 }
             )
             
-            # Handle response - gemini_structured_json_response returns dict directly
+            # Handle response - structured generation returns dict directly
             if isinstance(response, dict):
                 result = response
             elif isinstance(response, str):
@@ -399,7 +405,7 @@ class CompetitorAnalyzer:
             """
             
             # Use structured JSON response for better parsing
-            response = gemini_structured_json_response(
+            response = self._structured_generation(
                 prompt=prompt,
                 schema={
                     "type": "object",
@@ -422,7 +428,7 @@ class CompetitorAnalyzer:
                 }
             )
             
-            # Handle response - gemini_structured_json_response returns dict directly
+            # Handle response - structured generation returns dict directly
             if isinstance(response, dict):
                 result = response
             elif isinstance(response, str):

@@ -13,7 +13,6 @@ from collections import Counter, defaultdict
 
 # Import AI providers
 from services.llm_providers.main_text_generation import llm_text_gen
-from services.llm_providers.gemini_provider import gemini_structured_json_response
 
 # Import existing modules (will be updated to use FastAPI services)
 from services.database import get_db_session
@@ -25,10 +24,15 @@ class KeywordResearcher:
     def __init__(self):
         """Initialize the keyword researcher."""
         self.ai_engine = AIEngineService()
+        self._user_id: Optional[str] = None
         
         logger.trace("KeywordResearcher initialized (content-gap keyword research)")
-    
-    async def analyze_keywords(self, industry: str, url: str, target_keywords: Optional[List[str]] = None) -> Dict[str, Any]:
+
+    def _structured_generation(self, prompt: str, schema: Dict[str, Any]) -> Any:
+        """Generate structured JSON via the common LLM provider layer."""
+        return llm_text_gen(prompt=prompt, json_struct=schema, user_id=self._user_id)
+
+    async def analyze_keywords(self, industry: str, url: str, target_keywords: Optional[List[str]] = None, user_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Analyze keywords for content strategy.
         
@@ -36,11 +40,13 @@ class KeywordResearcher:
             industry: Industry category
             url: Target website URL
             target_keywords: Optional list of target keywords
+            user_id: User ID for subscription checking
             
         Returns:
             Dictionary containing keyword analysis results
         """
         try:
+            self._user_id = user_id
             logger.info(f"Starting keyword analysis for {industry} industry")
             
             results = {
@@ -109,7 +115,7 @@ class KeywordResearcher:
             """
             
             # Use structured JSON response for better parsing
-            response = gemini_structured_json_response(
+            response = self._structured_generation(
                 prompt=prompt,
                 schema={
                     "type": "object",
@@ -155,7 +161,7 @@ class KeywordResearcher:
                 }
             )
             
-            # Handle response - gemini_structured_json_response returns dict directly
+            # Handle response - structured generation returns dict directly
             if isinstance(response, dict):
                 trend_analysis = response
             elif isinstance(response, str):
@@ -233,7 +239,7 @@ class KeywordResearcher:
             """
             
             # Use structured JSON response for better parsing
-            response = gemini_structured_json_response(
+            response = self._structured_generation(
                 prompt=prompt,
                 schema={
                     "type": "object",
@@ -294,7 +300,7 @@ class KeywordResearcher:
                 }
             )
             
-            # Handle response - gemini_structured_json_response returns dict directly
+            # Handle response - structured generation returns dict directly
             if isinstance(response, dict):
                 intent_analysis = response
             elif isinstance(response, str):
@@ -390,7 +396,7 @@ class KeywordResearcher:
             """
             
             # Use structured JSON response for better parsing
-            response = gemini_structured_json_response(
+            response = self._structured_generation(
                 prompt=prompt,
                 schema={
                     "type": "object",
@@ -419,7 +425,7 @@ class KeywordResearcher:
                 }
             )
             
-            # Handle response - gemini_structured_json_response returns dict directly
+            # Handle response - structured generation returns dict directly
             if isinstance(response, dict):
                 result = response
             elif isinstance(response, str):
@@ -499,7 +505,7 @@ class KeywordResearcher:
             """
             
             # Use structured JSON response for better parsing
-            response = gemini_structured_json_response(
+            response = self._structured_generation(
                 prompt=prompt,
                 schema={
                     "type": "object",
@@ -908,7 +914,7 @@ class KeywordResearcher:
             """
             
             # Use structured JSON response for better parsing
-            response = gemini_structured_json_response(
+            response = self._structured_generation(
                 prompt=prompt,
                 schema={
                     "type": "object",
@@ -1051,7 +1057,7 @@ class KeywordResearcher:
             """
             
             # Use structured JSON response for better parsing
-            response = gemini_structured_json_response(
+            response = self._structured_generation(
                 prompt=prompt,
                 schema={
                     "type": "object",
@@ -1169,7 +1175,7 @@ class KeywordResearcher:
             """
             
             # Use structured JSON response for better parsing
-            response = gemini_structured_json_response(
+            response = self._structured_generation(
                 prompt=prompt,
                 schema={
                     "type": "object",

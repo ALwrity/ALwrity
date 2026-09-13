@@ -229,6 +229,9 @@ class CalendarGenerationSession(Base):
     user_id = Column(String(255), nullable=False, index=True)
     strategy_id = Column(Integer, ForeignKey("content_strategies.id"), nullable=True)
     session_type = Column(String(50), nullable=False)  # monthly, weekly, custom
+    # Phase 2: stable lookup key (mirrors generation_params.session_id).
+    # Nullable for backfill; unique index enforced in migration.
+    session_key = Column(String(255), nullable=True, unique=True, index=True)
     generation_params = Column(JSON, nullable=True)  # Parameters used for generation
     generated_calendar = Column(JSON, nullable=True)  # Generated calendar data
     ai_insights = Column(JSON, nullable=True)  # AI insights and recommendations
@@ -254,6 +257,7 @@ class CalendarGenerationSession(Base):
             'user_id': self.user_id,
             'strategy_id': self.strategy_id,
             'session_type': self.session_type,
+            'session_key': self.session_key,
             'generation_params': self.generation_params,
             'generated_calendar': self.generated_calendar,
             'ai_insights': self.ai_insights,

@@ -14,7 +14,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import ContentStrategyBuilder from '../components/ContentStrategyBuilder';
 import CalendarGenerationWizard from '../components/CalendarGenerationWizard';
 import { CalendarGenerationModal } from '../components/CalendarGenerationModal';
-import { apiClient } from '../../../api/client';
+import { longRunningApiClient } from '../../../api/client';
 
 // Import hooks and services
 import { useStrategyCalendarContext } from '../../../contexts/StrategyCalendarContext';
@@ -171,11 +171,17 @@ const CreateTab: React.FC = () => {
       
       for (let retryCount = 0; retryCount < maxRetries; retryCount++) {
         try {
-          const response = await apiClient.post('/api/content-planning/calendar-generation/start', requestData);
+          const response = await longRunningApiClient.post('/api/content-planning/calendar-generation/start', requestData);
           startResponse = { ok: true, data: response.data };
           break; // Success, exit retry loop
         } catch (error: any) {
           console.warn(`⚠️ Attempt ${retryCount + 1} failed with error:`, error);
+          // Phase 1: auth/ownership failures are not retryable.
+          const startStatus = error?.response?.status;
+          if (startStatus === 401 || startStatus === 403 || startStatus === 404) {
+            startResponse = { ok: false, data: error?.response?.data ?? null };
+            break;
+          }
           if (retryCount < maxRetries - 1) {
             // Wait before retry (exponential backoff)
             const delay = 1000 * (retryCount + 1);

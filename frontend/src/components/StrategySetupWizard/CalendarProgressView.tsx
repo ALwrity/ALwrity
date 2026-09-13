@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -26,14 +26,15 @@ import TimeIcon from '@mui/icons-material/Timer';
 import PillarIcon from '@mui/icons-material/Category';
 import PlatformIcon from '@mui/icons-material/Devices';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { apiClient } from '../../api/client';
+import { longRunningApiClient } from '../../api/client';
+import useCalendarGenerationPolling, {
+  extractPollErrorMessage,
+} from '../ContentPlanningDashboard/components/CalendarGenerationModal/calendarGenerationModalPanels/useCalendarGenerationPolling';
 
 interface CalendarProgressViewProps {
   strategyId: number | null;
   onGenerated?: (result: any) => void;
 }
-
-const POLL_INTERVAL_MS = 2000;
 
 const STEP_NAMES: Record<number, string> = {
   1: 'Content Strategy Analysis',
@@ -67,26 +68,65 @@ const STEP_PHASES: Record<number, { label: string; color: string }> = {
 
 const CalendarProgressView: React.FC<CalendarProgressViewProps> = ({ strategyId, onGenerated }) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [status, setStatus] = useState<'idle' | 'starting' | 'running' | 'completed' | 'failed'>('idle');
-  const [currentStep, setCurrentStep] = useState(0);
-  const [overallProgress, setOverallProgress] = useState(0);
-  const [stepProgress, setStepProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<any>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [phase, setPhase] = useState<'idle' | 'starting' | 'polling'>('idle');
+  const [startError, setStartError] = useState<string | null>(null);
 
+  // Phase 5: single canonical poller (long-running client, abort + unmount
+  // guards, backend status enum). Server remains source of truth; progress is
+  // derived during render instead of mirrored into local state.
+  const sessionContext = useMemo(
+    () => ({ strategyId, calendarType: 'monthly' as const }),
+    [strategyId]
+  );
+  const polling = useCalendarGenerationPolling(sessionId ?? '', sessionContext);
+  const { startPolling: startCanonicalPolling } = polling;
+
+  const progress = polling.progress;
+  const progressFailed =
+    progress?.status === 'failed' ||
+    progress?.status === 'error' ||
+    progress?.status === 'cancelled' ||
+    (progress?.errors?.length ?? 0) > 0;
+  const firstProgressError = progress?.errors?.[0];
+  const progressErrorMessage =
+    typeof firstProgressError === 'string'
+      ? firstProgressError
+      : typeof firstProgressError?.message === 'string'
+        ? firstProgressError.message
+        : null;
+
+  // Derived view state (no mirrored copies of poller state).
+  const status: 'idle' | 'starting' | 'running' | 'completed' | 'failed' =
+    phase !== 'polling'
+      ? phase
+      : polling.error || progressFailed
+        ? 'failed'
+        : progress?.status === 'completed'
+          ? 'completed'
+          : 'running';
+  const currentStep = progress?.currentStep || 0;
+  const overallProgress =
+    status === 'completed' ? 100 : progress?.overallProgress || 0;
+  const stepProgress = progress?.stepProgress || 0;
+  const error = startError || polling.error || progressErrorMessage;
+  const result = progress?.status === 'completed' ? progress?.result : null;
+
+  const notifiedRef = useRef<string | null>(null);
   useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, []);
+    if (progress?.status === 'completed' && progress?.result) {
+      if (notifiedRef.current !== sessionId) {
+        notifiedRef.current = sessionId;
+        onGenerated?.(progress.result);
+      }
+    }
+  }, [progress, sessionId, onGenerated]);
 
-  const startGeneration = async () => {
+  const startGeneration = useCallback(async () => {
     try {
-      setStatus('starting');
-      setError(null);
+      setPhase('starting');
+      setStartError(null);
 
-      const res = await apiClient.post('/api/content-planning/calendar-generation/start', {
+      const res = await longRunningApiClient.post('/api/content-planning/calendar-generation/start', {
         user_id: 0,
         strategy_id: strategyId,
         calendar_type: 'monthly',
@@ -99,45 +139,15 @@ const CalendarProgressView: React.FC<CalendarProgressViewProps> = ({ strategyId,
       const sid = data?.session_id;
       if (!sid) throw new Error('No session ID returned');
 
+      notifiedRef.current = null;
       setSessionId(sid);
-      setStatus('running');
-      startPolling(sid);
+      setPhase('polling');
+      await startCanonicalPolling();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || 'Failed to start calendar generation');
-      setStatus('idle');
+      setStartError(extractPollErrorMessage(err, 'Failed to start calendar generation'));
+      setPhase('idle');
     }
-  };
-
-  const startPolling = (sid: string) => {
-    if (pollRef.current) clearInterval(pollRef.current);
-
-    pollRef.current = setInterval(async () => {
-      try {
-        const res = await apiClient.get(`/api/content-planning/calendar-generation/progress/${sid}`);
-        const data = res.data;
-
-        setCurrentStep(data.current_step || 0);
-        setOverallProgress(data.overall_progress || 0);
-        setStepProgress(data.step_progress || 0);
-
-        if (data.status === 'completed') {
-          if (pollRef.current) clearInterval(pollRef.current);
-          setStatus('completed');
-          setOverallProgress(100);
-          if (data.result) {
-            setResult(data.result);
-            onGenerated?.(data.result);
-          }
-        } else if (data.status === 'failed' || data.errors?.length > 0) {
-          if (pollRef.current) clearInterval(pollRef.current);
-          setStatus('failed');
-          setError(data.errors?.[0] || 'Calendar generation failed');
-        }
-      } catch {
-        // Continue polling
-      }
-    }, POLL_INTERVAL_MS);
-  };
+  }, [strategyId, startCanonicalPolling]);
 
   if (status === 'idle') {
     return (
@@ -257,9 +267,11 @@ const CalendarProgressView: React.FC<CalendarProgressViewProps> = ({ strategyId,
       <Box sx={{ p: 3 }}>
         <Alert severity="error" sx={{ mb: 2 }} action={
           <Button size="small" startIcon={<RefreshIcon />} onClick={() => {
-            setStatus('idle');
-            setError(null);
-            setResult(null);
+            polling.resetPolling();
+            notifiedRef.current = null;
+            setSessionId(null);
+            setStartError(null);
+            setPhase('idle');
           }}>
             Retry
           </Button>

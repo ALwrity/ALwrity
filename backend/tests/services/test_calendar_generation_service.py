@@ -329,7 +329,8 @@ async def test_start_generation_error_result_sets_error_status():
 
     await service.start_orchestrator_generation("sid-1", {"user_id": "user-123"})
 
-    assert session["status"] == "error"
+    # Phase 2: canonical failure status is "failed" ("error" accepted on read).
+    assert session["status"] == "failed"
     assert session["error"] == "Step 5 exploded"
     assert "result" not in session
     assert any(e["message"] == "Step 5 exploded" for e in session["progress"]["errors"])
@@ -361,7 +362,8 @@ async def test_start_generation_completed_status_without_calendar_is_error():
 
     await service.start_orchestrator_generation("sid-1", {"user_id": "user-123"})
 
-    assert session["status"] == "error"
+    # Phase 2: canonical failure status is "failed".
+    assert session["status"] == "failed"
     assert session["error"]
     assert "result" not in session
 
