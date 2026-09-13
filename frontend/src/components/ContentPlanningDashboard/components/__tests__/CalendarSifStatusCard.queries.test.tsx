@@ -8,29 +8,33 @@
  * calendar passages (kind label, score, text). The panel is hidden
  * for any non-indexed phase, and errors/empty results degrade to
  * guidance text. Mirrors SemanticIndexCard.queries tests.
+ *
+ * Async interactions use userEvent; promise-driven renders are asserted
+ * with findBy* (acts wrap them) so timing is deterministic.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 
 import CalendarSifStatusCard from '../CalendarSifStatusCard';
 
-vi.mock('../../../hooks/useCalendarSifStatus', () => ({
+vi.mock('../../../../hooks/useCalendarSifStatus', () => ({
   useCalendarSifStatus: vi.fn(),
 }));
 
-vi.mock('../../../services/contentPlanningApi', () => ({
+vi.mock('../../../../services/contentPlanningApi', () => ({
   contentPlanningApi: {
     searchCalendarSif: vi.fn(),
   },
 }));
 
-vi.mock('../../../config/strategySifConfig', () => ({
+vi.mock('../../../../config/strategySifConfig', () => ({
   isCalendarSifCardEnabled: () => true,
 }));
 
-import { useCalendarSifStatus } from '../../../hooks/useCalendarSifStatus';
-import { contentPlanningApi } from '../../../services/contentPlanningApi';
+import { useCalendarSifStatus } from '../../../../hooks/useCalendarSifStatus';
+import { contentPlanningApi } from '../../../../services/contentPlanningApi';
 
 const mockUseCalendarSifStatus = vi.mocked(useCalendarSifStatus);
 const mockSearchCalendarSif = vi.mocked(contentPlanningApi.searchCalendarSif);
@@ -69,33 +73,38 @@ describe('CalendarSifStatusCard — preset semantic queries', () => {
 
     render(<CalendarSifStatusCard />);
     expect(screen.getByText('Try a semantic search')).toBeTruthy();
-    expect(screen.getByText('Ask your calendar, e.g. what events are next week?')).toBeTruthy();
+    // Placeholder text lives on the input, not the document text.
+    expect(
+      screen.getByPlaceholderText('Ask your calendar, e.g. what events are next week?'),
+    ).toBeTruthy();
   });
 
-  it('calls searchCalendarSif when clicking a preset chip', () => {
+  it('calls searchCalendarSif when clicking a preset chip', async () => {
+    const user = userEvent.setup();
     mockUseCalendarSifStatus.mockReturnValue(hookState({ data: indexing('success') }));
 
     render(<CalendarSifStatusCard />);
-    const chip = screen.getByText("What's in my calendar this month?");
-    fireEvent.click(chip);
+    await user.click(screen.getByText("What's in my calendar this month?"));
 
     expect(mockSearchCalendarSif).toHaveBeenCalledTimes(1);
     expect(mockSearchCalendarSif).toHaveBeenCalledWith("What's in my calendar this month?", 4);
   });
 
-  it('calls searchCalendarSif when pressing Enter in the input', () => {
+  it('calls searchCalendarSif when pressing Enter in the input', async () => {
+    const user = userEvent.setup();
     mockUseCalendarSifStatus.mockReturnValue(hookState({ data: indexing('success') }));
 
     render(<CalendarSifStatusCard />);
     const input = screen.getByTestId('calendar-sif-question-input');
-    fireEvent.change(input, { target: { value: 'my calendar' } });
-    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
+    await user.type(input, 'my calendar');
+    await user.keyboard('{Enter}');
 
     expect(mockSearchCalendarSif).toHaveBeenCalledTimes(1);
     expect(mockSearchCalendarSif).toHaveBeenCalledWith('my calendar', 4);
   });
 
   it('renders search results with kind labels and scores', async () => {
+    const user = userEvent.setup();
     mockUseCalendarSifStatus.mockReturnValue(hookState({ data: indexing('success') }));
     mockSearchCalendarSif.mockResolvedValue({
       query: 'events',
@@ -106,35 +115,33 @@ describe('CalendarSifStatusCard — preset semantic queries', () => {
     });
 
     render(<CalendarSifStatusCard />);
-    const chip = screen.getByText('What events are scheduled?');
-    fireEvent.click(chip);
+    await user.click(screen.getByText('What events are scheduled?'));
 
-    expect(mockSearchCalendarSif).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('Daily schedule')).toBeTruthy();
+    expect(await screen.findByText('Daily schedule')).toBeTruthy();
     expect(screen.getByText('Calendar events')).toBeTruthy();
     expect(screen.getByText('score 0.920')).toBeTruthy();
   });
 
   it('shows empty-state guidance when no results', async () => {
+    const user = userEvent.setup();
     mockUseCalendarSifStatus.mockReturnValue(hookState({ data: indexing('success') }));
     mockSearchCalendarSif.mockResolvedValue({ query: 'q', hits: [] });
 
     render(<CalendarSifStatusCard />);
-    const chip = screen.getByText('What events are scheduled?');
-    fireEvent.click(chip);
+    await user.click(screen.getByText('What events are scheduled?'));
 
-    expect(screen.getByText(/No matching passage found/i)).toBeTruthy();
+    expect(await screen.findByText(/No matching passage found/i)).toBeTruthy();
   });
 
   it('shows error text when search fails', async () => {
+    const user = userEvent.setup();
     mockUseCalendarSifStatus.mockReturnValue(hookState({ data: indexing('success') }));
     mockSearchCalendarSif.mockRejectedValue(new Error('search failed'));
 
     render(<CalendarSifStatusCard />);
-    const chip = screen.getByText('What events are scheduled?');
-    fireEvent.click(chip);
+    await user.click(screen.getByText('What events are scheduled?'));
 
-    expect(screen.getByText('search failed')).toBeTruthy();
+    expect(await screen.findByText('search failed')).toBeTruthy();
   });
 
   it('hides the query panel for not_indexed phase', () => {
