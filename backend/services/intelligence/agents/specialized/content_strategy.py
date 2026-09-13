@@ -4,6 +4,7 @@ Content Strategy Agent implementation.
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import asyncio
+import re
 from concurrent.futures import ThreadPoolExecutor
 from loguru import logger
 from .base import SIFBaseAgent, TXTAI_AVAILABLE, Agent
@@ -44,6 +45,286 @@ class ContentStrategyAgent(BaseALwrityAgent):
                 "Skipping SIF service initialization for ContentStrategyAgent user {}: no onboarding session",
                 user_id,
             )
+
+    def _monitoring_evidence_proposals(
+        self, strategy_monitoring: Optional[Dict[str, Any]]
+    ) -> List["TaskProposal"]:
+        """Derive evidence-grounded proposals from strategy-monitoring signals.
+
+        Reads the ``strategy_monitoring`` envelope injected into the meeting
+        grounding by ``build_grounding_context`` (Phase 2). Only when the
+        active strategy is ``degraded``/``down`` does it emit proposals:
+          - each failed task -> "Investigate <metric> failure" (analyze)
+          - overdue tasks    -> "Verify overdue monitoring runs" (analyze)
+          - human reviews    -> "Review <title>" (plan)
+
+        Inactive/healthy/error/missing envelopes produce NO proposals — the
+        honest-absence policy is preserved; nothing is fabricated. Every
+        emitted proposal is tagged ``synthesis_mode="data_derived"`` so the
+        reviewer/UI can distinguish measured-signal tasks from LLM ones.
+        """
+        if not isinstance(strategy_monitoring, dict):
+            return []
+        if strategy_monitoring.get("overall") not in {"degraded", "down"}:
+            return []
+
+        proposals: List["TaskProposal"] = []
+        failed_tasks = strategy_monitoring.get("failed_tasks") or []
+        for failed in failed_tasks:
+            if not isinstance(failed, dict):
+                continue
+            metric = str(failed.get("metric") or "monitored metric")
+            title = str(failed.get("title") or metric)
+            error = failed.get("error_message")
+            error_suffix = f" Error: {error}" if error else ""
+            task_id = failed.get("monitoring_task_id") or failed.get("id")
+            proposal = TaskProposal(
+                title=f"Investigate {metric} monitoring failure",
+                description=(
+                    f"The monitoring task '{title}' failed on its latest run."
+                    f" Verify the data source and restore coverage."
+                ),
+                pillar_id="analyze",
+                priority="high" if strategy_monitoring.get("overall") == "down" else "medium",
+                estimated_time=20,
+                source_agent="ContentStrategyAgent",
+                reasoning=(
+                    f"Strategy monitoring is {strategy_monitoring.get('overall')}; "
+                    f"task '{title}' (metric {metric}) failed.{error_suffix} "
+                    f"Restore the metric before it skews decisions."
+                ),
+                action_type="navigate",
+                action_url="/content-planning-dashboard",
+                evidence=f"monitoring:{metric}",
+                expected_impact="Restore accurate metric coverage",
+                effort="low",
+                risk_level="medium",
+                measurement="monitoring task success",
+                kpi="monitoring_success_rate",
+                context_data={
+                    "monitoring_task_id": task_id,
+                    "metric": metric,
+                    "monitoring_signal": "failed",
+                },
+                synthesis_mode="data_derived",
+            )
+            proposals.append(proposal)
+
+        if strategy_monitoring.get("overdue_tasks"):
+            overdue = strategy_monitoring["overdue_tasks"]
+            proposals.append(TaskProposal(
+                title="Verify overdue monitoring runs",
+                description=(
+                    f"{len(overdue)} monitoring check(s) missed their scheduled "
+                    f"execution and may be showing stale metrics."
+                ),
+                pillar_id="analyze",
+                priority="medium",
+                estimated_time=15,
+                source_agent="ContentStrategyAgent",
+                reasoning=(
+                    f"Strategy monitoring has {len(overdue)} overdue "
+                    f"task(s); re-running restores fresh evidence for the meeting."
+                ),
+                action_type="navigate",
+                action_url="/content-planning-dashboard",
+                evidence="monitoring:overdue",
+                expected_impact="Restore fresh metric data",
+                effort="low",
+                risk_level="low",
+                measurement="overdue count",
+                kpi="monitoring_freshness",
+                context_data={"monitoring_signal": "overdue",
+                              "overdue_count": len(overdue)},
+                synthesis_mode="data_derived",
+            ))
+
+        human_pending = strategy_monitoring.get("human_pending") or []
+        for review in human_pending:
+            if not isinstance(review, dict):
+                continue
+            review_title = str(review.get("title") or "monitoring review")
+            review_id = review.get("id")
+            proposals.append(TaskProposal(
+                title=f"Review {review_title}",
+                description=(
+                    f"The monitoring check '{review_title}' awaits your human "
+                    f"review before it can inform the strategy."
+                ),
+                pillar_id="plan",
+                priority="medium",
+                estimated_time=15,
+                source_agent="ContentStrategyAgent",
+                reasoning=(
+                    f"A human monitoring review '{review_title}' is pending; "
+                    f"completing it unblocks strategy decisions grounded in data."
+                ),
+                action_type="navigate",
+                action_url="/content-planning-dashboard",
+                evidence="monitoring:human_review",
+                expected_impact="Unblock strategy decisions",
+                effort="low",
+                risk_level="low",
+                measurement="pending human reviews",
+                kpi="monitoring_review_completion",
+                context_data={"monitoring_signal": "human_pending",
+                              "monitoring_task_id": review_id},
+                synthesis_mode="data_derived",
+            ))
+
+        return proposals
+
+    def _strategy_delta_proposals(
+        self, strategy_context: Optional[Dict[str, Any]],
+        strategy_monitoring: Optional[Dict[str, Any]],
+    ) -> List["TaskProposal"]:
+        """Emit strategy-aligned proposals ONLY on real deltas.
+
+        Unlike monitoring/roadmap filler, this never proposes on a static
+        schedule. Two honest triggers, both grounded in real data:
+
+          - Roadmap milestone window arrived: the milestone's ``timeline``
+            (e.g. "Month 3-4") lands within the current month relative to
+            the strategy's ``created_at``, and its status is not done.
+          - KPI below target verified from REAL measured value: the KPI is
+            in the active strategy, the monitoring evidence carries a last
+            measured value for it (``strategy_monitoring.kpi_last_values``),
+            and that value trails the target. Predictions/mocks never count.
+
+        Inactive/error/missing strategy or no delta → ``[]`` (honest absence).
+        Every emitted proposal is ``synthesis_mode="data_derived"``.
+        """
+        if not isinstance(strategy_context, dict):
+            return []
+        if strategy_context.get("status") != "available":
+            return []
+        if not isinstance(strategy_monitoring, dict):
+            strategy_monitoring = {}
+
+        proposals: List["TaskProposal"] = []
+        created_at = strategy_context.get("created_at")
+        now = datetime.utcnow()
+
+        def _month_offset(ref: str) -> Optional[int]:
+            """Months between ref ISO (or None→now) and now, or None."""
+            try:
+                ref_dt = datetime.fromisoformat(str(ref).replace("Z", "+00:00"))
+                if ref_dt.tzinfo is not None:
+                    ref_dt = ref_dt.replace(tzinfo=None)
+            except (TypeError, ValueError):
+                ref_dt = datetime.utcnow()
+            return max(0, (now.year - ref_dt.year) * 12 + (now.month - ref_dt.month))
+
+        def _timeline_month(timeline: str) -> Optional[int]:
+            """Extract the starting month from 'Month 3-4' / '3 months' etc."""
+            text = str(timeline or "").lower().strip()
+            if not text:
+                return None
+            match = re.search(r"(?:month(?:s)?)?\s*(\d+)", _clean(text))
+            if not match:
+                return None
+            return int(match.group(1))
+
+        def _clean(text: str) -> str:
+            # 'month 3-4' -> '3-4'
+            return text.replace("month", "").replace("-", " ").strip()
+
+        # Trigger 1: roadmap milestone window arrived, not completed.
+        current_month = _month_offset(created_at) if created_at else 0
+        for milestone in strategy_context.get("roadmap") or []:
+            if not isinstance(milestone, dict):
+                continue
+            status = str(milestone.get("status") or "planned").lower()
+            if status in {"done", "completed", "complete"}:
+                continue
+            start_month = _timeline_month(milestone.get("timeline"))
+            if start_month is None or current_month < start_month:
+                continue
+            milestone_title = str(milestone.get("milestone") or milestone.get("phase") or "roadmap milestone")
+            proposals.append(TaskProposal(
+                title=f"Deliver {milestone_title}",
+                description=(
+                    f"The '{milestone_title}' strategy milestone is now in its "
+                    f"scheduled window and not yet completed."
+                ),
+                pillar_id="plan",
+                priority="medium",
+                estimated_time=15,
+                source_agent="ContentStrategyAgent",
+                reasoning=(
+                    f"Strategy roadmap milestone '{milestone_title}' (phase "
+                    f"{str(milestone.get('phase') or '-')}) is scheduled for "
+                    f"month {start_month} and the strategy is now in month "
+                    f"{current_month}; advancing it keeps the plan on track."
+                ),
+                action_type="navigate",
+                action_url="/content-planning-dashboard",
+                evidence=f"strategy:roadmap:{milestone_title}",
+                expected_impact="Keep the implementation roadmap on schedule",
+                effort="low",
+                risk_level="low",
+                measurement="roadmap milestone completion",
+                kpi="strategy_roadmap_progress",
+                context_data={"strategy_signal": "milestone_due",
+                              "milestone": milestone_title,
+                              "milestone_month": start_month,
+                              "current_month": current_month},
+                synthesis_mode="data_derived",
+            ))
+
+        # Trigger 2: KPI below target per REAL measured value only.
+        kpi_values = strategy_monitoring.get("kpi_last_values") or {}
+        for kpi in strategy_context.get("kpi_targets") or []:
+            if not isinstance(kpi, dict):
+                continue
+            metric = str(kpi.get("metric") or "")
+            if not metric:
+                continue
+            try:
+                target = float(kpi.get("target"))
+            except (TypeError, ValueError):
+                continue
+            # Strategy KPI names may be bare ('ctr'); evidence stores them
+            # under canonical MetricKey values ('gsc.ctr'). Resolve so real
+            # measured values are found; unmappable -> no task (honest).
+            from services.kpi_value_extractor import normalize_kpi_metric
+            resolved = normalize_kpi_metric(metric)
+            last = kpi_values.get(resolved) if resolved else kpi_values.get(metric)
+            try:
+                last_value = float(last)
+            except (TypeError, ValueError):
+                continue  # no real measured value → no fabrication
+            if last_value >= target:
+                continue
+            proposals.append(TaskProposal(
+                title=f"Close gap on {metric}",
+                description=(
+                    f"The tracked metric '{metric}' is below its strategy "
+                    f"target ({last_value} vs {target})."
+                ),
+                pillar_id="analyze",
+                priority="high",
+                estimated_time=20,
+                source_agent="ContentStrategyAgent",
+                reasoning=(
+                    f"Measured value {last_value} for KPI '{metric}' trails the "
+                    f"strategy target {target}; investigate the driver and "
+                    f"restore trajectory."
+                ),
+                action_type="navigate",
+                action_url="/content-planning-dashboard",
+                evidence=f"monitoring:{metric}:{last_value}",
+                expected_impact="Recover KPI trajectory toward the strategy target",
+                effort="low",
+                risk_level="medium",
+                measurement="kpi value vs strategy target",
+                kpi=metric,
+                context_data={"strategy_signal": "kpi_gap", "metric": metric,
+                              "last_value": last_value, "target": target},
+                synthesis_mode="data_derived",
+            ))
+
+        return proposals[:2]  # hard cap: strategy shapes, never floods
 
     def _create_txtai_agent(self):
         """Create a specialized txtai Agent for content strategy with tools."""
@@ -660,6 +941,22 @@ class ContentStrategyAgent(BaseALwrityAgent):
         # filler was removed per the honest-absence policy — this agent now
         # declines or returns empty when neither pillars, competitors, nor
         # LLM synthesis provide anything grounded.
+
+        # Phase 3: append evidence-grounded monitoring proposals when the
+        # active strategy's scheduler signals are degraded/down. Additive
+        # only — normal pillar/competitor proposals are never replaced.
+        default_proposals.extend(
+            self._monitoring_evidence_proposals(context.get("strategy_monitoring"))
+        )
+
+        # Phase 3B: strategy-delta proposals — only roadmap-window / verified
+        # KPI gaps, capped so strategy reflects but never floods. Additive.
+        default_proposals.extend(
+            self._strategy_delta_proposals(
+                context.get("strategy_context"),
+                context.get("strategy_monitoring"),
+            )
+        )
 
         return await self._synthesize_task_proposals(
             context,
