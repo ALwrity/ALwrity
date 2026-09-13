@@ -94,6 +94,20 @@ def _record_committee_shared_note(
         logger.debug(f"[today_workflow_agents] Shared note write failed for {user_id}: {exc}")
 
 
+def _format_strategy_block_for_prompt(grounding: Dict[str, Any]) -> str:
+    """Render the bounded strategy-focus block for the LLM fallback prompt.
+
+    Reads ``grounding['strategy_context']`` (Phase 2 wiring). Degrade-not-
+    crash: any failure renders nothing so the fallback still generates.
+    """
+    try:
+        from services.strategy_context import format_strategy_block
+        return format_strategy_block(grounding.get("strategy_context"))
+    except Exception as exc:
+        logger.warning(f"Strategy block rendering failed: {exc}")
+        return ""
+
+
 def _proposal_field(proposal, key: str, default=None):
     """Read a field from a TaskProposal object or a dict-shaped proposal.
 
@@ -847,6 +861,19 @@ async def generate_agent_enhanced_plan(
         "plan, generate, publish, analyze, engage, remarket.\n\n"
         "User Context (Onboarding & Strategy):\n"
         f"{json.dumps(grounding.get('onboarding_data', {}), indent=2)}\n\n"
+    )
+
+    # Phase 3C: a compact "Strategy focus" block from the active strategy
+    # context shapes the fallback LLM plan. Bounded, degrade-not-crash: when
+    # the strategy context is unavailable/inactive it renders nothing.
+    maybe_strategy_block = _format_strategy_block_for_prompt(grounding)
+    if maybe_strategy_block:
+        prompt += (
+            f"Active strategy focus (must inform pillar prioritization):\n"
+            f"{maybe_strategy_block}\n\n"
+        )
+
+    prompt += (
         "Rules:\n"
         "- Produce JSON only that matches the schema.\n"
         "- Include 1-3 tasks per pillar.\n"

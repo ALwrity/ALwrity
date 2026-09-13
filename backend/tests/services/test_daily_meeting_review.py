@@ -140,3 +140,59 @@ def test_prioritization_returns_explainable_selection_factors():
     assert result[0]["title"] == "Improve conversion funnel"
     assert 0.0 <= result[0]["selection_score"] <= 1.0
     assert "business_goal_alignment" in result[0]["selection_factors"]
+
+
+# ── Phase 3A: strategy-aware prioritization ──────────────────────────────
+def _strategy_grounding():
+    return {
+        "strategy_context": {
+            "status": "available",
+            "strategy_id": 7,
+            "kpi_targets": [{"metric": "visibility_score", "target": "70", "period": ""}],
+            "roadmap": [{"phase": "Phase 1", "milestone": "Foundation",
+                         "timeline": "Month 1", "status": "in_progress"}],
+            "goals": ["increase organic visibility"],
+            "positioning": "Challenger in B2B SEO",
+        },
+    }
+
+
+def test_strategy_aligned_proposal_outranks_neutral():
+    aligned = normalize_proposal(proposal(
+        "Improve visibility score",
+        "Increase organic visibility toward the Foundation milestone.",
+        "high",
+        pillar_id="analyze",
+    ))
+    neutral = normalize_proposal(proposal(
+        "Review old notes",
+        "Low priority cleanup.",
+        "low",
+        pillar_id="plan",
+    ))
+
+    result = prioritize_proposals(
+        [neutral, aligned],
+        grounding=_strategy_grounding(),
+        preflight={"checks": {"providers": {"status": "available"}}},
+    )
+
+    assert result[0]["title"] == "Improve visibility score"
+    assert result[0]["selection_factors"]["strategy_alignment"] > result[1]["selection_factors"]["strategy_alignment"]
+    assert "active content strategy" in " ".join(result[0].get("selection_reason", []))
+
+
+def test_missing_strategy_context_keeps_neutral_factor():
+    aligned = normalize_proposal(proposal(
+        "Improve organic visibility",
+        "Increase visibility.",
+        "high",
+        pillar_id="analyze",
+    ))
+
+    result = prioritize_proposals(
+        [aligned],
+        grounding={"onboarding_data": {}},
+        preflight={"checks": {"providers": {"status": "available"}}},
+    )
+    assert result[0]["selection_factors"]["strategy_alignment"] == 0.5
