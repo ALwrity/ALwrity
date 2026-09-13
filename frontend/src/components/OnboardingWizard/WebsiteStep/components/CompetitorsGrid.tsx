@@ -35,6 +35,7 @@ import {
   onboardingDialogPaperProps,
   onboardingDialogTitleSx,
 } from '../../common/onboardingDialogStyles';
+import { researchSectionDescriptionSx } from '../../CompetitorAnalysisStep/researchStepSectionStyles';
 
 export interface Competitor {
   url: string;
@@ -156,10 +157,7 @@ const CompetitorsGrid: React.FC<CompetitorsGridProps> = ({
             <BusinessIcon sx={{ mr: 1, verticalAlign: 'middle', color: '#667eea !important' }} />
             Discovered Competitors ({competitors.length})
           </Typography>
-          <Typography
-            variant="body2"
-            sx={{ color: '#64748b', mt: 0.5, pl: { xs: 0, sm: 4 }, maxWidth: 560 }}
-          >
+          <Typography variant="body2" sx={researchSectionDescriptionSx}>
             {DISCOVERED_COMPETITORS_DESCRIPTION}
           </Typography>
         </Box>

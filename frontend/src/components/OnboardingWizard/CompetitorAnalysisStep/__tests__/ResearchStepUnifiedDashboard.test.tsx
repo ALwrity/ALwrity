@@ -105,14 +105,14 @@ describe('ResearchStepUnifiedDashboard', () => {
 
   it('switches to Content Pillars sub-tab', () => {
     renderDashboard();
-    const subtabs = screen.getByTestId('research-vertical-subtabs');
+    const subtabs = screen.getByTestId('research-horizontal-subtabs');
     fireEvent.click(within(subtabs).getByText('Content Pillars'));
     expect(screen.getByTestId('content-pillars')).toBeInTheDocument();
   });
 
   it('switches to Benchmark Insights sub-tab', () => {
     renderDashboard();
-    const subtabs = screen.getByTestId('research-vertical-subtabs');
+    const subtabs = screen.getByTestId('research-horizontal-subtabs');
     fireEvent.click(within(subtabs).getByText('Benchmark Insights'));
     expect(screen.getByTestId('benchmark-insights')).toBeInTheDocument();
   });
@@ -134,7 +134,7 @@ describe('ResearchStepUnifiedDashboard', () => {
   it('shows SIF Indexing sub-tab on Tab 2', () => {
     renderDashboard();
     fireEvent.click(screen.getByText('Strategic Opportunities'));
-    const subtabs = screen.getAllByTestId('research-vertical-subtabs')[0];
+    const subtabs = screen.getByTestId('research-horizontal-subtabs');
     fireEvent.click(within(subtabs).getByText('SIF Indexing'));
     expect(screen.getByTestId('sif-indexing-panel')).toBeInTheDocument();
   });

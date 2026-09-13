@@ -20,7 +20,7 @@ import { SifIndexingPanel } from '../common/SifIndexingPanel';
 import { ContentPillarsSection } from './ContentPillarsSection';
 import { BenchmarkInsightsSection } from './BenchmarkInsightsSection';
 import { StrategicInsightsSection } from './StrategicInsightsSection';
-import { ResearchStepVerticalSubTabs } from './ResearchStepVerticalSubTabs';
+import { ResearchStepHorizontalSubTabs } from './ResearchStepHorizontalSubTabs';
 import { ResearchStepBackgroundSetupPanel } from './ResearchStepBackgroundSetupPanel';
 import { useResearchStepBackgroundSetup } from './useResearchStepBackgroundSetup';
 import { getBackgroundSetupTaskSummaryLines } from './researchStepBackgroundSetupConstants';
@@ -69,6 +69,8 @@ const OPPORTUNITIES_SUBTABS = [
   { id: 'strategic', label: 'Strategic Content Opportunities', icon: <TrendingUpIcon fontSize="small" /> },
   { id: 'sif', label: 'SIF Indexing', icon: <StorageIcon fontSize="small" /> },
 ];
+
+const MAIN_TAB_CAPTION_MIN_HEIGHT = { xs: 0, md: 42 };
 
 export const ResearchStepUnifiedDashboard: React.FC<ResearchStepDashboardProps> = (props) => {
   const {
@@ -122,6 +124,7 @@ export const ResearchStepUnifiedDashboard: React.FC<ResearchStepDashboardProps> 
             isLoading={isLoadingPillars}
             error={pillarsError}
             onRefresh={onRefreshPillars}
+            variant="dashboard"
           />
         );
       case 'benchmark':
@@ -168,8 +171,8 @@ export const ResearchStepUnifiedDashboard: React.FC<ResearchStepDashboardProps> 
   const renderMainContent = () => {
     if (activeMainTab === 'intelligence') {
       return (
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, minHeight: 320 }}>
-          <ResearchStepVerticalSubTabs
+        <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 320 }}>
+          <ResearchStepHorizontalSubTabs
             items={INTELLIGENCE_SUBTABS}
             activeId={intelligenceSubTab}
             onChange={setIntelligenceSubTab}
@@ -183,8 +186,8 @@ export const ResearchStepUnifiedDashboard: React.FC<ResearchStepDashboardProps> 
 
     if (activeMainTab === 'opportunities') {
       return (
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, minHeight: 320 }}>
-          <ResearchStepVerticalSubTabs
+        <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 320 }}>
+          <ResearchStepHorizontalSubTabs
             items={OPPORTUNITIES_SUBTABS}
             activeId={opportunitiesSubTab}
             onChange={setOpportunitiesSubTab}
@@ -231,6 +234,8 @@ export const ResearchStepUnifiedDashboard: React.FC<ResearchStepDashboardProps> 
                         gap: 0.5,
                         textAlign: 'center',
                         py: 0.5,
+                        height: '100%',
+                        width: '100%',
                       }}
                     >
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -247,42 +252,42 @@ export const ResearchStepUnifiedDashboard: React.FC<ResearchStepDashboardProps> 
                           {tab.title}
                         </Typography>
                       </Box>
-                      {tab.id === 'automation' ? (
-                        <Box
-                          sx={{
-                            display: { xs: 'none', md: 'flex' },
-                            flexDirection: 'column',
-                            gap: 0.25,
-                            maxWidth: 360,
-                          }}
-                        >
-                          <Typography
-                            variant="caption"
-                            sx={{ color: '#64748B', textTransform: 'none', lineHeight: 1.35 }}
-                          >
-                            {automationTabSummary.line1}
-                          </Typography>
-                          {automationTabSummary.line2 && (
+                      <Box
+                        sx={{
+                          display: { xs: 'none', md: 'flex' },
+                          flexDirection: 'column',
+                          justifyContent: 'flex-start',
+                          gap: 0.25,
+                          maxWidth: 360,
+                          minHeight: MAIN_TAB_CAPTION_MIN_HEIGHT,
+                        }}
+                      >
+                        {tab.id === 'automation' ? (
+                          <>
                             <Typography
                               variant="caption"
                               sx={{ color: '#64748B', textTransform: 'none', lineHeight: 1.35 }}
                             >
-                              {automationTabSummary.line2}
+                              {automationTabSummary.line1}
                             </Typography>
-                          )}
-                        </Box>
-                      ) : (
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: '#64748B',
-                            textTransform: 'none',
-                            display: { xs: 'none', md: 'block' },
-                          }}
-                        >
-                          {tab.caption}
-                        </Typography>
-                      )}
+                            {automationTabSummary.line2 && (
+                              <Typography
+                                variant="caption"
+                                sx={{ color: '#64748B', textTransform: 'none', lineHeight: 1.35 }}
+                              >
+                                {automationTabSummary.line2}
+                              </Typography>
+                            )}
+                          </>
+                        ) : (
+                          <Typography
+                            variant="caption"
+                            sx={{ color: '#64748B', textTransform: 'none', lineHeight: 1.35 }}
+                          >
+                            {tab.caption}
+                          </Typography>
+                        )}
+                      </Box>
                     </Box>
                   }
                   sx={getFolderTabSx(isActive, index, MAIN_TABS.length)}
