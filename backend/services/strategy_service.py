@@ -1,6 +1,6 @@
 import logging
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 
@@ -175,23 +175,51 @@ class StrategyService:
                         MonitoringTask.strategy_id == strategy_id
                     ).delete()
                     
-                    # Create individual monitoring tasks
-                    for component in plan_data.get('components', []):
-                        for task in component.get('tasks', []):
+                    # Create individual monitoring tasks — supports both legacy components and deterministic monitoringTasks flat list
+                    freq_delta = {"Daily": 1, "Weekly": 7, "Monthly": 30, "Quarterly": 90}
+                    if plan_data.get("monitoringTasks"):
+                        for task in plan_data.get("monitoringTasks", []):
+                            freq = task.get("frequency", "Weekly")
                             monitoring_task = MonitoringTask(
                                 strategy_id=strategy_id,
-                                component_name=component['name'],
-                                task_title=task['title'],
-                                task_description=task['description'],
-                                assignee=task['assignee'],
-                                frequency=task['frequency'],
-                                metric=task['metric'],
-                                measurement_method=task['measurementMethod'],
-                                success_criteria=task['successCriteria'],
-                                alert_threshold=task['alertThreshold'],
-                                status='pending'
+                                component_name=task.get("component", "General"),
+                                task_title=task.get("title", ""),
+                                task_description=task.get("description", ""),
+                                assignee=task.get("assignee", "ALwrity"),
+                                frequency=freq,
+                                metric=task.get("metric", ""),
+                                measurement_method=task.get("measurementMethod") or task.get("tool", ""),
+                                success_criteria=task.get("successCriteria", ""),
+                                alert_threshold=task.get("alertThreshold", ""),
+                                status='pending',  # Will be set to 'active' on strategy activation
+                                next_execution=datetime.utcnow() + timedelta(days=freq_delta.get(freq, 7))
                             )
                             session.add(monitoring_task)
+                    else:
+                        for component in plan_data.get('components', []):
+                            for task in component.get('tasks', []):
+                                freq = task.get('frequency', "Weekly")
+                                monitoring_task = MonitoringTask(
+                                    strategy_id=strategy_id,
+                                    component_name=component['name'],
+                                    task_title=task['title'],
+                                    task_description=task['description'],
+                                    assignee=task['assignee'],
+                                    frequency=freq,
+                                    metric=task['metric'],
+                                    measurement_method=task['measurementMethod'],
+                                    success_criteria=task['successCriteria'],
+                                    alert_threshold=task['alertThreshold'],
+                                    status='pending',  # Will be set to 'active' on strategy activation
+                                    next_execution=datetime.utcnow() + timedelta(days=freq_delta.get(freq, 7))
+                                )
+                                session.add(monitoring_task)
+                    
+                    # NEW: Mark all created tasks as 'active' so the scheduler can execute them
+                    # immediately upon strategy activation rather than waiting for a first run cycle.
+                    session.query(MonitoringTask).filter(
+                        MonitoringTask.strategy_id == strategy_id
+                    ).update({"status": "active"})
                     
                     session.commit()
                     logger.info(f"Monitoring plan saved for strategy {strategy_id}")

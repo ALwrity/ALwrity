@@ -19,6 +19,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useContentPlanningStore } from '../../../stores/contentPlanningStore';
 import { useOnboardingTasksStatus } from '../../../hooks/useOnboardingTasksStatus';
 import SemanticIndexSnapshotRow from './SemanticIndexSnapshotRow';
+import MonitoringHealthRow from './MonitoringHealthRow';
 import { isStrategySifSnapshotEnabled } from '../../../config/strategySifConfig';
 
 interface StrategySnapshotProps {
@@ -242,6 +243,13 @@ const ContentStrategySnapshot: React.FC<StrategySnapshotProps> = ({
             default); degrades gracefully (renders nothing) on endpoint error. */}
         {isStrategySifSnapshotEnabled() && (strategyStatus === 'active' || strategyStatus === 'pending') && (
           <SemanticIndexSnapshotRow />
+        )}
+
+        {/* Monitoring health — Phase 3b: real scheduler run results for the
+            active strategy. Renders nothing without a strategy id; errors
+            surface inline with Retry (never silent, never fabricated). */}
+        {strategyStatus === 'active' && typeof strategyData?.id === 'number' && (
+          <MonitoringHealthRow strategyId={strategyData.id} />
         )}
 
         {/* Action Button */}
