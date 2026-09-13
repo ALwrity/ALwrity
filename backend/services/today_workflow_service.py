@@ -16,6 +16,8 @@ from services.daily_meeting_persistence import attach_daily_meeting_tasks, finis
 from services.task_memory_service import TaskMemoryService
 from services.agent_schedule_service import evaluate_agent_schedule
 from services.daily_meeting_preflight import build_agent_evidence, run_daily_meeting_preflight
+from services.monitoring_evidence import build_strategy_monitoring_evidence
+from services.strategy_context import build_strategy_context
 from services.daily_meeting_review import prioritize_proposals, review_proposals
 from services.intelligence.agents.team_catalog import AGENT_TEAM_CATALOG
 
@@ -304,6 +306,67 @@ def build_grounding_context(db: Session, user_id: str, date: str) -> Dict[str, A
     except Exception as e:
         logger.warning(f"Failed to fetch calendar events for grounding context: {e}")
 
+    # ── Strategy monitoring evidence (Phase 2) ────────────────────
+    # Real scheduler signal (failed/overdue/human-pending, success rate)
+    # available to the committee. Never raises: a monitoring_evidence
+    # outage degrades to an {status:'error'} envelope (loaded via the
+    # module-level import above) so the rest of the grounding survives.
+    strategy_monitoring: Dict[str, Any] = {}
+    try:
+        strategy_monitoring = build_strategy_monitoring_evidence(db, user_id)
+        if not isinstance(strategy_monitoring, dict):
+            strategy_monitoring = {"status": "error",
+                                   "limitations": ["Monitoring evidence returned an unexpected shape."]}
+    except Exception as exc:
+        logger.warning(
+            f"Failed to build strategy monitoring evidence for user {user_id}: {exc}"
+        )
+        strategy_monitoring = {
+            "status": "error",
+            "limitations": [f"Monitoring evidence could not be loaded: {exc}"],
+        }
+
+    # ── Strategy context (Phase 2) ──────────────────────────────
+    # Compact digest of the active strategy (KPIs, roadmap, risks) so the
+    # committee can align proposals with the plan. Never raises: a failure
+    # degrades to {status:'error'} and the rest of the grounding survives.
+    strategy_context: Dict[str, Any] = {}
+    try:
+        strategy_context = build_strategy_context(db, user_id)
+        if not isinstance(strategy_context, dict):
+            strategy_context = {"status": "error",
+                                "limitations": ["Strategy context returned an unexpected shape."]}
+    except Exception as exc:
+        logger.warning(
+            f"Failed to build strategy context for user {user_id}: {exc}"
+        )
+        strategy_context = {
+            "status": "error",
+            "limitations": [f"Strategy context could not be loaded: {exc}"],
+        }
+
+    # ── SEO evidence (Phase 13 / plan D) ────────────────────────
+    # Real persisted SEO signals (on-page health, GSC highlights, page-audit
+    # aggregates, content trend) so the committee — and specifically the SEO
+    # specialist — proposes tasks from actual data. Never raises: failures
+    # degrade to an {status:'error'} envelope like the other evidence blocks.
+    seo_evidence: Dict[str, Any] = {}
+    try:
+        from services.intelligence.agents.seo_evidence import build_seo_evidence
+
+        seo_evidence = build_seo_evidence(db, user_id)
+        if not isinstance(seo_evidence, dict):
+            seo_evidence = {
+                "status": "error",
+                "limitations": ["SEO evidence returned an unexpected shape."],
+            }
+    except Exception as exc:
+        logger.warning(f"Failed to build SEO evidence for user {user_id}: {exc}")
+        seo_evidence = {
+            "status": "error",
+            "limitations": [f"SEO evidence could not be loaded: {exc}"],
+        }
+
     return {
         "recent_agent_alerts": [
             {
@@ -315,6 +378,9 @@ def build_grounding_context(db: Session, user_id: str, date: str) -> Dict[str, A
             }
             for a in unread_agent_alerts
         ],
+        "strategy_monitoring": strategy_monitoring,
+        "strategy_context": strategy_context,
+        "seo_evidence": seo_evidence,
         "onboarding_data": onboarding_context,
         "workflow_config": onboarding_context.get("workflow_config", {}),
         "calendar_events_today": [
