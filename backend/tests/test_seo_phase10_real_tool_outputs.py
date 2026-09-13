@@ -176,7 +176,7 @@ def test_b4_competitive_uses_real_deep_analysis_when_available():
     fake_deep = MagicMock()
     fake_deep.run = AsyncMock(return_value=DEEP_FIXTURE)
     with patch(
-        "services.seo_tools.enterprise_seo_service.DeepCompetitorAnalysisService",
+        "services.seo.deep_competitor_analysis_service.DeepCompetitorAnalysisService",
         MagicMock(return_value=fake_deep),
     ):
         result = asyncio.run(

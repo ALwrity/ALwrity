@@ -27,8 +27,9 @@ from services.seo_tools.pagespeed_service import PageSpeedService
 from services.seo_tools.sitemap_service import SitemapService
 from services.seo_tools.content_strategy_service import ContentStrategyService
 from services.llm_providers.main_text_generation import llm_text_gen
-# Phase 10 / B4: real competitive benchmarking seam (was a placeholder).
-from services.seo.deep_competitor_analysis_service import DeepCompetitorAnalysisService
+# Phase 10 / B4: DeepCompetitorAnalysisService is imported lazily inside
+# _execute_competitive_analysis — a module-level import forms a cycle
+# (services.seo.__init__ -> dashboard_service -> ... -> this module).
 
 
 @dataclass
@@ -387,6 +388,11 @@ class EnterpriseSEOService:
                     "primary_site": website_url,
                     "message": "Authenticated user required for real competitor analysis.",
                 }
+
+            # Lazy import: avoids the services.seo package import cycle.
+            from services.seo.deep_competitor_analysis_service import (
+                DeepCompetitorAnalysisService,
+            )
 
             deep_result = await DeepCompetitorAnalysisService().run(
                 user_id=user_id,

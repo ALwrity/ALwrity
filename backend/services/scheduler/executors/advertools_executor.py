@@ -276,7 +276,14 @@ class AdvertoolsExecutor(TaskExecutor):
                 ))
                 
                 if result.get('success'):
+                    # Phase 11 / B2: real communication-style enrichment (skip
+                    # on degraded/root-only runs; never blocks the audit).
+                    if not result.get('degraded') and audit_urls:
+                        await self._augment_with_communication_style(audit_urls, result)
                     await self._update_persona_augmentation(user_id, website_url, result, db)
+                    # Phase 11 / B1: weekly crawl trend diff against the stored
+                    # snapshot (first/degraded runs record no trend).
+                    await self._update_content_audit_trend(user_id, website_url, result, db)
                     
             elif task_type == 'site_health':
                 # Site health: freshness, velocity, URL structure. Fast-fail on 429s.
@@ -425,6 +432,82 @@ class AdvertoolsExecutor(TaskExecutor):
             "rate_limited": rate_limited,
         }
 
+    async def _augment_with_communication_style(self, url_list: List[str], result: Dict[str, Any]) -> None:
+        """Phase 11 / B2: attach REAL communication-style extraction output.
+
+        Harnesses AdvertoolsService.extract_communication_style (previously
+        zero callers). Never blocks or fails the audit, and never stores
+        fabricated style data — on service failure/exception nothing is
+        attached.
+        """
+        if not url_list:
+            return
+        try:
+            communication = await self.advertools_service.extract_communication_style(
+                list(url_list)
+            )
+            if communication and communication.get('success'):
+                result['communication_style'] = communication
+                self.logger.info(
+                    f"Communication style extracted "
+                    f"({len(communication.get('social_links') or [])} social links)"
+                )
+            else:
+                self.logger.info(
+                    f"Communication style unavailable: "
+                    f"{(communication or {}).get('error', 'empty result')}"
+                )
+        except Exception as e:
+            self.logger.warning(f"Communication style extraction failed (non-blocking): {e}")
+
+    async def _update_content_audit_trend(self, user_id: str, website_url: str, result: Dict[str, Any], db: Session):
+        """Phase 11 / B1: persist a compact content-audit snapshot and diff it.
+
+        Harnesses AdvertoolsService.compare_crawl_results (previously zero
+        callers) by keeping `seo_audit['content_audit_snapshot']` between
+        weekly runs and storing the real trend. First run and degraded runs
+        are honest: trend is None, no fabricated change numbers.
+        """
+        try:
+            session = db.query(OnboardingSession).filter(OnboardingSession.user_id == user_id).first()
+            if not session:
+                return
+            analysis = db.query(WebsiteAnalysis).filter(WebsiteAnalysis.session_id == session.id).first()
+            if not analysis:
+                return
+
+            current_seo = dict(analysis.seo_audit or {})
+            previous = current_seo.get('content_audit_snapshot')
+            snapshot = {
+                'page_count': result.get('page_count', 0),
+                'page_status': result.get('page_status', {}),
+                'link_health': result.get('link_health', {}),
+                'redirect_audit': result.get('redirect_audit', {}),
+            }
+
+            trend = None
+            if previous and result.get('success') and not result.get('degraded'):
+                diff = await self.advertools_service.compare_crawl_results(previous, snapshot)
+                if diff.get('success'):
+                    trend = diff
+
+            result['trend'] = trend
+            current_seo['content_audit_snapshot'] = snapshot
+            if trend is not None:
+                current_seo['last_content_audit_trend'] = trend
+            current_seo['last_content_audit_at'] = datetime.utcnow().isoformat()
+            analysis.seo_audit = current_seo
+
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(analysis, "seo_audit")
+
+            self.logger.info(
+                f"Content audit trend for {user_id}: "
+                f"{'computed' if trend else 'none (first run or degraded)'}"
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to update content audit trend: {e}")
+
     async def _update_persona_augmentation(self, user_id: str, website_url: str, audit_result: Dict[str, Any], db: Session):
         """
         Updates the user's Brand Persona with discovered themes, site structure,
@@ -461,6 +544,17 @@ class AdvertoolsExecutor(TaskExecutor):
                     current_brand[brand_key] = incoming
 
             current_brand['last_advertools_audit'] = datetime.utcnow().isoformat()
+            # Phase 11 / B2: persist REAL communication-style extraction when
+            # present (merge-aware; a degraded/absent run never clobbers it).
+            incoming_comm = audit_result.get('communication_style')
+            if incoming_comm:
+                if degraded:
+                    current_brand['communication_style'] = _richer(
+                        current_brand.get('communication_style'), incoming_comm
+                    )
+                else:
+                    current_brand['communication_style'] = incoming_comm
+                current_brand['last_communication_style_at'] = datetime.utcnow().isoformat()
             # Degradation transparency: the LAST run's state, even when we
             # kept richer per-key values from a previous full run.
             current_brand['degraded'] = degraded
