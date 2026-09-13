@@ -6,6 +6,9 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+from services.monitoring_evidence import build_strategy_monitoring_evidence
+from services.strategy_context import build_strategy_context
+
 
 def _check(status: str, detail: str, **metadata: Any) -> Dict[str, Any]:
     return {"status": status, "detail": detail, **metadata}
@@ -104,6 +107,8 @@ def run_daily_meeting_preflight(
     checks["active_campaigns"] = _check("unavailable", "database is unavailable")
     checks["calendar_conflicts"] = _check("unavailable", "database is unavailable")
     checks["agent_health"] = _check("unavailable", "database is unavailable")
+    checks["strategy_monitoring"] = _check("unavailable", "database is unavailable")
+    checks["strategy_context"] = _check("unavailable", "database is unavailable")
 
     if db is not None:
         try:
@@ -167,6 +172,65 @@ def run_daily_meeting_preflight(
         except Exception as exc:
             checks["agent_health"] = _check("error", f"agent health check failed: {exc}")
             limitations.append("Agent health could not be evaluated.")
+
+        try:
+            evidence = build_strategy_monitoring_evidence(db, user_id)
+            evidence_overall = evidence.get("overall") if isinstance(evidence, dict) else None
+            evidence_status = evidence.get("status") if isinstance(evidence, dict) else "error"
+            if not isinstance(evidence, dict) or evidence_status == "error":
+                detail = (evidence.get("limitations") or ["unavailable"])[0] \
+                    if isinstance(evidence, dict) and evidence.get("limitations") else "monitoring evidence unavailable"
+                checks["strategy_monitoring"] = _check("error", detail)
+                limitations.append("Strategy monitoring evidence could not be evaluated.")
+            elif evidence_status == "inactive":
+                checks["strategy_monitoring"] = _check(
+                    "missing", "no active strategy with monitoring evidence",
+                    overall=None,
+                )
+                limitations.append("No active strategy monitoring evidence is present; plan may be missing health signals.")
+            else:
+                checks["strategy_monitoring"] = _check(
+                    evidence_overall if evidence_overall in {"degraded", "down"} else "available",
+                    f"strategy monitoring evidence evaluated",
+                    overall=evidence_overall,
+                    success_rate=evidence.get("success_rate"),
+                    failed_tasks=len(evidence.get("failed_tasks", [])),
+                    overdue_tasks=len(evidence.get("overdue_tasks", [])),
+                    human_pending=len(evidence.get("human_pending", [])),
+                )
+                if evidence_overall in {"degraded", "down"}:
+                    limitations.append(
+                        f"Strategy monitoring is {evidence_overall}; recommendations may need "
+                        f"to prioritize recovering monitored metrics."
+                    )
+        except Exception as exc:
+            checks["strategy_monitoring"] = _check("error", f"strategy monitoring check failed: {exc}")
+            limitations.append("Strategy monitoring evidence could not be evaluated.")
+
+        try:
+            ctx = build_strategy_context(db, user_id)
+            ctx_status = ctx.get("status") if isinstance(ctx, dict) else "error"
+            if not isinstance(ctx, dict) or ctx_status == "error":
+                detail = (ctx.get("limitations") or ["unavailable"])[0] \
+                    if isinstance(ctx, dict) and ctx.get("limitations") else "strategy context unavailable"
+                checks["strategy_context"] = _check("error", detail)
+                limitations.append("Strategy context could not be evaluated.")
+            elif ctx_status == "inactive":
+                checks["strategy_context"] = _check(
+                    "missing", "no active strategy with a strategy context",
+                )
+                limitations.append("No active strategy context is present; plan may not reflect the content strategy.")
+            else:
+                checks["strategy_context"] = _check(
+                    "available", "active strategy context evaluated",
+                    strategy_id=ctx.get("strategy_id"),
+                    name=ctx.get("name"),
+                    kpi_targets=len(ctx.get("kpi_targets", [])),
+                    roadmap_milestones=len(ctx.get("roadmap", [])),
+                )
+        except Exception as exc:
+            checks["strategy_context"] = _check("error", f"strategy context check failed: {exc}")
+            limitations.append("Strategy context could not be evaluated.")
 
     return {
         "meeting_date": meeting_date,

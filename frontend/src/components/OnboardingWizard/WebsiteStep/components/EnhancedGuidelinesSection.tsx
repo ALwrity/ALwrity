@@ -23,20 +23,10 @@ import LightbulbIcon from '@mui/icons-material/Lightbulb';
 // Import rendering utilities
 import { renderGuidelinesCard } from '../utils/renderUtils';
 import { useOnboardingStyles } from '../../common/useOnboardingStyles';
-
-interface Guidelines {
-  tone_recommendations?: string[];
-  structure_guidelines?: string[];
-  vocabulary_suggestions?: string[];
-  engagement_tips?: string[];
-  audience_considerations?: string[];
-  brand_alignment?: string[];
-  seo_optimization?: string[];
-  conversion_optimization?: string[];
-}
+import { hasArrayContent, hasRenderableGuidelines, type GuidelinesShape } from './guidelinesSectionUtils';
 
 interface EnhancedGuidelinesSectionProps {
-  guidelines?: Guidelines | null;
+  guidelines?: GuidelinesShape | null;
   domainName: string;
   bestPractices?: string[];
   avoidElements?: string[];
@@ -44,6 +34,7 @@ interface EnhancedGuidelinesSectionProps {
   headlineFormulas?: Array<{pattern: string; example: string; category: string}>;
   contentBriefs?: Array<{topic: string; target_keyword: string; target_audience: string; word_count: number; suggested_sections: string[]}>;
   competitiveAngles?: Array<{angle: string; differentiator: string; headline_example: string}>;
+  hideTitle?: boolean;
 }
 
 const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
@@ -55,22 +46,38 @@ const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
   headlineFormulas,
   contentBriefs,
   competitiveAngles,
+  hideTitle = false,
 }) => {
   const styles = useOnboardingStyles();
 
-  if (!guidelines) {
-    return null;
+  const extras = {
+    bestPractices,
+    avoidElements,
+    contentTemplates,
+    headlineFormulas,
+    contentBriefs,
+    competitiveAngles,
+  };
+
+  if (!hasRenderableGuidelines(guidelines, extras)) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        Guidelines are not available yet for {domainName}. Complete website analysis or refresh to generate them.
+      </Typography>
+    );
   }
 
   return (
-    <Box sx={styles.analysisSection}>
-      <Typography variant="h5" sx={styles.analysisSectionHeader} gutterBottom>
-        <LightbulbIcon color="primary" />
-        Enhanced Content Guidelines for {domainName}
-      </Typography>
-      
+    <Box sx={hideTitle ? undefined : styles.analysisSection}>
+      {!hideTitle && (
+        <Typography variant="h5" sx={styles.analysisSectionHeader} gutterBottom>
+          <LightbulbIcon color="primary" />
+          Enhanced Content Guidelines for {domainName}
+        </Typography>
+      )}
+
       <Grid container spacing={2}>
-        {guidelines.tone_recommendations && (
+        {hasArrayContent(guidelines?.tone_recommendations) && (
           <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
             {renderGuidelinesCard(
               'Tone Recommendations',
@@ -81,7 +88,7 @@ const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
           </Grid>
         )}
         
-        {guidelines.brand_alignment && (
+        {hasArrayContent(guidelines?.brand_alignment) && (
           <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
             {renderGuidelinesCard(
               'Brand Alignment',
@@ -92,7 +99,7 @@ const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
           </Grid>
         )}
         
-        {guidelines.audience_considerations && (
+        {hasArrayContent(guidelines?.audience_considerations) && (
           <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
             {renderGuidelinesCard(
               'Audience Considerations',
@@ -103,7 +110,7 @@ const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
           </Grid>
         )}
         
-        {guidelines.structure_guidelines && (
+        {hasArrayContent(guidelines?.structure_guidelines) && (
           <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
             {renderGuidelinesCard(
               'Structure Guidelines',
@@ -114,7 +121,7 @@ const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
           </Grid>
         )}
         
-        {guidelines.seo_optimization && (
+        {hasArrayContent(guidelines?.seo_optimization) && (
           <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
             {renderGuidelinesCard(
               'SEO Optimization',
@@ -125,7 +132,7 @@ const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
           </Grid>
         )}
         
-        {guidelines.conversion_optimization && (
+        {hasArrayContent(guidelines?.conversion_optimization) && (
           <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
             {renderGuidelinesCard(
               'Conversion Optimization',
@@ -136,7 +143,7 @@ const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
           </Grid>
         )}
         
-        {guidelines.engagement_tips && (
+        {hasArrayContent(guidelines?.engagement_tips) && (
           <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
             {renderGuidelinesCard(
               'Engagement Tips',
@@ -147,7 +154,7 @@ const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
           </Grid>
         )}
         
-        {guidelines.vocabulary_suggestions && (
+        {hasArrayContent(guidelines?.vocabulary_suggestions) && (
           <Grid item xs={12} sm={6} md={6} sx={{ display: 'flex' }}>
             {renderGuidelinesCard(
               'Vocabulary Suggestions',

@@ -325,6 +325,14 @@ describe('Content Matrix — Brand Voice', () => {
     fireEvent.click(editSwitch);
     expect(screen.getAllByRole('textbox').length).toBeGreaterThan(0);
   });
+
+  it('Brand × Guidelines renders style guideline cards from full guidelines data', () => {
+    fireEvent.click(screen.getByTestId('top-tab-guidelines'));
+    const stage = screen.getByTestId('content-stage');
+    expect(within(stage).getByText('Brand Alignment')).toBeInTheDocument();
+    expect(within(stage).getByText('Always mention core values')).toBeInTheDocument();
+    expect(within(stage).queryByText(/Enhanced Content Guidelines for/i)).not.toBeInTheDocument();
+  });
 });
 
 describe('Content Matrix — SEO Audit', () => {

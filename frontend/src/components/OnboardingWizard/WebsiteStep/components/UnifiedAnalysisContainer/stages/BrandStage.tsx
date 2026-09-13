@@ -74,12 +74,10 @@ const BrandStage: React.FC<BrandStageProps> = ({
       <Box sx={{ p: 2 }}>
         <SectionHeader title="Style Guidelines" icon={<AutoAwesomeIcon />} />
         <EnhancedGuidelinesSection
-          guidelines={{
-            brand_alignment: analysis.guidelines?.brand_alignment,
-            conversion_optimization: analysis.guidelines?.conversion_optimization,
-          }}
+          guidelines={analysis.guidelines ?? undefined}
           domainName={domainName}
           competitiveAngles={analysis.competitive_angles}
+          hideTitle
         />
       </Box>
     );

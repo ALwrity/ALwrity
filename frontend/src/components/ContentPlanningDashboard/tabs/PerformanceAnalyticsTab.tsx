@@ -7,9 +7,15 @@ import {
   Typography
 } from '@mui/material';
 import { useContentPlanningStore } from '../../../stores/contentPlanningStore';
+import MonitoringTasksHealthCard from '../components/MonitoringTasksHealthCard';
 
 const PerformanceAnalyticsTab: React.FC = () => {
-  const { performanceMetrics } = useContentPlanningStore();
+  const { performanceMetrics, currentStrategy } = useContentPlanningStore();
+
+  // Strict numeric id only — no user_id/1 fallbacks. The card renders
+  // nothing without a real strategy id (fail-fast, never fabricated).
+  const numericId = Number(currentStrategy?.id);
+  const strategyId = Number.isFinite(numericId) && numericId > 0 ? numericId : null;
 
   return (
     <Box sx={{ p: 3 }}>
@@ -50,6 +56,11 @@ const PerformanceAnalyticsTab: React.FC = () => {
           No performance analytics data available
         </Typography>
       )}
+
+      {/* Monitoring tasks — Phase 3b: live scheduler health + constrained
+          schedule editing (frequency / pause-resume). Independent of the
+          analytics payload above; the card owns its loading/error states. */}
+      <MonitoringTasksHealthCard strategyId={strategyId} />
     </Box>
   );
 };

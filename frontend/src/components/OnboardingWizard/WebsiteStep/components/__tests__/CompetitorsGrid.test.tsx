@@ -28,7 +28,9 @@ describe('CompetitorsGrid', () => {
     );
 
     expect(screen.getByText(/Discovered Competitors \(1\)/)).toBeInTheDocument();
-    expect(screen.getByText(DISCOVERED_COMPETITORS_DESCRIPTION)).toBeInTheDocument();
+    const description = screen.getByText(DISCOVERED_COMPETITORS_DESCRIPTION);
+    expect(description).toBeInTheDocument();
+    expect(description).toHaveStyle({ whiteSpace: 'nowrap' });
   });
 
   it('renders visible view mode toggle controls', () => {

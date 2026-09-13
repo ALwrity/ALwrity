@@ -28,13 +28,13 @@ export const folderTabsContainerSx: SxProps<Theme> = {
     overflow: 'visible !important',
   },
   '& .MuiTabs-flexContainer': {
-    alignItems: 'flex-end',
+    alignItems: 'stretch',
     width: '100%',
     gap: 0,
     overflow: 'visible',
   },
   '& .MuiTab-root': {
-    minHeight: 72,
+    minHeight: 88,
     overflow: 'visible',
     opacity: 1,
     maxWidth: 'none',

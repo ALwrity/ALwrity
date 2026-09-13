@@ -5,6 +5,8 @@ from datetime import datetime
 
 from services.llm_providers.gemini_provider import gemini_structured_json_response
 from services.strategy_service import StrategyService
+from services.monitoring_metrics import ALLOWED_METRICS, ALLOWED_FREQUENCIES, ALLOWED_ASSIGNEES, ALLOWED_COMPONENTS, LEGACY_METRIC_MAP
+from services.deterministic_monitoring_factory import DeterministicMonitoringFactory
 
 logger = logging.getLogger(__name__)
 
@@ -12,44 +14,37 @@ class MonitoringPlanGenerator:
     def __init__(self):
         self.strategy_service = StrategyService()
     
-    async def generate_monitoring_plan(self, strategy_id: int) -> Dict[str, Any]:
-        """Generate comprehensive monitoring plan for a strategy"""
-        
+    async def generate_monitoring_plan(self, strategy_id: int, user_id: str = None, use_deterministic: bool = True) -> Dict[str, Any]:
+        """Generate comprehensive monitoring plan for a strategy (deterministic by default)."""
         try:
-            # Get strategy data
             strategy_data = await self.strategy_service.get_strategy_by_id(strategy_id)
-            
             if not strategy_data:
                 raise Exception(f"Strategy with ID {strategy_id} not found")
-            
-            # Prepare prompt context
             prompt_context = self._prepare_prompt_context(strategy_data)
             logger.debug(
                 "MonitoringPlanGenerator: Prepared prompt context | strategy_id=%s | keys=%s",
                 strategy_id,
                 list(prompt_context.keys())
             )
-            
-            # Generate monitoring plan using AI
-            monitoring_plan = await self._generate_plan_with_ai(prompt_context)
-            
-            # Validate the plan structure
+            if use_deterministic:
+                factory = DeterministicMonitoringFactory()
+                monitoring_plan = factory.build_plan(strategy_data, user_id=user_id)
+                logger.info(f"MonitoringPlanGenerator: Deterministic plan built | total={monitoring_plan.get('totalTasks')}")
+            else:
+                monitoring_plan = await self._generate_plan_with_ai(prompt_context)
             if not self._validate_monitoring_plan(monitoring_plan):
                 raise Exception("Generated monitoring plan has invalid structure")
-            
-            # Validate and enhance the plan
             enhanced_plan = await self._enhance_monitoring_plan(monitoring_plan, strategy_data)
-            
-            # Save monitoring plan to database
             await self._save_monitoring_plan(strategy_id, enhanced_plan)
-            
             logger.info(f"Successfully generated monitoring plan for strategy {strategy_id}")
             return enhanced_plan
-            
         except Exception as e:
             logger.error(f"Error generating monitoring plan for strategy {strategy_id}: {e}")
-            # Don't mark as success if there's an error
             raise Exception(f"Failed to generate monitoring plan: {str(e)}")
+
+    def generate_deterministic_plan(self, strategy_data: Dict[str, Any], user_id: str = None) -> Dict[str, Any]:
+        factory = DeterministicMonitoringFactory()
+        return factory.build_plan(strategy_data, user_id=user_id)
     
     def _prepare_prompt_context(self, strategy_data: Dict[str, Any]) -> Dict[str, Any]:
         """Prepare context for AI prompt"""
@@ -436,48 +431,51 @@ Return a JSON object with monitoringTasks array containing 8 task objects."""
             # Don't raise the error as the plan generation was successful
     
     def _validate_monitoring_plan(self, plan: Dict[str, Any]) -> bool:
-        """Validate the structure of the generated monitoring plan"""
         try:
-            # Check that monitoringTasks is a list and has content
             monitoring_tasks = plan.get("monitoringTasks", [])
             if not isinstance(monitoring_tasks, list):
                 logger.error("monitoringTasks must be a list")
                 return False
-            
             if len(monitoring_tasks) == 0:
                 logger.error("No monitoring tasks generated")
                 return False
-            
-            # Validate we have the expected number of tasks (8)
-            if len(monitoring_tasks) != 8:
-                logger.warning(f"Expected 8 tasks, got {len(monitoring_tasks)}")
-            
-            # Validate each task structure
+            if not (3 <= len(monitoring_tasks) <= 13):
+                logger.warning(f"Monitoring tasks count out of deterministic range 3-13, got {len(monitoring_tasks)}")
             required_task_fields = [
-                "component", "title", "description", "assignee", "frequency", 
+                "component", "title", "description", "assignee", "frequency",
                 "metric", "measurementMethod", "successCriteria", "alertThreshold", "actionableInsights"
             ]
-            
             for i, task in enumerate(monitoring_tasks):
                 for field in required_task_fields:
                     if field not in task:
                         logger.error(f"Task {i} missing required field: {field}")
                         return False
-                
-                # Validate assignee is either "ALwrity" or "Human"
-                if task.get("assignee") not in ["ALwrity", "Human"]:
+                if task.get("assignee") not in ALLOWED_ASSIGNEES:
                     logger.error(f"Task {i} has invalid assignee: {task.get('assignee')}")
                     return False
-            
-            # Validate computed totals are present (added after AI response)
+                if task.get("frequency") not in ALLOWED_FREQUENCIES:
+                    logger.error(f"Task {i} has invalid frequency: {task.get('frequency')}")
+                    return False
+                if task.get("component") not in ALLOWED_COMPONENTS:
+                    logger.error(f"Task {i} has invalid component: {task.get('component')}")
+                    return False
+                metric = task.get("metric")
+                if metric not in ALLOWED_METRICS:
+                    if metric in LEGACY_METRIC_MAP:
+                        logger.warning(f"Task {i} legacy metric {metric} mapped to {LEGACY_METRIC_MAP[metric]}")
+                    else:
+                        logger.error(f"Task {i} has hallucinated metric: {metric} not in allow-list")
+                        return False
+                tool = task.get("tool") or task.get("measurementMethod")
+                if task.get("assignee") == "ALwrity" and tool == "manual.human_review":
+                    logger.error(f"Task {i} ALwrity task cannot use manual.human_review")
+                    return False
             computed_fields = ["totalTasks", "alwrityTasks", "humanTasks", "metricsCount"]
             for field in computed_fields:
                 if field not in plan:
                     logger.error(f"Missing computed field in monitoring plan: {field}")
                     return False
-            
             return True
-            
         except Exception as e:
             logger.error(f"Error validating monitoring plan: {e}")
             return False

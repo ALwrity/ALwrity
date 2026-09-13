@@ -241,14 +241,42 @@ def prioritize_proposals(
         preferences = {}
     preferred_pillars = {str(value).lower() for value in preferences.get("priority_pillars", [])}
     provider_status = ((preflight or {}).get("checks") or {}).get("providers", {}).get("status")
+
+    # Phase 3A: strategy context — compact digest of the active strategy.
+    # Builds a token set from its KPI metrics / roadmap milestones, so
+    # proposals that advance the active plan get a measurable boost without
+    # manufacturing any new tasks (the "not drowned by it" guardrail).
+    strategy_ctx = grounding.get("strategy_context") if isinstance(grounding.get("strategy_context"), dict) else {}
+    strategy_tokens: set = set()
+    if strategy_ctx.get("status") == "available":
+        for kpi in strategy_ctx.get("kpi_targets") or []:
+            strategy_tokens |= set(re.findall(r"[a-z0-9]+", str(kpi.get("metric") or "").lower()))
+        for milestone in strategy_ctx.get("roadmap") or []:
+            strategy_tokens |= set(re.findall(r"[a-z0-9]+", str(milestone.get("milestone") or "").lower()))
+            strategy_tokens |= set(re.findall(r"[a-z0-9]+", str(milestone.get("phase") or "").lower()))
+        for goal in strategy_ctx.get("goals") or []:
+            strategy_tokens |= set(re.findall(r"[a-z0-9]+", str(goal).lower()))
+        positioning = strategy_ctx.get("positioning") or ""
+        strategy_tokens |= set(re.findall(r"[a-z0-9]+", str(positioning).lower()))
+
     items = [dict(proposal) for proposal in proposals or []]
     pillar_counts: Dict[str, int] = {}
     for proposal in items:
         pillar = proposal.get("pillar") or "unknown"
         pillar_counts[pillar] = pillar_counts.get(pillar, 0) + 1
 
+    # Whether a proposal shares vocabulary with the active strategy. When a
+    # strategy context exists, the factor is the fraction of the proposal's
+    # own tokens found in the strategy vocabulary (more precise than inverse
+    # vocab size, which dilutes specific matches).
     for proposal in items:
         tokens = _tokens(proposal)
+        if strategy_tokens and tokens:
+            strategy_alignment_value = (
+                len(tokens & strategy_tokens) / len(tokens)
+            )
+        else:
+            strategy_alignment_value = 0.5
         factors = {
             "business_goal_alignment": (
                 len(tokens & goal_tokens) / len(goal_tokens) if goal_tokens else 0.5
@@ -262,11 +290,12 @@ def prioritize_proposals(
             "user_preferences": 1.0 if proposal.get("pillar", "").lower() in preferred_pillars else (0.5 if preferred_pillars else 0.5),
             "pillar_coverage": 1.0 / max(1, pillar_counts.get(proposal.get("pillar") or "unknown", 1)),
             "priority": PRIORITY_RANK.get(str(proposal.get("priority") or "medium").lower(), 2) / 3.0,
+            "strategy_alignment": strategy_alignment_value,
         }
         weights = {
-            "business_goal_alignment": 0.18,
+            "business_goal_alignment": 0.14,
             "evidence_quality": 0.18,
-            "expected_impact": 0.16,
+            "expected_impact": 0.14,
             "effort": 0.10,
             "urgency": 0.10,
             "existing_task_history": 0.08,
@@ -274,6 +303,7 @@ def prioritize_proposals(
             "user_preferences": 0.05,
             "pillar_coverage": 0.05,
             "priority": 0.05,
+            "strategy_alignment": 0.06,
         }
         proposal["selection_factors"] = factors
         proposal["selection_score"] = round(sum(factors[key] * weights[key] for key in weights), 4)
@@ -288,6 +318,8 @@ def prioritize_proposals(
             reasons.append("has a current deadline")
         if factors["pillar_coverage"] < 1.0:
             reasons.append("helps balance pillar coverage")
+        if factors["strategy_alignment"] > 0.5:
+            reasons.append("aligned with the active content strategy")
         proposal["selection_reason"] = reasons or ["passed the meeting review"]
     return sorted(
         items,

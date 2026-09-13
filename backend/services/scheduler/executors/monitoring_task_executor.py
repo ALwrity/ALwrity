@@ -3,11 +3,10 @@ Monitoring Task Executor
 Handles execution of content strategy monitoring tasks.
 """
 
-import hashlib
 import logging
 import re
 import time
-from datetime import datetime, date
+from datetime import datetime
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 
@@ -97,7 +96,13 @@ class MonitoringTaskExecutor(TaskExecutor):
             )
 
             if result.success:
-                task.status = 'completed'
+                task.status = 'active'
+                task.last_executed = datetime.utcnow()
+                task.next_execution = self.calculate_next_execution(
+                    task,
+                    task.frequency,
+                    task.last_executed
+                )
             else:
                 task.status = 'failed'
 
@@ -162,19 +167,6 @@ class MonitoringTaskExecutor(TaskExecutor):
                 retry_delay=300
             )
 
-    def _simulate_metric_value(self, task: MonitoringTask, metric_name: str) -> float:
-        """
-        Generate a deterministic simulated metric value that changes daily.
-
-        Uses task.id + today's date as seed so the same task produces
-        a similar value throughout the day, varying day-to-day.
-        Scales into the 0.0–1.0 range for threshold evaluation.
-        """
-        today = date.today().isoformat()
-        seed = f"{task.id}_{metric_name}_{today}"
-        digest = hashlib.md5(seed.encode()).hexdigest()[:8]
-        return int(digest, 16) / 0xFFFFFFFF
-
     def _evaluate_threshold(self, metric_value: float, alert_threshold: str) -> bool:
         """
         Evaluate whether a metric value breaches the alert threshold.
@@ -229,78 +221,41 @@ class MonitoringTaskExecutor(TaskExecutor):
         return True
 
     async def _execute_alwrity_task(self, task: MonitoringTask, db: Session, user_id: Any) -> TaskExecutionResult:
-        """
-        Execute an ALwrity automated monitoring task.
+        """Execute an ALwrity automated monitoring task on REAL tools.
 
-        Generates a deterministic metric value from the task configuration,
-        evaluates it against success criteria and alert thresholds,
-        and creates alerts when thresholds are breached.
+        Delegates to ``monitoring_bridge.execute_alwrity_orm`` (Phase 3a):
+        ORM row -> deterministic task dict -> ``MonitoringExecutor``
+        real tool dispatch. Fail-fast — any tool error raises and is
+        returned as ``success=False`` with ``retryable=True``; no
+        simulated values, no stub payloads.
         """
         try:
-            self.logger.info(f"Executing ALwrity task: {task.task_title}")
-
-            metric_name = task.metric or "unknown"
-            measurement_method = task.measurement_method or "manual"
-            alert_threshold = task.alert_threshold or ""
-            success_criteria = task.success_criteria or ""
-
-            metric_value = self._simulate_metric_value(task, metric_name)
-            threshold_breached = self._evaluate_threshold(metric_value, alert_threshold)
-            criteria_met = self._evaluate_criteria(metric_value, success_criteria)
-
-            result_data = {
-                'metric_name': metric_name,
-                'measurement_method': measurement_method,
-                'metric_value': round(metric_value, 4),
-                'status': 'alert' if threshold_breached else ('measured' if not criteria_met else 'passed'),
-                'threshold_breached': threshold_breached,
-                'success_criteria_met': criteria_met,
-                'alert_threshold': alert_threshold,
-                'success_criteria': success_criteria,
-                'message': f"Task '{task.task_title}' executed successfully",
-                'timestamp': datetime.utcnow().isoformat()
-            }
-
-            if user_id:
-                try:
-                    from services.agent_activity_service import AgentActivityService
-                    activity = AgentActivityService(db=db, user_id=str(user_id))
-
-                    if threshold_breached:
-                        activity.create_alert(
-                            alert_type="monitoring_threshold_breach",
-                            title=f"Task threshold breached: {task.task_title}",
-                            message=f"Metric '{metric_name}' value {metric_value:.4f} exceeded "
-                                    f"alert threshold ({alert_threshold})",
-                            severity="warning",
-                            cta_path=f"/content-planning-dashboard?task={task.id}",
-                            dedupe_key=f"monitoring_threshold_{task.id}",
-                        )
-
-                    if not criteria_met:
-                        activity.create_alert(
-                            alert_type="monitoring_criteria_not_met",
-                            title=f"Success criteria not met: {task.task_title}",
-                            message=f"Metric '{metric_name}' value {metric_value:.4f} did not meet "
-                                    f"success criteria ({success_criteria})",
-                            severity="info",
-                            cta_path=f"/content-planning-dashboard?task={task.id}",
-                            dedupe_key=f"monitoring_criteria_{task.id}",
-                        )
-                except Exception as alert_error:
-                    self.logger.warning(f"Failed to create alert for task {task.id}: {alert_error}")
-
-            return TaskExecutionResult(
-                success=True,
-                result_data=result_data
+            self.logger.info(
+                f"Executing ALwrity task: {task.task_title} | "
+                f"task_id={task.id} user_id={user_id} metric={task.metric}"
             )
-
+            from .monitoring_bridge import execute_alwrity_orm
+            tool_result = await execute_alwrity_orm(task, db, user_id)
+            metric_name = task.metric or "unknown"
+            result_data = {
+                "metric_name": metric_name,
+                "measurement_method": task.measurement_method or "unknown",
+                "tool_result": tool_result,
+                "status": "measured",
+                "message": f"Task '{task.task_title}' executed on real tools",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+            return TaskExecutionResult(success=True, result_data=result_data)
         except Exception as e:
-            self.logger.error(f"Error in ALwrity task execution: {e}")
+            # Fail fast: surface the real error, never a fake value.
+            self.logger.error(
+                f"Real tool execution failed for task {task.id} "
+                f"metric={task.metric}: {e}"
+            )
             return TaskExecutionResult(
                 success=False,
                 error_message=str(e),
-                retryable=True
+                retryable=True,
             )
 
     async def _execute_human_task(self, task: MonitoringTask, db: Session, user_id: Any) -> TaskExecutionResult:
