@@ -1,4 +1,4 @@
-import React, { useState, Fragment } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import {
   Typography,
   TextField,
@@ -45,9 +45,11 @@ const validateInputs = (
 interface SeoToolCardProps {
   def: ToolDef;
   siteUrl: string;
+  /** Phase 12 (plan C3): onboarding-derived initial values (real data only). */
+  prefill?: Record<string, string>;
 }
 
-const SeoToolCard: React.FC<SeoToolCardProps> = ({ def, siteUrl }) => {
+const SeoToolCard: React.FC<SeoToolCardProps> = ({ def, siteUrl, prefill }) => {
   const nextSignal = useAbortableRequest();
   const [values, setValues] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
@@ -58,6 +60,14 @@ const SeoToolCard: React.FC<SeoToolCardProps> = ({ def, siteUrl }) => {
         initial[input.name] = siteUrl;
       } else {
         initial[input.name] = '';
+      }
+    }
+    // Only apply prefill keys the card actually owns — never inject unknown fields.
+    if (prefill) {
+      for (const [name, value] of Object.entries(prefill)) {
+        if (def.inputs.some((input) => input.name === name) && typeof value === 'string') {
+          initial[name] = value;
+        }
       }
     }
     return initial;
@@ -76,6 +86,25 @@ const SeoToolCard: React.FC<SeoToolCardProps> = ({ def, siteUrl }) => {
   // re-executed. `onView` renders the stored result, `onClear` empties the
   // per-tool list.
   const [history, setHistory] = useState<ToolRunRecord[]>(() => toolHistoryFor(def.id));
+
+  // Phase 12 (plan C3): onboarding prefill usually arrives AFTER mount (async
+  // fetch in the panel), so apply it to still-empty owned fields when it lands;
+  // never overwrite anything the user has already typed.
+  useEffect(() => {
+    if (!prefill) return;
+    setValues((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const [name, value] of Object.entries(prefill)) {
+        const ownsField = def.inputs.some((input) => input.name === name);
+        if (ownsField && typeof value === 'string' && value && !prev[name]) {
+          next[name] = value;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [prefill, def.inputs]);
 
   const missingRequired = def.inputs.some(
     (input) => input.required && !(values[input.name] ?? '').trim(),

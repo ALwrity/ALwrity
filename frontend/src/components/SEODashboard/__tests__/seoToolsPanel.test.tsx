@@ -4,6 +4,15 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import SeoToolsPanel from '../components/SeoToolsPanel/SeoToolsPanel';
 import { seoApiService } from '../../../services/seoApiService';
+import { onboardingSeoInsightsApi } from '../../../api/onboardingSeoInsights';
+
+vi.mock('../../../api/onboardingSeoInsights', () => ({
+  onboardingSeoInsightsApi: {
+    getPrefill: vi.fn(),
+    persistOnPageAudit: vi.fn(),
+    requestGscSnapshot: vi.fn(),
+  },
+}));
 
 vi.mock('../../../services/seoApiService', () => ({
   seoApiService: {
@@ -30,6 +39,34 @@ const mocked = (fn: unknown) => vi.mocked(fn as (...a: any[]) => Promise<any>);
 describe('Phase C — SeoToolsPanel user-fired tools', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: no onboarding prefill (opt-in per test).
+    mocked(onboardingSeoInsightsApi.getPrefill as any).mockResolvedValue({
+      website_url: '',
+      keywords: [],
+      source: 'onboarding',
+    });
+  });
+
+  // Phase 12 (plan C3): onboarding pillars prefill the meta tool.
+  it('prefills the meta tool with onboarding content pillars and fires them', async () => {
+    mocked(onboardingSeoInsightsApi.getPrefill as any).mockResolvedValue({
+      website_url: 'https://example.com',
+      keywords: ['seo', 'content'],
+      source: 'onboarding',
+    });
+    mocked(seoApiService.generateMetaDescriptions).mockResolvedValue({ ok: true });
+    render(<SeoToolsPanel siteUrl="https://example.com" />);
+
+    const keywordsField = await screen.findByLabelText(/keywords for meta/i);
+    await waitFor(() => expect(keywordsField).toHaveValue('seo, content'));
+
+    fireEvent.click(screen.getByRole('button', { name: /run meta/i }));
+    await waitFor(() => {
+      expect(seoApiService.generateMetaDescriptions).toHaveBeenCalledWith(
+        expect.objectContaining({ keywords: ['seo', 'content'] }),
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+    });
   });
 
   it.each([
