@@ -66,6 +66,37 @@ async def test_save_dedupes_persist_row(sqlite_session):
 
 
 @pytest.mark.asyncio
+async def test_save_events_idempotent_on_resave(sqlite_session):
+    """R4.1: retrying/partial re-saving a session must NOT duplicate
+    CalendarEvent rows - save-is-twice counts events once."""
+    from models.content_planning import CalendarEvent, ContentStrategy
+
+    strategy = ContentStrategy(user_id=1, name="S", industry="saas")
+    sqlite_session.add(strategy)
+    sqlite_session.commit()
+
+    service = _service(sqlite_session)
+    calendar_data = {
+        "calendar_type": "monthly",
+        "daily_schedule": [
+            {"date": "2026-01-05", "content_items": [
+                {"title": "T", "description": "D",
+                 "content_type": "blog", "target_platform": "LinkedIn"}
+            ]},
+        ],
+    }
+    await service._save_calendar_to_db("user-123", strategy.id, calendar_data, "dup-sid")
+    await service._save_calendar_to_db("user-123", strategy.id, calendar_data, "dup-sid")
+
+    events = (
+        sqlite_session.query(CalendarEvent)
+        .filter(CalendarEvent.strategy_id == strategy.id)
+        .all()
+    )
+    assert len(events) == 1, "re-saving an identical calendar must be idempotent"
+
+
+@pytest.mark.asyncio
 async def test_save_loud_on_db_failure():
     service = object.__new__(CalendarGenerationService)
 
