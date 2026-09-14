@@ -1,10 +1,9 @@
 # Calendar + SIF Production Readiness — Phased Remediation Plan
 
-> Status 2026-09-13: R1 COMPLETE (R1.1–R1.4). R2: R2.1 DONE (task-owned DB
-> sessions), R2.3 DONE (durable progress reads), R2.5 DONE (service split:
-> 1,663-line module → core 318 + registry 602 + ops 675, no behavior change).
-> R2.2/R2.4 pending (R2.2 = naming gap, R2.4 = cancellation). Source:
-> production-readiness review of
+> Status 2026-09-13: R1 COMPLETE (R1.1–R1.4) + **R2 COMPLETE** (R2.1 task-
+> owned DB sessions, R2.3 durable progress reads, R2.4 cancellation stops
+> the task, R2.5 service split 1,663→318 core). Source: production-readiness
+> review of
 > the content calendar feature (backend lifecycle + SIF + frontend + migrations)
 > performed after SIF Phase A (backend) and Phase D (frontend) implementation.
 > Verdict at review time: **NOT READY for production** — 5 critical, 7 high,
@@ -266,17 +265,33 @@ Golden contract: existing suites unchanged and green — full battery
 task-owned 9, progress-route, generation-service). py_compile clean.
 Touch: `calendar_generation_service.py` + 2 new modules.
 
-### R2.4 Cancellation cancels the task (H2)
+### R2.4 Cancellation cancels the task (H2) ✅ DONE
 Problem: the created task is not retained (`calendar_generation.py:511`);
-`cancel_orchestrator_session` (`calendar_generation_service.py:1230-1255`) only
-sets status; the orchestrator keeps burning AI spend and later overwrites
-`cancelled` → `completed` (`:1198`).
+`cancel_orchestrator_session` (registry) only sets status; the orchestrator
+keeps burning AI spend and later overwrites `cancelled` → `completed`.
 Fix: keep a `asyncio.Task` reference per session; on cancel, `task.cancel()` and
 mark terminal so late completion cannot overwrite (`if session["status"] ==
 "cancelled": skip`). Await/observe cancellation in `start_orchestrator_generation`.
 TDD: cancel mid-run → task cancelled, session stays `cancelled`, no events, no
 SIF dispatch, no status overwrite.
-Touch: `calendar_generation_service.py`, `calendar_generation.py`, tests.
+**DONE 2026-09-13:**
+- `calendar_session_registry` gains module-level `_active_generation_tasks`
+  + `register/unregister/get_generation_task`; `cancel_orchestrator_session`
+  now cancels the registered task (if running) and pops the entry;
+- `run_generation_task` registers `asyncio.current_task()` at entry and
+  unregisters idempotently in `finally`;
+- `start_orchestrator_generation` refuses to (re)start a TERMINAL session
+  and ignores late orchestrator results on cancelled sessions — terminal
+  state wins, nothing persisted/dispatched after cancel;
+- `CancelledError` from the actually-cancelled task propagates naturally
+  (both broad `except Exception` layers skip BaseException), so the task
+  ends cancelled and the finally-block cleanup still runs.
+Route unchanged (registration happens inside the task-owned wrapper).
+Tests: `backend/tests/api/test_calendar_cancellation.py` (3): mid-run cancel
+cancels the awaiting task + durable row stays cancelled + no events/dispatch
++ registry entry dropped; late completion cannot overwrite cancelled; task
+self-unregisters. Golden battery **145 passed**.
+Touch: `calendar_session_registry.py` (via split), `calendar_generation_service.py`, tests.
 
 ---
 

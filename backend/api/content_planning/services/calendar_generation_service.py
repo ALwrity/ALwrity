@@ -152,6 +152,11 @@ class CalendarGenerationService(CalendarSessionRegistryMixin, CalendarGroundingO
                 session_info["error"] = "user_id missing from request_data"
             return
 
+        # R2.4: retain the running task so user cancel can actually stop it.
+        current_task = asyncio.current_task()
+        if current_task is not None:
+            self.register_generation_task(session_id, current_task)
+
         factory = getattr(self, "background_session_factory", None)
         if factory is None:
             from services.database.sessions import get_session_for_user as factory
@@ -177,6 +182,9 @@ class CalendarGenerationService(CalendarSessionRegistryMixin, CalendarGroundingO
                     task_session.close()
                 except Exception:
                     pass
+            # R2.4: the task no longer runs — drop its registry entry (even
+            # after a user-initiated cancel popped it, this is idempotent).
+            self.unregister_generation_task(session_id)
 
     async def start_orchestrator_generation(
         self,
@@ -202,6 +210,15 @@ class CalendarGenerationService(CalendarSessionRegistryMixin, CalendarGroundingO
             session = self.orchestrator_sessions.get(session_id)
             if not session:
                 logger.error(f"❌ Session {session_id} not found")
+                return
+
+            # R2.4: never run work on a terminal session — a cancelled session
+            # must not be (re)started into `running` by a re-entry call.
+            if session.get("status") in TERMINAL_STATUSES:
+                logger.warning(
+                    f"🚫 Session {session_id} is terminal "
+                    f"({session.get('status')}) — refusing to start generation"
+                )
                 return
             
             # Update session status
@@ -231,6 +248,16 @@ class CalendarGenerationService(CalendarSessionRegistryMixin, CalendarGroundingO
                 and result.get("status") == "completed"
                 and (result.get("daily_schedule") or result.get("final_calendar"))
             )
+
+            # R2.4: the user may have cancelled while the orchestrator ran.
+            # Terminal `cancelled` wins over ANY late orchestrator result —
+            # no completed status/result, no events, no SIF, no persist.
+            if session.get("status") == "cancelled":
+                logger.warning(
+                    f"🚫 Session {session_id} was cancelled — ignoring late "
+                    "orchestrator result"
+                )
+                return
 
             if is_real_calendar:
                 session["status"] = "completed"
