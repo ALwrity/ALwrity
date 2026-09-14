@@ -292,17 +292,26 @@ async def _run_indexing_lifecycle(
         # Index via txtai
         if sif_service is None:
             from services.intelligence.txtai_service import TxtaiIntelligenceService
-            sif_service = TxtaiIntelligenceService()
+            sif_service = TxtaiIntelligenceService(user_id)
 
-        sif_service.index_content(chunks)
+        embedded = await sif_service.index_content(chunks)
+        try:
+            embedded_count = int(embedded)
+        except (TypeError, ValueError):
+            embedded_count = 0
+        if embedded_count <= 0:
+            raise RuntimeError(
+                f"Calendar SIF embed produced {embedded_count} embeddings "
+                f"for {source_id}"
+            )
 
-        # Record watermark
+        # Record watermark with the ACTUAL embedded count
         CalendarSifWatermark.upsert(
             session,
             user_id,
             source_id,
             source_hash,
-            embedding_count=len(chunks),
+            embedding_count=embedded_count,
             notes="calendar generation completion",
         )
 
@@ -311,11 +320,11 @@ async def _run_indexing_lifecycle(
             user_id,
             source_id,
             STATUS_SUCCESS,
-            embedding_count=len(chunks),
+            embedding_count=embedded_count,
         )
         session.commit()
         logger.info(
-            f"📅 Calendar SIF indexed {len(chunks)} chunks for {source_id}"
+            f"📅 Calendar SIF indexed {embedded_count} chunks for {source_id}"
         )
 
     except Exception as exc:
