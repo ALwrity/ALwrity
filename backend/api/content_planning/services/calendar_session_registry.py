@@ -25,6 +25,10 @@ from models.content_planning import CalendarEvent
 # Global session store to persist across requests
 _global_orchestrator_sessions: dict = {}
 
+# R2.4: detached generation tasks per session, so a user cancel can actually
+# stop the work (not just flip a status). Registered by run_generation_task.
+_active_generation_tasks: dict = {}
+
 # Phase 2: canonical session statuses. "error" and "processing" are legacy
 # aliases accepted on read; new writes use initializing/running/completed/failed/cancelled.
 ACTIVE_STATUSES = ("initializing", "running")
@@ -38,6 +42,18 @@ _PERSIST_THROTTLE_SECONDS = 30
 
 class CalendarSessionRegistryMixin:
     """Mixin: orchestrator session registry, persistence and progress reads."""
+
+    # R2.4: task registry accessors (module-level store, shared across the
+    # process's service instances like _global_orchestrator_sessions).
+    def register_generation_task(self, session_id: str, task) -> None:
+        """Retain the running generation task for `session_id` (R2.4)."""
+        _active_generation_tasks[session_id] = task
+
+    def unregister_generation_task(self, session_id: str) -> None:
+        _active_generation_tasks.pop(session_id, None)
+
+    def get_generation_task(self, session_id: str):
+        return _active_generation_tasks.get(session_id)
 
     def initialize_orchestrator_session(self, session_id: str, request_data: Dict[str, Any]) -> bool:
         """Initialize a new orchestrator session with duplicate prevention."""
@@ -366,6 +382,13 @@ class CalendarSessionRegistryMixin:
                     f"owner={session.get('user_id')} requester={requester_user_id}"
                 )
                 return False
+            # R2.4: actually cancel the running generation task — status
+            # flips alone only stop the UI, not the AI spend.
+            task = _active_generation_tasks.get(session_id)
+            if task is not None and not task.done():
+                task.cancel()
+                logger.info(f"🛑 Cancelled generation task for session {session_id}")
+            _active_generation_tasks.pop(session_id, None)
             session["status"] = "cancelled"
             self._persist_session_to_db(session_id)
             logger.info(f"✅ Session {session_id} cancelled")
