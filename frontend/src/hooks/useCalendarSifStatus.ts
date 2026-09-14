@@ -38,6 +38,23 @@ export interface CalendarSifStatus {
   document_kinds: CalendarSifDocumentKinds | null;
 }
 
+/** R3.5: one search hit as labeled by GET .../calendar/sif-search. */
+export interface CalendarSifSearchHit {
+  id: string;
+  kind?: string;
+  kind_label?: string;
+  score?: number;
+  text?: string;
+}
+
+/** R3.5: the search endpoint's response (soft errors ride inside the 200). */
+export interface CalendarSifSearchResponse {
+  query: string;
+  source_id: string;
+  hits: CalendarSifSearchHit[];
+  error?: string;
+}
+
 export const DEFAULT_SIF_POLL_INTERVAL_MS = 5000;
 
 const ACTIVE_PHASES = new Set<CalendarSifIndexingPhase>(['pending', 'running']);

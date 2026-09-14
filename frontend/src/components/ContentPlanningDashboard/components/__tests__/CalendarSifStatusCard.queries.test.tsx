@@ -33,13 +33,13 @@ vi.mock('../../../../config/strategySifConfig', () => ({
   isCalendarSifCardEnabled: () => true,
 }));
 
-import { useCalendarSifStatus } from '../../../../hooks/useCalendarSifStatus';
+import { useCalendarSifStatus, type CalendarSifIndexingPhase } from '../../../../hooks/useCalendarSifStatus';
 import { contentPlanningApi } from '../../../../services/contentPlanningApi';
 
 const mockUseCalendarSifStatus = vi.mocked(useCalendarSifStatus);
 const mockSearchCalendarSif = vi.mocked(contentPlanningApi.searchCalendarSif);
 
-const indexing = (phase: string, over: Record<string, any> = {}) => ({
+const indexing = (phase: CalendarSifIndexingPhase, over: Record<string, any> = {}) => ({
   indexing: { phase, status: phase, embedding_count: 8, attempt: 1, ...over },
   watermark: { embedding_count: 8, indexed_at: '2026-01-01T00:00:01Z' },
   document_kinds: {
@@ -66,7 +66,7 @@ describe('CalendarSifStatusCard — preset semantic queries', () => {
   beforeEach(() => {
     mockUseCalendarSifStatus.mockReset();
     mockSearchCalendarSif.mockReset();
-    mockSearchCalendarSif.mockResolvedValue({ query: 'q', hits: [] });
+    mockSearchCalendarSif.mockResolvedValue({ query: 'q', source_id: 'user:user-42:calendar_latest', hits: [] });
   });
 
   it('renders the query panel when the calendar is searchable (success)', () => {
@@ -109,6 +109,7 @@ describe('CalendarSifStatusCard — preset semantic queries', () => {
     mockUseCalendarSifStatus.mockReturnValue(hookState({ data: indexing('success') }));
     mockSearchCalendarSif.mockResolvedValue({
       query: 'events',
+      source_id: 'user:user-42:calendar_latest',
       hits: [
         { id: 'd1', kind: 'daily_schedule', kind_label: 'Daily schedule', score: 0.92, text: 'detail' },
         { id: 'd2', kind: 'calendar_events', kind_label: 'Calendar events', score: 0.77, text: 'detail2' },
@@ -126,7 +127,7 @@ describe('CalendarSifStatusCard — preset semantic queries', () => {
   it('shows empty-state guidance when no results', async () => {
     const user = userEvent.setup();
     mockUseCalendarSifStatus.mockReturnValue(hookState({ data: indexing('success') }));
-    mockSearchCalendarSif.mockResolvedValue({ query: 'q', hits: [] });
+    mockSearchCalendarSif.mockResolvedValue({ query: 'q', source_id: 'user:user-42:calendar_latest', hits: [] });
 
     render(<CalendarSifStatusCard />);
     await user.click(screen.getByText('What events are scheduled?'));
@@ -151,6 +152,7 @@ describe('CalendarSifStatusCard — preset semantic queries', () => {
     // Backend deliberately returns HTTP 200 with a structured error on outages.
     mockSearchCalendarSif.mockResolvedValue({
       query: 'q',
+      source_id: 'user:user-42:calendar_latest',
       hits: [],
       error: 'txtai unavailable',
     });
@@ -167,7 +169,7 @@ describe('CalendarSifStatusCard — preset semantic queries', () => {
   it('true-empty results still show the no-match guidance (R3.2)', async () => {
     const user = userEvent.setup();
     mockUseCalendarSifStatus.mockReturnValue(hookState({ data: indexing('success') }));
-    mockSearchCalendarSif.mockResolvedValue({ query: 'q', hits: [] });
+    mockSearchCalendarSif.mockResolvedValue({ query: 'q', source_id: 'user:user-42:calendar_latest', hits: [] });
 
     render(<CalendarSifStatusCard />);
     await user.click(screen.getByText('What events are scheduled?'));

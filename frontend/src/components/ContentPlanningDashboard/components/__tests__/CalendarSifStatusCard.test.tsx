@@ -14,7 +14,7 @@ import { render, screen } from '@testing-library/react';
 import React from 'react';
 
 import CalendarSifStatusCard from '../CalendarSifStatusCard';
-import { CalendarSifStatus } from '../../../../hooks/useCalendarSifStatus';
+import { CalendarSifStatus, type CalendarSifIndexingPhase } from '../../../../hooks/useCalendarSifStatus';
 
 vi.mock('../../../../hooks/useCalendarSifStatus', () => ({
   useCalendarSifStatus: vi.fn(),
@@ -36,7 +36,7 @@ import { contentPlanningApi } from '../../../../services/contentPlanningApi';
 const mockUseCalendarSifStatus = vi.mocked(useCalendarSifStatus);
 const mockSearchCalendarSif = vi.mocked(contentPlanningApi.searchCalendarSif);
 
-const indexing = (phase: string, over: Record<string, any> = {}) => ({
+const indexing = (phase: CalendarSifIndexingPhase, over: Record<string, any> = {}) => ({
   indexing: { phase, status: phase, embedding_count: 8, attempt: 1, ...over },
   watermark: { embedding_count: 8, indexed_at: '2026-01-01T00:00:01Z' },
   document_kinds: {
