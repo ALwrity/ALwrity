@@ -144,6 +144,39 @@ describe('CalendarSifStatusCard — preset semantic queries', () => {
     expect(await screen.findByText('search failed')).toBeTruthy();
   });
 
+  it('surfaces a payload error as an outage, not as "no results" (R3.2)', async () => {
+    const user = userEvent.setup();
+    mockUseCalendarSifStatus.mockReturnValue(hookState({ data: indexing('success') }));
+    // Backend deliberately returns HTTP 200 with a structured error on outages.
+    mockSearchCalendarSif.mockResolvedValue({
+      query: 'q',
+      hits: [],
+      error: 'txtai unavailable',
+    });
+
+    render(<CalendarSifStatusCard />);
+    await user.click(screen.getByText('What events are scheduled?'));
+
+    expect(
+      await screen.findByTestId('calendar-sif-search-error'),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('calendar-sif-search-empty')).toBeNull();
+  });
+
+  it('true-empty results still show the no-match guidance (R3.2)', async () => {
+    const user = userEvent.setup();
+    mockUseCalendarSifStatus.mockReturnValue(hookState({ data: indexing('success') }));
+    mockSearchCalendarSif.mockResolvedValue({ query: 'q', hits: [] });
+
+    render(<CalendarSifStatusCard />);
+    await user.click(screen.getByText('What events are scheduled?'));
+
+    expect(
+      await screen.findByTestId('calendar-sif-search-empty'),
+    ).toBeTruthy();
+    expect(screen.queryByTestId('calendar-sif-search-error')).toBeNull();
+  });
+
   it('hides the query panel for not_indexed phase', () => {
     mockUseCalendarSifStatus.mockReturnValue(hookState({ data: indexing('not_indexed') }));
 

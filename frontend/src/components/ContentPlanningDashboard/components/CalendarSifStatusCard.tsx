@@ -142,6 +142,15 @@ const CalendarSifStatusCard: React.FC = () => {
     setSearchHits([]);
     try {
       const payload = await contentPlanningApi.searchCalendarSif(query, 4);
+      if (payload?.error) {
+        // R3.2: the backend deliberately returns HTTP 200 with a structured
+        // error on outages — an outage must never read as "no results".
+        setSearchError(
+          'Semantic search is temporarily unavailable — try again shortly.',
+        );
+        setSearchHits([]);
+        return;
+      }
       setSearchHits((payload?.hits || []) as SearchHit[]);
     } catch (e: any) {
       setSearchError(e?.message || 'Semantic search is unavailable right now.');
