@@ -41,6 +41,7 @@ function renderPlanStep(
   const props: React.ComponentProps<typeof PlanStep> = {
     userIdea: "Budget travel packing",
     durationType: "shorts",
+    aspectRatio: "9:16",
     language: "en",
     loading: false,
     referenceImage: "",
@@ -52,6 +53,7 @@ function renderPlanStep(
     scriptPhase: "idle",
     onIdeaChange: vi.fn(),
     onDurationChange: vi.fn(),
+    onAspectRatioChange: vi.fn(),
     onVideoTypeChange: vi.fn(),
     onTargetAudienceChange: vi.fn(),
     onVideoGoalChange: vi.fn(),
@@ -90,7 +92,7 @@ describe("YouTube PlanStep existing fields", () => {
     expect(screen.getByText("Primary Goal")).toBeTruthy();
     expect(screen.getByText("Brand Style / Visual Aesthetic")).toBeTruthy();
     expect(screen.getByText("Video Duration")).toBeTruthy();
-    expect(screen.getByText("Shorts (15-60 seconds)")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Shorts" })).toBeTruthy();
     expect(screen.getByText("Content Language")).toBeTruthy();
     expect(screen.getByText("English")).toBeTruthy();
   });
@@ -105,9 +107,9 @@ describe("YouTube PlanStep existing fields", () => {
 
   it("selects medium duration and educational video type", () => {
     const { props } = renderPlanStep();
-    fireEvent.mouseDown(screen.getByText("Shorts (15-60 seconds)"));
-    fireEvent.click(screen.getByRole("option", { name: /Medium \(1-4 minutes\)/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Medium" }));
     expect(props.onDurationChange).toHaveBeenCalledWith("medium");
+    expect(props.onAspectRatioChange).not.toHaveBeenCalled();
 
     fireEvent.mouseDown(screen.getByText(/Select video type/i));
     fireEvent.click(screen.getByRole("option", { name: /Educational \/ Explainer/i }));
@@ -218,20 +220,32 @@ describe("YouTube PlanStep existing fields", () => {
 
   it("shows the idea helper copy used on Plan", () => {
     renderPlanStep();
+    expect(screen.getByText(/Describe the topic in 1–2 sentences/i)).toBeTruthy();
+    expect(screen.queryByText(/your goal \(views, subscribers, sales/i)).toBeNull();
     expect(
-      screen.getByText(/Describe your video idea in 1-2 sentences/i),
-    ).toBeTruthy();
-    expect(
-      screen.getByPlaceholderText(/AI explains black holes in 60 seconds/i),
+      screen.getByPlaceholderText(/Budget travel packing for a Tokyo weekend/i),
     ).toBeTruthy();
   });
 
   it("lists shorts, medium, and long duration choices", () => {
     renderPlanStep();
-    fireEvent.mouseDown(screen.getByText("Shorts (15-60 seconds)"));
-    expect(screen.getByRole("option", { name: /Shorts \(15-60 seconds\)/i })).toBeTruthy();
-    expect(screen.getByRole("option", { name: /Medium \(1-4 minutes\)/i })).toBeTruthy();
-    expect(screen.getByRole("option", { name: /Long \(4-10 minutes\)/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Shorts" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Medium" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Long" })).toBeTruthy();
+  });
+
+  it("shows the idea field before Channel Bible", () => {
+    renderPlanStep();
+    const idea = screen.getByText("What's your video about?");
+    const bible = screen.getByTestId("channel-bible-panel");
+    expect(idea.compareDocumentPosition(bible) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("renders idea and basic setup as two separate pane cards", () => {
+    const { container } = renderPlanStep();
+    expect(container.querySelectorAll(".yt-plan-pane")).toHaveLength(2);
+    expect(screen.getByLabelText("Step 1")).toBeTruthy();
+    expect(screen.getByLabelText("Step 2")).toBeTruthy();
   });
 
   it("lists additional content languages from Plan", () => {

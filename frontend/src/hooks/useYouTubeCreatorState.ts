@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { VideoPlan, VideoPlanGeneration, VideoPlanResearchSource, Scene, SceneBuildGeneration } from '../services/youtubeApi';
 import { Resolution, DurationType, VideoType, YouTubeContentLanguage } from '../components/YouTubeCreator/constants';
+import { parseYouTubePlanAspect, type YouTubePlanAspect } from '../components/YouTubeCreator/components/youtubePlanAspect';
 import { parseYouTubePublishMetadata, type YouTubePublishMetadata } from '../components/YouTubeCreator/components/youtubePublishMetadata';
 
 export type YouTubeScriptPhase = 'idle' | 'pitch' | 'expanding' | 'ready';
@@ -25,6 +26,8 @@ export interface YouTubeCreatorState {
   // Step 1: Plan inputs
   userIdea: string;
   durationType: DurationType;
+  /** Draft frame for later stills/video. Not sent to pitch APIs in this slice. */
+  aspectRatio: YouTubePlanAspect;
   videoType: VideoType | '';
   targetAudience: string;
   videoGoal: string;
@@ -77,6 +80,7 @@ export interface YouTubeCreatorState {
 const DEFAULT_STATE: YouTubeCreatorState = {
   userIdea: '',
   durationType: 'medium',
+  aspectRatio: '16:9',
   videoType: '',
   targetAudience: '',
   videoGoal: '',
@@ -110,21 +114,33 @@ const STORAGE_KEY = 'youtube_creator_state';
 
 export const YOUTUBE_CREATOR_STATE_KEY = STORAGE_KEY;
 
+function normalizePersistedYouTubeCreatorState(parsed: Record<string, unknown>): YouTubeCreatorState {
+  const durationType =
+    parsed.durationType === "shorts" ||
+    parsed.durationType === "medium" ||
+    parsed.durationType === "long"
+      ? parsed.durationType
+      : DEFAULT_STATE.durationType;
+  return {
+    ...DEFAULT_STATE,
+    ...(parsed as Partial<YouTubeCreatorState>),
+    durationType,
+    scenes: Array.isArray(parsed.scenes) ? (parsed.scenes as YouTubeCreatorState["scenes"]) : [],
+    enableResearch: typeof parsed.enableResearch === "boolean" ? parsed.enableResearch : true,
+    pitchHistory: Array.isArray(parsed.pitchHistory)
+      ? (parsed.pitchHistory as YouTubeCreatorState["pitchHistory"])
+      : [],
+    scriptPhase: (parsed.scriptPhase as YouTubeCreatorState["scriptPhase"]) || "idle",
+    publishMetadata: parseYouTubePublishMetadata(parsed.publishMetadata),
+    aspectRatio: parseYouTubePlanAspect(parsed.aspectRatio, durationType),
+  };
+}
+
 export function getYouTubeCreatorStateSnapshot(): YouTubeCreatorState {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      const parsed = JSON.parse(saved);
-      return {
-        ...DEFAULT_STATE,
-        ...parsed,
-        scenes: Array.isArray(parsed.scenes) ? parsed.scenes : [],
-        enableResearch:
-          typeof parsed.enableResearch === "boolean" ? parsed.enableResearch : true,
-        pitchHistory: Array.isArray(parsed.pitchHistory) ? parsed.pitchHistory : [],
-        scriptPhase: parsed.scriptPhase || 'idle',
-        publishMetadata: parseYouTubePublishMetadata(parsed.publishMetadata),
-      };
+      return normalizePersistedYouTubeCreatorState(JSON.parse(saved) as Record<string, unknown>);
     }
   } catch (error) {
     console.error('[getYouTubeCreatorStateSnapshot] Failed to read state', error);
@@ -171,22 +187,13 @@ export const useYouTubeCreatorState = () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved);
-        
-        // Restore state with defaults for any missing fields
+        const parsed = JSON.parse(saved) as Record<string, unknown>;
         const restoredState: YouTubeCreatorState = {
-          ...DEFAULT_STATE,
-          ...parsed,
-          // Ensure arrays are arrays (not null/undefined)
-          scenes: Array.isArray(parsed.scenes) ? parsed.scenes : [],
-          enableResearch:
-            typeof parsed.enableResearch === "boolean" ? parsed.enableResearch : true,
-          pitchHistory: Array.isArray(parsed.pitchHistory) ? parsed.pitchHistory : [],
-          scriptPhase: parsed.scriptPhase || 'idle',
-          publishMetadata: parseYouTubePublishMetadata(parsed.publishMetadata),
-          // Ensure dates are preserved
-          createdAt: parsed.createdAt || new Date().toISOString(),
-          updatedAt: parsed.updatedAt || new Date().toISOString(),
+          ...normalizePersistedYouTubeCreatorState(parsed),
+          createdAt:
+            typeof parsed.createdAt === "string" ? parsed.createdAt : new Date().toISOString(),
+          updatedAt:
+            typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
         };
         
         console.log('[useYouTubeCreatorState] Restored state from localStorage:', {
@@ -196,6 +203,8 @@ export const useYouTubeCreatorState = () => {
           scenesCount: restoredState.scenes.length,
           activeStep: restoredState.activeStep,
           hasPublishMetadata: Boolean(restoredState.publishMetadata),
+          durationType: restoredState.durationType,
+          aspectRatio: restoredState.aspectRatio,
         });
         
         return restoredState;

@@ -31,6 +31,7 @@ function renderPlanStep() {
     <PlanStep
       userIdea="Budget travel packing"
       durationType="shorts"
+      aspectRatio="9:16"
       language="en"
       loading={false}
       referenceImage=""
@@ -42,6 +43,7 @@ function renderPlanStep() {
       scriptPhase="idle"
       onIdeaChange={noop}
       onDurationChange={noop}
+      onAspectRatioChange={noop}
       onVideoTypeChange={noop}
       onTargetAudienceChange={noop}
       onVideoGoalChange={noop}
