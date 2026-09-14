@@ -103,3 +103,38 @@
 .yt-plan-pill--selected:hover:not(:disabled) {
   background: #e60000;
 }
+
+.yt-plan-idea-field {
+  position: relative;
+}
+
+.yt-plan-idea-field .MuiOutlinedInput-root {
+  padding-bottom: 36px;
+}
+
+.yt-plan-mic {
+  position: absolute;
+  right: 8px;
+  bottom: 28px;
+  color: #0f0f0f;
+  z-index: 1;
+}
+
+.yt-plan-mic:hover {
+  color: #ff0000;
+}
+
+.yt-plan-mic--listening {
+  color: #ff0000;
+  animation: yt-plan-mic-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes yt-plan-mic-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}

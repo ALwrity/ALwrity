@@ -184,6 +184,14 @@ describe("YouTube PlanStep existing fields", () => {
     expect(screen.getByRole("progressbar")).toBeTruthy();
   });
 
+  it("shows Enhance Topic with AI without removing Generate Pitch or discovery shortcuts", () => {
+    renderPlanStep();
+    expect(screen.getByRole("button", { name: /enhance topic with ai/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /generate pitch/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /brainstorm video idea/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /blog \/ url → video/i })).toBeTruthy();
+  });
+
   it("shows Brainstorm and Blog/URL shortcuts from the idea field", () => {
     renderPlanStep();
     fireEvent.click(screen.getByRole("button", { name: /brainstorm video idea/i }));
