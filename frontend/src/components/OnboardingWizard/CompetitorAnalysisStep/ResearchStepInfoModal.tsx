@@ -11,7 +11,7 @@ import { lightTheme } from './competitorStepUiHelpers';
 import { ResearchStepInfoPanel } from './ResearchStepInfoPanel';
 import {
   RESEARCH_INFO_PANEL_TITLE,
-  RESEARCH_SECTION_HEADING_COLOR,
+  researchInfoPanelTitleSx,
 } from './researchStepInfoConstants';
 
 export {
@@ -56,7 +56,7 @@ export const ResearchStepInfoModal: React.FC<ResearchStepInfoModalProps> = ({ op
         variant="h6"
         component="span"
         fontWeight={700}
-        sx={{ color: RESEARCH_SECTION_HEADING_COLOR, display: 'block', textAlign: 'center' }}
+        sx={{ ...researchInfoPanelTitleSx, display: 'block', textAlign: 'center' }}
       >
         {RESEARCH_INFO_PANEL_TITLE}
       </Typography>

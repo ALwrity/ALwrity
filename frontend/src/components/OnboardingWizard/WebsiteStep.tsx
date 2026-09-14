@@ -23,6 +23,7 @@ import { apiClient } from '../../api/client';
 // Extracted utilities
 import { fixUrlFormat } from './WebsiteStep/utils';
 import { STEP0_NAV_TITLE } from './WebsiteStep/constants/websiteStepLayout';
+import { ONBOARDING_STEP_CONTENT_PADDING_X } from './common/wizardChromeLayout';
 import {
   ALL_FOLDER_TABS_VIEWED,
   isConnectStepFullyUnlocked,
@@ -201,7 +202,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({
       maxWidth: '100%',
       width: '100%',
       mx: 0,
-      px: { xs: 1.5, md: 2 },
+      px: ONBOARDING_STEP_CONTENT_PADDING_X,
       pb: 0,
       pt: { xs: 0.375, md: 0.625 },
       position: 'relative',
