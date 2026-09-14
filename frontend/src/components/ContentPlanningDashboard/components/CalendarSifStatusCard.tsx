@@ -290,6 +290,8 @@ const CalendarSifStatusCard: React.FC = () => {
         {isIndexed && (
           <Box
             data-testid="calendar-sif-try-queries"
+            role="status"
+            aria-live="polite"
             sx={{ mt: 2, p: 1.5, borderRadius: 2, bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}
           >
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -298,7 +300,7 @@ const CalendarSifStatusCard: React.FC = () => {
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
               Ask a question about your calendar and SIF retrieves the matching passage straight from your indexed calendar — no canned answers.
             </Typography>
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1, alignItems: 'stretch' }}>
               <TextField
                 size="small"
                 value={typedQuestion}
@@ -307,8 +309,9 @@ const CalendarSifStatusCard: React.FC = () => {
                   if (e.key === 'Enter') handleAsk();
                 }}
                 placeholder="Ask your calendar, e.g. what events are next week?"
+                aria-label="Search your calendar index"
                 disabled={searchBusy}
-                inputProps={{ 'data-testid': 'calendar-sif-question-input' }}
+                inputProps={{ 'data-testid': 'calendar-sif-question-input', 'aria-label': 'Search your calendar index' }}
                 sx={{ flex: 1 }}
               />
               <Button

@@ -73,7 +73,12 @@ const CalendarSifEducationDialog: React.FC<CalendarSifEducationDialogProps> = ({
 }) => {
   const parts = documentKindNames && documentKindNames.length > 0
     ? documentKindNames.map(
-        (name) => CALENDAR_KIND_PRESENTATION[name] ?? { ...UNKNOWN_PART, label: name },
+        (name) =>
+          CALENDAR_KIND_PRESENTATION[name] ?? {
+            // R5.5: unknown kinds render the readable fallback — never the raw id
+            label: 'Indexed part',
+            description: 'This part of your calendar is prepared for AI-powered search.',
+          },
       )
     : Object.values(CALENDAR_KIND_PRESENTATION);
 
@@ -107,7 +112,7 @@ const CalendarSifEducationDialog: React.FC<CalendarSifEducationDialogProps> = ({
         </Typography>
       </DialogTitle>
 
-      <DialogContent sx={{ p: 4 }}>
+      <DialogContent sx={{ p: { xs: 2, md: 4 } }}>
         <Typography variant="body1" sx={{ mb: 3, lineHeight: 1.7 }}>
           When your calendar is generated, ALWRity indexes it into a
           searchable knowledge base. Each part below becomes a searchable note
@@ -120,7 +125,7 @@ const CalendarSifEducationDialog: React.FC<CalendarSifEducationDialogProps> = ({
           sx={{ fontWeight: 600, color: '#667eea', display: 'flex', alignItems: 'center', gap: 1 }}
         >
           <LightbulbIcon fontSize="small" />
-          The 8 indexed parts
+          {`The ${parts.length} indexed parts`}
         </Typography>
         <List dense sx={{ py: 0 }}>
           {parts.map((part) => (

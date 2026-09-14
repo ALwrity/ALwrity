@@ -126,4 +126,20 @@ describe('CalendarSifStatusCard — plain-language status card', () => {
     const { container } = render(<CalendarSifStatusCard />);
     expect(container.firstChild).toBeNull();
   });
+
+  it('R5.3: the search input has an accessible NAME (aria-label)', () => {
+    mockUseCalendarSifStatus.mockReturnValue(hookState({ data: indexing('success') as any }));
+
+    render(<CalendarSifStatusCard />);
+    const input = screen.getByTestId('calendar-sif-question-input');
+    expect(input.getAttribute('aria-label')).toBeTruthy();
+  });
+
+  it('R5.3: the results region announces async updates', () => {
+    mockUseCalendarSifStatus.mockReturnValue(hookState({ data: indexing('success') as any }));
+
+    render(<CalendarSifStatusCard />);
+    const panel = screen.getByTestId('calendar-sif-try-queries');
+    expect(panel.getAttribute('aria-live')).toBe('polite');
+  });
 });
