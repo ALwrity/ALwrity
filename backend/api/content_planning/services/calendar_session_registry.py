@@ -437,6 +437,9 @@ class CalendarSessionRegistryMixin:
             # B4: deliver the assembled calendar only once the session
             # actually completed with a real result.
             "result": row.generated_calendar if status == "completed" else None,
+            # R6.2: durable fallback can't carry a live flag; the save itself
+            # couldn't commit. Surfaced as None here (memory-first read wins).
+            "persistence_error": None,
         }
 
     def get_orchestrator_progress(
@@ -504,7 +507,9 @@ class CalendarSessionRegistryMixin:
                 "last_updated": session.get("last_updated", datetime.now().isoformat()),
                 # B4: deliver the assembled calendar only once the session
                 # actually completed with a real result.
-                "result": session.get("result") if session["status"] == "completed" else None
+                "result": session.get("result") if session["status"] == "completed" else None,
+                # R6.2: persistence failure surfaced for /progress banner
+                "persistence_error": session.get("persistence_error"),
             }
             
         except Exception as e:
@@ -690,5 +695,13 @@ class CalendarSessionRegistryMixin:
                 if self.db_session:
                     self.db_session.rollback()
             finally:
+                # R6.2: best-effort surface the save failure on the in-memory
+                # session so /progress can show it (never silently swallowed).
+                try:
+                    in_memory = self.orchestrator_sessions.get(session_id)
+                    if in_memory is not None:
+                        in_memory["persistence_error"] = repr(e)[:400]
+                except Exception:
+                    pass
                 logger.error(f"❌ Error saving calendar to database: {str(e)}")
                 raise
