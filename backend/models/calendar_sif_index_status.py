@@ -21,6 +21,7 @@ Contract:
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import (
     Column, DateTime, Index, Integer, String, Text, UniqueConstraint,
@@ -96,9 +97,20 @@ class CalendarSifIndexStatus(Base):
         source_id: str,
         status: str,
         *,
-        embedding_count: int = 0,
-        error_message=None,
+        embedding_count: Optional[int] = None,
+        error_message: Optional[str] = None,
     ):
+        """Status transitions with honest reset semantics (R4.3):
+
+        - entering ``pending``/``running`` clears finished_at and the stale
+          error_message (unless ``error_message_unchanged`` is True) so a
+          retry attempt never displays last attempt's failure alongside a
+          fresh `success`;
+        - ``embedding_count`` is explicit: ``None`` = leave unchanged, an int
+          (including 0) sets it — a zero-embed attempt can reset the count;
+        - each `running` entry increments `attempt`; terminal statuses stamp
+          `finished_at`.
+        """
         try:
             now = datetime.utcnow()
             row = (
@@ -118,19 +130,22 @@ class CalendarSifIndexStatus(Base):
             prev = row.status
             row.status = status
             row.updated_at = now
-            if embedding_count:
+            if embedding_count is not None:
                 row.embedding_count = int(embedding_count)
-            if error_message is not None:
-                row.error_message = str(error_message)
 
             if status in (STATUS_PENDING, STATUS_RUNNING):
+                row.finished_at = None
+                row.error_message = None
                 if prev in _TERMINAL_STATUSES or row.started_at is None:
                     row.started_at = now
-                    row.finished_at = None
                 if status == STATUS_RUNNING:
                     row.attempt = (row.attempt or 0) + 1
             elif status in _TERMINAL_STATUSES:
                 row.finished_at = now
+                if status in (STATUS_SUCCESS, STATUS_SKIPPED):
+                    row.error_message = None
+                if error_message is not None:
+                    row.error_message = str(error_message)
 
             return row
         except SQLAlchemyError as exc:

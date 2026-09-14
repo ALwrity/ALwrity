@@ -19,6 +19,7 @@ Contract:
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from datetime import datetime
@@ -29,6 +30,7 @@ from loguru import logger
 from models.calendar_sif_watermark import CalendarSifWatermark
 from models.calendar_sif_index_status import (
     STATUS_FAILED,
+    STATUS_PENDING,
     STATUS_RUNNING,
     STATUS_SKIPPED,
     STATUS_SUCCESS,
@@ -265,11 +267,30 @@ def index_calendar_async(
     it in ``finally``. Returns the created asyncio task (or ``None`` when
     dispatch failed). Never raises — indexing must never fail calendar
     generation.
+    R4.3: records `pending` DURABLY at dispatch (before the task exists).
     """
-    import asyncio
 
+    source_id = calendar_latest_source_id(user_id)
     if session_factory is None:
         session_factory = _default_sif_session_factory
+
+    # R4.3: record `pending` DURABLY at dispatch, synchronously, before the
+    # background task exists (best-effort) — so a shutdown between dispatch
+    # and task-run still leaves a visible indexing request in the DB.
+    try:
+        provisional = session_factory(user_id)
+        try:
+            CalendarSifIndexStatus.set_status(
+                provisional, user_id, source_id, STATUS_PENDING
+            )
+            provisional.commit()
+        finally:
+            try:
+                provisional.close()
+            except Exception:
+                pass
+    except Exception as exc:
+        logger.warning(f"⚠️ Calendar SIF pending write skipped: {exc}")
 
     async def _run():
         session = session_factory(user_id)
@@ -329,12 +350,32 @@ async def _run_indexing_lifecycle(
             session.commit()
             return
 
-        # Index via txtai
+        # Index via txtai — R4.3: retries per the documented contract
+        # (3 attempts, 1s/2s/4s backoff) around the embed step.
         if sif_service is None:
             from services.intelligence.txtai_service import TxtaiIntelligenceService
             sif_service = TxtaiIntelligenceService(user_id)
 
-        embedded = await sif_service.index_content(chunks)
+        embedded = None
+        last_exc: Optional[Exception] = None
+        for attempt in range(1, DEFAULT_INDEX_RETRIES + 1):
+            try:
+                embedded = await sif_service.index_content(chunks)
+                last_exc = None
+                break
+            except Exception as exc:
+                last_exc = exc
+                if attempt < DEFAULT_INDEX_RETRIES:
+                    delay = DEFAULT_RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                    logger.warning(
+                        f"⚠️ Calendar SIF embed attempt {attempt} failed "
+                        f"({exc}); retrying in {delay}: "
+                        f"status={source_id}"
+                    )
+                    await asyncio.sleep(delay)
+        if last_exc is not None:
+            raise last_exc
+
         try:
             embedded_count = int(embedded)
         except (TypeError, ValueError):
