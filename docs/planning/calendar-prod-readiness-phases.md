@@ -1,6 +1,9 @@
 # Calendar + SIF Production Readiness — Phased Remediation Plan
 
-> Status 2026-09-13: ALL PHASES PENDING. Source: production-readiness review of
+> Status 2026-09-13: R1 COMPLETE (R1.1 /start persistence, R1.2 indexer
+> embed, R1.3 single head + SIF tables + engine fail-loud, R1.4 frontend
+> suites green) — backend-critical release blockers closed; R2+ pending.
+> Source: production-readiness review of
 > the content calendar feature (backend lifecycle + SIF + frontend + migrations)
 > performed after SIF Phase A (backend) and Phase D (frontend) implementation.
 > Verdict at review time: **NOT READY for production** — 5 critical, 7 high,
@@ -145,7 +148,7 @@ round-trips the `CalendarSif*` models. Tests: `test_alembic_migrations.py`
 follow-up slice.
 Touch: `alembic_migrations/versions/*`, `env.py`, `init_db.py`, `engine.py`, migration tests.
 
-### R1.4 Frontend suites load and assert correctly (F1, F6, F7)
+### R1.4 Frontend suites load and assert correctly (F1, F6, F7) ✅ DONE
 Problem: `CalendarSifStatusCard.test.tsx` + `.queries.test.tsx` import
 `../../../hooks|services|config` — one segment short (`TS2307`, 0 tests collected);
 async assertions use sync `getByText` after `fireEvent`; a placeholder is asserted
@@ -154,6 +157,12 @@ Fix: correct to `../../../../...`; convert async interactions to `userEvent` +
 `findBy*`/`waitFor`; placeholder via `getByPlaceholderText`.
 TDD: the corrected suites themselves (16 tests) pass; typecheck no new errors.
 Done: `npm test -- --run <3 files>` green; suites collected.
+**DONE 2026-09-13:** both card suites import `../../../../...` (loadable);
+async interactions use `userEvent` + `findBy*`; placeholder asserted with
+`getByPlaceholderText`; fixed a wrong regex (`/regenerate/i` — the copy says
+"regenerating") that broke the failed-phase test. All 3 calendar SIF suites:
+**23 passed** (7 hook + 8 render + 8 queries); typecheck: no errors in the
+touched files.
 Touch: the two test files only.
 
 ---

@@ -14,24 +14,24 @@ import { render, screen } from '@testing-library/react';
 import React from 'react';
 
 import CalendarSifStatusCard from '../CalendarSifStatusCard';
-import { CalendarSifStatus } from '../../../hooks/useCalendarSifStatus';
+import { CalendarSifStatus } from '../../../../hooks/useCalendarSifStatus';
 
-vi.mock('../../../hooks/useCalendarSifStatus', () => ({
+vi.mock('../../../../hooks/useCalendarSifStatus', () => ({
   useCalendarSifStatus: vi.fn(),
 }));
 
-vi.mock('../../../services/contentPlanningApi', () => ({
+vi.mock('../../../../services/contentPlanningApi', () => ({
   contentPlanningApi: {
     searchCalendarSif: vi.fn(),
   },
 }));
 
-vi.mock('../../../config/strategySifConfig', () => ({
+vi.mock('../../../../config/strategySifConfig', () => ({
   isCalendarSifCardEnabled: () => true,
 }));
 
-import { useCalendarSifStatus } from '../../../hooks/useCalendarSifStatus';
-import { contentPlanningApi } from '../../../services/contentPlanningApi';
+import { useCalendarSifStatus } from '../../../../hooks/useCalendarSifStatus';
+import { contentPlanningApi } from '../../../../services/contentPlanningApi';
 
 const mockUseCalendarSifStatus = vi.mocked(useCalendarSifStatus);
 const mockSearchCalendarSif = vi.mocked(contentPlanningApi.searchCalendarSif);
@@ -108,7 +108,7 @@ describe('CalendarSifStatusCard — plain-language status card', () => {
     render(<CalendarSifStatusCard />);
     expect(screen.getByText(/couldn.t? be indexed/i)).toBeTruthy();
     expect(screen.getByText(/embedding crashed/i)).toBeTruthy();
-    expect(screen.getByText(/regenerate/i)).toBeTruthy();
+    expect(screen.getByText(/regenerating/i)).toBeTruthy();
   });
 
   it('renders a not-indexed fallback', () => {
