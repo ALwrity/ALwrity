@@ -1,24 +1,24 @@
 /**
- * Plan Your Video Phase 2: prompt accordion uses pitch preview API.
- * Component test — Jest + React Testing Library (TESTING.md).
+ * Plan Your Video: prompt accordion uses pitch preview API.
+ * Component test — Vitest + React Testing Library.
  */
 
 import React from "react";
-import "@testing-library/jest-dom";
+import "@testing-library/jest-dom/vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PlanPromptPreview } from "../components/PlanPromptPreview";
 import { youtubeApi } from "../../../services/youtubeApi";
 
-jest.mock("../../../services/youtubeApi", () => ({
+vi.mock("../../../services/youtubeApi", () => ({
   youtubeApi: {
-    previewPitchPrompt: jest.fn(),
+    previewPitchPrompt: vi.fn(),
   },
 }));
 
 describe("PlanPromptPreview pitch builder", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.mocked(youtubeApi.previewPitchPrompt).mockReset();
   });
 
   it("does not fetch until idea and creative angle are present", async () => {
@@ -42,7 +42,7 @@ describe("PlanPromptPreview pitch builder", () => {
 
   it("loads the pitch preview API with angle and language", async () => {
     const user = userEvent.setup();
-    jest.mocked(youtubeApi.previewPitchPrompt).mockResolvedValue({
+    vi.mocked(youtubeApi.previewPitchPrompt).mockResolvedValue({
       success: true,
       system_prompt: "You are ALwrity's YouTube Script Architect.",
       user_prompt:
