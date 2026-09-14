@@ -292,7 +292,13 @@ class PromptChainOrchestrator:
             raise
     
     async def _get_comprehensive_user_data(self, user_id: int, strategy_id: Optional[int]) -> Dict[str, Any]:
-        """Get comprehensive user data for calendar generation with caching support."""
+        """Get comprehensive user data for calendar generation with caching support.
+
+        R6.3 (H5): NO silent placeholder fallback — infrastructure/data
+        failures propagate so the orchestration fails fast with an explicit
+        reason. A calendar grounded in fake `"industry": "technology"` inputs
+        is worse than an honest failure (repo no-mock policy).
+        """
         try:
             # Try to use cached version if available
             try:
@@ -305,19 +311,16 @@ class PromptChainOrchestrator:
                 user_data = await self.comprehensive_user_processor.get_comprehensive_user_data(user_id, strategy_id)
                 return user_data
         except Exception as e:
-            logger.error(f"❌ Error getting comprehensive user data: {str(e)}")
-            # Fallback to placeholder data
-            return {
-                "user_id": user_id,
-                "strategy_id": strategy_id,
-                "industry": "technology",
-                "onboarding_data": {},
-                "strategy_data": {},
-                "gap_analysis": {},
-                "ai_analysis": {},
-                "performance_data": {},
-                "competitor_data": {}
-            }
+            err = repr(e)[:400]
+            logger.error(
+                f"❌ CALENDAR GROUNDING FAILED — comprehensive user data "
+                f"unavailable; failing fast (no placeholder inputs) for "
+                f"user={user_id} strategy={strategy_id}: {e}"
+            )
+            raise RuntimeError(
+                "Calendar grounding failed: comprehensive user data "
+                f"unavailable ({err})"
+            ) from e
     
     async def _execute_12_step_process(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the complete 12-step process."""
