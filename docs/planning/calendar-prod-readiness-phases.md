@@ -1,9 +1,10 @@
 # Calendar + SIF Production Readiness — Phased Remediation Plan
 
-> Status 2026-09-13: R1 COMPLETE (R1.1 /start persistence, R1.2 indexer
-> embed, R1.3 single head + SIF tables + engine fail-loud, R1.4 frontend
-> suites green). R2.1 DONE (task-owned DB sessions). R2.3/R2.4 pending.
-> Source: production-readiness review of
+> Status 2026-09-13: R1 COMPLETE (R1.1–R1.4). R2: R2.1 DONE (task-owned DB
+> sessions), R2.3 DONE (durable progress reads), R2.5 DONE (service split:
+> 1,663-line module → core 318 + registry 602 + ops 675, no behavior change).
+> R2.2/R2.4 pending (R2.2 = naming gap, R2.4 = cancellation). Source:
+> production-readiness review of
 > the content calendar feature (backend lifecycle + SIF + frontend + migrations)
 > performed after SIF Phase A (backend) and Phase D (frontend) implementation.
 > Verdict at review time: **NOT READY for production** — 5 critical, 7 high,
@@ -240,6 +241,30 @@ forbidden; missing → None; fresh-memory priority; orphan reconcile +
 fresh-restore; reconciled terminal + unblocked regeneration.
 Tests: R2.3 **8 passed**; calendar regression **117 passed**.
 Touch: `calendar_generation_service.py`, new test file.
+
+### R2.5 Service split (consolidation — no behavior change) ✅ DONE
+Problem: `calendar_generation_service.py` grew past 1,600 lines over the
+R1/R2 slices (lifecycle + registry + grounded ops in one file).
+Fix (mechanical move onto mixins; user-approved structure):
+- NEW `calendar_session_registry.py` → `CalendarSessionRegistryMixin`
+  (~600 lines): `initialize_orchestrator_session`, `_cleanup_old_sessions`,
+  `_get_active_session_for_user`, `_find_session_row`,
+  `_persist_session_to_db`, orphan reconciliation, `_load_sessions_from_db`,
+  cancel/owner, `_progress_from_db_row`, `get_orchestrator_progress`,
+  `_update_session_progress`, `_parse_scheduled_date`, `_save_calendar_to_db`,
+  status constants + `_global_orchestrator_sessions` (re-exported from the
+  service module so test bindings keep working);
+- NEW `calendar_generation_operations.py` →
+  `CalendarGroundingOperationsMixin` (~675 lines): optimize / predict /
+  repurpose / trending / comprehensive-user-data + Phase-4 helpers;
+- `calendar_generation_service.py` keeps the core lifecycle (~318 lines):
+  `__init__`, `generate_comprehensive_calendar`, `run_generation_task`,
+  `start_orchestrator_generation`, `health_check`; MRO =
+  `CalendarSessionRegistryMixin, CalendarGroundingOperationsMixin`.
+Golden contract: existing suites unchanged and green — full battery
+**145 passed** (phase 0/2/3/4, start e2e, SIF 79, durability 8,
+task-owned 9, progress-route, generation-service). py_compile clean.
+Touch: `calendar_generation_service.py` + 2 new modules.
 
 ### R2.4 Cancellation cancels the task (H2)
 Problem: the created task is not retained (`calendar_generation.py:511`);
