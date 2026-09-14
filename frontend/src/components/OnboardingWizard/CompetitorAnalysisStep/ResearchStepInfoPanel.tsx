@@ -1,76 +1,97 @@
 import React from 'react';
-import { Box, Grid, Typography } from '@mui/material';
+import { Box, Grid, IconButton, Typography } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import SearchIcon from '@mui/icons-material/Search';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AutoFixHighIcon from '@mui/icons-material/AutoAwesome';
-import { RESEARCH_INFO_PANEL_TITLE, RESEARCH_SECTION_HEADING_COLOR } from './researchStepInfoConstants';
+import { RESEARCH_INFO_PANEL_TITLE, researchInfoPanelTitleSx } from './researchStepInfoConstants';
+import { ResearchStepInfoPillar } from './ResearchStepInfoPillar';
 
-const pillarLabelSx = {
-  fontWeight: 700,
-  color: RESEARCH_SECTION_HEADING_COLOR,
-};
+const RESEARCH_INFO_PILLARS = [
+  {
+    label: 'What',
+    description: 'We analyze top competitors in your niche.',
+    Icon: SearchIcon,
+    iconBg: '#DBEAFE',
+    iconColor: '#2563EB',
+  },
+  {
+    label: 'Why',
+    description: 'To identify content gaps and market positioning.',
+    Icon: TrendingUpIcon,
+    iconBg: '#F3E8FF',
+    iconColor: '#7C3AED',
+  },
+  {
+    label: 'How',
+    description: 'Using AI to scan their public content and social footprint.',
+    Icon: AutoFixHighIcon,
+    iconBg: '#DCFCE7',
+    iconColor: '#16A34A',
+  },
+] as const;
 
 interface ResearchStepInfoPanelProps {
   showTitle?: boolean;
+  onClose?: () => void;
 }
 
-export const ResearchStepInfoPanel: React.FC<ResearchStepInfoPanelProps> = ({ showTitle = true }) => (
+export const ResearchStepInfoPanel: React.FC<ResearchStepInfoPanelProps> = ({
+  showTitle = true,
+  onClose,
+}) => (
   <Box
     data-testid="research-step-info-panel"
     sx={{
+      position: 'relative',
       mb: 3,
-      p: 3,
+      mt: 1.5,
+      p: { xs: 2, md: 3 },
+      pt: onClose ? { xs: 2.5, md: 3.5 } : { xs: 2, md: 3 },
       bgcolor: '#ffffff',
       borderRadius: 3,
       border: '1px solid #E5E7EB',
-      boxShadow: '0 1px 2px rgba(16,24,40,0.06)',
+      boxShadow: '0 4px 16px rgba(15, 23, 42, 0.06)',
       textAlign: 'center',
     }}
   >
+    {onClose && (
+      <IconButton
+        size="small"
+        onClick={onClose}
+        aria-label="Close research information panel"
+        data-testid="research-step-info-panel-close"
+        sx={{
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          color: '#64748b',
+          bgcolor: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          '&:hover': { bgcolor: '#f1f5f9', color: '#334155' },
+        }}
+      >
+        <CloseIcon fontSize="small" />
+      </IconButton>
+    )}
+
     {showTitle && (
       <Typography
         variant="h6"
         component="h2"
         fontWeight={700}
-        sx={{ color: RESEARCH_SECTION_HEADING_COLOR, mb: 2.5, textAlign: 'center' }}
+        sx={{ ...researchInfoPanelTitleSx, mb: 2.5, textAlign: 'center', pr: onClose ? 3 : 0 }}
       >
         {RESEARCH_INFO_PANEL_TITLE}
       </Typography>
     )}
-    <Grid container spacing={3}>
-      <Grid item xs={12} md={4}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-          <Box sx={{ p: 1.5, bgcolor: '#DBEAFE', borderRadius: '50%', mb: 1.5, color: '#2563EB' }}>
-            <SearchIcon />
-          </Box>
-          <Typography variant="subtitle2" sx={pillarLabelSx} gutterBottom>What</Typography>
-          <Typography variant="body2" color="text.secondary">
-            We analyze top competitors in your niche.
-          </Typography>
-        </Box>
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-          <Box sx={{ p: 1.5, bgcolor: '#F3E8FF', borderRadius: '50%', mb: 1.5, color: '#7C3AED' }}>
-            <TrendingUpIcon />
-          </Box>
-          <Typography variant="subtitle2" sx={pillarLabelSx} gutterBottom>Why</Typography>
-          <Typography variant="body2" color="text.secondary">
-            To identify content gaps and market positioning.
-          </Typography>
-        </Box>
-      </Grid>
-      <Grid item xs={12} md={4}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-          <Box sx={{ p: 1.5, bgcolor: '#DCFCE7', borderRadius: '50%', mb: 1.5, color: '#16A34A' }}>
-            <AutoFixHighIcon />
-          </Box>
-          <Typography variant="subtitle2" sx={pillarLabelSx} gutterBottom>How</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Using AI to scan their public content and social footprint.
-          </Typography>
-        </Box>
-      </Grid>
+
+    <Grid container spacing={{ xs: 2.5, md: 3 }}>
+      {RESEARCH_INFO_PILLARS.map((pillar) => (
+        <Grid item xs={12} md={4} key={pillar.label}>
+          <ResearchStepInfoPillar {...pillar} />
+        </Grid>
+      ))}
     </Grid>
   </Box>
 );

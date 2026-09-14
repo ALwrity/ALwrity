@@ -32,6 +32,7 @@ import {
   folderTabsContainerSx,
   getFolderTabSx,
 } from '../WebsiteStep/components/unifiedFolderTabStyles';
+import { researchSectionHeadingSx } from './researchStepSectionStyles';
 
 const MAIN_TABS = [
   {
@@ -241,10 +242,10 @@ export const ResearchStepUnifiedDashboard: React.FC<ResearchStepDashboardProps> 
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Icon sx={{ color: isActive ? tab.color : '#64748B', fontSize: 20 }} />
                         <Typography
-                          variant="subtitle1"
+                          variant="h6"
                           sx={{
-                            fontWeight: 700,
-                            color: isActive ? '#1E293B' : '#475569',
+                            ...researchSectionHeadingSx,
+                            color: isActive ? '#1a202c !important' : '#475569 !important',
                             lineHeight: 1.2,
                             textTransform: 'none',
                           }}

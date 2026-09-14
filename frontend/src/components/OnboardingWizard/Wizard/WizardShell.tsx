@@ -5,6 +5,10 @@ import { WizardHeader } from '../common/WizardHeader';
 import { WizardStepper } from '../common/WizardStepper';
 import { WizardRetryBar } from '../common/WizardRetryBar';
 import { WizardNavigation } from '../common/WizardNavigation';
+import {
+  ONBOARDING_STEP_CONTENT_PADDING_TOP,
+  ONBOARDING_STEP_CONTENT_PADDING_X,
+} from '../common/wizardChromeLayout';
 
 interface StepHeaderContent {
   title: string;
@@ -149,9 +153,12 @@ export const WizardShell: React.FC<WizardShellProps> = ({
 
       <Box
         sx={{
-          p: { xs: 2, md: 4 },
-          pt: activeStep === 0 ? { xs: 1.375, md: 1.625 } : { xs: 2, md: 3 },
-          pb: activeStep === 0 ? { xs: 0.5, md: 1 } : { xs: 2, md: 4 },
+          px: ONBOARDING_STEP_CONTENT_PADDING_X,
+          pt:
+            activeStep === 0
+              ? ONBOARDING_STEP_CONTENT_PADDING_TOP.connect
+              : ONBOARDING_STEP_CONTENT_PADDING_TOP.default,
+          pb: activeStep === 0 ? { xs: 0.5, md: 1 } : { xs: 1.5, md: 2 },
           flexGrow: 1,
           width: '100%',
           overflow: 'visible',

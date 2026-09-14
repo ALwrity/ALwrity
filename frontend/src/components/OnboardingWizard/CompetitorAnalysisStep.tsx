@@ -206,10 +206,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
 
   return (
     <Box sx={classes.container}>
-      <CompetitorAnalysisHeader
-        isAnalyzing={isAnalyzing}
-        onRunFreshAnalysis={() => startCompetitorDiscovery(true)}
-      />
+      <CompetitorAnalysisHeader />
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
@@ -229,6 +226,8 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         onUpdateAccounts={handleUpdateSocialAccounts}
         onRefresh={discoverSocialMedia}
         isRefreshing={isDiscoveringSocial}
+        onRunFreshAnalysis={() => startCompetitorDiscovery(true)}
+        isAnalyzing={isAnalyzing}
       />
 
       {benchmarkError && (

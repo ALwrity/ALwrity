@@ -1,4 +1,5 @@
 import { useTheme, alpha } from '@mui/material/styles';
+import { ONBOARDING_STEP_CONTENT_PADDING_X } from './wizardChromeLayout';
 
 export const useOnboardingStyles = () => {
   const theme = useTheme();
@@ -9,7 +10,7 @@ export const useOnboardingStyles = () => {
       maxWidth: '100%', // Use full width for maximum data display
       width: '100%',
       mx: 0, // Remove auto margins to use full width
-      px: { xs: 1.5, md: 2 }, // Responsive padding for better mobile spacing
+      px: ONBOARDING_STEP_CONTENT_PADDING_X,
       py: { xs: 1.5, md: 2 }, // Add responsive vertical padding
     },
     
@@ -248,7 +249,7 @@ export const useOnboardingStyles = () => {
       width: '100%',
       maxWidth: '100%',  // Use full width for maximum data display
       mx: 0, // Remove auto margins to use full width
-      px: { xs: 1.5, md: 2 }, // Responsive padding for better mobile spacing
+      px: ONBOARDING_STEP_CONTENT_PADDING_X,
       py: { xs: 1.5, md: 2 }, // Add responsive vertical padding
     },
 
