@@ -83,8 +83,17 @@ def _build_events_text(calendar: Dict[str, Any]) -> Optional[str]:
     schedule = calendar.get("daily_schedule") or []
     events: list = []
     for day in schedule:
+        # R4.5: generated content items do not carry their own date — the
+        # containing day does. Event queries like "what's scheduled next
+        # week?" need that date (and the weekly theme) in the passage.
+        day_date = day.get("date") or day.get("scheduled_date") or ""
         for item in day.get("content_items") or []:
-            events.append(item)
+            events.append({
+                **item,
+                "_day_date": day_date,
+                "_week_number": day.get("week_number"),
+                "_theme": day.get("theme"),
+            })
     if not events:
         return None
     lines = []
@@ -92,13 +101,18 @@ def _build_events_text(calendar: Dict[str, Any]) -> Optional[str]:
         title = evt.get("title", "")
         content_type = evt.get("content_type", "")
         platform = evt.get("platform", "")
-        date = evt.get("date") or evt.get("scheduled_date", "")
+        date = evt.get("_day_date") or evt.get("date") or evt.get("scheduled_date", "")
+        week = evt.get("_week_number")
+        theme = evt.get("_theme") or ""
         status = evt.get("status", "")
         kpi = evt.get("kpi", "")
         outcome = evt.get("expected_outcome", "")
+        week_part = f"week {week} | " if week is not None else ""
+        theme_part = f"theme: {theme} | " if theme else ""
         lines.append(
             f"title: {title} | content_type: {content_type} | "
             f"platform: {platform} | date: {date} | "
+            f"{week_part}{theme_part}"
             f"status: {status} | kpi: {kpi} | outcome: {outcome}"
         )
     return "\n".join(lines) + "\n" if lines else None

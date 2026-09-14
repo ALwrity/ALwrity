@@ -153,6 +153,15 @@ class TestChunkBuilder:
         assert "blog_post" in events
         assert "website" in events
 
+    def test_event_chunks_carry_the_day_date_and_theme(self):
+        """R4.5: event queries like 'what's scheduled next week?' need the
+        containing day's date — generated content items don't carry one."""
+        calendar = make_calendar()
+        chunks = build_calendar_chunks(calendar, UID, GENERATED_AT)
+        events = [c[1] for c in chunks if c[2]["kind"] == "calendar_events"][0]
+        assert "2026-09-14" in events, "the day's date must be in the passage"
+        assert "week 38" in events or "AI Foundations" in events
+
     def test_recommendations_serialized(self):
         calendar = make_calendar()
         chunks = build_calendar_chunks(calendar, UID, GENERATED_AT)
