@@ -81,6 +81,9 @@ class FlakySif:
             raise RuntimeError(f"attempt {self.attempts} exploded")
         return len(items)
 
+    async def delete_content(self, doc_ids):
+        return len(doc_ids)
+
 
 class AlwaysFailingSif:
     async def index_content(self, items):
@@ -152,6 +155,9 @@ class _AlwaysOk:
     async def index_content(self, items):
         return len(items)
 
+    async def delete_content(self, doc_ids):
+        return len(doc_ids)
+
 
 class TestEmbedRetryWithBackoff:
     @pytest.mark.asyncio
@@ -174,7 +180,6 @@ class TestEmbedRetryWithBackoff:
         row = CalendarSifIndexStatus.get(session, UID, calendar_latest_source_id(UID))
         session.expire_all()
         row = CalendarSifIndexStatus.get(session, UID, calendar_latest_source_id(UID))
-        print('DEBUG row status:', row.status, '| err:', row.error_message, '| sleeps:', sleeps, '| wmcount:', session.query(CalendarSifWatermark).count())
         assert row.status == 'success'
         chunks = len(build_calendar_chunks(make_calendar(), UID, GENERATED_AT))
         wm = (
