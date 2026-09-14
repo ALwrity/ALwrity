@@ -1113,6 +1113,41 @@ class CalendarGenerationService:
                 self.db_session.rollback()
             logger.error(f"❌ Error persisting session {session_id} to DB: {e}")
 
+    # R2.3: an active row older than this at (re)start belongs to a process
+    # that no longer holds its task — reconcile it to `failed` instead of
+    # leaving a stuck `running` row that blocks the user from regenerating.
+    _ORPHAN_CUTOFF_SECONDS = 900
+
+    def _is_orphaned_session_row(self, row: CalendarGenerationSession) -> bool:
+        started_at = row.created_at
+        if not started_at:
+            return False  # no timestamp basis — don't guess
+        return (datetime.utcnow() - started_at).total_seconds() > self._ORPHAN_CUTOFF_SECONDS
+
+    def _reconcile_orphaned_row(self, row: CalendarGenerationSession) -> None:
+        """Mark a dead `running` row failed so it cannot block regeneration."""
+        params = dict(row.generation_params or {})
+        progress = dict(params.get("progress") or {})
+        errors = list(progress.get("errors") or [])
+        errors.append({
+            "message": "Generation interrupted by process restart.",
+            "step": None,
+            "timestamp": datetime.utcnow().isoformat(),
+            "severity": "error",
+            "recoverable": False,
+        })
+        progress["errors"] = errors
+        params["status"] = "failed"
+        params["error"] = "Generation interrupted by process restart."
+        params["progress"] = progress
+        row.generation_params = params
+        row.generation_status = "failed"
+        self.db_session.commit()
+        logger.info(
+            f"🧟 Reconciled orphaned session row {row.id} → failed "
+            "(interrupted by restart)"
+        )
+
     def _load_sessions_from_db(self) -> None:
         """Load active sessions from database into the in-memory store."""
         try:
@@ -1125,6 +1160,7 @@ class CalendarGenerationService:
                 )
             ).all()
 
+            reconciled = 0
             for db_session_record in active_sessions:
                 params = db_session_record.generation_params or {}
                 session_id = (
@@ -1134,6 +1170,13 @@ class CalendarGenerationService:
                 )
                 
                 if session_id in self.orchestrator_sessions:
+                    continue
+
+                # R2.3: a cold process cannot be running this task — old
+                # active rows are interrupted for restart reconciliation.
+                if self._is_orphaned_session_row(db_session_record):
+                    self._reconcile_orphaned_row(db_session_record)
+                    reconciled += 1
                     continue
                 
                 self.orchestrator_sessions[session_id] = {
@@ -1154,7 +1197,10 @@ class CalendarGenerationService:
                 logger.info(f"🔄 Restored session {session_id} for user {db_session_record.user_id}")
             
             if active_sessions:
-                logger.info(f"✅ Restored {len(active_sessions)} active sessions from database")
+                logger.info(
+                    f"✅ Restored {len(active_sessions) - reconciled} active sessions "
+                    f"from database, reconciled {reconciled} orphans"
+                )
                 
         except Exception as e:
             logger.error(f"❌ Error loading sessions from DB: {e}")
@@ -1348,6 +1394,40 @@ class CalendarGenerationService:
         owner = session.get("user_id", "")
         return str(owner) if owner else None
 
+    def _progress_from_db_row(self, row: CalendarGenerationSession) -> Dict[str, Any]:
+        """Serve the durable session row's progress payload (R2.3).
+
+        Same shape as the in-memory payload so ``GET /progress`` responses are
+        byte-compatible whichever worker serves them: status from the row,
+        throttled progress from ``generation_params.progress``, and the
+        assembled calendar as ``result`` only once completed.
+        """
+        params = row.generation_params or {}
+        progress = params.get("progress") or {}
+        status = row.generation_status
+        updated_at = getattr(row, "updated_at", None)
+        errors = progress.get("errors") or []
+        error_value = params.get("error")
+        if error_value and not errors:
+            errors = [{"message": str(error_value), "severity": "error", "recoverable": False}]
+        return {
+            "status": status,
+            "current_step": progress.get("current_step", 0),
+            "step_progress": progress.get("step_progress", 0),
+            "overall_progress": progress.get("overall_progress", 0),
+            "step_results": progress.get("step_results", {}),
+            "quality_scores": progress.get("quality_scores", {}),
+            "errors": errors,
+            "warnings": progress.get("warnings", []),
+            "transparency_messages": params.get("transparency_messages", []),
+            "educational_content": params.get("educational_content", []),
+            "estimated_completion": params.get("estimated_completion"),
+            "last_updated": updated_at.isoformat() if updated_at else None,
+            # B4: deliver the assembled calendar only once the session
+            # actually completed with a real result.
+            "result": row.generated_calendar if status == "completed" else None,
+        }
+
     def get_orchestrator_progress(
         self, session_id: str, requester_user_id: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
@@ -1362,8 +1442,27 @@ class CalendarGenerationService:
 
             session = self.orchestrator_sessions.get(session_id)
             if not session:
-                logger.warning(f"❌ Session {session_id} not found")
-                return None
+                # R2.3: another worker (or a restarted process) holds this
+                # session only as a durable row — serve the same payload from
+                # the DB so progress is not worker-bound.
+                db_row = self._find_session_row(session_id)
+                if db_row is None:
+                    logger.warning(f"❌ Session {session_id} not found")
+                    return None
+                if (
+                    requester_user_id is not None
+                    and str(db_row.user_id or "") != str(requester_user_id)
+                ):
+                    logger.warning(
+                        f"⛔ Progress denied for session {session_id}: "
+                        f"owner={db_row.user_id} requester={requester_user_id}"
+                    )
+                    return {"forbidden": True, "status": "forbidden"}
+                logger.info(
+                    f"✅ Session {session_id} served from durable row "
+                    f"(status: {db_row.generation_status})"
+                )
+                return self._progress_from_db_row(db_row)
             if (
                 requester_user_id is not None
                 and str(session.get("user_id", "")) != str(requester_user_id)

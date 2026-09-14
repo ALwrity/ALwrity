@@ -211,7 +211,7 @@ TDD: session whose `commit` raises → status recorded `failed` or explicit log
 assert; no unhandled exception escapes `_run_indexing_lifecycle`.
 Touch: `calendar_sif_indexer.py`, lifecycle tests.
 
-### R2.3 Durable, multi-worker-safe progress (H1)
+### R2.3 Durable, multi-worker-safe progress (H1) ✅ DONE
 Problem: progress lives in a process-local dict (`calendar_generation_service.py:26-27`);
 other workers return 404/stale; `_load_sessions_from_db` (`:1112-1153`) restores
 rows but not their tasks; orphaned `running` rows block regeneration until GC.
@@ -224,7 +224,22 @@ Fix (incremental):
 TDD: progress test hitting a cold service instance with only a DB row → 200 with
 result; restart-reconciliation test → orphaned sessions become `failed`.
 Done: progress served cross-worker; no permanent stuck-running state.
-Touch: `calendar_generation_service.py`, tests.
+**DONE 2026-09-13:**
+- `get_orchestrator_progress` falls back to `_find_session_row` when the
+  in-memory session is missing (owner-checked forbidden sentinel preserved),
+  serving an identical payload via new `_progress_from_db_row` (status +
+  throttled progress from `generation_params`, `result` only when completed).
+- Restart reconciliation: `_load_sessions_from_db` reconciles ACTIVE rows
+  older than `_ORPHAN_CUTOFF_SECONDS` (900s) to `failed` ("interrupted by
+  restart") instead of restoring a stuck-running session; recent rows
+  restore as before; fresh in-memory state keeps priority over the DB row.
+- (Item 3 — durable worker/queue — remains a separate follow-up.)
+Tests: `backend/tests/api/test_calendar_progress_durability.py` (8): completed
+row delivers calendar; running row without result; failed row; cross-user
+forbidden; missing → None; fresh-memory priority; orphan reconcile +
+fresh-restore; reconciled terminal + unblocked regeneration.
+Tests: R2.3 **8 passed**; calendar regression **117 passed**.
+Touch: `calendar_generation_service.py`, new test file.
 
 ### R2.4 Cancellation cancels the task (H2)
 Problem: the created task is not retained (`calendar_generation.py:511`);
