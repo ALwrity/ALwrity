@@ -108,8 +108,9 @@ describe('CalendarSifStatusCard — plain-language status card', () => {
 
     render(<CalendarSifStatusCard />);
     expect(screen.getByText(/couldn.t? be indexed/i)).toBeTruthy();
-    expect(screen.getByText(/embedding crashed/i)).toBeTruthy();
     expect(screen.getByText(/regenerating/i)).toBeTruthy();
+    // R5.1: raw backend error text must NEVER reach the DOM
+    expect(screen.queryByText(/embedding crashed/i)).toBeNull();
   });
 
   it('renders a not-indexed fallback', () => {

@@ -135,9 +135,14 @@ class TestSearchEndpoint:
         )
 
     def test_no_fabricated_answers_when_search_fails(self, monkeypatch):
+        """SIF search failures surface a structured code — clients must never
+        see raw exception text (R5.1), and never a fabricated answer."""
+
         class BrokenSIFService:
             async def search(self, query, limit=5):  # noqa: ARG002
-                raise RuntimeError("txtai index unavailable")
+                raise RuntimeError(
+                    "internal txtai exception: c:/secret/path.py line 42"
+                )
 
         monkeypatch.setattr(f"{TXTAI_MOD}.TxtaiIntelligenceService", BrokenSIFService)
 
@@ -160,4 +165,10 @@ class TestSearchEndpoint:
         assert resp.status_code == 200, resp.text
         data = resp.json()["data"]
         assert data["hits"] == []
-        assert data.get("error")
+        # R5.1: structured error contract — no raw exception text to clients
+        assert data["error"] == {"code": "search_unavailable"}
+        import json as _json
+
+        body = _json.dumps(resp.json())
+        assert "secret" not in body
+        assert "internal txtai exception" not in body

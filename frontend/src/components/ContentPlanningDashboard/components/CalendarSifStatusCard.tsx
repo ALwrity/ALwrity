@@ -20,6 +20,7 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import PublishedWithChangesIcon from '@mui/icons-material/PublishedWithChanges';
 
 import { useCalendarSifStatus } from '../../../hooks/useCalendarSifStatus';
+import { devLog } from '../../../utils/devLogger';
 import { contentPlanningApi } from '../../../services/contentPlanningApi';
 import { isCalendarSifCardEnabled } from '../../../config/strategySifConfig';
 import CalendarSifEducationDialog from './CalendarSifEducationDialog';
@@ -229,13 +230,20 @@ const CalendarSifStatusCard: React.FC = () => {
           color: 'default',
           body: 'Nothing new to index — your calendar hasn’t changed since the last indexing pass.',
         };
-      case 'failed':
+      case 'failed': {
+        // R5.1: never render raw backend error text — it may carry internal
+        // implementation detail. Friendly copy in the UI; detail logged only.
+        const detail = data.indexing?.error_message || '';
+        if (detail) {
+          devLog.warn('calendar sif indexing failed:', detail);
+        }
         return {
           label: 'Indexing needs attention',
           icon: <ErrorIcon />,
           color: 'error',
-          body: `Your calendar couldn’t be indexed: ${data.indexing?.error_message || 'unknown error'}. Try regenerating the calendar to retry.`,
+          body: 'Your calendar couldn’t be indexed because of a temporary issue. Try regenerating the calendar to retry.',
         };
+      }
       case 'not_indexed':
         return {
           label: 'Not yet indexed',

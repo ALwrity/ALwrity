@@ -882,6 +882,8 @@ async def search_calendar_sif(
     except HTTPException:
         raise
     except Exception as e:
+        # R5.1: structured error contract — the client gets a stable code,
+        # NEVER raw exception text (implementation detail leakage).
         logger.error(f"Error searching calendar SIF: {str(e)}")
         return {
             "status": "error",
@@ -889,7 +891,7 @@ async def search_calendar_sif(
                 "query": query,
                 "source_id": calendar_latest_source_id(str(current_user.get("id"))),
                 "hits": [],
-                "error": str(e),
+                "error": {"code": "search_unavailable"},
             },
         }
 
