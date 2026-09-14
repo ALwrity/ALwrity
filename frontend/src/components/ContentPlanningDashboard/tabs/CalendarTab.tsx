@@ -105,11 +105,6 @@ const CalendarTab: React.FC = () => {
 
   const safeCalendarEvents = Array.isArray(calendarEvents) ? calendarEvents : [];
 
-  useEffect(() => {
-    loadCalendarData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const loadCalendarData = async () => {
     try {
       // Load existing calendar events
@@ -118,6 +113,11 @@ const CalendarTab: React.FC = () => {
       console.error('Error loading calendar data:', error);
     }
   };
+
+  useEffect(() => {
+    loadCalendarData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleOpenDialog = (event?: any) => {
     if (event) {

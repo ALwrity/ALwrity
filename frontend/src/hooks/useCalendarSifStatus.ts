@@ -67,10 +67,9 @@ export function useCalendarSifStatus(
   }, []);
 
   useEffect(() => {
+    // R3.3: no sync setState in the effect body — the disabled surface is
+    // derived at the return site instead of cleared here.
     if (!enabled) {
-      setData(null);
-      setError(null);
-      setLoading(false);
       return;
     }
 
@@ -109,5 +108,12 @@ export function useCalendarSifStatus(
     };
   }, [enabled, pollIntervalMs, refreshKey]);
 
-  return { data, loading, error, refresh };
+  // R3.3: when disabled, surfaces NOTHING — derived here so the effect body
+  // never mutates state synchronously (avoids cascading renders).
+  return {
+    data: enabled ? data : null,
+    loading: enabled ? loading : false,
+    error: enabled ? error : null,
+    refresh,
+  };
 }
