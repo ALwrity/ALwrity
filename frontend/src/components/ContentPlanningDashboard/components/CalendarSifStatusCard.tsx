@@ -119,7 +119,12 @@ const renderPassage = (text: string) => {
 };
 
 const CalendarSifStatusCard: React.FC = () => {
-  const { data, loading, error } = useCalendarSifStatus({ enabled: true });
+  // R3.1: the rollout flag gates the request itself — the hook still runs
+  // unconditionally (hook-order safe), but `enabled` follows the flag so a
+  // disabled card makes NO authenticated calls.
+  const { data, loading, error } = useCalendarSifStatus({
+    enabled: isCalendarSifCardEnabled(),
+  });
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState<string | null>(null);
   const [searchHits, setSearchHits] = React.useState<SearchHit[]>([]);
