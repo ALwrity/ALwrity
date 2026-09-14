@@ -56,6 +56,7 @@ const indexing = (phase: string, over: Record<string, any> = {}) => ({
 const hookState = (over: any = {}) => ({
   data: null as any,
   loading: false,
+  refreshing: false,
   error: null as string | null,
   refresh: vi.fn(),
   ...over,

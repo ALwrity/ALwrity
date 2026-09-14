@@ -40,6 +40,7 @@ const mockHook = vi.mocked(useCalendarSifStatus);
 const hookState = (): ReturnType<typeof useCalendarSifStatus> => ({
   data: null as CalendarSifStatus | null,
   loading: false,
+  refreshing: false,
   error: null as string | null,
   refresh: vi.fn(),
 });

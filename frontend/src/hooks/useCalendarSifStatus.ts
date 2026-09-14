@@ -54,13 +54,24 @@ interface UseCalendarSifStatusOptions {
  */
 export function useCalendarSifStatus(
   options: UseCalendarSifStatusOptions = {},
-): { data: CalendarSifStatus | null; loading: boolean; error: string | null; refresh: () => void } {
+): {
+  data: CalendarSifStatus | null;
+  loading: boolean;
+  refreshing: boolean;
+  error: string | null;
+  refresh: () => void;
+} {
   const { enabled = true, pollIntervalMs = DEFAULT_SIF_POLL_INTERVAL_MS } = options;
   const [data, setData] = useState<CalendarSifStatus | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // R3.4: last-known payload mirrored into a ref so poll closures can keep
+  // it on an error without a state dependency.
+  const dataRef = useRef<CalendarSifStatus | null>(null);
+  const retryRef = useRef(0);
 
   const refresh = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -77,13 +88,20 @@ export function useCalendarSifStatus(
 
     const tick = async () => {
       if (cancelled) return;
-      setLoading(true);
+      if (dataRef.current === null) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
       try {
         const payload: CalendarSifStatus | null = await contentPlanningApi.getCalendarSifStatus();
         if (cancelled) return;
         setData(payload);
+        dataRef.current = payload;
         setError(null);
         setLoading(false);
+        setRefreshing(false);
+        retryRef.current = 0;
 
         const phase = payload?.indexing?.phase;
         if (phase && ACTIVE_PHASES.has(phase)) {
@@ -92,8 +110,15 @@ export function useCalendarSifStatus(
       } catch (e: any) {
         if (cancelled) return;
         setError(e?.message || 'Could not load calendar indexing status');
-        setData(null);
         setLoading(false);
+        setRefreshing(false);
+        // R3.4: initial failure degrades to nothing; a poll failing once we
+        // HOLD data keeps the last payload and retries a bounded number of
+        // times instead of vanishing.
+        if (dataRef.current !== null && retryRef.current < 3) {
+          retryRef.current += 1;
+          timerRef.current = setTimeout(tick, pollIntervalMs);
+        }
       }
     };
 
@@ -108,11 +133,10 @@ export function useCalendarSifStatus(
     };
   }, [enabled, pollIntervalMs, refreshKey]);
 
-  // R3.3: when disabled, surfaces NOTHING — derived here so the effect body
-  // never mutates state synchronously (avoids cascading renders).
   return {
     data: enabled ? data : null,
     loading: enabled ? loading : false,
+    refreshing: enabled ? refreshing : false,
     error: enabled ? error : null,
     refresh,
   };

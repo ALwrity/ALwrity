@@ -122,7 +122,7 @@ const CalendarSifStatusCard: React.FC = () => {
   // R3.1: the rollout flag gates the request itself — the hook still runs
   // unconditionally (hook-order safe), but `enabled` follows the flag so a
   // disabled card makes NO authenticated calls.
-  const { data, loading, error } = useCalendarSifStatus({
+  const { data, loading, refreshing, error } = useCalendarSifStatus({
     enabled: isCalendarSifCardEnabled(),
   });
   const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -165,10 +165,14 @@ const CalendarSifStatusCard: React.FC = () => {
     handleSearch(question);
   };
 
-  // Graceful degradation: if the read-only status endpoint errors, render nothing.
-  if (error) return null;
+  // Graceful degradation: if the read-only status endpoint errors with NO
+  // prior data, render nothing (a poll error while HOLDING data keeps the
+  // last rendered card instead).
+  if (error && !data) return null;
 
-  if (loading || !data) {
+  // R3.4: full-card spinner only on the INITIAL load — background refreshes
+  // keep the card rendered (no 5s flicker).
+  if ((loading || refreshing) && !data) {
     return (
       <Card variant="outlined" sx={{ mt: 3 }}>
         <CardContent>
@@ -182,6 +186,8 @@ const CalendarSifStatusCard: React.FC = () => {
       </Card>
     );
   }
+
+  if (!data) return null;
 
   const phase = data.indexing?.phase ?? 'not_indexed';
   const count = data.indexing?.embedding_count ?? data.watermark?.embedding_count ?? 0;

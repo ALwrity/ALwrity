@@ -53,6 +53,7 @@ const indexing = (phase: string, over: Record<string, any> = {}) => ({
 const hookState = (over: Partial<ReturnType<typeof useCalendarSifStatus>> = {}) => ({
   data: null as CalendarSifStatus | null,
   loading: false,
+  refreshing: false,
   error: null as string | null,
   refresh: vi.fn(),
   ...over,
