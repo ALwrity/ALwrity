@@ -23,6 +23,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from api.content_planning.utils.rate_limiter import register_rate_limit_hit
+
 _BACKEND_ROOT = Path(__file__).resolve().parents[2]
 if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
@@ -172,3 +174,55 @@ class TestSearchEndpoint:
         body = _json.dumps(resp.json())
         assert "secret" not in body
         assert "internal txtai exception" not in body
+
+    def test_empty_query_rejected_422(self, make_client):
+        """R6.1: empty/whitespace query must not load the index."""
+        client = make_client()
+        for query in ("", "   "):
+            resp = client.get(
+                "/calendar-generation/calendar/sif-search",
+                params={"query": query, "limit": 4},
+            )
+            assert resp.status_code == 422, (query, resp.text)
+            assert resp.json()["detail"]["code"] == "invalid_query"
+
+    def test_overlong_query_rejected_422(self, make_client):
+        """R6.1: >512 chars is abuse-shaped."""
+        client = make_client()
+        resp = client.get(
+            "/calendar-generation/calendar/sif-search",
+            params={"query": "x" * 513, "limit": 4},
+        )
+        assert resp.status_code == 422, resp.text
+        assert resp.json()["detail"]["code"] == "invalid_query"
+
+    def test_search_rate_limited_429(self, make_client):
+        """R6.1: beyond the 20/min budget the endpoint stops loading txtai."""
+        from api.content_planning.utils import rate_limiter as rl
+
+        rl._clear()
+        client = make_client()
+        # Fill the budget BEFORE the request: the enforced call must 429
+        # WITHOUT re-registering an extra hit.
+        for _ in range(rl.CALENDAR_SIF_SEARCH_LIMITS[0]):
+            register_rate_limit_hit("calendar_sif_search", NUMERIC_UID)
+
+        resp = client.get(
+            "/calendar-generation/calendar/sif-search",
+            params={"query": "schedule", "limit": 4},
+        )
+        assert resp.status_code == 429, resp.text
+        assert resp.json()["detail"]["code"] == "rate_limited"
+
+    def test_search_valid_query_registers_one_hit_each(self, make_client):
+        """R6.1: hits recorded exactly once per valid search."""
+        from api.content_planning.utils import rate_limiter as rl
+
+        rl._clear()
+        client = make_client()
+        client.get("/calendar-generation/calendar/sif-search", params={"query": "a", "limit": 4})
+        client.get("/calendar-generation/calendar/sif-search", params={"query": "b", "limit": 4})
+        scope_key = [k for k in rl._hits.keys() if "calendar_sif_search:user-42" in k]
+        assert len(scope_key) == 1
+        hits = rl._hits[scope_key[0]]
+        assert len(hits) == 2

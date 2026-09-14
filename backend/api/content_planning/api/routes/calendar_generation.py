@@ -54,7 +54,13 @@ from services.subscription.preflight_validator import validate_calendar_generati
 from services.subscription.pricing_service import PricingService
 from models.onboarding import OnboardingSession
 from models.content_planning import ContentStrategy
-from ...utils.rate_limiter import enforce_rate_limit, GENERATE_CALENDAR_LIMITS
+from ...utils.rate_limiter import (
+    enforce_rate_limit,
+    rate_limit_budget_exhausted,
+    register_rate_limit_hit,
+    CALENDAR_SIF_SEARCH_LIMITS,
+    GENERATE_CALENDAR_LIMITS,
+)
 
 # Create router
 router = APIRouter(prefix="/calendar-generation", tags=["calendar-generation"])
@@ -842,14 +848,44 @@ async def search_calendar_sif(
     fabricated).
     """
     try:
+        # R6.1: query validation — empty/whitespace queries load the index
+        # for nothing; overlong queries are abuse-shaped.
+        trimmed_query = (query or "").strip()
+        if not trimmed_query:
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "invalid_query", "message": "query must not be empty"},
+            )
+        from api.content_planning.utils.constants import CALENDAR_SIF_QUERY_MAX
+
+        if len(trimmed_query) > CALENDAR_SIF_QUERY_MAX:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "invalid_query",
+                    "message": f"query too long (max {CALENDAR_SIF_QUERY_MAX} characters)",
+                },
+            )
+
+        # R6.1: detect-only budget (index loads are expensive); a hit is
+        # recorded only once the search is actually attempted.
+        if rate_limit_budget_exhausted("calendar_sif_search", str(current_user.get("id")), CALENDAR_SIF_SEARCH_LIMITS):
+            raise HTTPException(
+                status_code=429,
+                detail={"code": "rate_limited", "message": "Too many calendar searches. Please wait a minute."},
+            )
+
         user_id = str(current_user.get("id"))
         source_id = calendar_latest_source_id(user_id)
         prefix = f"{source_id}:"
 
         from services.intelligence.txtai_service import TxtaiIntelligenceService
 
+        register_rate_limit_hit("calendar_sif_search", user_id)
         svc = TxtaiIntelligenceService(user_id)
-        raw = await svc.search(query, limit=max(limit * 4, 12))
+        raw = await svc.search(
+            trimmed_query, limit=max(limit * 4, 12)
+        )
 
         hits: list = []
         for result in raw or []:
@@ -887,7 +923,7 @@ async def search_calendar_sif(
         return {
             "status": "success",
             "data": {
-                "query": query,
+                "query": trimmed_query,
                 "source_id": source_id,
                 "hits": hits,
             },
@@ -902,7 +938,7 @@ async def search_calendar_sif(
         return {
             "status": "error",
             "data": {
-                "query": query,
+                "query": trimmed_query,
                 "source_id": calendar_latest_source_id(str(current_user.get("id"))),
                 "hits": [],
                 "error": {"code": "search_unavailable"},

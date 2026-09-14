@@ -23,6 +23,8 @@ from loguru import logger
 CREATE_STRATEGY_LIMITS: Tuple[int, int] = (10, 600)    # 10 creates per 10 min
 GENERATE_STRATEGY_LIMITS: Tuple[int, int] = (3, 600)   # 3 AI generations per 10 min
 GENERATE_CALENDAR_LIMITS: Tuple[int, int] = (3, 3600)  # 3 calendar generations per hour
+# R6.1: semantic search loads the txtai index — budget it but keep polling cheap
+CALENDAR_SIF_SEARCH_LIMITS: Tuple[int, int] = (20, 60)  # 20 searches per minute
 
 _now = time.time  # module-level so tests can advance the clock
 
@@ -54,3 +56,25 @@ def enforce_rate_limit(scope: str, user_id: str, limits: Tuple[int, int]) -> Non
                 ),
             )
         bucket.append(now)
+
+
+def rate_limit_budget_exhausted(scope: str, user_id: str, limits: Tuple[int, int]) -> bool:
+    """Detect-only variant (R6.1) — returns True when a NEW hit for
+    ``(scope, user_id)`` would exceed ``limits`` WITHOUT recording the hit.
+    Lets read endpoints (which shouldn't record anything on rejection) share
+    the limiter's accounting, and lets tests assert "beyond budget" without
+    double-marking."""
+    max_requests, window_seconds = limits
+    key = f"{scope}:{user_id}"
+    with _lock:
+        now = _now()
+        bucket = _hits.setdefault(key, deque())
+        while bucket and now - bucket[0] > window_seconds:
+            bucket.popleft()
+        return len(bucket) >= max_requests
+
+
+def register_rate_limit_hit(scope: str, user_id: str) -> None:
+    """Record a usage tick for ``(scope, user_id)`` (R6.1)."""
+    with _lock:
+        _hits.setdefault(f"{scope}:{user_id}", deque()).append(_now())
