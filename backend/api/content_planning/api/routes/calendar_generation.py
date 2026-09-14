@@ -515,9 +515,10 @@ async def start_calendar_generation(
         if not success:
             raise HTTPException(status_code=500, detail="Failed to initialize orchestrator session")
         
-        # Start the generation process asynchronously using orchestrator
-        # This will run in the background while the frontend polls for progress
-        asyncio.create_task(calendar_service.start_orchestrator_generation(session_id, request_dict))
+        # Start the generation process in the background using the
+        # task-owned wrapper (R2.1): the background task opens and closes its
+        # own database session instead of holding this request's session.
+        asyncio.create_task(calendar_service.run_generation_task(session_id, request_dict))
         
         return {
             "session_id": session_id,

@@ -224,30 +224,56 @@ def build_calendar_chunks(
     return chunks
 
 
+def _default_sif_session_factory(user_id: str):
+    """Open a fresh per-user session for the background indexing task.
+
+    The returned session is owned by the task (R2.1) and closed in
+    ``finally`` — the caller's request-scoped session never crosses the
+    task boundary.
+    """
+    from services.database.sessions import get_session_for_user
+
+    return get_session_for_user(user_id)
+
+
 def index_calendar_async(
-    session,
     user_id: str,
     calendar_data: Dict[str, Any],
     generated_at: str,
     sif_service: Optional[TxtaiIntelligenceService] = None,
-) -> None:
+    session_factory=None,
+):
     """Fire-and-forget entry point for calendar SIF indexing.
 
-    Records ``pending`` status, then dispatches the full lifecycle
-    in a background task. Never raises — indexing must never fail
-    calendar generation.
+    R2.1: takes NO session parameter — the background task opens its own
+    dedicated session via ``get_session_for_user`` (or the injected
+    ``session_factory`` in tests), runs the lifecycle inside it, and closes
+    it in ``finally``. Returns the created asyncio task (or ``None`` when
+    dispatch failed). Never raises — indexing must never fail calendar
+    generation.
     """
     import asyncio
 
+    if session_factory is None:
+        session_factory = _default_sif_session_factory
+
     async def _run():
-        await _run_indexing_lifecycle(
-            session, user_id, calendar_data, generated_at, sif_service
-        )
+        session = session_factory(user_id)
+        try:
+            await _run_indexing_lifecycle(
+                session, user_id, calendar_data, generated_at, sif_service
+            )
+        finally:
+            try:
+                session.close()
+            except Exception:
+                pass
 
     try:
-        asyncio.create_task(_run())
+        return asyncio.create_task(_run())
     except Exception as exc:
         logger.warning(f"⚠️ Calendar SIF dispatch failed: {exc}")
+        return None
 
 
 async def _run_indexing_lifecycle(

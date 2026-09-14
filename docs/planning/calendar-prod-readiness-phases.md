@@ -2,7 +2,7 @@
 
 > Status 2026-09-13: R1 COMPLETE (R1.1 /start persistence, R1.2 indexer
 > embed, R1.3 single head + SIF tables + engine fail-loud, R1.4 frontend
-> suites green) — backend-critical release blockers closed; R2+ pending.
+> suites green). R2.1 DONE (task-owned DB sessions). R2.3/R2.4 pending.
 > Source: production-readiness review of
 > the content calendar feature (backend lifecycle + SIF + frontend + migrations)
 > performed after SIF Phase A (backend) and Phase D (frontend) implementation.
@@ -174,7 +174,7 @@ Touch: the two test files only.
 
 ## Phase R2 — Session & task safety
 
-### R2.1 Background tasks own their DB sessions (C5)
+### R2.1 Background tasks own their DB sessions (C5) ✅ DONE
 Problem: `/start` (`calendar_generation.py:511`) and `index_calendar_async`
 (`calendar_sif_indexer.py:248`) detach work via `asyncio.create_task` while
 holding the session yielded by `get_db` (`sessions.py:110-128`), which FastAPI
@@ -185,7 +185,26 @@ Registry/`get_orchestrator_progress` reads keep using request sessions.
 TDD: task-run test asserting the request session is untouched and the task
 session is opened/closed exactly once (mock factory records lifecycle).
 Done: no request-scoped session crosses a task boundary (source guard test).
-Touch: `calendar_generation_service.py`, `calendar_sif_indexer.py`, new test.
+**DONE 2026-09-13:**
+- `calendar_sif_indexer.index_calendar_async(user_id, calendar_data,
+  generated_at, sif_service=None, session_factory=None)` — no session param;
+  the task opens its own session via `get_session_for_user` (injectable),
+  closes it in `finally`, returns the created task.
+- New `CalendarGenerationService.run_generation_task(session_id, request_data)`:
+  swaps `self.db_session` to a task-owned session for the whole generation
+  (progress persists + R1.1 save + SIF dispatch), restores in `finally`;
+  bounded failure marks the in-memory session `failed`, never raises.
+- `/start` route now schedules `run_generation_task` (source guard asserts
+  no `start_orchestrator_generation` crosses `create_task`).
+- Tests: `backend/tests/services/test_task_owned_sessions.py` (9: opened-
+  once/closed-once, lifecycle inside factory session, dispatch-failure
+  no-raise, swap/restore/single-close, factory-failure → failed, route
+  wiring, plus 3 source guards). Updated capture signatures in
+  `test_calendar_sif_trigger.py` / `test_calendar_start_e2e.py`
+  (+ identity-map expire in the route test).
+Tests: R2.1 + R1.1 **14 passed**; full calendar regression **112 passed**.
+Touch: `calendar_generation_service.py`, `calendar_sif_indexer.py`,
+`calendar_generation.py` route, new test + two test updates.
 
 ### R2.2 Lifecycle commits fully guarded (M7)
 Problem: `calendar_sif_indexer.py:263-267` — the initial `running` write + commit

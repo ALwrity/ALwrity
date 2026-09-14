@@ -122,8 +122,8 @@ class TestCalendarSifTrigger:
         service = _make_service(ctx)
         captured = {}
 
-        def _dispatch(session, user_id, calendar_data, generated_at, sif_service=None):
-            captured["session"] = session
+        def _dispatch(user_id, calendar_data, generated_at, sif_service=None):
+            captured["session"] = None  # task opens its own session (R2.1)
             captured["user_id"] = user_id
             captured["calendar_data"] = calendar_data
             captured["generated_at"] = generated_at
@@ -173,7 +173,7 @@ class TestCalendarSifTrigger:
 
         called = {}
 
-        def _dispatch(session, user_id, calendar_data, generated_at, sif_service=None):
+        def _dispatch(user_id, calendar_data, generated_at, sif_service=None):
             called["invoked"] = True
 
         with patch(DISPATCH_TARGET, side_effect=_dispatch):
