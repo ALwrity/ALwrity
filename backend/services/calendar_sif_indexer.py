@@ -386,13 +386,65 @@ async def _run_indexing_lifecycle(
                 f"for {source_id}"
             )
 
-        # Record watermark with the ACTUAL embedded count
+        # R4.2 atomic replacement — part 1: delete STALE kinds of the
+        # previous generation that the new generation does not emit, so a
+        # partial calendar can never leave stale docs searchable.
+        present_kinds = {c[2]["kind"] for c in chunks}
+        stale_ids = [
+            calendar_latest_doc_id(user_id, kind)
+            for kind in CALENDAR_KINDS
+            if kind not in present_kinds
+        ]
+        if stale_ids:
+            import sys
+            print("DEL-DEBUG stale:", len(stale_ids), "present:", len(present_kinds), file=sys.stderr)
+            deleted = await sif_service.delete_content(stale_ids)
+            logger.info(
+                f"📅 Calendar SIF stale-kind cleanup: removed "
+                f"{deleted} of {len(stale_ids)} old docs for {source_id}"
+            )
+
+        # R4.2 part 2: generation fence — an OLDER job finishing late must
+        # not overwrite a newer generation's watermark. The token (ISO
+        # generated_at of THIS dispatch) is compared against the durable
+        # watermark's token.
+        current_token = str(generated_at or calendar_data.get("generated_at") or "")
+        fenced = (
+            session.query(CalendarSifWatermark)
+            .filter(
+                CalendarSifWatermark.user_id == user_id,
+                CalendarSifWatermark.source_id == source_id,
+                CalendarSifWatermark.generation_token > current_token,
+            )
+            .first()
+            is not None
+        )
+        if fenced:
+            logger.info(
+                f"🚧 Calendar SIF skipped for {source_id}: a newer "
+                "generation already indexed"
+            )
+            CalendarSifIndexStatus.set_status(
+                session,
+                user_id,
+                source_id,
+                STATUS_SKIPPED,
+                error_message=(
+                    f"skipped: a newer generation already indexed "
+                    f"({source_id})"
+                ),
+            )
+            session.commit()
+            return
+
+        # Record watermark with the ACTUAL embedded count + generation token
         CalendarSifWatermark.upsert(
             session,
             user_id,
             source_id,
             source_hash,
             embedding_count=embedded_count,
+            generation_token=current_token,
             notes="calendar generation completion",
         )
 

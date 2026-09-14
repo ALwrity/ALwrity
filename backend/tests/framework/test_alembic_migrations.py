@@ -477,11 +477,10 @@ class TestCalendarSifTables:
         command.upgrade(cfg, "head")
         assert "calendar_sif_index_status" in _table_names(engine)
 
-        from alembic.script import ScriptDirectory
-
-        merge_rev = ScriptDirectory.from_config(cfg).get_revision(
-            _current_head()
-        ).down_revision
+        # Downgrade to ONE REVISION BELOW the SIF-tables migration (tables'
+        # parent): children may be appended over time, but the SIF tables
+        # are always created at e2f3a4b5c6d7, parented by d1e2f3a4b5c6.
+        merge_rev = "d1e2f3a4b5c6"
 
         command.downgrade(cfg, merge_rev)
         tables = _table_names(engine)
