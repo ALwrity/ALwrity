@@ -809,8 +809,22 @@ async def get_calendar_sif_status(
     except HTTPException:
         raise
     except Exception as e:
+        # R5.2: schema/DB failures must be DISTINGUISHABLE from the honest
+        # "nothing indexed yet" state — surface a degraded 503 with a stable
+        # code. The raw detail stays in server logs.
         logger.error(f"Error retrieving calendar SIF status: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve calendar SIF status")
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "error",
+                "data": {
+                    "indexing": {"phase": "unavailable", "status": None,
+                                 "embedding_count": 0, "error_message": None},
+                    "forward_note": "sif storage unavailable",
+                    "code": "sif_storage_unavailable",
+                },
+            },
+        )
 
 
 @router.get("/calendar/sif-search")
