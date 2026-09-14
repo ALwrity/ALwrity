@@ -1,7 +1,7 @@
 /* @refresh reset */
 /**
  * YouTube Video Creator pipeline composer (Plan → Scenes → Assets → Render).
- * Step UI and handlers live in panel/* — PlanStep internals are unchanged.
+ * Step UI and handlers live in panel/*. Plan layout is composed in PlanStep.
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Box } from "@mui/material";
@@ -25,6 +25,7 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
   const {
     userIdea,
     durationType,
+    aspectRatio,
     videoType,
     targetAudience,
     videoGoal,
@@ -269,6 +270,7 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
         activeStep={activeStep}
         userIdea={userIdea}
         durationType={durationType}
+        aspectRatio={aspectRatio}
         videoType={videoType}
         targetAudience={targetAudience}
         videoGoal={videoGoal}

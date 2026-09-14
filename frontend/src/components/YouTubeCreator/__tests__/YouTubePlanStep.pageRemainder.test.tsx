@@ -93,6 +93,7 @@ function renderPlanStep(
   const props: React.ComponentProps<typeof PlanStep> = {
     userIdea: "Budget travel packing",
     durationType: "shorts",
+    aspectRatio: "9:16",
     language: "en",
     loading: false,
     referenceImage: "",
@@ -104,6 +105,7 @@ function renderPlanStep(
     scriptPhase: "idle",
     onIdeaChange: vi.fn(),
     onDurationChange: vi.fn(),
+    onAspectRatioChange: vi.fn(),
     onVideoTypeChange: vi.fn(),
     onTargetAudienceChange: vi.fn(),
     onVideoGoalChange: vi.fn(),
@@ -170,6 +172,13 @@ describe("YouTube PlanStep complete page remainder", () => {
     ).toBeTruthy();
   });
 
+  it("shows Channel Bible after the idea canvas", () => {
+    renderPlanStep({ channelBible: BIBLE });
+    const idea = screen.getByText("What's your video about?");
+    const bible = screen.getByText("Channel Bible");
+    expect(idea.compareDocumentPosition(bible) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("saves and applies Channel Bible from Plan", () => {
     const { props } = renderPlanStep({ channelBible: BIBLE });
     fireEvent.click(screen.getByText("Channel Bible"));
@@ -225,9 +234,9 @@ describe("YouTube PlanStep complete page remainder", () => {
     fireEvent.click(screen.getByRole("option", { name: /Modern Minimalist/i }));
     expect(props.onBrandStyleChange).toHaveBeenCalledWith("modern_minimalist");
 
-    fireEvent.mouseDown(screen.getByText("Shorts (15-60 seconds)"));
-    fireEvent.click(screen.getByRole("option", { name: /Long \(4-10 minutes\)/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Long" }));
     expect(props.onDurationChange).toHaveBeenCalledWith("long");
+    expect(props.onAspectRatioChange).not.toHaveBeenCalled();
   });
 
   it("updates the optional visual style guide", () => {

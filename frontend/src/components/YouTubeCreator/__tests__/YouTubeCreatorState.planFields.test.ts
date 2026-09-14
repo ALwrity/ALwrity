@@ -34,6 +34,7 @@ describe("YouTube creator draft Plan fields", () => {
     expect(snapshot.videoGoal).toBe("educate");
     expect(snapshot.brandStyle).toBe("cinematic");
     expect(snapshot.language).toBe("hi");
+    expect(snapshot.aspectRatio).toBe("9:16");
   });
 
   it("uses Plan defaults when a saved draft omits those fields", () => {
@@ -47,6 +48,7 @@ describe("YouTube creator draft Plan fields", () => {
     expect(snapshot.videoType).toBe("");
     expect(snapshot.language).toBe("en");
     expect(snapshot.enableResearch).toBe(true);
+    expect(snapshot.aspectRatio).toBe("16:9");
   });
 
   it("returns defaults when saved JSON is invalid", () => {
@@ -98,5 +100,31 @@ describe("YouTube creator draft Plan fields", () => {
     expect(snapshot.creativeAngle).toBe("Contrarian");
     expect(snapshot.currentPitch?.selected_title).toBe("Stop Overpacking");
     expect(snapshot.scriptPhase).toBe("pitch");
+  });
+
+  it("restores missing aspectRatio from durationType without overwriting a saved ratio", () => {
+    localStorage.setItem(
+      YOUTUBE_CREATOR_STATE_KEY,
+      JSON.stringify({ durationType: "shorts" }),
+    );
+    expect(getYouTubeCreatorStateSnapshot().aspectRatio).toBe("9:16");
+
+    localStorage.setItem(
+      YOUTUBE_CREATOR_STATE_KEY,
+      JSON.stringify({ durationType: "long", aspectRatio: "9:16" }),
+    );
+    expect(getYouTubeCreatorStateSnapshot().aspectRatio).toBe("9:16");
+    expect(getYouTubeCreatorStateSnapshot().durationType).toBe("long");
+  });
+
+  it("warns and derives aspectRatio when the saved value is invalid", () => {
+    localStorage.setItem(
+      YOUTUBE_CREATOR_STATE_KEY,
+      JSON.stringify({ durationType: "shorts", aspectRatio: "1:1" }),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(getYouTubeCreatorStateSnapshot().aspectRatio).toBe("9:16");
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

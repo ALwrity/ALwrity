@@ -18,6 +18,7 @@ export interface YouTubeVideoCreatorStepsProps {
   activeStep: number;
   userIdea: string;
   durationType: DurationType;
+  aspectRatio: YouTubeCreatorState["aspectRatio"];
   videoType: VideoType | "";
   targetAudience: string;
   videoGoal: string;
@@ -95,6 +96,7 @@ export const YouTubeVideoCreatorSteps: React.FC<YouTubeVideoCreatorStepsProps> =
       <PlanStep
         userIdea={props.userIdea}
         durationType={props.durationType}
+        aspectRatio={props.aspectRatio}
         videoType={props.videoType || undefined}
         targetAudience={props.targetAudience}
         videoGoal={props.videoGoal}
@@ -108,6 +110,7 @@ export const YouTubeVideoCreatorSteps: React.FC<YouTubeVideoCreatorStepsProps> =
         language={props.language}
         onIdeaChange={(value) => props.updateState({ userIdea: value })}
         onDurationChange={(value) => props.updateState({ durationType: value })}
+        onAspectRatioChange={(value) => props.updateState({ aspectRatio: value })}
         onVideoTypeChange={(value) => props.updateState({ videoType: value })}
         onTargetAudienceChange={(value) => props.updateState({ targetAudience: value })}
         onVideoGoalChange={(value) => props.updateState({ videoGoal: value })}
