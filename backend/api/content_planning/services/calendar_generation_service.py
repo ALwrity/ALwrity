@@ -1159,6 +1159,51 @@ class CalendarGenerationService:
         except Exception as e:
             logger.error(f"❌ Error loading sessions from DB: {e}")
 
+    async def run_generation_task(self, session_id: str, request_data: Dict[str, Any]) -> None:
+        """Task-owned entry point for the ``/start`` background job (R2.1).
+
+        Opens a dedicated session via ``get_session_for_user`` (or the
+        injected ``background_session_factory``), runs the whole generation
+        through it — orchestrator progress persists, the R1.1 calendar save
+        and the SIF dispatch — and closes it in ``finally``. The
+        request-scoped session never crosses the task boundary. Never
+        raises: bounded failures mark the in-memory session ``failed``.
+        """
+        user_id = str(request_data.get("user_id") or "")
+        session_info = self.orchestrator_sessions.get(session_id)
+        if not user_id:
+            logger.error(f"❌ Generation task {session_id}: user_id missing")
+            if session_info is not None:
+                session_info["status"] = "failed"
+                session_info["error"] = "user_id missing from request_data"
+            return
+
+        factory = getattr(self, "background_session_factory", None)
+        if factory is None:
+            from services.database.sessions import get_session_for_user as factory
+
+        task_session = None
+        swapped = False
+        request_session = self.db_session
+        try:
+            task_session = factory(user_id)
+            self.db_session = task_session
+            swapped = True
+            await self.start_orchestrator_generation(session_id, request_data)
+        except Exception as exc:
+            logger.error(f"❌ Generation task failed for session {session_id}: {exc}")
+            if session_info is not None:
+                session_info["status"] = "failed"
+                session_info["error"] = str(exc)
+        finally:
+            if swapped:
+                self.db_session = request_session
+            if task_session is not None:
+                try:
+                    task_session.close()
+                except Exception:
+                    pass
+
     async def start_orchestrator_generation(
         self,
         session_id: str,
@@ -1490,6 +1535,9 @@ class CalendarGenerationService:
             logger.info(f"✅ Calendar saved to database for user {user_id}")
 
             # Phase A: trigger calendar SIF indexing (fire-and-forget).
+            # R2.1: no session is passed — the indexing task opens and closes
+            # its own per-user session, so the request-scoped session never
+            # crosses the task boundary.
             try:
                 from services.calendar_sif_indexer import (
                     calendar_sif_indexing_enabled,
@@ -1498,7 +1546,6 @@ class CalendarGenerationService:
                 if calendar_sif_indexing_enabled():
                     generated_at = calendar_data.get("generated_at")
                     index_calendar_async(
-                        self.db_session,
                         user_id,
                         calendar_data,
                         generated_at or datetime.utcnow().isoformat(),

@@ -114,6 +114,12 @@ def make_service(db_session, orchestrator_result):
     service.db_session = db_session
     service.orchestrator = StubOrchestrator(orchestrator_result)
     service.orchestrator_sessions = {}
+    # R2.1: background tasks open per-user sessions through this factory
+    # (same engine, so in-test sqlite memory sees the same data).
+    bind = db_session.get_bind()
+    service.background_session_factory = (
+        lambda user_id: sessionmaker(autocommit=False, autoflush=False, bind=bind)()
+    )
     return service
 
 
@@ -156,7 +162,7 @@ class TestStartPathPersistsCalendar:
 
         captured = {}
 
-        def _dispatch(db_arg, user_id, calendar_data, generated_at, sif_service=None):
+        def _dispatch(user_id, calendar_data, generated_at, sif_service=None):
             captured["user_id"] = user_id
             captured["calendar"] = calendar_data
             captured["generated_at"] = generated_at
@@ -331,10 +337,14 @@ class TestStartRouteEndToEnd:
         # Deterministically run the background coroutine the route created.
         asyncio.run(captured["coro"])
 
+        # The task committed through its own session (R2.1); expire the
+        # request session's identity map so we read the durable values.
+        db.expire_all()
+
         assert service.orchestrator_sessions[session_id]["status"] == "completed"
         row = service._find_session_row(session_id)
         assert row is not None and row.generation_status == "completed"
         assert (row.generated_calendar or {}).get("daily_schedule")
         assert _count_events(db) == 1
         assert len(captured["dispatched"]) == 1
-        assert captured["dispatched"][0][1] == UID
+        assert captured["dispatched"][0][0] == UID
