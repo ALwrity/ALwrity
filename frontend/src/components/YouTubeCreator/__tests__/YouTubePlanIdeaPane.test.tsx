@@ -28,6 +28,16 @@ describe("YouTubePlanIdeaPane", () => {
     expect(screen.queryByRole("button", { name: /dictate video topic/i })).toBeNull();
   });
 
+  it("keeps the Enhance Topic with AI Hub tooltip when the mic is hidden", () => {
+    render(
+      <YouTubePlanIdeaPane userIdea="Budget travel packing" loading={false} onIdeaChange={vi.fn()} />,
+    );
+    expect(screen.getByRole("button", { name: /enhance topic with ai/i })).toHaveAttribute(
+      "data-tooltip",
+      "Use AI to offer three stronger topic options from your idea.",
+    );
+  });
+
   it("forwards idea edits", () => {
     const onIdeaChange = vi.fn();
     render(

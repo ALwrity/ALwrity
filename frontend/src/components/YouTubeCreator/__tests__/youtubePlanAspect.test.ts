@@ -5,6 +5,7 @@ import {
   parseYouTubePlanAspect,
   youtubePlanAspectFromDuration,
   youtubePlanDurationHint,
+  YOUTUBE_PLAN_DURATION_PILLS,
 } from "../components/youtubePlanAspect";
 
 describe("youtubePlanAspect", () => {
@@ -42,5 +43,13 @@ describe("youtubePlanAspect", () => {
     expect(youtubePlanDurationHint("shorts")).toMatch(/≤60s/i);
     expect(youtubePlanDurationHint("medium")).toMatch(/1-4/i);
     expect(youtubePlanDurationHint("long")).toMatch(/4-10/i);
+  });
+
+  it("keeps duration pill hints as Hub tooltip copy", () => {
+    expect(YOUTUBE_PLAN_DURATION_PILLS.map((pill) => pill.hint)).toEqual([
+      "Vertical bite-sized (≤60s).",
+      "Quick explainers (1-4 min).",
+      "Deep dives (4-10 min).",
+    ]);
   });
 });
