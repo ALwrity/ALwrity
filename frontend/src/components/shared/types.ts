@@ -85,6 +85,8 @@ export interface DashboardHeaderProps {
     label: string;
     color: string;
     icon: React.ReactElement;
+    onClick?: () => void;
+    testId?: string;
   }>;
   rightContent?: React.ReactNode;
   customIcon?: string;

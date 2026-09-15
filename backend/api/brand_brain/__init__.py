@@ -1,0 +1,1 @@
+"""Brand Brain API package (unified semantic search, dashboard aggregate)."""

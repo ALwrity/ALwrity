@@ -442,6 +442,27 @@ class TxtaiIntelligenceService:
             return ""
         return self._get_document_text(doc_id)
 
+    def get_document_metadata(self, doc_id):
+        """Return the stored metadata/object for a document ID, or None.
+
+        Indexed metadata is JSON-encoded by ``index_content`` and stored as
+        the txtai ``object`` (the third element of the ``(id, text, object)``
+        tuple). Callers requesting enrichment (e.g. the Brand Brain semantic
+        search, which reads ``metadata.type`` for onboarding docs) surface the
+        raw value here and parse it themselves.
+        """
+        if not self._initialized or not self.embeddings:
+            return None
+        try:
+            doc = self.embeddings.get(doc_id)
+            if isinstance(doc, dict):
+                return doc.get("object") or doc.get("metadata")
+            if isinstance(doc, (list, tuple)):
+                return doc[2] if len(doc) > 2 else None
+            return None
+        except Exception:
+            return None
+
     @staticmethod
     def _cosine_similarity_from_vectors(v1, v2) -> float:
         """Compute cosine similarity for two embedding vectors."""
