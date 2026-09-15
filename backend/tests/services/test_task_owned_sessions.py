@@ -183,9 +183,14 @@ class TestSifTaskOwnsSession:
         asyncio.run(runner())
 
         source_id = calendar_latest_source_id(UID)
-        assert len(factory.made) == 1
-        assert factory.made[0].close_calls == 1, "task must close its session"
-        assert factory.user_ids == [UID]
+        # R4.3 contract: dispatch now opens TWO sessions — one for the
+        # durable `pending` write, one for the lifecycle task.
+        assert len(factory.made) == 2
+        assert factory.made[0].close_calls == 1, "pending session must close"
+        assert factory.made[1].close_calls == 1, "task must close its session"
+        assert factory.user_ids == [UID, UID], (
+            "pending write + lifecycle task both run as the user"
+        )
 
         status = CalendarSifIndexStatus.get(engine_db.session, UID, source_id)
         assert status is not None and status.status == STATUS_SUCCESS

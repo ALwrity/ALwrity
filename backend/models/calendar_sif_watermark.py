@@ -35,6 +35,10 @@ class CalendarSifWatermark(Base):
     source_hash = Column(String(128), nullable=False, default="")
     embedding_count = Column(Integer, nullable=False, default=0)
     indexed_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    # R4.2: generation token (ISO generated_at of the SUCCESSFULLY indexed
+    # generation) — fences concurrent lifecycle jobs so an older, slower
+    # job cannot overwrite a newer one's watermark.
+    generation_token = Column(String(64), nullable=False, default="")
     notes = Column(Text, nullable=True)
 
     __table_args__ = (
@@ -97,6 +101,7 @@ class CalendarSifWatermark(Base):
         source_id: str,
         source_hash: str,
         embedding_count: int = 0,
+        generation_token: Optional[str] = None,
         notes=None,
     ):
         try:
@@ -111,6 +116,7 @@ class CalendarSifWatermark(Base):
                     source_id=source_id,
                     source_hash=source_hash,
                     embedding_count=embedding_count,
+                    generation_token=generation_token or "",
                     notes=notes,
                 )
                 session.add(row)
@@ -118,6 +124,8 @@ class CalendarSifWatermark(Base):
                 row.source_hash = source_hash
                 row.embedding_count = embedding_count
                 row.indexed_at = datetime.utcnow()
+                if generation_token is not None:
+                    row.generation_token = generation_token
                 if notes is not None:
                     row.notes = notes
             return row

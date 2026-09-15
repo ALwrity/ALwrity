@@ -437,6 +437,9 @@ class CalendarSessionRegistryMixin:
             # B4: deliver the assembled calendar only once the session
             # actually completed with a real result.
             "result": row.generated_calendar if status == "completed" else None,
+            # R6.2: durable fallback can't carry a live flag; the save itself
+            # couldn't commit. Surfaced as None here (memory-first read wins).
+            "persistence_error": None,
         }
 
     def get_orchestrator_progress(
@@ -504,7 +507,9 @@ class CalendarSessionRegistryMixin:
                 "last_updated": session.get("last_updated", datetime.now().isoformat()),
                 # B4: deliver the assembled calendar only once the session
                 # actually completed with a real result.
-                "result": session.get("result") if session["status"] == "completed" else None
+                "result": session.get("result") if session["status"] == "completed" else None,
+                # R6.2: persistence failure surfaced for /progress banner
+                "persistence_error": session.get("persistence_error"),
             }
             
         except Exception as e:
@@ -609,13 +614,32 @@ class CalendarSessionRegistryMixin:
                  daily_schedule = calendar_data.get("step_results", {}).get("step_08", {}).get("daily_schedule", [])
 
             # Skip calendar event creation when no valid strategy_id (FK constraint)
+            # R4.1: inserts are pre-filtered by the natural key
+            # (strategy_id, user_id, title, scheduled_date) so a retry/partial
+            # re-save of the same session cannot duplicate rows; user edits
+            # persisted by hand are left untouched (we only skip items whose
+            # natural-key match already exists).
             if not strategy_id:
                 logger.warning(f"⚠️ No strategy_id provided — skipping CalendarEvent creation for session {session_id}")
             else:
                 for day in daily_schedule:
                     content_items = day.get("content_items", [])
+                    scheduled_date = self._parse_scheduled_date(day.get("date"))
                     for item in content_items:
-                        scheduled_date = self._parse_scheduled_date(day.get("date"))
+                        title = item.get("title", "Untitled Event")
+                        exists = (
+                            self.db_session.query(CalendarEvent)
+                            .filter(
+                                CalendarEvent.user_id == user_id,
+                                CalendarEvent.strategy_id == strategy_id,
+                                CalendarEvent.title == title,
+                                CalendarEvent.scheduled_date == scheduled_date,
+                            )
+                            .first()
+                            is not None
+                        )
+                        if exists:
+                            continue
 
                         event = CalendarEvent(
                             user_id=user_id,
@@ -671,5 +695,13 @@ class CalendarSessionRegistryMixin:
                 if self.db_session:
                     self.db_session.rollback()
             finally:
+                # R6.2: best-effort surface the save failure on the in-memory
+                # session so /progress can show it (never silently swallowed).
+                try:
+                    in_memory = self.orchestrator_sessions.get(session_id)
+                    if in_memory is not None:
+                        in_memory["persistence_error"] = repr(e)[:400]
+                except Exception:
+                    pass
                 logger.error(f"❌ Error saving calendar to database: {str(e)}")
                 raise

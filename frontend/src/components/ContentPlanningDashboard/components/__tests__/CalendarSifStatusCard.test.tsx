@@ -14,7 +14,7 @@ import { render, screen } from '@testing-library/react';
 import React from 'react';
 
 import CalendarSifStatusCard from '../CalendarSifStatusCard';
-import { CalendarSifStatus } from '../../../../hooks/useCalendarSifStatus';
+import { CalendarSifStatus, type CalendarSifIndexingPhase } from '../../../../hooks/useCalendarSifStatus';
 
 vi.mock('../../../../hooks/useCalendarSifStatus', () => ({
   useCalendarSifStatus: vi.fn(),
@@ -36,7 +36,7 @@ import { contentPlanningApi } from '../../../../services/contentPlanningApi';
 const mockUseCalendarSifStatus = vi.mocked(useCalendarSifStatus);
 const mockSearchCalendarSif = vi.mocked(contentPlanningApi.searchCalendarSif);
 
-const indexing = (phase: string, over: Record<string, any> = {}) => ({
+const indexing = (phase: CalendarSifIndexingPhase, over: Record<string, any> = {}) => ({
   indexing: { phase, status: phase, embedding_count: 8, attempt: 1, ...over },
   watermark: { embedding_count: 8, indexed_at: '2026-01-01T00:00:01Z' },
   document_kinds: {
@@ -53,6 +53,7 @@ const indexing = (phase: string, over: Record<string, any> = {}) => ({
 const hookState = (over: Partial<ReturnType<typeof useCalendarSifStatus>> = {}) => ({
   data: null as CalendarSifStatus | null,
   loading: false,
+  refreshing: false,
   error: null as string | null,
   refresh: vi.fn(),
   ...over,
@@ -107,8 +108,9 @@ describe('CalendarSifStatusCard — plain-language status card', () => {
 
     render(<CalendarSifStatusCard />);
     expect(screen.getByText(/couldn.t? be indexed/i)).toBeTruthy();
-    expect(screen.getByText(/embedding crashed/i)).toBeTruthy();
     expect(screen.getByText(/regenerating/i)).toBeTruthy();
+    // R5.1: raw backend error text must NEVER reach the DOM
+    expect(screen.queryByText(/embedding crashed/i)).toBeNull();
   });
 
   it('renders a not-indexed fallback', () => {
@@ -123,5 +125,21 @@ describe('CalendarSifStatusCard — plain-language status card', () => {
 
     const { container } = render(<CalendarSifStatusCard />);
     expect(container.firstChild).toBeNull();
+  });
+
+  it('R5.3: the search input has an accessible NAME (aria-label)', () => {
+    mockUseCalendarSifStatus.mockReturnValue(hookState({ data: indexing('success') as any }));
+
+    render(<CalendarSifStatusCard />);
+    const input = screen.getByTestId('calendar-sif-question-input');
+    expect(input.getAttribute('aria-label')).toBeTruthy();
+  });
+
+  it('R5.3: the results region announces async updates', () => {
+    mockUseCalendarSifStatus.mockReturnValue(hookState({ data: indexing('success') as any }));
+
+    render(<CalendarSifStatusCard />);
+    const panel = screen.getByTestId('calendar-sif-try-queries');
+    expect(panel.getAttribute('aria-live')).toBe('polite');
   });
 });

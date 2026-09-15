@@ -33,6 +33,25 @@ CALENDAR_KINDS: tuple = (
 
 CALENDAR_LATEST_SOURCE_PREFIX = "user:{uid}:calendar_latest"
 
+# R4.4: volatile fields that change on every generation run — they are UI
+# provenance, NOT content, so they must never force a re-embed. Stripped
+# wherever they appear (top level or nested) before canonicalization.
+CALENDAR_VOLATILE_FIELDS = frozenset(
+    {"generated_at", "processing_time", "session_id"}
+)
+
+
+def _strip_volatile(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            str(k): _strip_volatile(v)
+            for k, v in value.items()
+            if k not in CALENDAR_VOLATILE_FIELDS
+        }
+    if isinstance(value, (list, tuple, set)):
+        return [_strip_volatile(v) for v in value]
+    return value
+
 
 def calendar_latest_source_id(user_id: str) -> str:
     """Return the watermark/dedupe source id for a user's latest calendar."""
@@ -84,14 +103,17 @@ def compute_calendar_source_hash(
     calendar_data: Dict[str, Any],
     generated_at: str,
 ) -> str:
-    """sha256 over the canonical form of ``{user_id, generated_at, data}``.
+    """sha256 over the canonical form of ``{user_id, volatile-stripped data}``.
 
-    Changing any calendar field changes the digest and forces a re-embed.
-    ``generated_at`` should already be an ISO string.
+    R4.4 (contract fix): the hash is over calendar CONTENT. ``generated_at``,
+    ``processing_time`` and ``session_id`` — which change on every
+    regeneration run — are stripped (top level and nested), so a
+    content-identical regeneration dedupes via the watermark instead of
+    forcing a re-embed. The full timestamp stays in chunk metadata for
+    display. ``generated_at`` remains a parameter for API compatibility.
     """
     canonical = to_canonical({
         "user_id": user_id,
-        "generated_at": generated_at,
-        "data": calendar_data,
+        "data": _strip_volatile(calendar_data),
     })
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()

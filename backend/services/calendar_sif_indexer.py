@@ -19,6 +19,7 @@ Contract:
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from datetime import datetime
@@ -29,6 +30,7 @@ from loguru import logger
 from models.calendar_sif_watermark import CalendarSifWatermark
 from models.calendar_sif_index_status import (
     STATUS_FAILED,
+    STATUS_PENDING,
     STATUS_RUNNING,
     STATUS_SKIPPED,
     STATUS_SUCCESS,
@@ -83,8 +85,17 @@ def _build_events_text(calendar: Dict[str, Any]) -> Optional[str]:
     schedule = calendar.get("daily_schedule") or []
     events: list = []
     for day in schedule:
+        # R4.5: generated content items do not carry their own date — the
+        # containing day does. Event queries like "what's scheduled next
+        # week?" need that date (and the weekly theme) in the passage.
+        day_date = day.get("date") or day.get("scheduled_date") or ""
         for item in day.get("content_items") or []:
-            events.append(item)
+            events.append({
+                **item,
+                "_day_date": day_date,
+                "_week_number": day.get("week_number"),
+                "_theme": day.get("theme"),
+            })
     if not events:
         return None
     lines = []
@@ -92,13 +103,18 @@ def _build_events_text(calendar: Dict[str, Any]) -> Optional[str]:
         title = evt.get("title", "")
         content_type = evt.get("content_type", "")
         platform = evt.get("platform", "")
-        date = evt.get("date") or evt.get("scheduled_date", "")
+        date = evt.get("_day_date") or evt.get("date") or evt.get("scheduled_date", "")
+        week = evt.get("_week_number")
+        theme = evt.get("_theme") or ""
         status = evt.get("status", "")
         kpi = evt.get("kpi", "")
         outcome = evt.get("expected_outcome", "")
+        week_part = f"week {week} | " if week is not None else ""
+        theme_part = f"theme: {theme} | " if theme else ""
         lines.append(
             f"title: {title} | content_type: {content_type} | "
             f"platform: {platform} | date: {date} | "
+            f"{week_part}{theme_part}"
             f"status: {status} | kpi: {kpi} | outcome: {outcome}"
         )
     return "\n".join(lines) + "\n" if lines else None
@@ -251,11 +267,30 @@ def index_calendar_async(
     it in ``finally``. Returns the created asyncio task (or ``None`` when
     dispatch failed). Never raises — indexing must never fail calendar
     generation.
+    R4.3: records `pending` DURABLY at dispatch (before the task exists).
     """
-    import asyncio
 
+    source_id = calendar_latest_source_id(user_id)
     if session_factory is None:
         session_factory = _default_sif_session_factory
+
+    # R4.3: record `pending` DURABLY at dispatch, synchronously, before the
+    # background task exists (best-effort) — so a shutdown between dispatch
+    # and task-run still leaves a visible indexing request in the DB.
+    try:
+        provisional = session_factory(user_id)
+        try:
+            CalendarSifIndexStatus.set_status(
+                provisional, user_id, source_id, STATUS_PENDING
+            )
+            provisional.commit()
+        finally:
+            try:
+                provisional.close()
+            except Exception:
+                pass
+    except Exception as exc:
+        logger.warning(f"⚠️ Calendar SIF pending write skipped: {exc}")
 
     async def _run():
         session = session_factory(user_id)
@@ -315,12 +350,32 @@ async def _run_indexing_lifecycle(
             session.commit()
             return
 
-        # Index via txtai
+        # Index via txtai — R4.3: retries per the documented contract
+        # (3 attempts, 1s/2s/4s backoff) around the embed step.
         if sif_service is None:
             from services.intelligence.txtai_service import TxtaiIntelligenceService
             sif_service = TxtaiIntelligenceService(user_id)
 
-        embedded = await sif_service.index_content(chunks)
+        embedded = None
+        last_exc: Optional[Exception] = None
+        for attempt in range(1, DEFAULT_INDEX_RETRIES + 1):
+            try:
+                embedded = await sif_service.index_content(chunks)
+                last_exc = None
+                break
+            except Exception as exc:
+                last_exc = exc
+                if attempt < DEFAULT_INDEX_RETRIES:
+                    delay = DEFAULT_RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                    logger.warning(
+                        f"⚠️ Calendar SIF embed attempt {attempt} failed "
+                        f"({exc}); retrying in {delay}: "
+                        f"status={source_id}"
+                    )
+                    await asyncio.sleep(delay)
+        if last_exc is not None:
+            raise last_exc
+
         try:
             embedded_count = int(embedded)
         except (TypeError, ValueError):
@@ -331,13 +386,65 @@ async def _run_indexing_lifecycle(
                 f"for {source_id}"
             )
 
-        # Record watermark with the ACTUAL embedded count
+        # R4.2 atomic replacement — part 1: delete STALE kinds of the
+        # previous generation that the new generation does not emit, so a
+        # partial calendar can never leave stale docs searchable.
+        present_kinds = {c[2]["kind"] for c in chunks}
+        stale_ids = [
+            calendar_latest_doc_id(user_id, kind)
+            for kind in CALENDAR_KINDS
+            if kind not in present_kinds
+        ]
+        if stale_ids:
+            import sys
+            print("DEL-DEBUG stale:", len(stale_ids), "present:", len(present_kinds), file=sys.stderr)
+            deleted = await sif_service.delete_content(stale_ids)
+            logger.info(
+                f"📅 Calendar SIF stale-kind cleanup: removed "
+                f"{deleted} of {len(stale_ids)} old docs for {source_id}"
+            )
+
+        # R4.2 part 2: generation fence — an OLDER job finishing late must
+        # not overwrite a newer generation's watermark. The token (ISO
+        # generated_at of THIS dispatch) is compared against the durable
+        # watermark's token.
+        current_token = str(generated_at or calendar_data.get("generated_at") or "")
+        fenced = (
+            session.query(CalendarSifWatermark)
+            .filter(
+                CalendarSifWatermark.user_id == user_id,
+                CalendarSifWatermark.source_id == source_id,
+                CalendarSifWatermark.generation_token > current_token,
+            )
+            .first()
+            is not None
+        )
+        if fenced:
+            logger.info(
+                f"🚧 Calendar SIF skipped for {source_id}: a newer "
+                "generation already indexed"
+            )
+            CalendarSifIndexStatus.set_status(
+                session,
+                user_id,
+                source_id,
+                STATUS_SKIPPED,
+                error_message=(
+                    f"skipped: a newer generation already indexed "
+                    f"({source_id})"
+                ),
+            )
+            session.commit()
+            return
+
+        # Record watermark with the ACTUAL embedded count + generation token
         CalendarSifWatermark.upsert(
             session,
             user_id,
             source_id,
             source_hash,
             embedding_count=embedded_count,
+            generation_token=current_token,
             notes="calendar generation completion",
         )
 

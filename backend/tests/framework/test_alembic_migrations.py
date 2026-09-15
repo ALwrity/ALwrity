@@ -14,6 +14,7 @@ import pytest
 from alembic import command
 from alembic.config import Config as AlembicConfig
 from sqlalchemy import create_engine, inspect
+from sqlalchemy.exc import IntegrityError as sa_exc
 
 _ALEMBIC_INI = (
     Path(__file__).resolve().parents[2] / "alembic.ini"
@@ -477,11 +478,10 @@ class TestCalendarSifTables:
         command.upgrade(cfg, "head")
         assert "calendar_sif_index_status" in _table_names(engine)
 
-        from alembic.script import ScriptDirectory
-
-        merge_rev = ScriptDirectory.from_config(cfg).get_revision(
-            _current_head()
-        ).down_revision
+        # Downgrade to ONE REVISION BELOW the SIF-tables migration (tables'
+        # parent): children may be appended over time, but the SIF tables
+        # are always created at e2f3a4b5c6d7, parented by d1e2f3a4b5c6.
+        merge_rev = "d1e2f3a4b5c6"
 
         command.downgrade(cfg, merge_rev)
         tables = _table_names(engine)
@@ -492,6 +492,51 @@ class TestCalendarSifTables:
         tables = _table_names(engine)
         assert "calendar_sif_index_status" in tables
         assert "calendar_sif_indexing_watermarks" in tables
+
+    def test_sif_integrity_constraints_after_head(self, tmp_path):
+        """R6.4: after upgrade head, the status table enforces CHECKs -
+        illegal status and negative counters must be rejected."""
+        import sqlite3
+
+        fd_path = str(tmp_path / "con_test.db")
+        cfg = AlembicConfig(str(_ALEMBIC_INI))
+        cfg.set_main_option("sqlalchemy.url", f"sqlite:///{fd_path}")
+        command.upgrade(cfg, "head")
+
+        conn = sqlite3.connect(fd_path)
+        try:
+            bad_sqls = [
+                # bogus status rejected by the enum CHECK
+                "INSERT INTO calendar_sif_index_status"
+                " (user_id, source_id, status, embedding_count, attempt, updated_at)"
+                " VALUES ('u1', 's1', 'bogus_status', 0, 0, CURRENT_TIMESTAMP)",
+                # negative counters rejected
+                "INSERT INTO calendar_sif_index_status"
+                " (user_id, source_id, status, embedding_count, attempt, updated_at)"
+                " VALUES ('u2', 's2', 'success', -1, 1, CURRENT_TIMESTAMP)",
+                "INSERT INTO calendar_sif_index_status"
+                " (user_id, source_id, status, embedding_count, attempt, updated_at)"
+                " VALUES ('u3', 's3', 'success', 3, -2, CURRENT_TIMESTAMP)",
+            ]
+            for bad in bad_sqls:
+                with pytest.raises(sqlite3.IntegrityError):
+                    conn.execute(bad)
+            # legal insert accepted
+            conn.execute(
+                "INSERT INTO calendar_sif_index_status"
+                " (user_id, source_id, status, embedding_count, attempt, updated_at)"
+                " VALUES ('u4', 's4', 'success', 1, 1, CURRENT_TIMESTAMP)"
+            )
+
+            # Watermark counter CHECK too
+            with pytest.raises(sqlite3.IntegrityError):
+                conn.execute(
+                    "INSERT INTO calendar_sif_indexing_watermarks"
+                    " (user_id, source_id, source_hash, embedding_count, generation_token)"
+                    " VALUES ('u5', 's5', 'h', -4, 'g')"
+                )
+        finally:
+            conn.close()
 
     def test_sif_models_are_registered_with_metadata(self):
         import services.database.init_db  # noqa: F401 — triggers model imports

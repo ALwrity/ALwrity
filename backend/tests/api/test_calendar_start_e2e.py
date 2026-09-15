@@ -241,6 +241,39 @@ class TestStartPathPersistsCalendar:
         assert _count_events(db) == 0
         assert dispatch_calls == []
 
+        # R6.2: the failure is SURFACED on the session for /progress -
+        # never silently swallowed while status reads completed.
+        assert service.orchestrator_sessions[session_id].get("persistence_error"), (
+            "persistence failure must be visible on the progress payload"
+        )
+
+    def test_progress_payload_includes_persistence_error(self, db):
+        from services.calendar_sif_indexer import build_calendar_chunks  # noqa: F401
+        service = make_service(db, make_real_calendar())
+        request_data = {"user_id": UID, "strategy_id": STRATEGY_ID}
+        session_id = "cal-start-6"
+        assert service.initialize_orchestrator_session(session_id, request_data)
+
+        def _raise_save(self, *args, **kwargs):
+            raise RuntimeError("disk full during calendar save")
+
+        dispatch_calls = []
+
+        def _dispatch(*args, **kwargs):
+            dispatch_calls.append(args)
+
+        with patch(DISPATCH_TARGET, side_effect=_dispatch), patch.object(
+            CalendarGenerationService, "_save_calendar_to_db", _raise_save
+        ):
+            asyncio.run(service.start_orchestrator_generation(session_id, request_data))
+
+        progress = service.get_orchestrator_progress(session_id, requester_user_id=UID)
+        assert progress is not None
+        assert progress["status"] == "completed"
+        assert "disk full during calendar save" in (progress.get("persistence_error") or ""), (
+            "/progress must surface the persistence failure (R6.2)"
+        )
+
     def test_sync_generate_path_saves_exactly_once(self, db):
         """Legacy sync path: still persists itself, and only once."""
         service = make_service(db, make_real_calendar())

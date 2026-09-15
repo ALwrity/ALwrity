@@ -33,7 +33,19 @@ export function isStrategySifEducationEnabled(): boolean {
   return STRATEGY_SIF_EDUCATION_ENABLED;
 }
 
-export const CALENDAR_SIF_CARD_ENABLED: boolean = true;
+export const CALENDAR_SIF_CARD_ENABLED: boolean = (() => {
+  const raw = String(
+    import.meta.env.VITE_CALENDAR_SIF_CARD_ENABLED ?? "",
+  )
+    .trim()
+    .toLowerCase();
+  // Explicit env override wins (kill switch / staged rollout); unset keeps
+  // the module default (on, matching the current flagged rollout).
+  if (raw !== "") {
+    return !["false", "0", "no", "off"].includes(raw);
+  }
+  return true;
+})();
 
 export function isCalendarSifCardEnabled(): boolean {
   return CALENDAR_SIF_CARD_ENABLED;

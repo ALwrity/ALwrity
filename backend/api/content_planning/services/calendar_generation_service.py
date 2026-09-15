@@ -284,6 +284,9 @@ class CalendarGenerationService(CalendarSessionRegistryMixin, CalendarGroundingO
                             f"❌ Calendar persistence failed for session {session_id} "
                             f"(non-fatal): {save_exc}"
                         )
+                        # R6.2: surface the failure for /progress — never
+                        # silently swallow while status reads completed.
+                        session["persistence_error"] = repr(save_exc)[:400]
             else:
                 error_message = (
                     result.get("error_message")
