@@ -40,6 +40,32 @@ TERMINAL_STATUSES_WITH_LEGACY = ("completed", "failed", "error", "cancelled")
 _PERSIST_THROTTLE_SECONDS = 30
 
 
+def _str_or_none(value: Any) -> Optional[str]:
+    """Coerce pipeline metadata to a scalar string for typed columns."""
+    if isinstance(value, str) and value.strip():
+        return value.strip()[:200]
+    return None
+
+
+def _keywords_or_none(value: Any) -> Optional[list]:
+    """Coerce pipeline keywords to a homogeneous string list for the JSON column."""
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    if isinstance(value, (list, tuple, set)):
+        cleaned = [str(item).strip() for item in value if str(item).strip()]
+        return cleaned or None
+    return None
+
+
+def _score_or_none(value: Any) -> Optional[float]:
+    """Coerce pipeline engagement predictions to a float for the Float column."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
 class CalendarSessionRegistryMixin:
     """Mixin: orchestrator session registry, persistence and progress reads."""
 
@@ -650,6 +676,11 @@ class CalendarSessionRegistryMixin:
                             platform=item.get("platform") or item.get("target_platform") or "generic",
                             scheduled_date=scheduled_date,
                             status="draft",
+                            content_pillar=_str_or_none(item.get("content_pillar") or item.get("pillar")),
+                            target_keywords=_keywords_or_none(item.get("target_keywords") or item.get("keywords")),
+                            content_angle=_str_or_none(item.get("content_angle") or item.get("angle")),
+                            target_audience=_str_or_none(item.get("target_audience") or item.get("audience")),
+                            estimated_engagement=_score_or_none(item.get("estimated_engagement")),
                             ai_recommendations=item
                         )
                         self.db_session.add(event)

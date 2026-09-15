@@ -59,6 +59,11 @@ class CalendarEvent(Base):
     platform = Column(String(50), nullable=False)  # website, linkedin, youtube, etc.
     scheduled_date = Column(DateTime, nullable=False)
     status = Column(String(20), default="draft")  # draft, scheduled, published, cancelled
+    content_pillar = Column(String(100), nullable=True)  # e.g. "AI & Automation"
+    target_keywords = Column(JSON, nullable=True)  # List of target keyword strings
+    content_angle = Column(String(200), nullable=True)  # e.g. "first-principles implementation"
+    target_audience = Column(String(200), nullable=True)  # e.g. "CTOs in tech enterprises"
+    estimated_engagement = Column(Float, nullable=True)  # 0.0-1.0 predicted engagement
     ai_recommendations = Column(JSON, nullable=True)  # Store AI recommendations for the event
     owner_agent = Column(String(100), nullable=True, index=True)
     recommendation_id = Column(String(255), nullable=True, index=True)
@@ -98,6 +103,11 @@ class CalendarEvent(Base):
             'platform': self.platform,
             'scheduled_date': self.scheduled_date.isoformat() if self.scheduled_date else None,
             'status': self.status,
+            'content_pillar': self.content_pillar,
+            'target_keywords': self.target_keywords,
+            'content_angle': self.content_angle,
+            'target_audience': self.target_audience,
+            'estimated_engagement': self.estimated_engagement,
             'ai_recommendations': self.ai_recommendations,
             'owner_agent': self.owner_agent,
             'recommendation_id': self.recommendation_id,
