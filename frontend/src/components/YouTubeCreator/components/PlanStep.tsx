@@ -140,6 +140,8 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo((props) => {
             <YouTubePlanIdeaPane
               userIdea={userIdea}
               loading={loading}
+              language={language}
+              durationType={durationType}
               onIdeaChange={onIdeaChange}
             />
             <YouTubePlanBasicSetup

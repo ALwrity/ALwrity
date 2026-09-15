@@ -87,6 +87,39 @@ class VideoPlanResponse(BaseModel):
     message: str
 
 
+class PlanIdeaEnhanceRequest(BaseModel):
+    """Three AI topic options for Plan Your Video (not a full pitch)."""
+    user_idea: str = Field(..., description="Current Plan idea text")
+    duration_type: Optional[str] = Field(
+        None,
+        pattern="^(shorts|medium|long)$",
+        description="Optional Plan duration for topic length",
+    )
+    language: Optional[str] = Field(
+        None,
+        max_length=16,
+        description="Content language code from Plan Your Video",
+    )
+
+    @field_validator("language", mode="before")
+    @classmethod
+    def normalize_enhance_language(cls, value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        return text[:16]
+
+
+class PlanIdeaEnhanceResponse(BaseModel):
+    """Exactly three enhanced topic strings."""
+    success: bool
+    enhanced_ideas: List[str] = Field(default_factory=list)
+    rationales: List[str] = Field(default_factory=list)
+    message: str = ""
+
+
 class PitchRequest(VideoPlanRequest):
     """Phase 1: idea + creative angle → one lightweight pitch."""
     creative_angle: str = Field(

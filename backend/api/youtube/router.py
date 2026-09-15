@@ -15,6 +15,7 @@ from .handlers import audio as audio_handlers
 from .handlers import channel_bible as channel_bible_handlers
 from .handlers import images as image_handlers
 from .handlers import plan as plan_handlers
+from .handlers import plan_idea_enhance as plan_idea_enhance_handlers
 from .handlers import plan_pitch as plan_pitch_handlers
 from .handlers import render as render_handlers
 from .handlers import videos as video_handlers
@@ -37,6 +38,8 @@ from .schemas import (  # noqa: F401
     PitchPreviewResponse,
     PitchRequest,
     PitchResponse,
+    PlanIdeaEnhanceRequest,
+    PlanIdeaEnhanceResponse,
     SceneBuildRequest,
     SceneBuildResponse,
     SceneUpdateRequest,
@@ -55,6 +58,9 @@ from .handlers.plan import (  # noqa: F401
     build_scenes,
     create_video_plan,
     update_scene,
+)
+from .handlers.plan_idea_enhance import (  # noqa: F401
+    enhance_plan_idea,
 )
 from .handlers.plan_pitch import (  # noqa: F401
     create_video_pitch,
@@ -87,6 +93,7 @@ logger = get_service_logger("api.youtube")
 
 # Domain handlers (plan/scenes, render, videos)
 router.include_router(plan_handlers.router)
+router.include_router(plan_idea_enhance_handlers.router)
 router.include_router(plan_pitch_handlers.router)
 router.include_router(channel_bible_handlers.router)
 router.include_router(render_handlers.router)
@@ -109,6 +116,7 @@ __all__ = [
     "task_manager",
     "create_video_plan",
     "create_video_pitch",
+    "enhance_plan_idea",
     "preview_video_pitch",
     "expand_video_pitch",
     "build_scenes",

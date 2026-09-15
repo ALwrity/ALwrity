@@ -21,6 +21,13 @@ describe("YouTubePlanIdeaPane", () => {
     expect(screen.getByText("What's your video about?")).toBeTruthy();
   });
 
+  it("hides the microphone when speech recognition is unavailable", () => {
+    render(
+      <YouTubePlanIdeaPane userIdea="Budget travel packing" loading={false} onIdeaChange={vi.fn()} />,
+    );
+    expect(screen.queryByRole("button", { name: /dictate video topic/i })).toBeNull();
+  });
+
   it("forwards idea edits", () => {
     const onIdeaChange = vi.fn();
     render(

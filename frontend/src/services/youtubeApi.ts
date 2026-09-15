@@ -2,6 +2,7 @@
 
 import { apiClient, aiApiClient, longRunningApiClient } from '../api/client';
 import { expandPitchToScript, generatePitch, previewPitchPrompt } from './youtubePitchApi';
+import { enhancePlanIdea } from './youtubePlanIdeaEnhanceApi';
 
 const API_BASE = '/api/youtube';
 
@@ -343,6 +344,7 @@ export const youtubeApi = {
   generatePitch,
   expandPitchToScript,
   previewPitchPrompt,
+  enhancePlanIdea,
 
   /**
    * Generate a video plan from user input.
