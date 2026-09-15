@@ -31,6 +31,7 @@ export const FEATURE_KEYS = {
   BING: 'bing',
   ASSET_LIBRARY: 'asset-library',
   BACKLINKING: 'backlinking',
+  BRAND_BRAIN: 'brand-brain',
 } as const;
 
 export type FeatureKey = typeof FEATURE_KEYS[keyof typeof FEATURE_KEYS];

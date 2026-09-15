@@ -394,11 +394,14 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
                   key={index}
                   icon={chip.icon} 
                   label={chip.label} 
+                  data-testid={chip.testId}
+                  {...(chip.onClick ? { onClick: chip.onClick, clickable: true } : {})}
                   sx={{ 
                     background: `${chip.color}20`,
                     border: `1px solid ${chip.color}40`,
                     color: chip.color,
                     fontWeight: 700,
+                    ...(chip.onClick ? { cursor: 'pointer' } : {}),
                   }}
                 />
               ))}

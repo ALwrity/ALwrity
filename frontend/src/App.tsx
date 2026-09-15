@@ -63,6 +63,7 @@ const BingAnalyticsStorage = React.lazy(() => import('./components/BingAnalytics
 const ResearchDashboard = React.lazy(() => import('./pages/ResearchDashboard'));
 const IntentResearchTest = React.lazy(() => import('./pages/IntentResearchTest'));
 const SchedulerDashboard = React.lazy(() => import('./pages/SchedulerDashboard'));
+const BrandBrainDashboard = React.lazy(() => import('./pages/BrandBrainDashboard'));
 const BillingPage = React.lazy(() => import('./pages/BillingPage'));
 const ApprovalsPage = React.lazy(() => import('./pages/ApprovalsPage'));
 const TeamActivityPage = React.lazy(() => import('./pages/TeamActivityPage'));
@@ -246,6 +247,7 @@ const App: React.FC = () => {
                       <Route path="/error-test" element={<ErrorBoundaryTest />} />
                     )}
                     <Route path="/dashboard" element={<ProtectedRoute><MainDashboard /></ProtectedRoute>} />
+                    <Route path="/brand-brain" element={<ProtectedRoute><FeatureRoute feature="brand-brain"><BrandBrainDashboard /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/marketing-outcomes" element={<ProtectedRoute><MarketingOutcomesDashboard /></ProtectedRoute>} />
                     <Route path="/seo" element={<ProtectedRoute><FeatureRoute feature="seo"><SEODashboard /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/seo-dashboard" element={<ProtectedRoute><FeatureRoute feature="seo"><SEODashboard /></FeatureRoute></ProtectedRoute>} />

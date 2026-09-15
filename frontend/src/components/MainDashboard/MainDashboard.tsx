@@ -91,6 +91,8 @@ import { apiClient } from '../../api/client';
 import { useOnboardingTasksStatus } from '../../hooks/useOnboardingTasksStatus';
 import { useContentPlanningStore } from '../../stores/contentPlanningStore';
 import { useDashboardStore } from '../../stores/dashboardStore';
+import { isBrandBrainDashboardEnabled } from '../../config/brandBrainConfig';
+import { FEATURE_KEYS, isFeatureEnabled } from '../../utils/demoMode';
 
 // Shared components
 import DashboardHeader from '../shared/DashboardHeader';
@@ -122,6 +124,16 @@ import { toolCategories } from '../../data/toolCategories';
 const MainDashboard: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+
+  // Brand Brain dashboard entry: when the feature flag is on, the SIF health
+  // chip doubles as the navigation chip to /brand-brain (keeping its
+  // health-state coloring/labels per docs/planning/brand-brain-dashboard.md).
+  // The chip also honors the route feature entitlement (FeatureRoute gating)
+  // so it can never advertise a route a feature-only deployment would
+  // redirect away from.
+  const brandBrainEnabled =
+    isBrandBrainDashboardEnabled() && isFeatureEnabled(FEATURE_KEYS.BRAND_BRAIN);
+  const openBrandBrain = useCallback(() => navigate('/brand-brain'), [navigate]);
   
   // Sidebar state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -453,11 +465,16 @@ const MainDashboard: React.FC = () => {
     }
 
     if (sifHealth) {
+      const sifPrefix = brandBrainEnabled ? 'Brand Brain' : 'SIF Index';
+      const brandBrainChipProps = brandBrainEnabled
+        ? { onClick: openBrandBrain, testId: 'brand-brain-chip' }
+        : {};
       if (!sifHealth.has_task) {
         chips.push({
-          label: 'SIF Index: not scheduled',
+          label: `${sifPrefix}: not scheduled`,
           color: '#9e9e9e',
           icon: <Storage sx={{ color: '#9e9e9e' }} />,
+          ...brandBrainChipProps,
         });
       } else {
         const failures = sifHealth.task?.consecutive_failures || 0;
@@ -465,25 +482,26 @@ const MainDashboard: React.FC = () => {
         let label: string;
         let color: string;
         if (sifHealth.status === 'healthy') {
-          label = `SIF Index: active${lastRunStatus === 'success' ? '' : ' (pending)'}`;
+          label = `${sifPrefix}: active${lastRunStatus === 'success' ? '' : ' (pending)'}`;
           color = '#22c55e';
         } else if (sifHealth.status === 'warning') {
-          label = `SIF Index: ${failures} failure${failures > 1 ? 's' : ''}`;
+          label = `${sifPrefix}: ${failures} failure${failures > 1 ? 's' : ''}`;
           color = '#f59e0b';
         } else {
-          label = 'SIF Index: needs attention';
+          label = `${sifPrefix}: needs attention`;
           color = '#ef4444';
         }
         chips.push({
           label,
           color,
           icon: <Storage sx={{ color }} />,
+          ...brandBrainChipProps,
         });
       }
     }
 
     return chips;
-  }, [scheduleStatus, sifHealth]);
+  }, [scheduleStatus, sifHealth, brandBrainEnabled, openBrandBrain]);
 
   if (loading) {
     return <LoadingSkeleton />;

@@ -6,12 +6,29 @@ Handles utility endpoints for enhanced content strategies.
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
+from sqlalchemy.orm import Session
 
 from middleware.auth_middleware import get_current_user
+from services.database import get_session_for_user
+from api.content_planning.services.content_strategy.onboarding import OnboardingDataIntegrationService
 from ....utils.error_handlers import ContentPlanningErrorHandler
 from ....utils.response_builders import ResponseBuilder
 
 router = APIRouter(tags=["Strategy Utilities"])
+
+
+def get_db(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Get a per-user DB session for the authenticated user's workspace."""
+    user_id = str(current_user.get("id"))
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    db = get_session_for_user(user_id)
+    if not db:
+        raise HTTPException(status_code=500, detail="Database connection failed")
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 @router.get("/tooltips")
@@ -223,3 +240,49 @@ async def clear_streaming_cache(
     except Exception as e:
         logger.error(f"❌ Error clearing streaming cache: {str(e)}")
         raise ContentPlanningErrorHandler.handle_general_error(e, "clear_streaming_cache") 
+
+
+@router.get("/onboarding-data")
+async def get_onboarding_data(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Return the structural SSOT (``canonical_profile``) for the Brand Brain.
+
+    Powers ``StrategySetupWizard/BrandBrainView.tsx`` and the new Brand Brain
+    Identity view. Returns the canonical_profile (+ its ``sources``),
+    ``data_quality``, and the processing timestamp. 404 when onboarding was
+    never started so the frontend can render a "complete onboarding" state.
+
+    Registered as a specific ``/onboarding-data`` path so it is never shadowed
+    by the parameterized ``GET /enhanced-strategies/{strategy_id}`` CRUD route.
+    """
+    try:
+        user_id = str(current_user.get("id"))
+        integrated = OnboardingDataIntegrationService().get_integrated_data_sync(user_id, db)
+
+        onboarding_session = integrated.get("onboarding_session") or {}
+        canonical_profile = integrated.get("canonical_profile") or {}
+        if not onboarding_session or not canonical_profile:
+            raise HTTPException(
+                status_code=404,
+                detail="Complete onboarding first to build your Brand Brain.",
+            )
+
+        payload = {
+            "canonical_profile": canonical_profile,
+            "sources": canonical_profile.get("sources", {}),
+            "data_quality": integrated.get("data_quality") or {},
+            "onboarding_session": onboarding_session,
+            "processing_timestamp": integrated.get("processing_timestamp"),
+        }
+        logger.info(f"🧠 Brand Brain canonical profile served for user {user_id}")
+        return ResponseBuilder.create_success_response(
+            message="Brand Brain canonical profile retrieved successfully",
+            data=payload
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error reading onboarding data: {str(e)}")
+        raise ContentPlanningErrorHandler.handle_general_error(e, "get_onboarding_data") 
