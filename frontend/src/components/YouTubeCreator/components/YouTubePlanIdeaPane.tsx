@@ -5,7 +5,6 @@
 import React, { useState } from "react";
 import {
   Box,
-  Button,
   CircularProgress,
   IconButton,
   InputLabel,
@@ -22,8 +21,10 @@ import { youtubeApi } from "../../../services/youtubeApi";
 import { useYouTubePlanSpeechInput } from "../hooks/useYouTubePlanSpeechInput";
 import { PlanDiscoveryShortcuts } from "./PlanDiscoveryShortcuts";
 import { YouTubePlanEnhanceChoicesModal } from "./YouTubePlanEnhanceChoicesModal";
+import { YouTubePlanHubAction } from "./YouTubePlanHubAction";
 import { YouTubePlanIdeaEnhanceProgressPanel } from "./YouTubePlanIdeaEnhanceProgressPanel";
 import { YouTubePlanPaneCard } from "./YouTubePlanPaneCard";
+import { YOUTUBE_PLAN_HUB_TOOLTIPS } from "./youtubePlanHubTooltips";
 
 export interface YouTubePlanIdeaPaneProps {
   userIdea: string;
@@ -144,40 +145,41 @@ export const YouTubePlanIdeaPane: React.FC<YouTubePlanIdeaPaneProps> = ({
             FormHelperTextProps={{ sx: helperSx }}
           />
           {speech.isSupported && !loading ? (
-            <Tooltip
-              title={speech.isListening ? "Stop dictation" : "Dictate your topic"}
-              arrow
-              sx={tooltipSx}
+            <YouTubePlanHubAction
+              className={
+                speech.isListening ? "yt-plan-mic yt-plan-mic--listening" : "yt-plan-mic"
+              }
+              selected={speech.isListening}
+              tooltip={
+                speech.isListening
+                  ? YOUTUBE_PLAN_HUB_TOOLTIPS.micStop
+                  : YOUTUBE_PLAN_HUB_TOOLTIPS.micDictate
+              }
+              tipId="yt-plan-hub-tip-mic"
+              aria-label={speech.isListening ? "Stop dictating video topic" : "Dictate video topic"}
+              onClick={handleMicClick}
+              disabled={enhancing}
             >
-              <IconButton
-                type="button"
-                className={
-                  speech.isListening ? "yt-plan-mic yt-plan-mic--listening" : "yt-plan-mic"
-                }
-                aria-label={speech.isListening ? "Stop dictating video topic" : "Dictate video topic"}
-                onClick={handleMicClick}
-                disabled={enhancing}
-              >
-                {speech.isListening ? <StopIcon /> : <MicIcon />}
-              </IconButton>
-            </Tooltip>
+              {speech.isListening ? <StopIcon /> : <MicIcon />}
+            </YouTubePlanHubAction>
           ) : null}
         </Box>
 
-        <Button
-          fullWidth
-          variant="contained"
-          color="error"
-          size="small"
-          startIcon={enhancing ? <CircularProgress size={16} color="inherit" /> : <AutoAwesome />}
-          disabled={!ideaReady || busy}
-          onClick={() => {
-            void handleEnhance();
-          }}
-          sx={{ mt: 1.5, textTransform: "none", fontWeight: 600 }}
-        >
-          {enhancing ? "Enhancing topic…" : "Enhance Topic with AI"}
-        </Button>
+        <Box sx={{ mt: 1.5 }}>
+          <YouTubePlanHubAction
+            wide
+            filled
+            disabled={!ideaReady || busy}
+            tooltip={YOUTUBE_PLAN_HUB_TOOLTIPS.enhance}
+            tipId="yt-plan-hub-tip-enhance"
+            onClick={() => {
+              void handleEnhance();
+            }}
+          >
+            {enhancing ? <CircularProgress size={16} color="inherit" /> : <AutoAwesome fontSize="small" />}
+            {enhancing ? "Enhancing topic…" : "Enhance Topic with AI"}
+          </YouTubePlanHubAction>
+        </Box>
 
         <PlanDiscoveryShortcuts userIdea={userIdea} disabled={busy} />
         {enhancing ? (

@@ -100,7 +100,14 @@ describe("YouTubePlanIdeaPane enhance and mic", () => {
         onIdeaChange={vi.fn()}
       />,
     );
-    expect(screen.getByRole("button", { name: /dictate video topic/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /dictate video topic/i })).toHaveAttribute(
+      "data-tooltip",
+      "Dictate your topic. Final words are added to the idea field.",
+    );
+    expect(screen.getByRole("button", { name: /enhance topic with ai/i })).toHaveAttribute(
+      "data-tooltip",
+      "Use AI to offer three stronger topic options from your idea.",
+    );
   });
 
   it("disables Enhance Topic with AI when the idea is empty", () => {
@@ -113,7 +120,12 @@ describe("YouTubePlanIdeaPane enhance and mic", () => {
         onIdeaChange={vi.fn()}
       />,
     );
-    expect(screen.getByRole("button", { name: /enhance topic with ai/i })).toBeDisabled();
+    const enhance = screen.getByRole("button", { name: /enhance topic with ai/i });
+    expect(enhance).toBeDisabled();
+    expect(enhance).toHaveAttribute(
+      "data-tooltip",
+      "Use AI to offer three stronger topic options from your idea.",
+    );
   });
 
   it("shows the Hub progress status bar while enhance is in flight", async () => {

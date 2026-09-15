@@ -40,21 +40,24 @@ describe("YouTubePlanBasicSetup", () => {
 
   it("shows the Shorts duration hint", () => {
     renderSetup();
-    expect(screen.getByText(/Vertical bite-sized/i)).toBeTruthy();
+    expect(screen.getAllByText(/Vertical bite-sized/i).length).toBeGreaterThan(0);
   });
 
   it("marks the selected duration with Hub primary, not Podcast purple", () => {
     const { container } = renderSetup();
     const shorts = screen.getByRole("button", { name: "Shorts" });
-    expect(shorts.className).toMatch(/yt-plan-pill--selected/);
+    expect(shorts.className).toMatch(/yt-plan-hub-action--selected/);
+    expect(shorts).toHaveAttribute("data-tooltip", "Vertical bite-sized (≤60s).");
+    expect(screen.getByRole("button", { name: "9:16" })).toHaveAttribute(
+      "data-tooltip",
+      expect.stringMatching(/9:16/),
+    );
     expect(container.innerHTML).not.toMatch(/667eea|#9c27b0|podcast/i);
   });
 
   it("states that aspect is saved on the draft and not sent to providers yet", () => {
     renderSetup();
-    expect(
-      screen.getByText(/saved on this draft/i),
-    ).toBeTruthy();
+    expect(screen.getAllByText(/saved on this draft/i).length).toBeGreaterThan(0);
     expect(
       screen.getByText(/still use today's provider sizes until a follow-up/i),
     ).toBeTruthy();

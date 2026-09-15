@@ -22,6 +22,8 @@ import {
   type YouTubePlanAspect,
 } from "./youtubePlanAspect";
 import { YouTubePlanPaneCard } from "./YouTubePlanPaneCard";
+import { YouTubePlanHubAction } from "./YouTubePlanHubAction";
+import { YOUTUBE_PLAN_HUB_TOOLTIPS } from "./youtubePlanHubTooltips";
 
 export interface YouTubePlanBasicSetupProps {
   durationType: DurationType;
@@ -78,17 +80,16 @@ export const YouTubePlanBasicSetup: React.FC<YouTubePlanBasicSetupProps> = ({
       <InputLabel sx={{ ...labelSx, mb: 0.75 }}>Video Duration</InputLabel>
       <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 0.75 }}>
         {YOUTUBE_PLAN_DURATION_PILLS.map((pill) => (
-          <button
+          <YouTubePlanHubAction
             key={pill.value}
-            type="button"
             disabled={disabled}
-            className={
-              durationType === pill.value ? "yt-plan-pill yt-plan-pill--selected" : "yt-plan-pill"
-            }
+            selected={durationType === pill.value}
+            tooltip={pill.hint}
+            tipId={`yt-plan-hub-tip-duration-${pill.value}`}
             onClick={() => handleDuration(pill.value)}
           >
             {pill.label}
-          </button>
+          </YouTubePlanHubAction>
         ))}
       </Stack>
       <Typography variant="caption" sx={{ color: "#6b7280", display: "block", mb: 2 }}>
@@ -118,17 +119,20 @@ export const YouTubePlanBasicSetup: React.FC<YouTubePlanBasicSetupProps> = ({
       <InputLabel sx={{ ...labelSx, mb: 0.75 }}>Aspect ratio</InputLabel>
       <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 0.75 }}>
         {YOUTUBE_PLAN_ASPECT_OPTIONS.map((option) => (
-          <button
+          <YouTubePlanHubAction
             key={option.value}
-            type="button"
             disabled={disabled}
-            className={
-              aspectRatio === option.value ? "yt-plan-pill yt-plan-pill--selected" : "yt-plan-pill"
+            selected={aspectRatio === option.value}
+            tooltip={
+              option.value === "9:16"
+                ? YOUTUBE_PLAN_HUB_TOOLTIPS.aspect916
+                : YOUTUBE_PLAN_HUB_TOOLTIPS.aspect169
             }
+            tipId={`yt-plan-hub-tip-aspect-${option.value}`}
             onClick={() => handleAspect(option.value)}
           >
             {option.label}
-          </button>
+          </YouTubePlanHubAction>
         ))}
       </Stack>
       <Typography variant="caption" sx={{ color: "#6b7280", display: "block" }}>
