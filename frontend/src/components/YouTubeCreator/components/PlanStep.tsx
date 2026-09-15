@@ -3,8 +3,9 @@
  */
 
 import React from "react";
-import { Button, Stack, Typography } from "@mui/material";
+import { Button, Stack, Typography, Accordion, AccordionSummary, AccordionDetails } from "@mui/material";
 import AutoAwesome from "@mui/icons-material/AutoAwesome";
+import ExpandMore from "@mui/icons-material/ExpandMore";
 import PlayArrow from "@mui/icons-material/PlayArrow";
 import Refresh from "@mui/icons-material/Refresh";
 import { motion } from "framer-motion";
@@ -28,6 +29,7 @@ import {
   parseYouTubePlanAspect,
   type YouTubePlanAspect,
 } from "./youtubePlanAspect";
+import type { YouTubePlanCategory } from "./youtubePlanCategory";
 import "./youtubePlanLayout.css";
 
 export interface PlanStepProps {
@@ -48,6 +50,8 @@ export interface PlanStepProps {
   onIdeaChange: (idea: string) => void;
   onDurationChange: (duration: DurationType) => void;
   onAspectRatioChange: (aspect: YouTubePlanAspect) => void;
+  planCategory?: YouTubePlanCategory;
+  onPlanCategoryChange?: (category: YouTubePlanCategory) => void;
   onVideoTypeChange: (type: VideoType | "") => void;
   onTargetAudienceChange: (audience: string) => void;
   onVideoGoalChange: (goal: string) => void;
@@ -94,6 +98,8 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo((props) => {
     makingPresentable = false,
     language,
     aspectRatio: aspectRatioProp,
+    planCategory = "",
+    onPlanCategoryChange,
     onIdeaChange,
     onDurationChange,
     onAspectRatioChange,
@@ -148,23 +154,62 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo((props) => {
               durationType={durationType}
               language={language}
               aspectRatio={aspectRatio}
+              planCategory={planCategory}
               disabled={loading}
               onDurationChange={onDurationChange}
               onLanguageChange={onLanguageChange}
               onAspectRatioChange={onAspectRatioChange}
+              onPlanCategoryChange={onPlanCategoryChange}
             />
           </div>
 
-          <YouTubePlanDetailsFields
-            videoType={videoType}
-            targetAudience={targetAudience}
-            videoGoal={videoGoal}
-            brandStyle={brandStyle}
-            onVideoTypeChange={onVideoTypeChange}
-            onTargetAudienceChange={onTargetAudienceChange}
-            onVideoGoalChange={onVideoGoalChange}
-            onBrandStyleChange={onBrandStyleChange}
-          />
+          <Accordion
+            key={planCategory || "none"}
+            defaultExpanded={!planCategory}
+            disableGutters
+            elevation={0}
+            className="yt-plan-fine-tune"
+            slotProps={{ transition: { unmountOnExit: false } }}
+            sx={{
+              border: "1px solid #e5e5e5",
+              borderRadius: "16px",
+              boxShadow: "none",
+              "&:before": { display: "none" },
+              overflow: "visible",
+              bgcolor: "#ffffff",
+              color: "#0f0f0f",
+            }}
+          >
+            <AccordionSummary
+              expandIcon={<ExpandMore sx={{ color: "#0f0f0f" }} />}
+              sx={{
+                px: 2.5,
+                py: 0.5,
+                background: "#fafafa",
+                color: "#0f0f0f",
+                "& .MuiAccordionSummary-content": { my: 1 },
+              }}
+            >
+              <Typography sx={{ fontWeight: 700, color: "#0f0f0f", fontSize: "0.95rem" }}>
+                Fine-tune (optional)
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails
+              className="yt-plan-fine-tune__details"
+              sx={{ px: 2.5, pb: 2, pt: 1, bgcolor: "#ffffff", color: "#0f0f0f" }}
+            >
+              <YouTubePlanDetailsFields
+                videoType={videoType}
+                targetAudience={targetAudience}
+                videoGoal={videoGoal}
+                brandStyle={brandStyle}
+                onVideoTypeChange={onVideoTypeChange}
+                onTargetAudienceChange={onTargetAudienceChange}
+                onVideoGoalChange={onVideoGoalChange}
+                onBrandStyleChange={onBrandStyleChange}
+              />
+            </AccordionDetails>
+          </Accordion>
 
           <YouTubePlanAvatarSection
             referenceImage={referenceImage}

@@ -23,26 +23,32 @@ import {
 } from "./youtubePlanAspect";
 import { YouTubePlanPaneCard } from "./YouTubePlanPaneCard";
 import { YouTubePlanHubAction } from "./YouTubePlanHubAction";
+import { YouTubePlanCategoryPills } from "./YouTubePlanCategoryPills";
 import { YOUTUBE_PLAN_HUB_TOOLTIPS } from "./youtubePlanHubTooltips";
+import type { YouTubePlanCategory } from "./youtubePlanCategory";
 
 export interface YouTubePlanBasicSetupProps {
   durationType: DurationType;
   language: YouTubeContentLanguage;
   aspectRatio: YouTubePlanAspect;
+  planCategory?: YouTubePlanCategory;
   disabled?: boolean;
   onDurationChange: (duration: DurationType) => void;
   onLanguageChange: (language: YouTubeContentLanguage) => void;
   onAspectRatioChange: (aspect: YouTubePlanAspect) => void;
+  onPlanCategoryChange?: (category: YouTubePlanCategory) => void;
 }
 
 export const YouTubePlanBasicSetup: React.FC<YouTubePlanBasicSetupProps> = ({
   durationType,
   language,
   aspectRatio,
+  planCategory = "",
   disabled = false,
   onDurationChange,
   onLanguageChange,
   onAspectRatioChange,
+  onPlanCategoryChange,
 }) => {
   const handleDuration = (next: DurationType) => {
     try {
@@ -70,13 +76,33 @@ export const YouTubePlanBasicSetup: React.FC<YouTubePlanBasicSetupProps> = ({
     }
   };
 
+  const handleCategory = (next: YouTubePlanCategory) => {
+    try {
+      if (!onPlanCategoryChange) {
+        console.error("[YouTubePlan] Category update failed: missing handler", {
+          planCategory: next,
+        });
+        return;
+      }
+      onPlanCategoryChange(next);
+    } catch (error) {
+      console.error("[YouTubePlan] Category update failed", { planCategory: next, error });
+    }
+  };
+
   return (
     <YouTubePlanPaneCard
       step={2}
       title="Basic setup"
-      subtitle="Set duration, language, and frame."
+      subtitle="Set category, duration, language, and frame."
       ariaLabel="Basic setup"
     >
+      <YouTubePlanCategoryPills
+        planCategory={planCategory}
+        disabled={disabled}
+        onPlanCategoryChange={handleCategory}
+      />
+
       <InputLabel sx={{ ...labelSx, mb: 0.75 }}>Video Duration</InputLabel>
       <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 0.75 }}>
         {YOUTUBE_PLAN_DURATION_PILLS.map((pill) => (

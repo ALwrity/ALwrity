@@ -9,4 +9,6 @@ export const YOUTUBE_PLAN_HUB_TOOLTIPS = {
   urlImport: "Have a blog or article? Paste the URL and we will turn it into a video idea.",
   aspect916: "Vertical frame (9:16). Saved on this draft; providers still use today's sizes.",
   aspect169: "Widescreen frame (16:9). Saved on this draft; providers still use today's sizes.",
+  categoryKids: "Kids stories: simple words, a playful look, and a family audience.",
+  categoryExplainer: "Explain a topic clearly for learners. Structure, pacing, and a clean look.",
 } as const;

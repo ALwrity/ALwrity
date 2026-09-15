@@ -11,6 +11,7 @@ export interface YouTubePlanHubActionProps
   /** Filled Hub CTA (Enhance) — same chrome as selected, without implying a toggle. */
   filled?: boolean;
   wide?: boolean;
+  tooltipAbove?: boolean;
   tipId?: string;
 }
 
@@ -19,6 +20,7 @@ export const YouTubePlanHubAction: React.FC<YouTubePlanHubActionProps> = ({
   selected = false,
   filled = false,
   wide = false,
+  tooltipAbove = false,
   tipId,
   className,
   children,
@@ -36,6 +38,7 @@ export const YouTubePlanHubAction: React.FC<YouTubePlanHubActionProps> = ({
           "yt-plan-hub-action",
           selected || filled ? "yt-plan-hub-action--selected" : "",
           wide ? "yt-plan-hub-action--wide" : "",
+          tooltipAbove ? "yt-plan-hub-action--tip-above" : "",
           className || "",
         ]
           .filter(Boolean)

@@ -30,6 +30,8 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
     targetAudience,
     videoGoal,
     brandStyle,
+    planCategory,
+    planDetailsTouched,
     referenceImage,
     avatarUrl,
     language,
@@ -275,6 +277,8 @@ export const YouTubeVideoCreatorPanel: React.FC = () => {
         targetAudience={targetAudience}
         videoGoal={videoGoal}
         brandStyle={brandStyle}
+        planCategory={planCategory}
+        planDetailsTouched={planDetailsTouched}
         referenceImage={referenceImage}
         avatarUrl={avatarUrl}
         language={language}

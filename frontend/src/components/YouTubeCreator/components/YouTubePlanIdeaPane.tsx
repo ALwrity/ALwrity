@@ -150,6 +150,7 @@ export const YouTubePlanIdeaPane: React.FC<YouTubePlanIdeaPaneProps> = ({
                 speech.isListening ? "yt-plan-mic yt-plan-mic--listening" : "yt-plan-mic"
               }
               selected={speech.isListening}
+              tooltipAbove
               tooltip={
                 speech.isListening
                   ? YOUTUBE_PLAN_HUB_TOOLTIPS.micStop

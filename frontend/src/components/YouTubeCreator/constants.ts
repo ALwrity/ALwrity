@@ -182,6 +182,11 @@ export const TARGET_AUDIENCE_OPTIONS: TargetAudienceOption[] = [
     description: 'High school, college students, lifelong learners',
   },
   {
+    value: 'kids_and_families',
+    label: 'Kids & Families',
+    description: 'Young children watching with a parent or caregiver',
+  },
+  {
     value: 'parents',
     label: 'Parents & Families',
     description: 'Parents with children, family-oriented content',

@@ -9,8 +9,13 @@ import { PlanStep } from "../components/PlanStep";
 import { ScenesStep } from "../components/ScenesStep";
 import { SceneGenerationStep } from "../components/SceneGenerationStep";
 import { RenderStep } from "../components/RenderStep";
-import type { DurationType, Resolution, VideoType, YouTubeContentLanguage } from "../constants";
+import {
+  applyYouTubePlanCategoryPack,
+  type YouTubePlanCategory,
+  type YouTubePlanDetailsTouched,
+} from "../components/youtubePlanCategory";
 import { useCostEstimate } from "../hooks/useCostEstimate";
+import type { DurationType, Resolution, VideoType, YouTubeContentLanguage } from "../constants";
 
 type CostEstimate = ReturnType<typeof useCostEstimate>["costEstimate"];
 
@@ -23,6 +28,8 @@ export interface YouTubeVideoCreatorStepsProps {
   targetAudience: string;
   videoGoal: string;
   brandStyle: string;
+  planCategory: YouTubePlanCategory;
+  planDetailsTouched: YouTubePlanDetailsTouched;
   referenceImage: string;
   avatarUrl: string | null;
   language: YouTubeContentLanguage;
@@ -101,6 +108,24 @@ export const YouTubeVideoCreatorSteps: React.FC<YouTubeVideoCreatorStepsProps> =
         targetAudience={props.targetAudience}
         videoGoal={props.videoGoal}
         brandStyle={props.brandStyle}
+        planCategory={props.planCategory}
+        onPlanCategoryChange={(next) => {
+          try {
+            const applied = applyYouTubePlanCategoryPack({
+              category: next,
+              current: {
+                videoType: props.videoType,
+                targetAudience: props.targetAudience,
+                videoGoal: props.videoGoal,
+                brandStyle: props.brandStyle,
+              },
+              touched: props.planDetailsTouched,
+            });
+            props.updateState(applied);
+          } catch (error) {
+            console.error("[YouTubePlan] Category update failed", error);
+          }
+        }}
         referenceImage={props.referenceImage}
         loading={props.loading}
         avatarPreview={props.avatarUrl}
@@ -111,10 +136,30 @@ export const YouTubeVideoCreatorSteps: React.FC<YouTubeVideoCreatorStepsProps> =
         onIdeaChange={(value) => props.updateState({ userIdea: value })}
         onDurationChange={(value) => props.updateState({ durationType: value })}
         onAspectRatioChange={(value) => props.updateState({ aspectRatio: value })}
-        onVideoTypeChange={(value) => props.updateState({ videoType: value })}
-        onTargetAudienceChange={(value) => props.updateState({ targetAudience: value })}
-        onVideoGoalChange={(value) => props.updateState({ videoGoal: value })}
-        onBrandStyleChange={(value) => props.updateState({ brandStyle: value })}
+        onVideoTypeChange={(value) =>
+          props.updateState({
+            videoType: value,
+            planDetailsTouched: { ...props.planDetailsTouched, videoType: true },
+          })
+        }
+        onTargetAudienceChange={(value) =>
+          props.updateState({
+            targetAudience: value,
+            planDetailsTouched: { ...props.planDetailsTouched, targetAudience: true },
+          })
+        }
+        onVideoGoalChange={(value) =>
+          props.updateState({
+            videoGoal: value,
+            planDetailsTouched: { ...props.planDetailsTouched, videoGoal: true },
+          })
+        }
+        onBrandStyleChange={(value) =>
+          props.updateState({
+            brandStyle: value,
+            planDetailsTouched: { ...props.planDetailsTouched, brandStyle: true },
+          })
+        }
         onReferenceImageChange={(value) => props.updateState({ referenceImage: value })}
         onLanguageChange={props.handleLanguageChange}
         onAvatarUpload={props.handleAvatarUpload}
