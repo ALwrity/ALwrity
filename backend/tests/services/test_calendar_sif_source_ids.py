@@ -126,6 +126,43 @@ class TestCanonicalHash:
         assert len(h) == 64
 
 
+class TestSourceHashIgnoresVolatileFields:
+    """R4.4: the hash is over CONTENT — volatile timestamps/session identity
+    must never force a re-embed of an unchanged calendar."""
+
+    def test_generated_at_alone_does_not_change_hash(self):
+        content = {"daily_schedule": [{"date": "2026-01-01", "theme": "T"}]}
+        h1 = compute_calendar_source_hash("u", content, "2026-01-01T00:00:00")
+        h2 = compute_calendar_source_hash("u", content, "2027-12-31T23:59:59")
+        assert h1 == h2
+
+    def test_volatile_inner_fields_do_not_change_hash(self):
+        base = {"daily_schedule": [{"date": "2026-01-01", "theme": "T"}]}
+        with_noise = {
+            **base,
+            "generated_at": "2026-02-02T02:02:02",
+            "processing_time": 3.25,
+            "session_id": "cal-session-77",
+        }
+        h1 = compute_calendar_source_hash("u", base, "2026-01-01T00:00:00")
+        h2 = compute_calendar_source_hash("u", with_noise, "2026-01-01T00:00:00")
+        assert h1 == h2
+
+    def test_nested_generated_at_does_not_change_hash(self):
+        base = {"daily_schedule": [{"date": "2026-01-01", "generated_at": "A"}]}
+        changed = {"daily_schedule": [{"date": "2026-01-01", "generated_at": "B"}]}
+        h1 = compute_calendar_source_hash("u", base, "x")
+        h2 = compute_calendar_source_hash("u", changed, "y")
+        assert h1 == h2
+
+    def test_real_content_change_still_changes_hash(self):
+        cal1 = {"daily_schedule": [{"date": "2026-01-01", "theme": "T"}]}
+        cal2 = {"daily_schedule": [{"date": "2026-01-01", "theme": "Also new"}]}
+        h1 = compute_calendar_source_hash("u", cal1, "g")
+        h2 = compute_calendar_source_hash("u", cal2, "x")
+        assert h1 != h2
+
+
 class TestCalendarSourceIdsAgainstStrategy:
     def test_calendar_and_strategy_source_ids_different(self):
         from services.intelligence.sif_strategy_source_ids import (

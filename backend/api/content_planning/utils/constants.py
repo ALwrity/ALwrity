@@ -9,6 +9,9 @@ from fastapi import status
 API_PREFIX = "/api/content-planning"
 API_TAGS = ["content-planning"]
 
+# Calendar SIF (R6.1): semantic-search query length cap
+CALENDAR_SIF_QUERY_MAX: int = 512
+
 # HTTP Status Codes
 HTTP_STATUS_CODES = {
     "OK": status.HTTP_200_OK,

@@ -1,0 +1,42 @@
+name: guard-alembic-heads
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  alembic-single-head:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install minimal deps
+        run: |
+          pip install alembic sqlalchemy
+
+      - name: Assert exactly one Alembic head (R6.5)
+        working-directory: backend
+        run: |
+          python -m alembic heads > heads_out.txt
+          echo "--- heads ---"; cat heads_out.txt
+          python - <<'PY'
+          from pathlib import Path
+          heads = [l.strip() for l in Path('heads_out.txt').read_text().splitlines() if l.strip()]
+          # Alembic names head lines like '<rev-id> (head)'
+          heads = [h.split(' ')[0] for h in heads]
+          assert len(heads) >= 1, "no alembic heads found"
+          # after heads dedupe across branches: filter to the (head) markers
+          marker_heads = [l.split(' ')[0] for l in Path('heads_out.txt').read_text().splitlines() if '(head)' in l]
+          assert len(marker_heads) == 1, (
+              f"EXPECTED exactly one alembic head, found {len(marker_heads)}: {marker_heads}. "
+              "Linearize the graph (or add a merge revision) before landing."
+          )
+          print('OK: exactly one head:', marker_heads[0])
+          PY

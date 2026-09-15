@@ -32,4 +32,8 @@ RUN mkdir -p /app/backend/logs /app/backend/data /app/backend/workspace
 
 EXPOSE 10000
 
-CMD ["python", "backend/start_alwrity_backend.py", "--production"]
+# R6.5 (L3): fail-fast migration prestart — if `alembic upgrade head`
+# errors, the release stops BEFORE serving (a lazy per-user upgrade would
+# otherwise hand out broken engines at request time).
+COPY backend/alembic.ini backend/alembic.ini
+CMD ["sh", "-c", "cd backend && python -m alembic upgrade head && cd .. && python backend/start_alwrity_backend.py --production"]

@@ -20,6 +20,7 @@ import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import PublishedWithChangesIcon from '@mui/icons-material/PublishedWithChanges';
 
 import { useCalendarSifStatus } from '../../../hooks/useCalendarSifStatus';
+import { devLog } from '../../../utils/devLogger';
 import { contentPlanningApi } from '../../../services/contentPlanningApi';
 import { isCalendarSifCardEnabled } from '../../../config/strategySifConfig';
 import CalendarSifEducationDialog from './CalendarSifEducationDialog';
@@ -119,7 +120,12 @@ const renderPassage = (text: string) => {
 };
 
 const CalendarSifStatusCard: React.FC = () => {
-  const { data, loading, error } = useCalendarSifStatus({ enabled: true });
+  // R3.1: the rollout flag gates the request itself — the hook still runs
+  // unconditionally (hook-order safe), but `enabled` follows the flag so a
+  // disabled card makes NO authenticated calls.
+  const { data, loading, refreshing, error } = useCalendarSifStatus({
+    enabled: isCalendarSifCardEnabled(),
+  });
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState<string | null>(null);
   const [searchHits, setSearchHits] = React.useState<SearchHit[]>([]);
@@ -137,6 +143,15 @@ const CalendarSifStatusCard: React.FC = () => {
     setSearchHits([]);
     try {
       const payload = await contentPlanningApi.searchCalendarSif(query, 4);
+      if (payload?.error) {
+        // R3.2: the backend deliberately returns HTTP 200 with a structured
+        // error on outages — an outage must never read as "no results".
+        setSearchError(
+          'Semantic search is temporarily unavailable — try again shortly.',
+        );
+        setSearchHits([]);
+        return;
+      }
       setSearchHits((payload?.hits || []) as SearchHit[]);
     } catch (e: any) {
       setSearchError(e?.message || 'Semantic search is unavailable right now.');
@@ -151,10 +166,14 @@ const CalendarSifStatusCard: React.FC = () => {
     handleSearch(question);
   };
 
-  // Graceful degradation: if the read-only status endpoint errors, render nothing.
-  if (error) return null;
+  // Graceful degradation: if the read-only status endpoint errors with NO
+  // prior data, render nothing (a poll error while HOLDING data keeps the
+  // last rendered card instead).
+  if (error && !data) return null;
 
-  if (loading || !data) {
+  // R3.4: full-card spinner only on the INITIAL load — background refreshes
+  // keep the card rendered (no 5s flicker).
+  if ((loading || refreshing) && !data) {
     return (
       <Card variant="outlined" sx={{ mt: 3 }}>
         <CardContent>
@@ -168,6 +187,8 @@ const CalendarSifStatusCard: React.FC = () => {
       </Card>
     );
   }
+
+  if (!data) return null;
 
   const phase = data.indexing?.phase ?? 'not_indexed';
   const count = data.indexing?.embedding_count ?? data.watermark?.embedding_count ?? 0;
@@ -209,13 +230,20 @@ const CalendarSifStatusCard: React.FC = () => {
           color: 'default',
           body: 'Nothing new to index — your calendar hasn’t changed since the last indexing pass.',
         };
-      case 'failed':
+      case 'failed': {
+        // R5.1: never render raw backend error text — it may carry internal
+        // implementation detail. Friendly copy in the UI; detail logged only.
+        const detail = data.indexing?.error_message || '';
+        if (detail) {
+          devLog.warn('calendar sif indexing failed:', detail);
+        }
         return {
           label: 'Indexing needs attention',
           icon: <ErrorIcon />,
           color: 'error',
-          body: `Your calendar couldn’t be indexed: ${data.indexing?.error_message || 'unknown error'}. Try regenerating the calendar to retry.`,
+          body: 'Your calendar couldn’t be indexed because of a temporary issue. Try regenerating the calendar to retry.',
         };
+      }
       case 'not_indexed':
         return {
           label: 'Not yet indexed',
@@ -262,6 +290,8 @@ const CalendarSifStatusCard: React.FC = () => {
         {isIndexed && (
           <Box
             data-testid="calendar-sif-try-queries"
+            role="status"
+            aria-live="polite"
             sx={{ mt: 2, p: 1.5, borderRadius: 2, bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}
           >
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -270,7 +300,7 @@ const CalendarSifStatusCard: React.FC = () => {
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
               Ask a question about your calendar and SIF retrieves the matching passage straight from your indexed calendar — no canned answers.
             </Typography>
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1, alignItems: 'stretch' }}>
               <TextField
                 size="small"
                 value={typedQuestion}
@@ -279,8 +309,9 @@ const CalendarSifStatusCard: React.FC = () => {
                   if (e.key === 'Enter') handleAsk();
                 }}
                 placeholder="Ask your calendar, e.g. what events are next week?"
+                aria-label="Search your calendar index"
                 disabled={searchBusy}
-                inputProps={{ 'data-testid': 'calendar-sif-question-input' }}
+                inputProps={{ 'data-testid': 'calendar-sif-question-input', 'aria-label': 'Search your calendar index' }}
                 sx={{ flex: 1 }}
               />
               <Button

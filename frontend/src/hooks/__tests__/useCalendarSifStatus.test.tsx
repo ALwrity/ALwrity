@@ -11,7 +11,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import React from 'react';
 
-import { useCalendarSifStatus, DEFAULT_SIF_POLL_INTERVAL_MS } from '../useCalendarSifStatus';
+import {
+  useCalendarSifStatus,
+  DEFAULT_SIF_POLL_INTERVAL_MS,
+  type CalendarSifIndexingPhase,
+} from '../useCalendarSifStatus';
 import { contentPlanningApi } from '../../services/contentPlanningApi';
 
 vi.mock('../../services/contentPlanningApi', () => ({
@@ -22,7 +26,7 @@ vi.mock('../../services/contentPlanningApi', () => ({
 
 const mockGetCalendarSifStatus = vi.mocked(contentPlanningApi.getCalendarSifStatus);
 
-const terminalPayload = (phase: string, over: Record<string, any> = {}) => ({
+const terminalPayload = (phase: CalendarSifIndexingPhase, over: Record<string, any> = {}) => ({
   indexing: { phase, status: phase, embedding_count: 8, attempt: 1, ...over },
   watermark: { embedding_count: 8, indexed_at: '2026-01-01T00:00:01Z' },
   document_kinds: { names: Array(8).fill('doc'), doc_ids: Array(8).fill('d1'), count: 8 },
@@ -159,5 +163,54 @@ describe('useCalendarSifStatus — status polling', () => {
 
     expect(mockGetCalendarSifStatus).toHaveBeenCalledTimes(2);
     expect(result.current.data?.indexing?.phase).toBe('success');
+  });
+
+  it('keeps last data + retries when a background poll fails (R3.4)', async () => {
+    mockGetCalendarSifStatus
+      .mockResolvedValueOnce(terminalPayload('pending'))
+      .mockResolvedValueOnce(terminalPayload('pending'))
+      .mockRejectedValueOnce(new Error('poll exploded'))
+      .mockResolvedValueOnce(terminalPayload('success'));
+
+    const { result } = renderHook(() => useCalendarSifStatus({ enabled: true }));
+
+    await flush();
+    expect(result.current.data?.indexing?.phase).toBe('pending');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEFAULT_SIF_POLL_INTERVAL_MS);
+    });
+    expect(result.current.data?.indexing?.phase).toBe('pending');
+
+    // Background poll rejects: last data must be retained, error surfaced,
+    // one retry scheduled (poll #3 → data kept; poll #4 arrives at success).
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEFAULT_SIF_POLL_INTERVAL_MS);
+    });
+    expect(result.current.data).not.toBeNull();
+    expect(result.current.error).toBe('poll exploded');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEFAULT_SIF_POLL_INTERVAL_MS);
+    });
+    expect(result.current.data?.indexing?.phase).toBe('success');
+    expect(result.current.error).toBeNull();
+  });
+
+  it('refreshing is true only while re-polling with data in hand (R3.4)', async () => {
+    mockGetCalendarSifStatus
+      .mockResolvedValueOnce(terminalPayload('pending'))
+      .mockImplementationOnce(() => new Promise(() => undefined));
+
+    const { result } = renderHook(() => useCalendarSifStatus({ enabled: true }));
+
+    await flush();
+    expect(result.current.refreshing).toBe(false);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEFAULT_SIF_POLL_INTERVAL_MS);
+    });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.refreshing).toBe(true);
   });
 });
