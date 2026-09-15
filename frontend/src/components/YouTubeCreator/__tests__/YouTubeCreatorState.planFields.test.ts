@@ -7,6 +7,22 @@ import {
   YOUTUBE_CREATOR_STATE_KEY,
 } from "../../../hooks/useYouTubeCreatorState";
 
+type PlanCategoryDraft = ReturnType<typeof getYouTubeCreatorStateSnapshot> & {
+  planCategory: string;
+  planDetailsTouched: {
+    videoType: boolean;
+    targetAudience: boolean;
+    videoGoal: boolean;
+    brandStyle: boolean;
+  };
+};
+
+function asPlanCategoryDraft(
+  snapshot: ReturnType<typeof getYouTubeCreatorStateSnapshot>,
+): PlanCategoryDraft {
+  return snapshot as PlanCategoryDraft;
+}
+
 describe("YouTube creator draft Plan fields", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -43,12 +59,65 @@ describe("YouTube creator draft Plan fields", () => {
       JSON.stringify({ userIdea: "Rank videos" }),
     );
 
-    const snapshot = getYouTubeCreatorStateSnapshot();
+    const snapshot = asPlanCategoryDraft(getYouTubeCreatorStateSnapshot());
     expect(snapshot.durationType).toBe("medium");
     expect(snapshot.videoType).toBe("");
     expect(snapshot.language).toBe("en");
     expect(snapshot.enableResearch).toBe(true);
     expect(snapshot.aspectRatio).toBe("16:9");
+    expect(snapshot.planCategory).toBe("");
+    expect(snapshot.planDetailsTouched).toEqual({
+      videoType: false,
+      targetAudience: false,
+      videoGoal: false,
+      brandStyle: false,
+    });
+  });
+
+  it("restores planCategory and planDetailsTouched from the saved draft", () => {
+    localStorage.setItem(
+      YOUTUBE_CREATOR_STATE_KEY,
+      JSON.stringify({
+        userIdea: "How the sun works",
+        planCategory: "kids",
+        planDetailsTouched: {
+          videoType: true,
+          targetAudience: false,
+          videoGoal: false,
+          brandStyle: true,
+        },
+      }),
+    );
+
+    const snapshot = asPlanCategoryDraft(getYouTubeCreatorStateSnapshot());
+    expect(snapshot.planCategory).toBe("kids");
+    expect(snapshot.planDetailsTouched).toEqual({
+      videoType: true,
+      targetAudience: false,
+      videoGoal: false,
+      brandStyle: true,
+    });
+  });
+
+  it("unsets an unknown planCategory and fills missing touched flags", () => {
+    localStorage.setItem(
+      YOUTUBE_CREATOR_STATE_KEY,
+      JSON.stringify({
+        planCategory: "fun",
+        planDetailsTouched: { videoType: true },
+      }),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const snapshot = asPlanCategoryDraft(getYouTubeCreatorStateSnapshot());
+    expect(snapshot.planCategory).toBe("");
+    expect(snapshot.planDetailsTouched).toEqual({
+      videoType: true,
+      targetAudience: false,
+      videoGoal: false,
+      brandStyle: false,
+    });
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it("returns defaults when saved JSON is invalid", () => {

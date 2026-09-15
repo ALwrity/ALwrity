@@ -2,6 +2,13 @@ import { useState, useCallback, useEffect } from 'react';
 import { VideoPlan, VideoPlanGeneration, VideoPlanResearchSource, Scene, SceneBuildGeneration } from '../services/youtubeApi';
 import { Resolution, DurationType, VideoType, YouTubeContentLanguage } from '../components/YouTubeCreator/constants';
 import { parseYouTubePlanAspect, type YouTubePlanAspect } from '../components/YouTubeCreator/components/youtubePlanAspect';
+import {
+  EMPTY_YOUTUBE_PLAN_DETAILS_TOUCHED,
+  parseYouTubePlanCategory,
+  parseYouTubePlanDetailsTouched,
+  type YouTubePlanCategory,
+  type YouTubePlanDetailsTouched,
+} from '../components/YouTubeCreator/components/youtubePlanCategory';
 import { parseYouTubePublishMetadata, type YouTubePublishMetadata } from '../components/YouTubeCreator/components/youtubePublishMetadata';
 
 export type YouTubeScriptPhase = 'idle' | 'pitch' | 'expanding' | 'ready';
@@ -32,6 +39,9 @@ export interface YouTubeCreatorState {
   targetAudience: string;
   videoGoal: string;
   brandStyle: string;
+  /** Kids / Explainer pack. Not sent to pitch APIs; fills the four producer fields. */
+  planCategory: YouTubePlanCategory;
+  planDetailsTouched: YouTubePlanDetailsTouched;
   referenceImage: string;
   avatarUrl: string | null;
   // Step 1: Language (used for multilingual audio now; later for multilingual planning/scenes)
@@ -85,6 +95,8 @@ const DEFAULT_STATE: YouTubeCreatorState = {
   targetAudience: '',
   videoGoal: '',
   brandStyle: '',
+  planCategory: '',
+  planDetailsTouched: { ...EMPTY_YOUTUBE_PLAN_DETAILS_TOUCHED },
   referenceImage: '',
   avatarUrl: null,
   language: 'en',
@@ -133,6 +145,8 @@ function normalizePersistedYouTubeCreatorState(parsed: Record<string, unknown>):
     scriptPhase: (parsed.scriptPhase as YouTubeCreatorState["scriptPhase"]) || "idle",
     publishMetadata: parseYouTubePublishMetadata(parsed.publishMetadata),
     aspectRatio: parseYouTubePlanAspect(parsed.aspectRatio, durationType),
+    planCategory: parseYouTubePlanCategory(parsed.planCategory),
+    planDetailsTouched: parseYouTubePlanDetailsTouched(parsed.planDetailsTouched),
   };
 }
 

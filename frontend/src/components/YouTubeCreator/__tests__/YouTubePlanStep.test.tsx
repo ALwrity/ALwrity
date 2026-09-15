@@ -35,10 +35,13 @@ const SAMPLE_PITCH: YouTubeVideoPitch = {
   main_content_beats: ["Rule one"],
 };
 
-function renderPlanStep(
-  overrides: Partial<React.ComponentProps<typeof PlanStep>> = {},
-) {
-  const props: React.ComponentProps<typeof PlanStep> = {
+type PlanStepTestProps = React.ComponentProps<typeof PlanStep> & {
+  planCategory?: "kids" | "explainer" | "";
+  onPlanCategoryChange?: (category: "kids" | "explainer" | "") => void;
+};
+
+function renderPlanStep(overrides: Partial<PlanStepTestProps> = {}) {
+  const props: PlanStepTestProps = {
     userIdea: "Budget travel packing",
     durationType: "shorts",
     aspectRatio: "9:16",
@@ -73,9 +76,14 @@ function renderPlanStep(
     onRegeneratePitch: vi.fn(),
     onExpandPitch: vi.fn(),
     onSelectPitchFromHistory: vi.fn(),
+    planCategory: "",
+    onPlanCategoryChange: vi.fn(),
     ...overrides,
   };
-  return { ...render(<PlanStep {...props} />), props };
+  return {
+    ...render(<PlanStep {...(props as React.ComponentProps<typeof PlanStep>)} />),
+    props,
+  };
 }
 
 describe("YouTube PlanStep existing fields", () => {
@@ -284,6 +292,41 @@ describe("YouTube PlanStep existing fields", () => {
       { target: { value: "Get parents to subscribe" } },
     );
     expect(props.onVideoGoalChange).toHaveBeenCalledWith("Get parents to subscribe");
+  });
+
+  it("shows Fine-tune while still exposing type, audience, goal, and style", () => {
+    const { container } = renderPlanStep();
+    expect(screen.getByText(/Fine-tune \(optional\)/i)).toBeTruthy();
+    expect(container.querySelector(".yt-plan-fine-tune")).toBeTruthy();
+    expect(container.querySelector(".yt-plan-fine-tune")?.innerHTML).not.toMatch(
+      /667eea|#9c27b0|podcast/i,
+    );
+    expect(screen.getByText("Video Type")).toBeTruthy();
+    expect(screen.getByText("Target Audience")).toBeTruthy();
+    expect(screen.getByText("Primary Goal")).toBeTruthy();
+    expect(screen.getByText("Brand Style / Visual Aesthetic")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /generate pitch/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /brainstorm video idea/i })).toBeTruthy();
+  });
+
+  it("notifies onPlanCategoryChange from the Kids Hub pill without dropping duration or pitch", () => {
+    const { props } = renderPlanStep();
+    fireEvent.click(screen.getByRole("button", { name: "Kids" }));
+    expect(props.onPlanCategoryChange).toHaveBeenCalledWith("kids");
+    expect(screen.getByRole("button", { name: "Shorts" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /generate pitch/i })).not.toBeDisabled();
+  });
+
+  it("keeps Fine-tune collapsed when a category is selected without removing the four fields", () => {
+    renderPlanStep({ planCategory: "kids" });
+    expect(screen.getByRole("button", { name: /Fine-tune \(optional\)/i })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.getByText("Video Type")).toBeTruthy();
+    expect(screen.getByText("Target Audience")).toBeTruthy();
+    expect(screen.getByText("Primary Goal")).toBeTruthy();
+    expect(screen.getByText("Brand Style / Visual Aesthetic")).toBeTruthy();
   });
 
   it("opens custom brand style entry from Plan", () => {

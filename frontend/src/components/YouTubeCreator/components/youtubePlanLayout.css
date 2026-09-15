@@ -198,6 +198,28 @@
   transform: translateY(0);
 }
 
+.yt-plan-hub-action-wrap:hover,
+.yt-plan-hub-action-wrap:focus-within {
+  z-index: 8;
+}
+
+.yt-plan-hub-action--tip-above::after {
+  top: auto;
+  bottom: calc(100% + 8px);
+  z-index: 8;
+  transform: translateY(4px);
+  transform-origin: bottom left;
+}
+
+.yt-plan-hub-action-wrap:last-child .yt-plan-hub-action--tip-above::after {
+  transform-origin: bottom right;
+}
+
+.yt-plan-hub-action--tip-above:hover::after,
+.yt-plan-hub-action--tip-above:focus-visible::after {
+  transform: translateY(0);
+}
+
 .yt-plan-hub-action-tip {
   position: absolute;
   width: 1px;
@@ -225,7 +247,7 @@
   position: absolute;
   right: 8px;
   bottom: 28px;
-  z-index: 1;
+  z-index: 8;
 }
 
 .yt-plan-idea-field .yt-plan-hub-action.yt-plan-mic {
@@ -245,4 +267,27 @@
   50% {
     opacity: 0.45;
   }
+}
+
+.yt-plan-fine-tune {
+  background: #fff;
+  color: #0f0f0f;
+}
+
+.yt-plan-fine-tune__details {
+  background: #fff;
+  color: #0f0f0f;
+}
+
+.yt-plan-fine-tune .MuiAccordionSummary-root {
+  background: #fafafa;
+  color: #0f0f0f;
+}
+
+.yt-plan-fine-tune .MuiFormHelperText-root {
+  color: #6b7280;
+}
+
+.yt-plan-fine-tune .MuiInputLabel-root {
+  color: #0f0f0f;
 }

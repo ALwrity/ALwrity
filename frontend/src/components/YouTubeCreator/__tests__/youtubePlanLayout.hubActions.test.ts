@@ -33,4 +33,18 @@ describe("youtubePlanLayout Hub hover tooltips", () => {
     );
     expect(css).toMatch(/\.yt-plan-hub-action-wrap--wide[\s\S]*left:\s*0/);
   });
+
+  it("opens compact mic and category tooltips above so duration and pitch do not cover them", () => {
+    expect(css).toMatch(
+      /\.yt-plan-hub-action--tip-above::after[\s\S]*bottom:\s*calc\(100%\s*\+\s*8px\)/,
+    );
+    expect(css).toMatch(/\.yt-plan-idea-field \.yt-plan-hub-action-wrap[\s\S]*z-index:\s*[5-9]/);
+  });
+
+  it("styles Fine-tune with Hub white pane chrome, not a dark panel", () => {
+    expect(css).toMatch(/\.yt-plan-fine-tune[\s\S]*background:\s*#fff/);
+    expect(css).toMatch(/\.yt-plan-fine-tune[\s\S]*color:\s*#0f0f0f/);
+    expect(css).toMatch(/\.yt-plan-fine-tune__details[\s\S]*background:\s*#fff/);
+    expect(css).not.toMatch(/\.yt-plan-fine-tune[\s\S]*#0f172a|\.yt-plan-fine-tune[\s\S]*#111827/);
+  });
 });

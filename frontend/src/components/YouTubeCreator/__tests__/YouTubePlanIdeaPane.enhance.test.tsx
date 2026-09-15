@@ -104,6 +104,9 @@ describe("YouTubePlanIdeaPane enhance and mic", () => {
       "data-tooltip",
       "Dictate your topic. Final words are added to the idea field.",
     );
+    expect(screen.getByRole("button", { name: /dictate video topic/i }).className).toMatch(
+      /yt-plan-hub-action--tip-above/,
+    );
     expect(screen.getByRole("button", { name: /enhance topic with ai/i })).toHaveAttribute(
       "data-tooltip",
       "Use AI to offer three stronger topic options from your idea.",

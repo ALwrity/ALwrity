@@ -29,4 +29,15 @@ describe("YouTubePlanHubAction", () => {
     expect(enhance.className).toMatch(/yt-plan-hub-action--wide/);
     expect(enhance.className).toMatch(/yt-plan-hub-action--selected/);
   });
+
+  it("places compact Hub tooltips above the control so they are not covered", () => {
+    render(
+      <YouTubePlanHubAction tooltipAbove tooltip={YOUTUBE_PLAN_HUB_TOOLTIPS.categoryKids}>
+        Kids
+      </YouTubePlanHubAction>,
+    );
+    expect(screen.getByRole("button", { name: "Kids" }).className).toMatch(
+      /yt-plan-hub-action--tip-above/,
+    );
+  });
 });

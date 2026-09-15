@@ -6,10 +6,10 @@ import { renderHook, act } from "@testing-library/react";
 import { youtubeApi } from "../../../services/youtubeApi";
 import { useYouTubePitchHandlers } from "../panel/useYouTubePitchHandlers";
 
-jest.mock("../../../services/youtubeApi", () => ({
+vi.mock("../../../services/youtubeApi", () => ({
   youtubeApi: {
-    generatePitch: jest.fn(),
-    expandPitchToScript: jest.fn(),
+    generatePitch: vi.fn(),
+    expandPitchToScript: vi.fn(),
   },
 }));
 
@@ -39,21 +39,21 @@ function buildArgs() {
       research_sources: [{ title: "Guide", url: "https://example.com/a" }],
     },
     pitchHistory: [],
-    updateState: jest.fn(),
-    setLoading: jest.fn(),
-    setError: jest.fn(),
-    setSuccess: jest.fn(),
-    setActiveStep: jest.fn(),
+    updateState: vi.fn(),
+    setLoading: vi.fn(),
+    setError: vi.fn(),
+    setSuccess: vi.fn(),
+    setActiveStep: vi.fn(),
   };
 }
 
 describe("useYouTubePitchHandlers language contract", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it("forwards language on generatePitch", async () => {
-    jest.mocked(youtubeApi.generatePitch).mockResolvedValue({
+    vi.mocked(youtubeApi.generatePitch).mockResolvedValue({
       success: true,
       pitch: {
         selected_title: "Stop Overpacking",
@@ -74,10 +74,48 @@ describe("useYouTubePitchHandlers language contract", () => {
     expect(youtubeApi.generatePitch).toHaveBeenCalledWith(
       expect.objectContaining({ language: "hi", creative_angle: "Contrarian" }),
     );
+    expect(vi.mocked(youtubeApi.generatePitch).mock.calls[0][0]).not.toHaveProperty("plan_category");
+  });
+
+  it("sends pack-filled producer fields on generatePitch without a plan_category key", async () => {
+    vi.mocked(youtubeApi.generatePitch).mockResolvedValue({
+      success: true,
+      pitch: {
+        selected_title: "Stop Overpacking",
+        video_summary: "Pack three items.",
+        hook_concept: "Skip the suitcase.",
+        main_content_beats: ["Rule one", "Rule two", "Rule three"],
+        angle_used: "Contrarian",
+      },
+      message: "ok",
+    });
+    const args = {
+      ...buildArgs(),
+      videoType: "storytelling" as const,
+      targetAudience: "kids_and_families",
+      videoGoal: "educate",
+      brandStyle: "playful_fun",
+    };
+    const { result } = renderHook(() => useYouTubePitchHandlers(args));
+
+    await act(async () => {
+      await result.current.handleGeneratePitch();
+    });
+
+    const payload = vi.mocked(youtubeApi.generatePitch).mock.calls[0][0];
+    expect(payload).not.toHaveProperty("plan_category");
+    expect(payload).toEqual(
+      expect.objectContaining({
+        video_type: "storytelling",
+        target_audience: "kids_and_families",
+        video_goal: "educate",
+        brand_style: "playful_fun",
+      }),
+    );
   });
 
   it("forwards language on expandPitchToScript", async () => {
-    jest.mocked(youtubeApi.expandPitchToScript).mockResolvedValue({
+    vi.mocked(youtubeApi.expandPitchToScript).mockResolvedValue({
       success: true,
       expansion: {
         hook: { spoken_script: "Hook" },
@@ -113,7 +151,7 @@ describe("useYouTubePitchHandlers language contract", () => {
   });
 
   it("sends English when language is unknown", async () => {
-    jest.mocked(youtubeApi.generatePitch).mockResolvedValue({
+    vi.mocked(youtubeApi.generatePitch).mockResolvedValue({
       success: true,
       pitch: {
         selected_title: "Stop Overpacking",

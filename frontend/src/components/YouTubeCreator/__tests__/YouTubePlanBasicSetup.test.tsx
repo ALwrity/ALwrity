@@ -7,10 +7,13 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { YouTubePlanBasicSetup } from "../components/YouTubePlanBasicSetup";
 import "../components/youtubePlanLayout.css";
 
-function renderSetup(
-  overrides: Partial<React.ComponentProps<typeof YouTubePlanBasicSetup>> = {},
-) {
-  const props: React.ComponentProps<typeof YouTubePlanBasicSetup> = {
+type BasicSetupTestProps = React.ComponentProps<typeof YouTubePlanBasicSetup> & {
+  planCategory?: "kids" | "explainer" | "";
+  onPlanCategoryChange?: (category: "kids" | "explainer" | "") => void;
+};
+
+function renderSetup(overrides: Partial<BasicSetupTestProps> = {}) {
+  const props: BasicSetupTestProps = {
     durationType: "shorts",
     language: "en",
     aspectRatio: "9:16",
@@ -18,9 +21,14 @@ function renderSetup(
     onDurationChange: vi.fn(),
     onLanguageChange: vi.fn(),
     onAspectRatioChange: vi.fn(),
+    planCategory: "",
+    onPlanCategoryChange: vi.fn(),
     ...overrides,
   };
-  return { ...render(<YouTubePlanBasicSetup {...props} />), props };
+  return {
+    ...render(<YouTubePlanBasicSetup {...(props as React.ComponentProps<typeof YouTubePlanBasicSetup>)} />),
+    props,
+  };
 }
 
 describe("YouTubePlanBasicSetup", () => {
@@ -94,5 +102,36 @@ describe("YouTubePlanBasicSetup", () => {
     renderSetup();
     expect(screen.getByRole("region", { name: "Basic setup" })).toHaveClass("yt-plan-pane");
     expect(screen.getByLabelText("Step 2")).toBeTruthy();
+  });
+
+  it("exposes Hub Kids and Explainer category pills", () => {
+    const { container, props } = renderSetup();
+    const kids = screen.getByRole("button", { name: "Kids" });
+    const explainer = screen.getByRole("button", { name: "Explainer" });
+    expect(kids.className).toMatch(/yt-plan-hub-action--tip-above/);
+    expect(explainer.className).toMatch(/yt-plan-hub-action--tip-above/);
+    expect(kids).toHaveAttribute("data-tooltip");
+    expect(explainer).toHaveAttribute("data-tooltip");
+    expect(container.innerHTML).not.toMatch(/667eea|#9c27b0|podcast/i);
+    fireEvent.click(kids);
+    expect(props.onPlanCategoryChange).toHaveBeenCalledWith("kids");
+    fireEvent.click(explainer);
+    expect(props.onPlanCategoryChange).toHaveBeenCalledWith("explainer");
+  });
+
+  it("marks the selected category with Hub primary", () => {
+    renderSetup({ planCategory: "explainer" });
+    expect(screen.getByRole("button", { name: "Explainer" }).className).toMatch(
+      /yt-plan-hub-action--selected/,
+    );
+    expect(screen.getByRole("button", { name: "Kids" }).className).not.toMatch(
+      /yt-plan-hub-action--selected/,
+    );
+  });
+
+  it("clears the category when the selected pill is clicked again", () => {
+    const { props } = renderSetup({ planCategory: "kids" });
+    fireEvent.click(screen.getByRole("button", { name: "Kids" }));
+    expect(props.onPlanCategoryChange).toHaveBeenCalledWith("");
   });
 });
