@@ -8,7 +8,7 @@ const WebsiteStepHeader: React.FC = () => {
       data-testid="website-step-header"
       data-top-spacing-xs={WEBSITE_STEP_HEADER_TOP_MARGIN.xs}
       data-top-spacing-md={WEBSITE_STEP_HEADER_TOP_MARGIN.md}
-      sx={{ mb: 3, mt: WEBSITE_STEP_HEADER_TOP_MARGIN }}
+      sx={{ mb: { xs: 3.5, md: 5 }, mt: WEBSITE_STEP_HEADER_TOP_MARGIN }}
     >
       <Typography
         variant="h4"
