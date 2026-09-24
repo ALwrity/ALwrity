@@ -126,6 +126,8 @@ cd frontend && npm start
   - HF: broad model access via the Inference Providers
 - **Image generation**:
   - Gemini/Imagen and Hugging Face providers are supported with a unified interface
+- **LLM Providers supported**:
+  - Wavespeedai : https://wavespeed.ai/?ref=PodcastAL
 
 For module details, see `backend/services/llm_providers/README.md`.
 
