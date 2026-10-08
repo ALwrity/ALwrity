@@ -2,7 +2,8 @@
 SERP Gap Service for ALwrity
 
 Detects which competitors rank for target topics using Google Custom Search
-or the optional SerpBase API (opt-in via SERPBASE_API_KEY).
+or an optional SERP API provider: SerpBase (opt-in via SERPBASE_API_KEY) or
+Serping API (opt-in via SERPINGAPI_API_KEY).
 Phase 1 of the Content Gap Radar feature.
 
 Usage:
@@ -22,6 +23,7 @@ from typing import Dict, List, Optional, Any
 from loguru import logger
 from services.research.google_search_service import GoogleSearchService
 from services.seo_tools.serpbase_service import SerpBaseService
+from services.seo_tools.serpingapi_service import SerpingApiService
 
 
 class SerpGapService:
@@ -32,6 +34,8 @@ class SerpGapService:
     for specific topics. Results are cached for 24h to stay within free-tier quotas
     (100 queries/day). When SERPBASE_API_KEY is set, SerpBase is used instead of
     Google Custom Search (no 100-query/day cap, returns positions and AI Overview).
+    When SERPINGAPI_API_KEY is set (and SerpBase is not), Serping API is used —
+    same result contract, monthly quota instead of a daily cap.
     Designed to be consumed by a future ContentGapRadarAgent
     that scores and prioritizes gaps.
     """
@@ -41,8 +45,14 @@ class SerpGapService:
     def __init__(self, google_search_service: Optional[GoogleSearchService] = None):
         self.gcs = google_search_service or GoogleSearchService()
         self.serpbase = SerpBaseService()
+        self.serpingapi = SerpingApiService()
         self._cache: Dict[str, Dict[str, Any]] = {}
-        provider = "SerpBase" if self.serpbase.enabled else "Google Custom Search"
+        if self.serpbase.enabled:
+            provider = "SerpBase"
+        elif self.serpingapi.enabled:
+            provider = "Serping API"
+        else:
+            provider = "Google Custom Search"
         logger.info(f"SerpGapService initialized (provider: {provider})")
 
     def _cache_key(self, topics: List[str], domains: List[str]) -> str:
@@ -135,7 +145,7 @@ class SerpGapService:
 
         Removes the dateRestrict and sort=date defaults from Google CSE so we
         see all-time competitor content (not just last month). A per-query
-        failure (SerpBase error, CSE error, network timeout) is recorded as a
+        failure (SerpBase/Serping API error, CSE error, network timeout) is recorded as a
         failed query for that domain and skipped — it never aborts the batch
         (review feedback on PR #901).
         """
@@ -147,6 +157,11 @@ class SerpGapService:
             try:
                 if self.serpbase.enabled:
                     raw_results = await self.serpbase.perform_search(
+                        query,
+                        max_results,
+                    )
+                elif self.serpingapi.enabled:
+                    raw_results = await self.serpingapi.perform_search(
                         query,
                         max_results,
                     )
