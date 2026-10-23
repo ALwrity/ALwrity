@@ -18,13 +18,23 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Start the Backend Server
+### 2. Configure Environment Variables
+```bash
+cp env_template.txt .env
+```
+Generate an encryption key and paste it as the value of `OAUTH_TOKEN_ENCRYPTION_KEY` in `.env`:
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+Without this key the backend stops at startup with "token encryption key is not configured".
+
+### 3. Start the Backend Server
 ```bash
 python start_alwrity_backend.py
 ```
 
-### 3. Verify It's Working
-- Open your browser to: http://localhost:8000/api/docs
+### 4. Verify It's Working
+- Open your browser to: http://localhost:8000/docs
 - You should see the interactive API documentation
 - Health check: http://localhost:8000/health
 
@@ -128,9 +138,9 @@ When you start the backend successfully, you'll see:
    🔄 Reload: true
 
 🌐 Backend is starting...
-   📖 API Documentation: http://localhost:8000/api/docs
+   📖 API Documentation: http://localhost:8000/docs
    🔍 Health Check: http://localhost:8000/health
-   📊 ReDoc: http://localhost:8000/api/redoc
+   📊 ReDoc: http://localhost:8000/redoc
 
 ⏹️  Press Ctrl+C to stop the server
 ============================================================
@@ -140,8 +150,8 @@ When you start the backend successfully, you'll see:
 
 Once the server is running, you can access:
 
-- **📖 Interactive API Docs (Swagger)**: http://localhost:8000/api/docs
-- **📊 ReDoc Documentation**: http://localhost:8000/api/redoc
+- **📖 Interactive API Docs (Swagger)**: http://localhost:8000/docs
+- **📊 ReDoc Documentation**: http://localhost:8000/redoc
 - **🔍 Health Check**: http://localhost:8000/health
 
 ## 🔑 Available Endpoints
@@ -188,7 +198,7 @@ curl -X POST http://localhost:8000/api/onboarding/step/1/complete \
 ```
 
 ### Using the Swagger UI
-1. Open http://localhost:8000/api/docs
+1. Open http://localhost:8000/docs
 2. Click on any endpoint
 3. Click "Try it out"
 4. Fill in the parameters
@@ -251,7 +261,7 @@ python start_alwrity_backend.py
 The server automatically reloads when you save changes to Python files.
 
 ### 4. Test Changes
-- Use the Swagger UI at http://localhost:8000/api/docs
+- Use the Swagger UI at http://localhost:8000/docs
 - Or use curl commands for quick testing
 
 ## 🐛 Troubleshooting
@@ -284,10 +294,13 @@ ls -la
 - Make sure the frontend is running on http://localhost:3000
 - Check that CORS is properly configured in `app.py`
 
+#### 5. "Directory setup failed" at startup
+This usually means the disk is full. The dependencies include `torch` and `tensorflow`, which need several GB. Free some space, for example with `pip cache purge`, and start the backend again.
+
 ### Getting Help
 
 1. **Check the logs**: The startup script provides detailed information
-2. **API Documentation**: Use http://localhost:8000/api/docs to test endpoints
+2. **API Documentation**: Use http://localhost:8000/docs to test endpoints
 3. **Health Check**: Visit http://localhost:8000/health to verify the server is running
 
 ## 🚀 Production Deployment
