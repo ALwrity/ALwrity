@@ -5,12 +5,16 @@ Welcome to the ALwrity Backend! This is the FastAPI-powered backend that provide
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.8+ installed
+- Python 3.10 or newer (tested on 3.12; runtime.txt pins 3.11.9). Python 3.14 is not supported: Pillow fails to build.
 - pip (Python package manager)
+- Plenty of free disk space (installing torch and tensorflow filled a 32 GB Codespace)
+- On Ubuntu/Debian: sudo apt install python3-venv
 
 ### 1. Install Dependencies
 ```bash
 cd backend
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
