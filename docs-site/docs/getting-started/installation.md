@@ -226,3 +226,128 @@ npm start
 ### Frontend Verification
 
 1. **Application Load**: Visit `http://localhost:3000`
+   - Should display the ALwrity dashboard
+
+2. **API Connection**: Check browser console for connection errors
+   - Should show successful API connections
+
+3. **Authentication**: Test login functionality (if configured)
+
+## API Keys Setup
+
+### Required API Keys
+
+#### 1. Google Gemini API
+- Visit: [Google AI Studio](https://makersuite.google.com/app/apikey)
+- Create a new API key
+- Add to `GEMINI_API_KEY` in backend `.env`
+
+#### 2. OpenAI API (Optional)
+- Visit: [OpenAI Platform](https://platform.openai.com/api-keys)
+- Create a new API key
+- Add to `OPENAI_API_KEY` in backend `.env`
+
+#### 3. Anthropic API (Optional)
+- Visit: [Anthropic Console](https://console.anthropic.com/)
+- Create a new API key
+- Add to `ANTHROPIC_API_KEY` in backend `.env`
+
+### Optional API Keys
+
+#### Research & SEO Services
+- **Tavily**: [Tavily API](https://tavily.com/) - Web search and research
+- **Serper**: [Serper API](https://serper.dev/) - Google search results
+- **Metaphor**: [Metaphor API](https://metaphor.systems/) - Content discovery
+- **Firecrawl**: [Firecrawl API](https://firecrawl.dev/) - Web scraping
+
+#### Content Generation
+- **Stability AI**: [Stability Platform](https://platform.stability.ai/) - Image generation
+
+#### Authentication & Integration
+- **Clerk**: [Clerk Dashboard](https://dashboard.clerk.com/) - User authentication
+- **CopilotKit**: [CopilotKit](https://copilotkit.ai/) - AI chat interface
+
+## Troubleshooting
+
+### Common Issues
+
+#### Backend Issues
+
+**Port Already in Use**
+```bash
+# Find process using port 8000
+netstat -ano | findstr :8000  # Windows
+lsof -i :8000                 # macOS/Linux
+
+# Kill the process or use different port
+python start_alwrity_backend.py --port 8001
+```
+
+**Database Connection Error**
+```bash
+# Reset database
+rm backend/alwrity.db  # Linux/macOS
+del backend\alwrity.db  # Windows
+
+# Reinitialize
+python -c "from services.database import initialize_database; initialize_database()"
+```
+
+**Missing Dependencies**
+```bash
+# Reinstall requirements
+pip install -r requirements.txt --force-reinstall
+```
+
+#### Frontend Issues
+
+**Port Already in Use**
+```bash
+# Use different port
+npm start -- --port 3001
+```
+
+**Build Errors**
+```bash
+# Clear cache and reinstall
+rm -rf node_modules package-lock.json
+npm install
+```
+
+**API Connection Issues**
+- Verify backend is running on `http://localhost:8000`
+- Check `REACT_APP_API_URL` in frontend `.env`
+- Ensure CORS is properly configured
+
+### Getting Help
+
+If you encounter issues:
+
+1. **Check Logs**: Review console output for error messages
+2. **Verify Configuration**: Ensure all environment variables are set
+3. **Test API Keys**: Verify API keys are valid and have sufficient credits
+4. **Check Dependencies**: Ensure all required software is installed
+5. **Review Documentation**: Check our [troubleshooting guide](../guides/troubleshooting.md)
+
+## Next Steps
+
+After successful installation:
+
+1. **[Configuration Guide](configuration.md)** - Configure your API keys and settings
+2. **[First Steps](first-steps.md)** - Create your first content strategy
+3. **[Quick Start](quick-start.md)** - Get up and running quickly
+4. **[Troubleshooting Guide](../guides/troubleshooting.md)** - Common issues and solutions
+
+## Production Deployment
+
+For production deployment, consider:
+
+- **Environment Variables**: Use secure environment variable management
+- **Database**: Consider PostgreSQL or MySQL for production
+- **SSL/TLS**: Enable HTTPS for secure connections
+- **Monitoring**: Set up logging and monitoring
+- **Backup**: Implement regular database backups
+
+---
+
+*Installation complete? [Configure your settings](configuration.md) to start creating amazing content with ALwrity!*
