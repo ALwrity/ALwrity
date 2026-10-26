@@ -185,7 +185,7 @@ Add the following configuration:
 # Backend API URL
 REACT_APP_API_URL=http://localhost:8000
 
-# Clerk Authentication (Optional)
+# Clerk Authentication (required for now, see note below)
 REACT_APP_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key_here
 
 # CopilotKit (Optional)
