@@ -198,6 +198,8 @@ REACT_APP_GSC_CLIENT_ID=your_gsc_client_id_here
 NODE_ENV=development
 ```
 
+Note: the frontend shows "Missing Clerk Publishable Key" on startup unless `REACT_APP_CLERK_PUBLISHABLE_KEY` is set. Clerk is required for now. Local skip-login support is planned but not yet in the code.
+
 #### 3.3 Start Frontend Development Server
 
 ```bash
