@@ -1,8 +1,9 @@
 """
 SERP Gap Service for ALwrity
 
-Detects which competitors rank for target topics using Google Custom Search
-or the optional SerpBase API (opt-in via SERPBASE_API_KEY).
+Detects which competitors rank for target topics using Google Custom Search,
+the optional SerpBase API (opt-in via SERPBASE_API_KEY) or the optional
+Outcrawl API (opt-in via OUTCRAWL_API_KEY).
 Phase 1 of the Content Gap Radar feature.
 
 Usage:
@@ -22,6 +23,7 @@ from typing import Dict, List, Optional, Any
 from loguru import logger
 from services.research.google_search_service import GoogleSearchService
 from services.seo_tools.serpbase_service import SerpBaseService
+from services.seo_tools.outcrawl_service import OutcrawlService
 
 
 class SerpGapService:
@@ -32,6 +34,8 @@ class SerpGapService:
     for specific topics. Results are cached for 24h to stay within free-tier quotas
     (100 queries/day). When SERPBASE_API_KEY is set, SerpBase is used instead of
     Google Custom Search (no 100-query/day cap, returns positions and AI Overview).
+    Otherwise, when OUTCRAWL_API_KEY is set, Outcrawl web search is used instead
+    (no 100-query/day cap, up to 20 results per query).
     Designed to be consumed by a future ContentGapRadarAgent
     that scores and prioritizes gaps.
     """
@@ -41,8 +45,14 @@ class SerpGapService:
     def __init__(self, google_search_service: Optional[GoogleSearchService] = None):
         self.gcs = google_search_service or GoogleSearchService()
         self.serpbase = SerpBaseService()
+        self.outcrawl = OutcrawlService()
         self._cache: Dict[str, Dict[str, Any]] = {}
-        provider = "SerpBase" if self.serpbase.enabled else "Google Custom Search"
+        if self.serpbase.enabled:
+            provider = "SerpBase"
+        elif self.outcrawl.enabled:
+            provider = "Outcrawl"
+        else:
+            provider = "Google Custom Search"
         logger.info(f"SerpGapService initialized (provider: {provider})")
 
     def _cache_key(self, topics: List[str], domains: List[str]) -> str:
@@ -147,6 +157,11 @@ class SerpGapService:
             try:
                 if self.serpbase.enabled:
                     raw_results = await self.serpbase.perform_search(
+                        query,
+                        max_results,
+                    )
+                elif self.outcrawl.enabled:
+                    raw_results = await self.outcrawl.perform_search(
                         query,
                         max_results,
                     )
