@@ -127,7 +127,7 @@ cd frontend && npm start
 - **Image generation**:
   - Gemini/Imagen and Hugging Face providers are supported with a unified interface
 - **LLM Providers supported**:
-  - Wavespeedai : https://wavespeed.ai/?ref=PodcastAL
+  - Wavespeedai : https://wavespeed.ai/?ref=ALwrity
 
 For module details, see `backend/services/llm_providers/README.md`.
 
