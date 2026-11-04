@@ -189,8 +189,8 @@ async def _analyze_competitive_sitemap_structure(
 
 ##### 4.1 Unit Testing
 **Test Files**:
-- `backend/test/services/seo_tools/test_sitemap_service_enhanced.py`
-- `backend/test/services/seo_tools/onboarding/test_sitemap_competitive_analyzer.py`
+- `backend/tests/services/seo_tools/test_sitemap_service_enhanced.py` (planned, not yet implemented)
+- `backend/tests/services/seo_tools/onboarding/test_sitemap_competitive_analyzer.py` (planned, not yet implemented)
 
 ##### 4.2 Integration Testing
 **Scenarios**:

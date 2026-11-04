@@ -278,7 +278,7 @@ curl -X POST "http://localhost:8000/api/stability/advanced/compare/models" \
 - **Stability AI Platform**: https://platform.stability.ai
 - **Get API Key**: https://platform.stability.ai/account/keys
 - **Integration Guide**: `backend/docs/STABILITY_AI_INTEGRATION.md`
-- **Test Suite**: `backend/test/test_stability_endpoints.py`
+- **Test Suite**: none at the moment (the old `backend/test/test_stability_endpoints.py` was removed)
 
 ## 🆘 Quick Troubleshooting
 
