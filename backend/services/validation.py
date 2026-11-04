@@ -43,9 +43,10 @@ def check_all_api_keys(api_manager) -> Dict[str, Any]:
         logger.info("Checking AI provider API keys...")
         ai_providers = [
             'OPENAI_API_KEY',
-            'GEMINI_API_KEY', 
+            'GEMINI_API_KEY',
             'ANTHROPIC_API_KEY',
-            'MISTRAL_API_KEY'
+            'MISTRAL_API_KEY',
+            'ORCAROUTER_API_KEY'
         ]
         
         ai_provider_results = {}
@@ -220,7 +221,13 @@ def validate_api_key(provider: str, api_key: str) -> Dict[str, Any]:
                 return {'valid': False, 'error': 'Mistral API key must start with "mistral-"'}
             if len(api_key) < 20:
                 return {'valid': False, 'error': 'Mistral API key seems too short'}
-        
+
+        elif provider == "orcarouter":
+            if not api_key.startswith("sk-orca-"):
+                return {'valid': False, 'error': 'OrcaRouter API key must start with "sk-orca-"'}
+            if len(api_key) < 20:
+                return {'valid': False, 'error': 'OrcaRouter API key seems too short'}
+
         elif provider == "tavily":
             if len(api_key) < 10:
                 return {'valid': False, 'error': 'Tavily API key seems too short'}
@@ -447,6 +454,9 @@ def validate_api_key_format(provider: str, api_key: str) -> bool:
         return False
     
     if provider == "mistral" and not api_key.startswith("mistral-"):
+        return False
+
+    if provider == "orcarouter" and not api_key.startswith("sk-orca-"):
         return False
     
     return True 

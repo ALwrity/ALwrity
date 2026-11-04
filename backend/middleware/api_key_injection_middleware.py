@@ -133,6 +133,7 @@ class APIKeyInjectionMiddleware:
                 'copilotkit': 'COPILOTKIT_API_KEY',
                 'openai': 'OPENAI_API_KEY',
                 'anthropic': 'ANTHROPIC_API_KEY',
+                'orcarouter': 'ORCAROUTER_API_KEY',
                 'tavily': 'TAVILY_API_KEY',
                 'serper': 'SERPER_API_KEY',
                 'firecrawl': 'FIRECRAWL_API_KEY',

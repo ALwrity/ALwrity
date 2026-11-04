@@ -256,9 +256,10 @@ class OnboardingCompletionService:
                     if step_num == 1:
                         api_keys_data = integrated_data.get('api_keys_data', {})
                         step_completed = bool(
-                            api_keys_data.get('openai_api_key') or 
-                            api_keys_data.get('anthropic_api_key') or 
-                            api_keys_data.get('google_api_key')
+                            api_keys_data.get('openai_api_key') or
+                            api_keys_data.get('anthropic_api_key') or
+                            api_keys_data.get('google_api_key') or
+                            api_keys_data.get('orcarouter_api_key')
                         )
                         if not step_completed:
                             has_global_providers = bool(
@@ -266,7 +267,8 @@ class OnboardingCompletionService:
                                 os.getenv("GEMINI_API_KEY") or
                                 os.getenv("OPENAI_API_KEY") or
                                 os.getenv("ANTHROPIC_API_KEY") or
-                                os.getenv("GOOGLE_API_KEY")
+                                os.getenv("GOOGLE_API_KEY") or
+                                os.getenv("ORCAROUTER_API_KEY")
                             )
                             if has_global_providers:
                                 step_completed = True
