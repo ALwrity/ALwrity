@@ -212,8 +212,8 @@ async def health():
 
 @app.get("/health/database")
 async def database_health():
-    """Database health check endpoint."""
-    return health_checker.database_health_check()
+    """Public status; tenant database connectivity is not verified here."""
+    return health_checker.database_health_response()
 
 @app.get("/health/comprehensive")
 async def comprehensive_health():
