@@ -9,6 +9,8 @@ import os
 import sys
 from loguru import logger
 
+from utils.console_encoding import configure_windows_console_encoding
+
 
 class InterceptHandler(logging.Handler):
     """Route standard logging records into Loguru."""
@@ -99,6 +101,7 @@ def _configure_uvicorn_loggers(log_level):
 
 def setup_clean_logging():
     """Set up clean logging for end users."""
+    configure_windows_console_encoding()
     verbose_mode = os.getenv("ALWRITY_VERBOSE", "false").lower() == "true"
 
     logger.remove()
