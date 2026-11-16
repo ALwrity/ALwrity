@@ -18,8 +18,6 @@ from typing import Optional
 IS_WINDOWS = platform.system() == "Windows"
 IS_LINUX = platform.system() == "Linux"
 
-import uvicorn
-
 
 @dataclass
 class BootstrapResult:
@@ -221,25 +219,27 @@ def bootstrap_local_llm_models() -> BootstrapResult:
     return BootstrapResult(name="local_llm_models", success=True, skipped=False)
 
 
-# Bootstrap linguistic models BEFORE any imports that might need them
 BOOTSTRAP_RESULTS = []
 
-# Load .env file early so ALWRITY_ENABLED_FEATURES is available
-from dotenv import load_dotenv
-from pathlib import Path
 
-# Load from backend/.env specifically
-backend_dir = Path(__file__).parent
-load_dotenv(backend_dir / '.env')
+def load_startup_environment() -> None:
+    """Load startup environment settings after CLI arguments are parsed."""
+    from dotenv import load_dotenv
 
-# Debug: Print what PORT is set to - IMMEDIATELY at startup
-import os
-print(f"[STARTUP] PORT env: {os.getenv('PORT')}", flush=True)
-print(f"[STARTUP] RENDER env: {os.getenv('RENDER')}", flush=True)
-print(f"[STARTUP] ALWRITY_ENABLED_FEATURES: {os.getenv('ALWRITY_ENABLED_FEATURES')}", flush=True)
-print(f"[STARTUP] HOST env: {os.getenv('HOST')}", flush=True)
+    backend_dir = Path(__file__).parent
+    load_dotenv(backend_dir / '.env')
 
-if __name__ == "__main__":
+    print(f"[STARTUP] PORT env: {os.getenv('PORT')}", flush=True)
+    print(f"[STARTUP] RENDER env: {os.getenv('RENDER')}", flush=True)
+    print(f"[STARTUP] ALWRITY_ENABLED_FEATURES: {os.getenv('ALWRITY_ENABLED_FEATURES')}", flush=True)
+    print(f"[STARTUP] HOST env: {os.getenv('HOST')}", flush=True)
+
+
+def bootstrap_startup_models() -> None:
+    """Bootstrap configured models after the environment is loaded."""
+    global BOOTSTRAP_RESULTS
+
+    BOOTSTRAP_RESULTS = []
     enabled_features = get_enabled_features()
     features_str = ",".join(sorted(enabled_features))
     os.environ["ALWRITY_ENABLED_FEATURES"] = features_str
@@ -275,13 +275,17 @@ if __name__ == "__main__":
         status = "[SKIP]  Skipped" if r.skipped else ("[OK] Enabled" if r.success else "[FAIL] Failed")
         print(f"   {r.name}: {status}" + (f" ({r.reason})" if r.reason else ""))
 
-# NOW import modular utilities (after bootstrap)
-from alwrity_utils import (
-    DependencyManager,
-    EnvironmentSetup,
-    DatabaseSetup,
-    ProductionOptimizer
-)
+
+def load_startup_utilities():
+    """Import application startup utilities only after CLI parsing and bootstrapping."""
+    from alwrity_utils import (
+        DependencyManager,
+        EnvironmentSetup,
+        DatabaseSetup,
+        ProductionOptimizer
+    )
+
+    return DependencyManager, EnvironmentSetup, DatabaseSetup, ProductionOptimizer
 
 
 def start_backend(enable_reload=False, production_mode=False):
@@ -458,7 +462,7 @@ def start_backend(enable_reload=False, production_mode=False):
     return True
 
 
-def main():
+def main(argv=None):
     """Main function to set up and start the backend."""
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="ALwrity Backend Server")
@@ -466,7 +470,11 @@ def main():
     parser.add_argument("--dev", action="store_true", help="Enable development mode (auto-reload)")
     parser.add_argument("--production", action="store_true", help="Enable production mode (optimized for deployment)")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging for debugging")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+
+    load_startup_environment()
+    bootstrap_startup_models()
+    DependencyManager, EnvironmentSetup, DatabaseSetup, ProductionOptimizer = load_startup_utilities()
     
     # Determine mode
     production_mode = args.production
