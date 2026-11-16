@@ -14,6 +14,8 @@ from pathlib import Path
 from dataclasses import dataclass, asdict
 from typing import Optional
 
+from utils.console_encoding import configure_windows_console_encoding
+
 # Detect platform
 IS_WINDOWS = platform.system() == "Windows"
 IS_LINUX = platform.system() == "Linux"
@@ -472,6 +474,7 @@ def main(argv=None):
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging for debugging")
     args = parser.parse_args(argv)
 
+    configure_windows_console_encoding()
     load_startup_environment()
     bootstrap_startup_models()
     DependencyManager, EnvironmentSetup, DatabaseSetup, ProductionOptimizer = load_startup_utilities()
