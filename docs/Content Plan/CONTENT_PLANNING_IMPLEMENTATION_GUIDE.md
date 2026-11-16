@@ -150,10 +150,11 @@ This document provides detailed specifications for each component in the refacto
 - Handle alerting and notifications
 
 **Key Endpoints:**
-- `GET /health` - Basic health check
+- `GET /health` - Public process liveness only; no workspace-storage or tenant-database probe
 - `GET /health/backend` - Backend health
 - `GET /health/ai` - AI services health
-- `GET /health/database` - Database health
+- `GET /health/database` - Public status only; tenant database connectivity is not verified
+- `GET /api/content-planning/health/database` - Authenticated, tenant-scoped database health
 - `GET /metrics` - Performance metrics
 
 **Dependencies:**

@@ -346,11 +346,17 @@ GET /health/ai
 ```
 Checks AI services health separately.
 
-#### Database Health Check
+#### Public Database Status
 ```
 GET /health/database
 ```
-Checks database connectivity and operations.
+Returns HTTP 503 with `status: "not_verified"`. This public endpoint does not inspect a tenant database or verify live database connectivity. Use the authenticated tenant-scoped check below for that.
+
+#### Authenticated Tenant Database Health Check
+```
+GET /api/content-planning/health/database
+```
+Checks connectivity and operations for the authenticated tenant's database. The basic public `GET /health` endpoint reports process liveness only; it does not check workspace storage or tenant database health. Startup workspace checks are separate snapshots and do not verify live tenant database connectivity.
 
 #### Calendar Generation Health Check
 ```
