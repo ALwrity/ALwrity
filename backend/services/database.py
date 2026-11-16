@@ -4,7 +4,7 @@ Handles database connections and sessions.
 """
 
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import MetaData, create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
@@ -671,10 +671,26 @@ def get_engine_for_user(user_id: str):
         init_user_database(user_id)
     except Exception as e:
         logger.error(f"Failed to auto-initialize database for user {user_id}: {e}")
-        # We don't raise here to allow the engine to be returned, 
-        # but the application might fail later if tables are missing.
+        if _user_engines.get(user_id) is engine:
+            del _user_engines[user_id]
+        engine.dispose()
+        raise
     
     return engine
+
+def _create_enhanced_calendar_tables(engine):
+    """Create calendar tables with their content-planning FK targets registered."""
+    from models.enhanced_calendar_models import Base as EnhancedCalendarBase
+
+    calendar_metadata = MetaData()
+    for table_name in ("content_strategies", "calendar_events"):
+        ContentPlanningBase.metadata.tables[table_name].to_metadata(calendar_metadata)
+    for table in EnhancedCalendarBase.metadata.tables.values():
+        table.to_metadata(calendar_metadata)
+
+    for table in calendar_metadata.sorted_tables:
+        table.create(bind=engine, checkfirst=True)
+
 
 def init_user_database(user_id: str):
     """Initialize database tables for a specific user."""
@@ -695,17 +711,7 @@ def init_user_database(user_id: str):
         SubscriptionBase.metadata.create_all(bind=engine)
         UserBusinessInfoBase.metadata.create_all(bind=engine)
         ContentAssetBase.metadata.create_all(bind=engine)
-        from models.enhanced_calendar_models import Base as EnhancedCalendarBase
-        # Create each table individually to avoid cross-metadata FK validation.
-        # Referenced tables (content_strategies, calendar_events) are already
-        # created above by ContentPlanningBase.metadata.create_all.
-        for table in EnhancedCalendarBase.metadata.sorted_tables:
-            try:
-                table.create(bind=engine, checkfirst=True)
-            except Exception as table_err:
-                logger.warning(
-                    f"Could not create table {table.name}: {table_err}"
-                )
+        _create_enhanced_calendar_tables(engine)
         _ensure_enhanced_calendar_user_id_type(engine, user_id)
         BingAnalyticsBase.metadata.create_all(bind=engine)
         WatchdogBase.metadata.create_all(bind=engine)
