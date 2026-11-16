@@ -39,7 +39,7 @@ Create a `.env` file in your `frontend` directory:
 REACT_APP_COPILOTKIT_API_KEY=ck_public_your_actual_api_key_here
 
 # Backend API Configuration
-REACT_APP_API_BASE_URL=http://localhost:8000
+REACT_APP_API_URL=http://localhost:8000
 
 # Other Frontend Environment Variables
 REACT_APP_ENVIRONMENT=development

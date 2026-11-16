@@ -90,7 +90,7 @@ Cloud-hosted configuration (no runtimeUrl required):
 ```env
 REACT_APP_COPILOTKIT_API_KEY=ck_pub_your_public_key
 # Optional project API base if needed elsewhere
-REACT_APP_API_BASE_URL=http://localhost:8000
+REACT_APP_API_URL=http://localhost:8000
 ```
 
 Provider and sidebar structure:
