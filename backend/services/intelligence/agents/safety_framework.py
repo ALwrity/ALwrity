@@ -84,6 +84,17 @@ class SafetyValidation:
         if self.validation_timestamp is None:
             self.validation_timestamp = datetime.utcnow().isoformat()
 
+
+@dataclass
+class SafetyArbitrationDecision:
+    """Explicit allow/deny/lock decision with reasons."""
+    decision: str
+    reasons: List[str]
+    tier: int
+    confidence: float
+    lock_state_active: bool
+
+
 class SafetyConstraintManager:
     """Manages safety constraints for agent actions"""
     
@@ -92,6 +103,8 @@ class SafetyConstraintManager:
         self.constraints: Dict[str, SafetyConstraint] = {}
         self.action_history: List[Dict[str, Any]] = []
         self.violation_history: List[Dict[str, Any]] = []
+        self.lock_state_active: bool = False
+        self.lock_state_reason: Optional[str] = None
         
         # Initialize default constraints
         self._initialize_default_constraints()
@@ -163,6 +176,17 @@ class SafetyConstraintManager:
         """Validate an action against safety constraints"""
         try:
             logger.info(f"Validating action for user {self.user_id}: {action_data.get('action_type', 'unknown')}")
+
+            if self.lock_state_active and action_data.get("autonomous_modification", True):
+                reason = self.lock_state_reason or "Safety lock is active due to Tier 3 systemic anomaly"
+                return SafetyValidation(
+                    is_valid=False,
+                    risk_level=RiskLevel.CRITICAL,
+                    violations=["Autonomous modifications blocked while lock state is active"],
+                    recommendations=[reason],
+                    requires_approval=True,
+                    confidence_score=1.0
+                )
             
             violations = []
             recommendations = []
@@ -207,19 +231,29 @@ class SafetyConstraintManager:
             
             # Final validation
             is_valid = len(violations) == 0 and not requires_approval
-            
-            logger.info(f"Action validation completed for user {self.user_id}. Valid: {is_valid}, Risk: {risk_level.value}, Violations: {len(violations)}")
-            
+            confidence_score = max(0.0, min(1.0, confidence_score))
+            arbitration = self._arbitrate_decision(action_data, risk_level, violations, requires_approval, confidence_score)
+
+            if arbitration.decision == "lock":
+                self.lock_state_active = True
+                self.lock_state_reason = "; ".join(arbitration.reasons)
+                is_valid = False
+                requires_approval = True
+
+            recommendations.extend([f"Arbitration decision: {arbitration.decision}", *arbitration.reasons])
+
+            logger.info(f"Action validation completed for user {self.user_id}. Decision: {arbitration.decision}, Valid: {is_valid}, Risk: {risk_level.value}, Violations: {len(violations)}")
+
             # Record in history
             await self._record_validation_history(action_data, is_valid, violations)
-            
+
             return SafetyValidation(
                 is_valid=is_valid,
                 risk_level=risk_level,
                 violations=violations,
                 recommendations=recommendations,
                 requires_approval=requires_approval,
-                confidence_score=max(0.0, min(1.0, confidence_score))
+                confidence_score=confidence_score
             )
             
         except Exception as e:
@@ -235,6 +269,30 @@ class SafetyConstraintManager:
                 confidence_score=0.0
             )
     
+    def _arbitrate_decision(self, action_data: Dict[str, Any], risk_level: RiskLevel, violations: List[str], requires_approval: bool, confidence_score: float) -> SafetyArbitrationDecision:
+        """Arbitrate allow/deny/lock with explicit reasons."""
+        reasons: List[str] = []
+        tier = int(action_data.get("recommended_tier", 1))
+
+        if self.lock_state_active:
+            reasons.append("Existing lock state is active")
+            return SafetyArbitrationDecision("lock", reasons, tier, confidence_score, True)
+
+        if tier >= 3 or risk_level == RiskLevel.CRITICAL:
+            reasons.append("Tier 3 systemic anomaly or critical risk detected")
+            if violations:
+                reasons.extend(violations)
+            return SafetyArbitrationDecision("lock", reasons, 3, confidence_score, True)
+
+        if violations or requires_approval:
+            reasons.append("Safety policy violation or approval requirement triggered")
+            reasons.extend(violations)
+            return SafetyArbitrationDecision("deny", reasons, tier, confidence_score, False)
+
+        reasons.append("No policy violations detected")
+        return SafetyArbitrationDecision("allow", reasons, tier, confidence_score, False)
+
+
     def _determine_action_category(self, action_type: str) -> ActionCategory:
         """Determine the category of an action"""
         action_type_lower = action_type.lower()
