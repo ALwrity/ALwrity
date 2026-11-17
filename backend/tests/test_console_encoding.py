@@ -188,8 +188,6 @@ def test_cli_prints_write_with_cp1252(monkeypatch):
     _, stderr = _cp1252_stream()
     monkeypatch.setattr(sys, "stdout", stdout)
     monkeypatch.setattr(sys, "stderr", stderr)
-    monkeypatch.setattr(backend_cli, "load_startup_environment", lambda: None)
-    monkeypatch.setattr(backend_cli, "bootstrap_startup_models", lambda: None)
 
     class FakeDependencyManager:
         def check_critical_dependencies(self):
@@ -228,20 +226,15 @@ def test_cli_prints_write_with_cp1252(monkeypatch):
         def apply_production_optimizations(self):
             return True
 
-    monkeypatch.setattr(
-        backend_cli,
-        "load_startup_utilities",
-        lambda: (
-            FakeDependencyManager,
-            FakeEnvironmentSetup,
-            FakeDatabaseSetup,
-            FakeProductionOptimizer,
-        ),
-    )
+    monkeypatch.setattr(backend_cli, "DependencyManager", FakeDependencyManager)
+    monkeypatch.setattr(backend_cli, "EnvironmentSetup", FakeEnvironmentSetup)
+    monkeypatch.setattr(backend_cli, "DatabaseSetup", FakeDatabaseSetup)
+    monkeypatch.setattr(backend_cli, "ProductionOptimizer", FakeProductionOptimizer)
     monkeypatch.setattr(backend_cli, "start_backend", lambda **kwargs: True)
+    monkeypatch.setattr(sys, "argv", ["start_alwrity_backend.py", "--reload"])
 
     try:
-        assert backend_cli.main(["--reload"]) is True
+        assert backend_cli.main() is True
         stdout.flush()
 
         output = stdout_buffer.getvalue().decode("cp1252")
