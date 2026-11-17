@@ -181,7 +181,7 @@ After creating the `.env` file, open it in your preferred text editor and update
 Example:
 
 ```env
-REACT_APP_API_BASE_URL=http://localhost:8000
+REACT_APP_API_URL=http://localhost:8000
 REACT_APP_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
 REACT_APP_CLERK_JWT_TEMPLATE=
 ```
@@ -190,7 +190,7 @@ REACT_APP_CLERK_JWT_TEMPLATE=
 
 | Variable | Description | Where to Get It |
 |----------|-------------|-----------------|
-| `REACT_APP_API_BASE_URL` | URL of the backend server that the frontend communicates with. | Use `http://localhost:8000` for local development. |
+| `REACT_APP_API_URL` | URL of the backend server that the frontend communicates with. | Use `http://localhost:8000` for local development. |
 | `REACT_APP_CLERK_PUBLISHABLE_KEY` | Public key used by Clerk for frontend authentication. | Clerk Dashboard |
 | `REACT_APP_CLERK_JWT_TEMPLATE` | Optional JWT template name used for authentication if configured in Clerk. Leave it blank unless your Clerk setup requires it. | Clerk Dashboard (optional) |
 

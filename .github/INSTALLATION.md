@@ -99,7 +99,7 @@ cp env_template.txt .env
 
 # Edit .env and add:
 # REACT_APP_CLERK_PUBLISHABLE_KEY=<your-clerk-publishable-key>
-# REACT_APP_API_BASE_URL=http://localhost:8000
+# REACT_APP_API_URL=http://localhost:8000
 
 # Build the project (validates everything compiles)
 npm run build
@@ -160,7 +160,7 @@ pip install -r requirements.txt
 
 **Fix:**
 1. Ensure backend is running on `http://localhost:8000`
-2. Check `frontend/.env` has `REACT_APP_API_BASE_URL=http://localhost:8000`
+2. Check `frontend/.env` has `REACT_APP_API_URL=http://localhost:8000`
 3. Restart both frontend and backend
 
 ### **Issue 4: "Clerk Publishable Key Missing"**
@@ -243,7 +243,7 @@ DEPLOY_ENV=local
 REACT_APP_CLERK_PUBLISHABLE_KEY=pk_test_xxx...
 
 # Optional
-REACT_APP_API_BASE_URL=http://localhost:8000
+REACT_APP_API_URL=http://localhost:8000
 REACT_APP_COPILOTKIT_API_KEY=xxx...
 ```
 

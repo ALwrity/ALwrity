@@ -2,7 +2,7 @@
  * Shared API URL resolution utility.
  *
  * Determines the correct backend URL based on:
- *  1. Explicit REACT_APP_API_URL env var (production)
+ *  1. Explicit REACT_APP_API_URL env var (or legacy REACT_APP_API_BASE_URL)
  *  2. Browser origin when accessed via localhost (development)
  *  3. Fallback to http://localhost:8000
  *
@@ -48,12 +48,12 @@ function getLocalhostApiUrl(): string {
  * Returns the appropriate API base URL.
  *
  * Priority:
- *  1. REACT_APP_API_URL env var (if set — explicit user intent, always respected)
+ *  1. REACT_APP_API_URL env var, then the legacy REACT_APP_API_BASE_URL
  *  2. When accessed via localhost in development with no env var → localhost:8000
  *  3. Fallback to http://localhost:8000
  */
 export const getApiBaseUrl = (): string => {
-  const envUrl = process.env.REACT_APP_API_URL;
+  const envUrl = process.env.REACT_APP_API_URL || process.env.REACT_APP_API_BASE_URL;
   const isProduction = process.env.NODE_ENV === 'production';
 
   if (isProduction) {
@@ -77,6 +77,22 @@ export const getApiBaseUrl = (): string => {
 
   // Not on localhost and no env var set — best guess
   return 'http://localhost:8000';
+};
+
+export const resolveApiUrl = (url: string, token?: string | null): string => {
+  const baseUrl = getApiBaseUrl().replace(/\/+$/, '');
+  const apiOrigin = new URL(baseUrl).origin;
+  const resolvedUrl = /^[a-z][a-z\d+.-]*:/i.test(url)
+    ? new URL(url)
+    : url.startsWith('//')
+      ? new URL(url, baseUrl)
+      : new URL(`${baseUrl}/${url.replace(/^\/+/, '')}`);
+
+  if (token && resolvedUrl.origin === apiOrigin) {
+    resolvedUrl.searchParams.set('token', token);
+  }
+
+  return resolvedUrl.toString();
 };
 
 export default getApiBaseUrl;
