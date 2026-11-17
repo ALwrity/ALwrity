@@ -68,12 +68,40 @@ describe('API URL resolution', () => {
     );
   });
 
-  it('preserves absolute video URLs', () => {
+  it('adds the token to same-origin absolute video URLs', () => {
     process.env.REACT_APP_API_URL = 'https://api.example.com';
 
-    expect(resolveApiUrl('https://cdn.example.com/media/video.mp4')).toBe(
-      'https://cdn.example.com/media/video.mp4'
+    const resolvedUrl = new URL(
+      resolveApiUrl('https://api.example.com/media/video.mp4?download=1', 'auth token')
     );
+
+    expect(resolvedUrl.origin).toBe('https://api.example.com');
+    expect(resolvedUrl.searchParams.get('download')).toBe('1');
+    expect(resolvedUrl.searchParams.get('token')).toBe('auth token');
+  });
+
+  it('does not add the token to absolute external video URLs', () => {
+    process.env.REACT_APP_API_URL = 'https://api.example.com';
+
+    const resolvedUrl = new URL(
+      resolveApiUrl('https://cdn.example.com/media/video.mp4?signature=abc', 'auth token')
+    );
+
+    expect(resolvedUrl.origin).toBe('https://cdn.example.com');
+    expect(resolvedUrl.searchParams.get('signature')).toBe('abc');
+    expect(resolvedUrl.searchParams.has('token')).toBe(false);
+  });
+
+  it('does not add the token to protocol-relative external video URLs', () => {
+    process.env.REACT_APP_API_URL = 'https://api.example.com';
+
+    const resolvedUrl = new URL(
+      resolveApiUrl('//cdn.example.com/media/video.mp4?signature=abc', 'auth token')
+    );
+
+    expect(resolvedUrl.origin).toBe('https://cdn.example.com');
+    expect(resolvedUrl.searchParams.get('signature')).toBe('abc');
+    expect(resolvedUrl.searchParams.has('token')).toBe(false);
   });
 
   it('preserves API base path prefixes when resolving relative video URLs', () => {
@@ -84,11 +112,12 @@ describe('API URL resolution', () => {
     );
   });
 
-  it('preserves existing query parameters and adds the authentication token', () => {
+  it('adds the token to relative URLs on the API origin and preserves existing query parameters', () => {
     process.env.REACT_APP_API_URL = 'https://api.example.com';
 
     const resolvedUrl = new URL(resolveApiUrl('/media/video.mp4?download=1', 'new token'));
 
+    expect(resolvedUrl.origin).toBe('https://api.example.com');
     expect(resolvedUrl.searchParams.get('download')).toBe('1');
     expect(resolvedUrl.searchParams.get('token')).toBe('new token');
   });

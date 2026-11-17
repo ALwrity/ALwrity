@@ -81,13 +81,14 @@ export const getApiBaseUrl = (): string => {
 
 export const resolveApiUrl = (url: string, token?: string | null): string => {
   const baseUrl = getApiBaseUrl().replace(/\/+$/, '');
+  const apiOrigin = new URL(baseUrl).origin;
   const resolvedUrl = /^[a-z][a-z\d+.-]*:/i.test(url)
     ? new URL(url)
     : url.startsWith('//')
       ? new URL(url, baseUrl)
       : new URL(`${baseUrl}/${url.replace(/^\/+/, '')}`);
 
-  if (token) {
+  if (token && resolvedUrl.origin === apiOrigin) {
     resolvedUrl.searchParams.set('token', token);
   }
 
