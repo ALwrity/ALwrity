@@ -14,6 +14,8 @@ from pathlib import Path
 from dataclasses import dataclass, asdict
 from typing import Optional
 
+from utils.console_encoding import configure_windows_console_encoding
+
 # Detect platform
 IS_WINDOWS = platform.system() == "Windows"
 IS_LINUX = platform.system() == "Linux"
@@ -467,6 +469,8 @@ def main():
     parser.add_argument("--production", action="store_true", help="Enable production mode (optimized for deployment)")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging for debugging")
     args = parser.parse_args()
+
+    configure_windows_console_encoding()
     
     # Determine mode
     production_mode = args.production

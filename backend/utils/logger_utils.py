@@ -5,6 +5,8 @@ Logger utilities to prevent conflicts between different logging configurations.
 from loguru import logger
 import sys
 
+from utils.console_encoding import configure_windows_console_encoding
+
 
 def safe_logger_config(format_string: str, level: str = "INFO"):
     """
@@ -25,6 +27,7 @@ def safe_logger_config(format_string: str, level: str = "INFO"):
                     return  # Handler already exists with this format
         
         # Add new handler only if needed
+        configure_windows_console_encoding()
         logger.add(
             sys.stdout,
             level=level,
