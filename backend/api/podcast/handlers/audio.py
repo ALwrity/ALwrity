@@ -340,7 +340,7 @@ async def generate_podcast_audio(
                         )
                         audio_bytes = result_obj.preview_audio_bytes
                         provider = "wavespeed-ai"
-                        model = "wavespeed-ai/cosyvoice-tts/voice-clone"
+                        model = "wavespeed-ai/qwen3-tts/voice-clone"
                     else:
                         result_obj = await loop.run_in_executor(
                             _audio_executor,

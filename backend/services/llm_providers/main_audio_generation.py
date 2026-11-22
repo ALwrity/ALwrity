@@ -1062,16 +1062,16 @@ def cosyvoice_voice_clone(
 
                     actual_provider = detect_actual_provider(
                         provider_enum=APIProvider.AUDIO,
-                        model_name="wavespeed-ai/cosyvoice-tts/voice-clone",
-                        endpoint="/audio-generation/wavespeed/cosyvoice-tts/voice-clone",
+                        model_name="wavespeed-ai/qwen3-tts/voice-clone",
+                        endpoint="/audio-generation/wavespeed/qwen3-tts/voice-clone",
                     )
 
                     usage_log = APIUsageLog(
                         user_id=user_id,
                         provider=APIProvider.AUDIO,
-                        endpoint="/audio-generation/wavespeed/cosyvoice-tts/voice-clone",
+                        endpoint="/audio-generation/wavespeed/qwen3-tts/voice-clone",
                         method="POST",
-                        model_used="wavespeed-ai/cosyvoice-tts/voice-clone",
+                        model_used="wavespeed-ai/qwen3-tts/voice-clone",
                         actual_provider_name=actual_provider,
                         tokens_input=char_count,
                         tokens_output=0,
@@ -1094,7 +1094,7 @@ def cosyvoice_voice_clone(
 [SUBSCRIPTION] CosyVoice Voice Clone
 ├─ User: {user_id}
 ├─ Provider: wavespeed
-├─ Model: wavespeed-ai/cosyvoice-tts/voice-clone
+├─ Model: wavespeed-ai/qwen3-tts/voice-clone
 ├─ Calls: {current_calls_before} → {new_calls}
 ├─ Text chars: {char_count}
 └─ Status: ✅ Allowed & Tracked
@@ -1111,7 +1111,7 @@ def cosyvoice_voice_clone(
         return VoiceCloneResult(
             preview_audio_bytes=preview_audio_bytes,
             provider="wavespeed",
-            model="wavespeed-ai/cosyvoice-tts/voice-clone",
+            model="wavespeed-ai/qwen3-tts/voice-clone",
             custom_voice_id="",
             file_size=len(preview_audio_bytes),
         )
