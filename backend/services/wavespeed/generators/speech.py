@@ -490,7 +490,7 @@ class SpeechGenerator:
         audio_bytes: bytes,
         text: str,
         *,
-        model: str = "wavespeed-ai/cosyvoice-tts/voice-clone",
+        model: str = "wavespeed-ai/qwen3-tts/voice-clone",
         audio_mime_type: str = "audio/wav",
         reference_text: Optional[str] = None,
         timeout: int = 180,
