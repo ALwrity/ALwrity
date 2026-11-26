@@ -26,6 +26,7 @@ from services.database import get_db
 from middleware.auth_middleware import get_current_user, get_current_user_with_query_token
 from api.story_writer.utils.auth import require_authenticated_user
 from utils.asset_tracker import save_asset_to_library
+from models.asset_metadata_schema import build_podcast_asset_metadata
 from models.story_models import StoryAudioResult
 from loguru import logger
 from ..constants import get_podcast_audio_service, get_podcast_media_dir
@@ -217,11 +218,11 @@ async def upload_podcast_audio(
                     title=f"Uploaded Audio - {project_id}",
                     description="Uploaded podcast audio/voice sample",
                     tags=["podcast", "audio", "upload", project_id],
-                    asset_metadata={
-                        "project_id": project_id,
-                        "type": "uploaded_audio",
-                        "status": "completed",
-                    },
+                    asset_metadata=build_podcast_asset_metadata(
+                        asset_role="uploaded_audio",
+                        project_id=project_id,
+                        origin="podcast.audio.upload",
+                    ),
                 )
             except Exception as e:
                 logger.warning(f"[Podcast] Failed to save audio asset: {e}")
@@ -455,11 +456,12 @@ async def generate_podcast_audio(
                 provider=result.get("provider"),
                 model=result.get("model"),
                 cost=result.get("cost"),
-                asset_metadata={
-                    "scene_id": request.scene_id,
-                    "scene_title": request.scene_title,
-                    "status": "completed",
-                },
+                asset_metadata=build_podcast_asset_metadata(
+                    asset_role="podcast_audio",
+                    project_id=request.project_id,
+                    origin="podcast.audio.generate",
+                    extras={"scene_id": request.scene_id, "scene_title": request.scene_title},
+                ),
             )
     except Exception as e:
         logger.warning(f"[Podcast] Failed to save audio asset: {e}")
@@ -621,13 +623,12 @@ async def combine_podcast_audio(
                     title=f"Combined Podcast - {request.project_id}",
                     description=f"Combined podcast audio from {len(request.scene_ids)} scenes",
                     tags=["podcast", "audio", "combined", request.project_id],
-                    asset_metadata={
-                        "project_id": request.project_id,
-                        "scene_ids": request.scene_ids,
-                        "scene_count": len(request.scene_ids),
-                        "total_duration": total_duration,
-                        "status": "completed",
-                    },
+                    asset_metadata=build_podcast_asset_metadata(
+                        asset_role="combined_podcast_audio",
+                        project_id=request.project_id,
+                        origin="podcast.audio.combine",
+                        extras={"scene_ids": request.scene_ids, "scene_count": len(request.scene_ids), "total_duration": total_duration},
+                    ),
                 )
             except Exception as e:
                 logger.warning(f"[Podcast] Failed to save combined audio asset: {e}")
