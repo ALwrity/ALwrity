@@ -69,6 +69,10 @@ class SocialAmplificationAgent(BaseALwrityAgent):
             # Instruction will be provided via orchestrator context or initial prompt
             # Instruction should be provided during invocation or via orchestrator context
         )
+
+    def get_social_integration_capabilities(self) -> Dict[str, Dict[str, bool]]:
+        """Expose platform capability flags used by social integration managers."""
+        return self._get_social_capability_matrix()
     
     # Tool Implementations
     
